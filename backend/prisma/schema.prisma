@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+}
+
+enum ContentType {
+  news
+  page
+  announcement
+}
+
+enum ContentStatus {
+  draft
+  published
+  archived
+}
+
+enum NotificationChannel {
+  in_app
+  email
+  both
+}
+
+enum DocumentStatus {
+  active
+  deleted
+}
+
+enum OrgNodeType {
+  leader
+  group
+  person
+}
+
+// ─── ROLES Y PERMISOS ─────────────────────────────────────────
+
+model Role {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique @db.VarChar(50)
+  description String?
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  permissions Permission[]
+  users       User[]
+  documents   Document[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id        Int      @id @default(autoincrement())
+  roleId    Int      @map("role_id")
+  resource  String   @db.VarChar(100)
+  action    String   @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, resource, action])
+  @@map("permissions")
+}
+
+// ─── DEPARTAMENTOS ────────────────────────────────────────────
+
+model Department {
+  id          Int        @id @default(autoincrement())
+  name        String     @db.VarChar(150)
+  description String?
+  parentId    Int?       @map("parent_id")
+  managerId   Int?       @map("manager_id")
+  sortOrder   Int        @default(0) @map("sort_order")
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  parent     Department?  @relation("DeptHierarchy", fields: [parentId], references: [id])
+  children   Department[] @relation("DeptHierarchy")
+  manager    User?        @relation("DeptManager", fields: [managerId], references: [id])
+  users      User[]       @relation("DeptUsers")
+  documents  Document[]
+
+  @@map("departments")
+}
+
+// ─── USUARIOS ─────────────────────────────────────────────────
+
+model User {
+  id            Int        @id @default(autoincrement())
+  email         String     @unique @db.VarChar(255)
+  passwordHash  String     @map("password_hash") @db.VarChar(255)
+  firstName     String     @map("first_name") @db.VarChar(100)
+  lastName      String     @map("last_name") @db.VarChar(100)
+  avatarUrl     String?    @map("avatar_url")
+  phone         String?    @db.VarChar(30)
+  country       String?    @db.VarChar(100)
+  jobTitle      String?    @map("job_title") @db.VarChar(150)
+  bio           String?
+  roleId        Int        @map("role_id")
+  departmentId  Int?       @map("department_id")
+  status        UserStatus @default(active)
+  lastLoginAt   DateTime?  @map("last_login_at")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  role              Role           @relation(fields: [roleId], references: [id])
+  department        Department?    @relation("DeptUsers", fields: [departmentId], references: [id])
+  managedDepts      Department[]   @relation("DeptManager")
+  refreshTokens     RefreshToken[]
+  authoredContent   Content[]
+  uploadedDocuments Document[]
+  notifications     Notification[]
+  orgNodes          OrgNode[]
+
+  @@map("users")
+}
+
+// ─── TOKENS JWT ───────────────────────────────────────────────
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     Int       @map("user_id")
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  userAgent  String?   @map("user_agent")
+  ipAddress  String?   @map("ip_address")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model RevokedToken {
+  jti       String   @id @db.VarChar(36)
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime @default(now()) @map("revoked_at")
+
+  @@map("revoked_tokens")
+}
+
+// ─── CONTENIDO ────────────────────────────────────────────────
+
+model Content {
+  id          Int           @id @default(autoincrement())
+  title       String        @db.VarChar(255)
+  slug        String        @unique @db.VarChar(255)
+  body        String        @default("")
+  excerpt     String?
+  type        ContentType   @default(news)
+  status      ContentStatus @default(draft)
+  authorId    Int           @map("author_id")
+  thumbnail   String?
+  pinned      Boolean       @default(false)
+  publishedAt DateTime?     @map("published_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  author User @relation(fields: [authorId], references: [id])
+
+  @@map("content")
+}
+
+// ─── DOCUMENTOS ───────────────────────────────────────────────
+
+model Document {
+  id              Int            @id @default(autoincrement())
+  name            String         @db.VarChar(255)
+  description     String?
+  minioKey        String         @map("minio_key")
+  mimeType        String?        @map("mime_type") @db.VarChar(100)
+  sizeBytes       BigInt?        @map("size_bytes")
+  uploaderId      Int            @map("uploader_id")
+  departmentId    Int?           @map("department_id")
+  minRoleId       Int?           @map("min_role_id")
+  status          DocumentStatus @default(active)
+  downloadedCount Int            @default(0) @map("downloaded_count")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  uploader   User        @relation(fields: [uploaderId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  minRole    Role?       @relation(fields: [minRoleId], references: [id])
+
+  @@map("documents")
+}
+
+// ─── NOTIFICACIONES ───────────────────────────────────────────
+
+model Notification {
+  id        Int                 @id @default(autoincrement())
+  userId    Int                 @map("user_id")
+  title     String              @db.VarChar(255)
+  body      String?
+  link      String?
+  channel   NotificationChannel @default(in_app)
+  readAt    DateTime?           @map("read_at")
+  sentAt    DateTime?           @map("sent_at")
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─── ORGANIGRAMA ──────────────────────────────────────────────
+
+model OrgArea {
+  id        Int       @id @default(autoincrement())
+  slug      String    @unique @db.VarChar(50)
+  name      String    @db.VarChar(150)
+  color     String    @db.VarChar(20)
+  icon      String    @db.VarChar(10)
+  desc      String?
+  sortOrder Int       @default(0) @map("sort_order")
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  nodes OrgNode[]
+
+  @@map("org_areas")
+}
+
+model OrgNode {
+  id          Int         @id @default(autoincrement())
+  areaId      Int         @map("area_id")
+  parentId    Int?        @map("parent_id")
+  userId      Int?        @map("user_id")
+  type        OrgNodeType
+  name        String      @db.VarChar(500)
+  role        String?     @db.VarChar(255)
+  description String?
+  icon        String?     @db.VarChar(10)
+  colPosition Int         @default(1) @map("col_position")
+  sortOrder   Int         @default(0) @map("sort_order")
+  isActive    Boolean     @default(true) @map("is_active")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  area     OrgArea   @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  parent   OrgNode?  @relation("NodeHierarchy", fields: [parentId], references: [id])
+  children OrgNode[] @relation("NodeHierarchy")
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("org_nodes")
+}

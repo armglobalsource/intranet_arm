@@ -1,0 +1,43 @@
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { UsersService } from './users.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+
+@ApiTags('Users')
+@ApiBearerAuth()
+@Controller({ path: 'users', version: '1' })
+export class UsersController {
+  constructor(private readonly service: UsersService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar usuarios (con búsqueda opcional)' })
+  @ApiQuery({ name: 'search', required: false, description: 'Filtrar por nombre, apellido, email o cargo' })
+  findAll(@CurrentUser() user: any, @Query('search') search?: string) {
+    return this.service.findAll(user.sub, user.roleId, search);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Obtener un usuario por ID' })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.service.findOne(id);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear un nuevo usuario' })
+  create(@Body() dto: CreateUserDto, @CurrentUser() user: any) {
+    return this.service.create(dto, user.sub);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar datos personales de un usuario' })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: Partial<CreateUserDto>) {
+    return this.service.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Eliminar un usuario' })
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.service.remove(id);
+  }
+}

@@ -1,0 +1,36 @@
+# Para desarrollo local: solo infraestructura (DB + MinIO)
+# Uso: docker compose -f docker-compose.dev.yml up -d
+name: intranet-dev
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: intranet_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     intranet_user
+      POSTGRES_PASSWORD: intranet_pass
+      POSTGRES_DB:       intranet_db
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    ports:
+      - "5432:5432"
+
+  minio:
+    image: minio/minio:latest
+    container_name: intranet_minio_dev
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER:     minio_access_key
+      MINIO_ROOT_PASSWORD: minio_secret_key
+    volumes:
+      - minio_dev_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"   # http://localhost:9001 — consola MinIO
+
+volumes:
+  postgres_dev_data:
+  minio_dev_data:
