@@ -12,6 +12,8 @@ import { SearchModule } from './search/search.module';
 import { JobsModule } from './jobs/jobs.module';
 import { HealthModule } from './health/health.module';
 import { StorageModule } from './common/storage/storage.module';
+import { JobTitlesModule } from './job-titles/job-titles.module';
+import { CampusModule } from './campus/campus.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { StorageModule } from './common/storage/storage.module';
     SearchModule,
     JobsModule,
     HealthModule,
+    JobTitlesModule,
+    CampusModule,
   ],
 })
 export class AppModule {}

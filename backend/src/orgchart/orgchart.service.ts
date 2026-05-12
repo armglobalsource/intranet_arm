@@ -1,22 +1,23 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { CreateOrgAreaDto, CreateOrgNodeDto, UpdateOrgNodeDto, UpdateOrgAreaDto } from './dto/create-orgchart.dto';
+import {
+  CreateOrgAreaDto, UpdateOrgAreaDto,
+  CreateOrgTeamDto, UpdateOrgTeamDto,
+  CreateOrgMembershipDto, UpdateOrgMembershipDto,
+} from './dto/create-orgchart.dto';
 
-// Campos de usuario que se exponen en el organigrama (sin datos sensibles)
 const USER_SELECT = {
-  id: true,
-  firstName: true,
-  lastName: true,
-  email: true,
-  avatarUrl: true,
-  jobTitle: true,
-  phone: true,
-  country: true,
+  id: true, firstName: true, lastName: true,
+  email: true, avatarUrl: true,
+  phone: true, country: true, status: true,
+  jobTitles: { select: { jobTitle: { select: { name: true } } }, orderBy: { sortOrder: 'asc' as const } },
 };
 
 @Injectable()
 export class OrgChartService {
   constructor(private prisma: PrismaService) {}
+
+  // ── ÁREAS ────────────────────────────────────────────────────
 
   getAreas() {
     return this.prisma.orgArea.findMany({
@@ -25,52 +26,35 @@ export class OrgChartService {
     });
   }
 
+  getAllAreas() {
+    return this.prisma.orgArea.findMany({
+      orderBy: [{ isActive: 'desc' }, { sortOrder: 'asc' }],
+    });
+  }
+
   async getAreaTree(slug: string) {
     const area = await this.prisma.orgArea.findUnique({ where: { slug } });
-    if (!area) throw new NotFoundException(`Area '${slug}' not found`);
+    if (!area) throw new NotFoundException(`Área '${slug}' no encontrada`);
 
-    const nodes = await this.prisma.orgNode.findMany({
-      where: { areaId: area.id, isActive: true },
-      include: { user: { select: USER_SELECT } },
-      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-    });
+    const [leaders, teams] = await Promise.all([
+      this.prisma.orgMembership.findMany({
+        where: { areaId: area.id, role: 'area_leader' },
+        include: { user: { select: USER_SELECT } },
+        orderBy: { sortOrder: 'asc' },
+      }),
+      this.prisma.orgTeam.findMany({
+        where: { areaId: area.id, isActive: true },
+        orderBy: [{ colPosition: 'asc' }, { sortOrder: 'asc' }],
+        include: {
+          memberships: {
+            include: { user: { select: USER_SELECT } },
+            orderBy: [{ role: 'asc' }, { sortOrder: 'asc' }],
+          },
+        },
+      }),
+    ]);
 
-    return { ...area, nodes: this.buildTree(nodes, null) };
-  }
-
-  async searchNodes(q: string) {
-    if (!q || q.trim().length < 2) return [];
-
-    return this.prisma.orgNode.findMany({
-      where: {
-        isActive: true,
-        type: { not: 'group' },
-        name: { contains: q.trim(), mode: 'insensitive' },
-      },
-      include: {
-        area: true,
-        parent: { select: { name: true, type: true } },
-        user: { select: USER_SELECT },
-      },
-      orderBy: { name: 'asc' },
-      take: 40,
-    });
-  }
-
-  async linkUser(nodeId: number, userId: number | null) {
-    const node = await this.prisma.orgNode.findUnique({ where: { id: nodeId } });
-    if (!node) throw new NotFoundException(`Node ${nodeId} not found`);
-
-    if (userId !== null) {
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (!user) throw new NotFoundException(`User ${userId} not found`);
-    }
-
-    return this.prisma.orgNode.update({
-      where: { id: nodeId },
-      data: { userId },
-      include: { user: { select: USER_SELECT } },
-    });
+    return { ...area, leaders, teams };
   }
 
   async createArea(dto: CreateOrgAreaDto) {
@@ -78,30 +62,117 @@ export class OrgChartService {
   }
 
   async updateArea(id: number, dto: UpdateOrgAreaDto) {
-    const area = await this.prisma.orgArea.findUnique({ where: { id } });
-    if (!area) throw new NotFoundException(`Area ${id} not found`);
+    await this.findAreaOrFail(id);
     return this.prisma.orgArea.update({ where: { id }, data: dto });
   }
 
-  async createNode(dto: CreateOrgNodeDto) {
-    return this.prisma.orgNode.create({ data: dto as any });
+  async deleteArea(id: number) {
+    await this.findAreaOrFail(id);
+    await this.prisma.orgTeam.updateMany({ where: { areaId: id }, data: { isActive: false } });
+    return this.prisma.orgArea.update({ where: { id }, data: { isActive: false } });
   }
 
-  async updateNode(id: number, dto: UpdateOrgNodeDto) {
-    const node = await this.prisma.orgNode.findUnique({ where: { id } });
-    if (!node) throw new NotFoundException(`Node ${id} not found`);
-    return this.prisma.orgNode.update({ where: { id }, data: dto });
+  // ── EQUIPOS ──────────────────────────────────────────────────
+
+  getTeams() {
+    return this.prisma.orgTeam.findMany({
+      where: { isActive: true },
+      include: { area: true },
+      orderBy: [{ areaId: 'asc' }, { sortOrder: 'asc' }],
+    });
   }
 
-  async removeNode(id: number) {
-    const node = await this.prisma.orgNode.findUnique({ where: { id } });
-    if (!node) throw new NotFoundException(`Node ${id} not found`);
-    return this.prisma.orgNode.update({ where: { id }, data: { isActive: false } });
+  getAllTeams() {
+    return this.prisma.orgTeam.findMany({
+      include: { area: true },
+      orderBy: [{ isActive: 'desc' }, { areaId: 'asc' }, { sortOrder: 'asc' }],
+    });
   }
 
-  private buildTree(nodes: any[], parentId: number | null): any[] {
-    return nodes
-      .filter((n) => n.parentId === parentId)
-      .map((n) => ({ ...n, children: this.buildTree(nodes, n.id) }));
+  async createTeam(dto: CreateOrgTeamDto) {
+    await this.findAreaOrFail(dto.areaId);
+    return this.prisma.orgTeam.create({ data: dto as any });
+  }
+
+  async updateTeam(id: number, dto: UpdateOrgTeamDto) {
+    await this.findTeamOrFail(id);
+    return this.prisma.orgTeam.update({ where: { id }, data: dto });
+  }
+
+  async deleteTeam(id: number) {
+    await this.findTeamOrFail(id);
+    return this.prisma.orgTeam.update({ where: { id }, data: { isActive: false } });
+  }
+
+  // ── MEMBRESÍAS ───────────────────────────────────────────────
+
+  async createMembership(dto: CreateOrgMembershipDto) {
+    if (!dto.areaId && !dto.teamId) {
+      throw new BadRequestException('Debe indicar areaId o teamId');
+    }
+    if (dto.areaId && dto.teamId) {
+      throw new BadRequestException('Solo puede indicar areaId o teamId, no ambos');
+    }
+    if (dto.areaId && dto.role !== 'area_leader') {
+      throw new BadRequestException('Las membresías de área solo pueden tener rol area_leader');
+    }
+    return this.prisma.orgMembership.create({
+      data: dto as any,
+      include: { user: { select: USER_SELECT } },
+    });
+  }
+
+  async updateMembership(id: number, dto: UpdateOrgMembershipDto) {
+    const m = await this.prisma.orgMembership.findUnique({ where: { id } });
+    if (!m) throw new NotFoundException(`Membresía ${id} no encontrada`);
+    return this.prisma.orgMembership.update({ where: { id }, data: dto });
+  }
+
+  async deleteMembership(id: number) {
+    const m = await this.prisma.orgMembership.findUnique({ where: { id } });
+    if (!m) throw new NotFoundException(`Membresía ${id} no encontrada`);
+    return this.prisma.orgMembership.delete({ where: { id } });
+  }
+
+  // ── BÚSQUEDA ─────────────────────────────────────────────────
+
+  async search(q: string) {
+    if (!q || q.trim().length < 2) return [];
+
+    return this.prisma.user.findMany({
+      where: {
+        status: 'active',
+        OR: [
+          { firstName: { contains: q.trim(), mode: 'insensitive' } },
+          { lastName:  { contains: q.trim(), mode: 'insensitive' } },
+          { jobTitle:  { contains: q.trim(), mode: 'insensitive' } },
+        ],
+        orgMemberships: { some: {} },
+      },
+      select: {
+        ...USER_SELECT,
+        orgMemberships: {
+          include: {
+            area: { select: { id: true, name: true, color: true, slug: true } },
+            team: { select: { id: true, name: true } },
+          },
+        },
+      },
+      take: 40,
+    });
+  }
+
+  // ── HELPERS ──────────────────────────────────────────────────
+
+  private async findAreaOrFail(id: number) {
+    const a = await this.prisma.orgArea.findUnique({ where: { id } });
+    if (!a) throw new NotFoundException(`Área ${id} no encontrada`);
+    return a;
+  }
+
+  private async findTeamOrFail(id: number) {
+    const t = await this.prisma.orgTeam.findUnique({ where: { id } });
+    if (!t) throw new NotFoundException(`Equipo ${id} no encontrado`);
+    return t;
   }
 }

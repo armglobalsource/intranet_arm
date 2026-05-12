@@ -1,0 +1,43 @@
+import {
+  Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { JobTitlesService } from './job-titles.service';
+import { CreateJobTitleDto, UpdateJobTitleDto } from './dto/job-title.dto';
+
+@ApiTags('JobTitles')
+@ApiBearerAuth()
+@Controller({ path: 'job-titles', version: '1' })
+export class JobTitlesController {
+  constructor(private readonly service: JobTitlesService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar todos los cargos (admin)' })
+  findAll() {
+    return this.service.findAll();
+  }
+
+  @Get('active')
+  @ApiOperation({ summary: 'Listar nombres de cargos activos (para combobox)' })
+  findActive() {
+    return this.service.findActive();
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear un nuevo cargo' })
+  create(@Body() dto: CreateJobTitleDto) {
+    return this.service.create(dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar un cargo (nombre, estado, orden)' })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateJobTitleDto) {
+    return this.service.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Eliminar un cargo' })
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.service.remove(id);
+  }
+}

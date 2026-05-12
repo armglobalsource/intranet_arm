@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─── ENUMS ────────────────────────────────────────────────────
@@ -38,10 +39,51 @@ enum DocumentStatus {
   deleted
 }
 
-enum OrgNodeType {
-  leader
-  group
-  person
+enum OrgRole {
+  area_leader
+  team_leader
+  member
+}
+
+// ─── CAMPUS ───────────────────────────────────────────────────
+
+model Campus {
+  id        Int        @id @default(autoincrement())
+  name      String     @db.VarChar(150)
+  address   String?    @db.VarChar(255)
+  isActive  Boolean    @default(true) @map("is_active")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("campuses")
+}
+
+// ─── CARGOS ───────────────────────────────────────────────────
+
+model JobTitle {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(150)
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0)    @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users UserJobTitle[]
+
+  @@map("job_titles")
+}
+
+model UserJobTitle {
+  userId     Int @map("user_id")
+  jobTitleId Int @map("job_title_id")
+  sortOrder  Int @default(0) @map("sort_order")
+
+  user     User     @relation(fields: [userId],     references: [id], onDelete: Cascade)
+  jobTitle JobTitle @relation(fields: [jobTitleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, jobTitleId])
+  @@map("user_job_titles")
 }
 
 // ─── ROLES Y PERMISOS ─────────────────────────────────────────
@@ -105,10 +147,10 @@ model User {
   avatarUrl     String?    @map("avatar_url")
   phone         String?    @db.VarChar(30)
   country       String?    @db.VarChar(100)
-  jobTitle      String?    @map("job_title") @db.VarChar(150)
   bio           String?
   roleId        Int        @map("role_id")
   departmentId  Int?       @map("department_id")
+  campusId      Int?       @map("campus_id")
   status        UserStatus @default(active)
   lastLoginAt   DateTime?  @map("last_login_at")
   createdAt     DateTime   @default(now()) @map("created_at")
@@ -116,12 +158,14 @@ model User {
 
   role              Role           @relation(fields: [roleId], references: [id])
   department        Department?    @relation("DeptUsers", fields: [departmentId], references: [id])
+  campus            Campus?        @relation(fields: [campusId], references: [id])
   managedDepts      Department[]   @relation("DeptManager")
   refreshTokens     RefreshToken[]
   authoredContent   Content[]
   uploadedDocuments Document[]
   notifications     Notification[]
-  orgNodes          OrgNode[]
+  orgMemberships    OrgMembership[]
+  jobTitles         UserJobTitle[]
 
   @@map("users")
 }
@@ -229,31 +273,43 @@ model OrgArea {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  nodes OrgNode[]
+  teams       OrgTeam[]
+  memberships OrgMembership[]
 
   @@map("org_areas")
 }
 
-model OrgNode {
-  id          Int         @id @default(autoincrement())
-  areaId      Int         @map("area_id")
-  parentId    Int?        @map("parent_id")
-  userId      Int?        @map("user_id")
-  type        OrgNodeType
-  name        String      @db.VarChar(500)
-  role        String?     @db.VarChar(255)
-  description String?
-  icon        String?     @db.VarChar(10)
-  colPosition Int         @default(1) @map("col_position")
-  sortOrder   Int         @default(0) @map("sort_order")
-  isActive    Boolean     @default(true) @map("is_active")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+model OrgTeam {
+  id          Int      @id @default(autoincrement())
+  areaId      Int      @map("area_id")
+  name        String   @db.VarChar(150)
+  icon        String?  @db.VarChar(10)
+  desc        String?
+  colPosition Int      @default(1) @map("col_position")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  area     OrgArea   @relation(fields: [areaId], references: [id], onDelete: Cascade)
-  parent   OrgNode?  @relation("NodeHierarchy", fields: [parentId], references: [id])
-  children OrgNode[] @relation("NodeHierarchy")
-  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  area        OrgArea         @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  memberships OrgMembership[]
 
-  @@map("org_nodes")
+  @@map("org_teams")
+}
+
+model OrgMembership {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  areaId    Int?     @map("area_id")
+  teamId    Int?     @map("team_id")
+  role      OrgRole
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area OrgArea? @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  team OrgTeam? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, areaId, teamId, role])
+  @@map("org_memberships")
 }
