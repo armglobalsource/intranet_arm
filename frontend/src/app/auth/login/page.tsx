@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,8 +16,18 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function LoginPage() {
-  const router     = useRouter();
-  const setSession = useAuthStore((s) => s.setSession);
+  const router          = useRouter();
+  const setSession      = useAuthStore((s) => s.setSession);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const [showPwd, setShowPwd] = useState(false);
+  const hasHydrated     = useAuthStore((s) => s._hasHydrated);
+
+  // If already logged in, skip the login page
+  useEffect(() => {
+    if (hasHydrated && isAuthenticated) {
+      router.replace('/dashboard/orgchart');
+    }
+  }, [hasHydrated, isAuthenticated, router]);
 
   const {
     register,
@@ -103,19 +114,40 @@ export default function LoginPage() {
               <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
                 Contraseña
               </label>
-              <input
-                {...register('password')}
-                type="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                style={{
-                  background: '#1a1a1a',
-                  border: '1px solid #2a2a2a',
-                  color: '#fff',
-                }}
-                className="w-full px-3.5 py-2.5 rounded-lg text-sm placeholder-white/20
-                  focus:outline-none focus:border-white/30 focus:ring-0 transition-colors"
-              />
+              <div className="relative">
+                <input
+                  {...register('password')}
+                  type={showPwd ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  style={{
+                    background: '#1a1a1a',
+                    border: '1px solid #2a2a2a',
+                    color: '#fff',
+                  }}
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-lg text-sm placeholder-white/20
+                    focus:outline-none focus:border-white/30 focus:ring-0 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-white/30 hover:text-white/60 transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPwd ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPwd ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9-4-9-7s4-7 9-7a9.956 9.956 0 015.03 1.34M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
               {errors.password && (
                 <p className="text-red-400 text-xs mt-1.5">{errors.password.message}</p>
               )}

@@ -3,427 +3,228 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-type OrgNodeType = 'leader' | 'group' | 'person';
-
-interface NodeDef {
-  type: OrgNodeType;
-  name: string;
-  role?: string;
-  description?: string;
-  icon?: string;
-  col?: number;
-  children?: NodeDef[];
-}
-
-async function seedArea(
-  areaId: number,
-  nodes: NodeDef[],
-  parentId: number | null = null,
-  sortBase = 0,
-) {
-  for (let i = 0; i < nodes.length; i++) {
-    const def = nodes[i];
-    const created = await prisma.orgNode.create({
-      data: {
-        areaId,
-        parentId,
-        type: def.type,
-        name: def.name,
-        role: def.role ?? null,
-        description: def.description ?? null,
-        icon: def.icon ?? null,
-        colPosition: def.col ?? 1,
-        sortOrder: sortBase + i,
-      },
-    });
-    if (def.children?.length) {
-      await seedArea(areaId, def.children, created.id, 0);
-    }
-  }
-}
-
 async function main() {
-  // ── ROLES Y USUARIO ADMIN ─────────────────────────────────────
+  // ── ROLES DE SISTEMA ─────────────────────────────────────────
   const adminRole = await prisma.role.upsert({
     where: { name: 'admin' },
     update: {},
     create: { name: 'admin', description: 'Administrador con acceso total' },
   });
-
-  await prisma.role.upsert({
+  const userRole = await prisma.role.upsert({
     where: { name: 'user' },
     update: {},
     create: { name: 'user', description: 'Usuario estándar' },
   });
 
-  const passwordHash = await bcrypt.hash('Admin1234!', 10);
+  const defaultHash = await bcrypt.hash('ARM2026!', 10);
 
+  async function upsertUser(email: string, firstName: string, lastName: string, _jobTitle: string, roleId: number) {
+    return prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: { email, passwordHash: defaultHash, firstName, lastName, roleId, status: 'active' },
+    });
+  }
+
+  // ── ADMIN ─────────────────────────────────────────────────────
+  const adminHash = await bcrypt.hash('12345678', 10);
   await prisma.user.upsert({
     where: { email: 'admin@arm.com' },
-    update: {},
+    update: { passwordHash: adminHash },
     create: {
-      email: 'admin@arm.com',
-      passwordHash,
-      firstName: 'Admin',
-      lastName: 'ARM',
-      jobTitle: 'Administrador',
-      roleId: adminRole.id,
-      status: 'active',
+      email: 'admin@arm.com', passwordHash: adminHash,
+      firstName: 'Admin', lastName: 'ARM',
+      roleId: adminRole.id, status: 'active',
     },
   });
 
-  console.log('✅ Usuario admin creado → admin@arm.com / Admin1234!');
+  // ── USUARIOS ──────────────────────────────────────────────────
+  const patricia   = await upsertUser('patricia.burgos@arm.com',   'Patricia',   'Burgos',    'Pastora Principal',                    userRole.id);
+  const patricio   = await upsertUser('patricio.burgos@arm.com',   'Patricio',   'Burgos',    'Pastor Principal',                     userRole.id);
+  const rodrigo    = await upsertUser('rodrigo.quiroz@arm.com',    'Rodrigo',    'Quiroz',    'Pastor / Enc. Worship',                userRole.id);
+  const priscilla  = await upsertUser('priscilla.fabio@arm.com',   'Priscilla',  'Fabio',     'Pastora / Enc. Worship',               userRole.id);
+  const nico       = await upsertUser('nico.burgos@arm.com',       'Nicolás',    'Burgos',    'Director Creativo / Pastor Virtual',   userRole.id);
+  const pabloO     = await upsertUser('pablo.ortiz@arm.com',       'Pablo',      'Ortiz',     'Enc. Worship Montevideo / La Plata',   userRole.id);
+  const newman     = await upsertUser('newman.guevara@arm.com',    'Newman',     'Guevara',   'Enc. Worship Punta Arenas',            userRole.id);
+  const samuel     = await upsertUser('samuel.montalva@arm.com',   'Samuel',     'Montalva',  'Enc. Worship Concepción',              userRole.id);
+  const anderson   = await upsertUser('anderson.leon@arm.com',     'Anderson',   'León',      'Enc. Worship Maracaibo',               userRole.id);
+  const kariA      = await upsertUser('kari.alvarez@arm.com',      'Karina',     'Álvarez',   'Enc. Worship Katy',                    userRole.id);
+  const ismaG      = await upsertUser('isma.gonzalez@arm.com',     'Ismael',     'González',  'Productor Musical',                    userRole.id);
+  const treicy     = await upsertUser('treicy.aceyton@arm.com',    'Treicy',     'Aceitón',   'Enc. Voces',                           userRole.id);
+  const kikaMu     = await upsertUser('kika.munoz@arm.com',        'Kika',       'Muñoz',     'Enc. Finanzas Chile',                  userRole.id);
+  const paolaO     = await upsertUser('paola.ortiz@arm.com',       'Paola',      'Ortiz',     'Enc. Finanzas Montevideo',             userRole.id);
+  const kengev     = await upsertUser('kengev.pena@arm.com',       'Kengev',     'Peña',      'Producción Santiago',                  userRole.id);
+  const naty       = await upsertUser('naty.delfin@arm.com',       'Naty',       'Delfín',    'Producción Santiago',                  userRole.id);
+  const benja      = await upsertUser('benja.saavedra@arm.com',    'Benjamín',   'Saavedra',  'Producción / Sonido',                  userRole.id);
+  const alejandroM = await upsertUser('alejandro.montero@arm.com', 'Alejandro',  'Montero',   'Producción Montevideo',                userRole.id);
+  const andresZ    = await upsertUser('andres.zamorano@arm.com',   'Andrés',     'Zamorano',  'Producción Concepción',                userRole.id);
+  const josue      = await upsertUser('josue.ferrer@arm.com',      'Josué',      'Ferrer',    'Prod. Oración Global',                 userRole.id);
+  const fer        = await upsertUser('fer.herrera@arm.com',       'Fernanda',   'Herrera',   'Prod. Programación Global',            userRole.id);
+  const mateoQ     = await upsertUser('mateo.quiroz@arm.com',      'Mateo',      'Quiroz',    'Prod. Experiencias Virtual',           userRole.id);
+  const bayron     = await upsertUser('bayron.gonzalez@arm.com',   'Bayron',     'González',  'Visuales / Soporte Técnico',           userRole.id);
+  const caro       = await upsertUser('caro.cepeda@arm.com',       'Carolina',   'Cepeda',    'Enc. Visuales Puente Alto',            userRole.id);
+  const adri       = await upsertUser('adri.oliveros@arm.com',     'Adriana',    'Oliveros',  'Enc. Iluminación',                     userRole.id);
+  const patriciaN  = await upsertUser('patricia.alarcon@arm.com',  'Patricia',   'Alarcón',   'Directora de Media',                   userRole.id);
+  const natyS      = await upsertUser('naty.segura@arm.com',       'Naty',       'Segura',    'Enc. Media Puente Alto',               userRole.id);
+  const aileen     = await upsertUser('aileen.gonzalez@arm.com',   'Aileen',     'González',  'Enc. Media Santiago',                  userRole.id);
+  const mariangela = await upsertUser('mariangela.morin@arm.com',  'Mariangela', 'Morin',     'Enc. Media Montevideo',                userRole.id);
+  const bastian    = await upsertUser('bastian.oyarzo@arm.com',    'Bastián',    'Oyarzo',    'Enc. Media Punta Arenas',              userRole.id);
+  const pauliV     = await upsertUser('pauli.vasquez@arm.com',     'Paulina',    'Vásquez',   'Enc. Media Concepción',                userRole.id);
+  const carlosL    = await upsertUser('carlos.labarca@arm.com',    'Carlos',     'Labarca',   'Enc. Media Maracaibo',                 userRole.id);
+  const gabyR      = await upsertUser('gaby.rojas@arm.com',        'Gabriela',   'Rojas',     'Audiovisual / Cuenta Central',         userRole.id);
+  const cesarO     = await upsertUser('cesar.osses@arm.com',       'César',      'Osses',     'Productor de Streaming',               userRole.id);
+  const saraM      = await upsertUser('sara.montero@arm.com',      'Sara',       'Montero',   'Diseñadora Gráfica',                   userRole.id);
+  const claudio    = await upsertUser('claudio.navea@arm.com',     'Claudio',    'Navea',     'Director de Marketing Digital',        userRole.id);
 
-  // Clean orgchart tables
-  await prisma.orgNode.deleteMany();
+  // ── LIMPIAR ORGANIGRAMA ───────────────────────────────────────
+  await prisma.orgMembership.deleteMany();
+  await prisma.orgTeam.deleteMany();
   await prisma.orgArea.deleteMany();
 
-  // ── AREAS ──────────────────────────────────────────────────────
-  const areas = await prisma.$transaction([
-    prisma.orgArea.create({
-      data: { slug: 'worship', name: 'AR Worship', color: '#D97706', icon: '🎵', sortOrder: 0,
-        desc: 'Lideran el ministerio musical de adoración con foco en el desarrollo espiritual' },
-    }),
-    prisma.orgArea.create({
-      data: { slug: 'produccion', name: 'Producción', color: '#0D9488', icon: '⚙️', sortOrder: 1,
-        desc: 'Coordinan la parte técnica y logística de todos los encuentros y eventos' },
-    }),
-    prisma.orgArea.create({
-      data: { slug: 'media', name: 'Media', color: '#2563EB', icon: '📸', sortOrder: 2,
-        desc: 'Crean y gestionan los contenidos integrando fotografía, audiovisual y redes sociales' },
-    }),
-    prisma.orgArea.create({
-      data: { slug: 'creativa', name: 'Dirección Creativa', color: '#DB2777', icon: '🎨', sortOrder: 3,
-        desc: 'Entregan soluciones creativas y dirección artística a los distintos equipos' },
-    }),
-    prisma.orgArea.create({
-      data: { slug: 'marketing', name: 'Marketing Digital', color: '#7C3AED', icon: '📱', sortOrder: 4,
-        desc: 'Impulsan el crecimiento de las plataformas digitales a través de campañas pagadas' },
-    }),
-  ]);
+  // ── ÁREAS ─────────────────────────────────────────────────────
+  const worship = await prisma.orgArea.create({ data: {
+    slug: 'worship', name: 'AR Worship', color: '#D97706', icon: '🎵', sortOrder: 0,
+    desc: 'Lideran el ministerio musical de adoración con foco en el desarrollo espiritual',
+  }});
+  const produccion = await prisma.orgArea.create({ data: {
+    slug: 'produccion', name: 'Producción', color: '#0D9488', icon: '⚙️', sortOrder: 1,
+    desc: 'Coordinan la parte técnica y logística de todos los encuentros y eventos',
+  }});
+  const media = await prisma.orgArea.create({ data: {
+    slug: 'media', name: 'Media', color: '#2563EB', icon: '📸', sortOrder: 2,
+    desc: 'Crean y gestionan los contenidos integrando fotografía, audiovisual y redes sociales',
+  }});
+  const creativa = await prisma.orgArea.create({ data: {
+    slug: 'creativa', name: 'Dirección Creativa', color: '#DB2777', icon: '🎨', sortOrder: 3,
+    desc: 'Entregan soluciones creativas y dirección artística a los distintos equipos',
+  }});
+  const mktg = await prisma.orgArea.create({ data: {
+    slug: 'marketing', name: 'Marketing Digital', color: '#7C3AED', icon: '📱', sortOrder: 4,
+    desc: 'Impulsan el crecimiento de las plataformas digitales a través de campañas pagadas',
+  }});
 
-  const [worship, produccion, media, creativa, marketing] = areas;
+  // helper para membresías en lote
+  const mem = async (userId: number, areaId: number | null, teamId: number | null, role: 'area_leader'|'team_leader'|'member', sort = 0) =>
+    prisma.orgMembership.create({ data: { userId, areaId, teamId, role, sortOrder: sort } });
 
-  // ── WORSHIP ────────────────────────────────────────────────────
-  const worshipTree: NodeDef[] = [
-    {
-      type: 'leader',
-      name: 'Pres. Principales Patricia y Patricio Burgos\nPr. Rodrigo Quiroz y Pra. Priscilla Fabio',
-      role: 'Pastores Encargados',
-      description: 'Lideran el ministerio de forma global, entregando lineamiento y dirección general, velando por el equipo en su totalidad y respondiendo a los desafíos del área.',
-      children: [
-        {
-          type: 'group', name: 'Enc. de Worship', role: 'Por Campus', icon: '🎯', col: 1,
-          description: 'Dirigen el equipo de forma local, siendo el puente entre su campus y los directores generales, y ejecutando tareas específicas de su contexto.',
-          children: [
-            { type: 'person', name: 'Pra. Pri Fabio\nPr. Rodrigo Quiroz', role: 'Campus Santiago' },
-            { type: 'person', name: 'Pra. Pri Fabio\nPr. Rodrigo Quiroz', role: 'Campus Puente Alto' },
-            { type: 'person', name: 'Pablo Ortiz', role: 'Campus Montevideo' },
-            { type: 'person', name: 'Newman Guevara', role: 'Campus Punta Arenas' },
-            { type: 'person', name: 'Samuel Montalva', role: 'Campus Concepción' },
-            { type: 'person', name: 'Anderson León', role: 'Campus Maracaibo' },
-            { type: 'person', name: 'Pra. Kari Alvarez', role: 'Campus Katy' },
-            { type: 'person', name: 'Pablo Ortiz', role: 'Campus La Plata' },
-          ],
-        },
-        {
-          type: 'group', name: 'Directores Musicales', role: 'Por Campus', icon: '🎼', col: 1,
-          description: '• Es quien lidera al equipo en escena.\n• Indica a través de la plataforma Play List, la lista de canciones completa que lleva un encuentro o un evento.\n• Carga las canciones en plataforma y además se preocupa de las transiciones entre canción.\n• Dirige al equipo en la estructura de las canciones.',
-          children: [
-            { type: 'person', name: 'Min. José Gandía\nMin. Elías Quiroz\nJuan José Gonzalez\nIsmael Gonzalez\nMarco Mella\nDaniel Fabio\nRonald Romero\nManuel Córdova\nVicto Cárdenas\nPs. Pablo Encina\nPs. Rodrigo Quiroz', role: 'Campus Santiago y Puente Alto' },
-            { type: 'person', name: 'Pablo Ortiz\nEzequiel Cárdenas\nIsrael Videla', role: 'Campus Montevideo' },
-            { type: 'person', name: 'Min. Newman Guevara\nJavier Rosas\nJavier Carvajal', role: 'Campus Punta Arenas' },
-            { type: 'person', name: 'Samuel Montalva', role: 'Campus Concepción' },
-            { type: 'person', name: 'Anderson León\nRafael Pérez', role: 'Campus Maracaibo' },
-            { type: 'person', name: 'Ps. Karina Peralta\nPs. Nicolas Burgos', role: 'Campus Katy' },
-          ],
-        },
-        {
-          type: 'group', name: 'Enc. por Instrumento', role: 'Global / Local', icon: '🎸', col: 2,
-          description: 'Dan soporte musical y alineación técnica a cada instrumento, velando por la calidad y cohesión del equipo en su área específica. De manera global o local.',
-          children: [
-            { type: 'person', name: 'Min. José Candia', role: 'Guitarras' },
-            { type: 'person', name: 'Matias Batias', role: 'Bateristas' },
-            { type: 'person', name: 'Juan José González', role: 'Bajistas' },
-            { type: 'person', name: 'Marco Mella', role: 'Pianistas' },
-            { type: 'person', name: 'Min. Treicy Aceitón', role: 'Voces' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo Prod. Musical', role: 'Studio ARM', icon: '🎙️', col: 3,
-          description: 'Se encarga de procesos como mastering, edición, creación de playlists para eventos y coordinación de grabaciones y proyectos musicales del área.',
-          children: [
-            { type: 'person', name: 'Isma González', role: 'Productor Musical' },
-            { type: 'person', name: 'Pr. Nico Burgos', role: 'Ingeniero de Mezcla' },
-            { type: 'person', name: 'Pr. Rodrigo Quiroz\nPra. Pri Fabio\nPr. Nico Burgos', role: 'Composición' },
-          ],
-        },
-        {
-          type: 'group', name: 'Finanzas del Área', role: 'Administración', icon: '💰', col: 4,
-          description: 'Gestiona y da seguimiento a los recursos económicos del área, velando por una administración ordenada y responsable.',
-          children: [
-            { type: 'person', name: 'Kika Muñoz', role: 'Encargada Chile' },
-            { type: 'person', name: 'Pra. Paola Ortiz', role: 'Encargada Montevideo' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo ARW', role: 'Por Campus', icon: '🤝', col: 1,
-          description: 'La banda de voluntarios que sirve musicalmente en los encuentros regulares y eventos especiales de la organización.',
-          children: [
-            { type: 'person', name: 'Voluntarios', role: 'Banda por campus' },
-          ],
-        },
-      ],
-    },
-  ];
+  // ── WORSHIP ───────────────────────────────────────────────────
+  await mem(patricia.id,  worship.id, null, 'area_leader', 0);
+  await mem(patricio.id,  worship.id, null, 'area_leader', 1);
+  await mem(rodrigo.id,   worship.id, null, 'area_leader', 2);
+  await mem(priscilla.id, worship.id, null, 'area_leader', 3);
+
+  const wEnc = await prisma.orgTeam.create({ data: { areaId: worship.id, name: 'Enc. de Worship', icon: '📍', colPosition: 1, sortOrder: 0, desc: 'Dirigen el equipo de forma local, siendo el puente entre su campus y los directores generales.' }});
+  await mem(rodrigo.id,   null, wEnc.id, 'team_leader', 0);
+  await mem(priscilla.id, null, wEnc.id, 'team_leader', 1);
+  await mem(pabloO.id,    null, wEnc.id, 'member', 2);
+  await mem(newman.id,    null, wEnc.id, 'member', 3);
+  await mem(samuel.id,    null, wEnc.id, 'member', 4);
+  await mem(anderson.id,  null, wEnc.id, 'member', 5);
+  await mem(kariA.id,     null, wEnc.id, 'member', 6);
+
+  const wDirMus = await prisma.orgTeam.create({ data: { areaId: worship.id, name: 'Directores Musicales', icon: '🎼', colPosition: 1, sortOrder: 1, desc: 'Lidera al equipo en escena, indica la lista de canciones y dirige la estructura musical.' }});
+  await mem(rodrigo.id,  null, wDirMus.id, 'team_leader', 0);
+  await mem(ismaG.id,    null, wDirMus.id, 'member', 1);
+  await mem(newman.id,   null, wDirMus.id, 'member', 2);
+  await mem(samuel.id,   null, wDirMus.id, 'member', 3);
+  await mem(anderson.id, null, wDirMus.id, 'member', 4);
+
+  const wInstr = await prisma.orgTeam.create({ data: { areaId: worship.id, name: 'Enc. por Instrumento', icon: '🎸', colPosition: 2, sortOrder: 2, desc: 'Dan soporte musical y alineación técnica a cada instrumento.' }});
+  await mem(ismaG.id,  null, wInstr.id, 'team_leader', 0);
+  await mem(treicy.id, null, wInstr.id, 'team_leader', 1);
+
+  const wProd = await prisma.orgTeam.create({ data: { areaId: worship.id, name: 'Equipo Prod. Musical', icon: '🎙️', colPosition: 3, sortOrder: 3, desc: 'Mastering, edición, playlists para eventos y coordinación de grabaciones.' }});
+  await mem(ismaG.id,   null, wProd.id, 'team_leader', 0);
+  await mem(nico.id,    null, wProd.id, 'member', 1);
+  await mem(rodrigo.id, null, wProd.id, 'member', 2);
+
+  const wFin = await prisma.orgTeam.create({ data: { areaId: worship.id, name: 'Finanzas del Área', icon: '💰', colPosition: 4, sortOrder: 4, desc: 'Gestiona y da seguimiento a los recursos económicos del área.' }});
+  await mem(kikaMu.id, null, wFin.id, 'team_leader', 0);
+  await mem(paolaO.id, null, wFin.id, 'team_leader', 1);
 
   // ── PRODUCCIÓN ────────────────────────────────────────────────
-  const produccionTree: NodeDef[] = [
-    {
-      type: 'leader',
-      name: 'Pr. Principal Patricio Burgos\nPr. Rodrigo Quiroz',
-      role: 'Productor General',
-      description: 'Lidera y dirige el equipo de producción con una mirada global del área, tomando las decisiones estratégicas y velando por sacar adelante cada desafío que enfrenta el equipo.',
-      children: [
-        {
-          type: 'group', name: 'Equipo de Producción', role: 'Por Campus', icon: '🎬', col: 1,
-          description: 'Llevan la producción de los encuentros y eventos de su campus, entregando dirección local y ejecutando las tareas específicas que cada contexto requiere.',
-          children: [
-            { type: 'person', name: 'Kengev Peña\nNaty Delfín\nBenja Saavedra\nCarlos Villalobos', role: 'Campus Santiago' },
-            { type: 'person', name: 'Caro\nCamilo\nCamila\nEdison\nCarlos Contreras\nKaty', role: 'Campus Puente Alto' },
-            { type: 'person', name: 'Alejandro Montero', role: 'Campus Montevideo' },
-            { type: 'person', name: 'Pedro\nNewman Guevara', role: 'Campus Punta Arenas' },
-            { type: 'person', name: 'Andrés Zamorano\nAbi\nBayron González', role: 'Campus Concepción' },
-            { type: 'person', name: 'Andrea Pernia\nAnderson León', role: 'Campus Maracaibo' },
-            { type: 'person', name: 'Annie Stephens\nPr. Nico Burgos', role: 'Campus Katy' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo de Visuales', role: 'Por Campus', icon: '📺', col: 1,
-          description: 'Sirven de forma presencial en los encuentros y eventos, siendo las manos operativas del área en cada campus. Reciben directrices del equipo de producción.',
-          children: [
-            { type: 'person', name: 'Caro Cepeda', role: 'Encargada campus Pte' },
-            { type: 'person', name: 'Bayron González', role: 'Encargado campus Stgo' },
-            { type: 'person', name: 'Marianyela Morin', role: 'Encargada campus Montevideo' },
-            { type: 'person', name: 'Daniela Martinez', role: 'Encargada campus Pta Arenas' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo de Iluminación', role: 'Por Campus', icon: '💡', col: 1,
-          description: 'Sirven de forma presencial en los encuentros y eventos, siendo las manos operativas del área en cada campus. Reciben directrices del equipo de producción.',
-          children: [
-            { type: 'person', name: 'Adriana Oliveros', role: 'Encargada campus Pte' },
-            { type: 'person', name: 'Ruben Albornoz\nElkin Traspalacio', role: 'Encargado campus Stgo' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo de Sonido', role: 'Por Campus', icon: '🔊', col: 1,
-          description: 'Sirven de forma presencial en los encuentros y eventos, siendo las manos operativas del área en cada campus. Reciben directrices del equipo de producción.',
-          children: [
-            { type: 'person', name: 'Javier Encina', role: 'Encargado campus Pte' },
-            { type: 'person', name: 'Benja Saavedra', role: 'Encargado campus Stgo' },
-            { type: 'person', name: 'Andrés Zamorano', role: 'Encargado campus Concepción' },
-            { type: 'person', name: 'Kevin Sánchez', role: 'Encargado campus Pta Arenas' },
-            { type: 'person', name: 'Anderson León', role: 'Encargado campus Maracaibo' },
-            { type: 'person', name: 'Ps. Jus Alvares', role: 'Encargado campus Katy' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo de Stage', role: 'Por Campus', icon: '🎭', col: 1,
-          description: 'Sirven de forma presencial en los encuentros y eventos, siendo las manos operativas del área en cada campus. Reciben directrices del equipo de producción.',
-          children: [
-            { type: 'person', name: 'Rodrigo Becerra', role: 'Encargado campus Pte' },
-            { type: 'person', name: 'Benja Saavedra', role: 'Encargado campus Stgo' },
-            { type: 'person', name: 'Gabriel Ceñas', role: 'Encargado campus Katy' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo de Dirección', role: 'Por Campus', icon: '🎯', col: 1,
-          description: 'Sirven de forma presencial en los encuentros y eventos, siendo las manos operativas del área en cada campus. Reciben directrices del equipo de producción.',
-          children: [
-            { type: 'person', name: 'Sin asignar', role: 'Encargada campus Pte' },
-            { type: 'person', name: 'Sin asignar', role: 'Encargada campus Stgo' },
-            { type: 'person', name: 'Sin asignar', role: 'Encargada campus Montevideo' },
-          ],
-        },
-        {
-          type: 'group', name: 'Productores Específicos', role: 'Proyectos Especiales', icon: '🎯', col: 2,
-          children: [
-            { type: 'person', name: 'Mateo Quiroz', role: 'Prod. Experiencias Virtual', description: 'Gestiona y realiza todas las experiencias que ocurren en plataformas digitales como Zoom, incluyendo grupos pequeños, reuniones de liderazgo y otros encuentros virtuales.' },
-            { type: 'person', name: 'Josuè Ferrer', role: 'Prod. de Oración Global', description: 'Responsable específico del encuentro de oración, liderando su realización y gestión de principio a fin.' },
-            { type: 'person', name: 'Fer Herrera', role: 'Prod. Programación Global', description: 'Coordina y da seguimiento a las noticias y anuncios semanales, asegurando que todos los campus cuenten con los recursos necesarios para comunicar sus actividades a tiempo.' },
-          ],
-        },
-        {
-          type: 'group', name: 'Soporte Técnico Global', role: 'Apoyo Especializado', icon: '🔧', col: 3,
-          description: 'Personas con roles en otras áreas que prestan apoyo especializado ante problemáticas técnicas complejas o situaciones imprevistas que el equipo necesite resolver.',
-          children: [
-            { type: 'person', name: 'Bayron González', role: 'Visuales' },
-            { type: 'person', name: 'Adri Oliveros', role: 'Iluminación' },
-            { type: 'person', name: 'Benja Saavedra', role: 'Sonido' },
-          ],
-        },
-      ],
-    },
-  ];
+  await mem(patricio.id, produccion.id, null, 'area_leader', 0);
+  await mem(rodrigo.id,  produccion.id, null, 'area_leader', 1);
 
-  // ── MEDIA ──────────────────────────────────────────────────────
-  const mediaTree: NodeDef[] = [
-    {
-      type: 'leader',
-      name: 'Pra. Principal Patricia Alarcón\nPra. Naty Segura',
-      role: 'Directora de Media',
-      description: 'Lidera el área con una mirada global, define la dirección estratégica del equipo y toma las decisiones que marcan el rumbo del contenido de la organización.',
-      children: [
-        {
-          type: 'group', name: 'Enc. de Media', role: 'Por Campus', icon: '📋', col: 1,
-          description: 'Coordinan el área de forma local, gestionando los requerimientos del equipo, administrando el calendario y velando por el buen funcionamiento del voluntariado en su campus.',
-          children: [
-            { type: 'person', name: 'Aileen González', role: 'Campus Santiago' },
-            { type: 'person', name: 'Pra. Naty Segura', role: 'Campus Puente Alto' },
-            { type: 'person', name: 'Mariangela Morin', role: 'Campus Montevideo' },
-            { type: 'person', name: 'Bastián Oyarzo', role: 'Campus Punta Arenas' },
-            { type: 'person', name: 'Pauli Vasquez', role: 'Campus Concepción' },
-            { type: 'person', name: 'Carlos Labarca', role: 'Campus Maracaibo' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo Audiovisual', role: 'Por Campus', icon: '🎥', col: 1,
-          description: 'Sirven de forma presencial en los encuentros y eventos, siendo las manos operativas del área en cada campus. Reciben directrices del encargado de media.',
-          children: [
-            { type: 'person', name: 'Daninca Contreras', role: 'Encargada campus Pte' },
-            { type: 'person', name: 'Gaby Rojas', role: 'Encargada campus Stgo' },
-            { type: 'person', name: 'Annavaleria Casadiego', role: 'Encargada campus Montevideo' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo de Fotografía', role: 'Por Campus', icon: '📷', col: 1,
-          description: 'Sirven de forma presencial en los encuentros y eventos, siendo las manos operativas del área en cada campus. Reciben directrices del encargado de media.',
-          children: [
-            { type: 'person', name: 'Por confirmar', role: 'Encargada campus Pte' },
-            { type: 'person', name: 'Rotatorio', role: 'Encargada campus Stgo' },
-            { type: 'person', name: 'Maia Braceiro', role: 'Encargada campus Montevideo' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo de Stories', role: 'Por Campus', icon: '✨', col: 1,
-          description: 'Sirven de forma presencial en los encuentros y eventos, siendo las manos operativas del área en cada campus. Reciben directrices del encargado de media.',
-          children: [
-            { type: 'person', name: 'Javiera Burgos', role: 'Encargada campus Pte' },
-            { type: 'person', name: 'Por confirmar', role: 'Encargada campus Stgo' },
-            { type: 'person', name: 'Donella San Martín', role: 'Encargada campus Montevideo' },
-          ],
-        },
-        {
-          type: 'group', name: 'Enc. de Cuentas', role: 'Instagram por Campus', icon: '📱', col: 2,
-          description: 'Gestionan la grilla de contenido y mantienen activas las cuentas de Instagram de cada campus, asegurando publicaciones consistentes y alineadas con la comunicación de la organización.',
-          children: [
-            { type: 'person', name: 'Aileen González', role: 'Campus Santiago' },
-            { type: 'person', name: 'Caro Cepeda', role: 'Campus Puente Alto' },
-            { type: 'person', name: 'Sara Montero', role: 'Campus Montevideo' },
-            { type: 'person', name: 'Eliana', role: 'Campus Punta Arenas' },
-            { type: 'person', name: 'Pauli Vasquez', role: 'Campus Concepción' },
-            { type: 'person', name: 'Sofi Briceño', role: 'Campus Maracaibo' },
-            { type: 'person', name: 'Pr. Nico Burgos', role: 'Campus Katy' },
-            { type: 'person', name: 'Sara Montero\nCaro Cepeda\nPra. Naty Segura', role: 'Campus La Plata' },
-          ],
-        },
-        {
-          type: 'group', name: 'Equipo Focalizado', role: 'Cuenta Central y Web', icon: '🌐', col: 3,
-          description: 'Equipo 100% focalizado en generar contenido específico para la cuenta central y página web.',
-          children: [
-            { type: 'person', name: 'Gabi Rojas', role: 'Encargada' },
-            { type: 'person', name: 'Daninka', role: 'Contenidos' },
-            { type: 'person', name: 'Jo Osses', role: 'Contenidos' },
-            { type: 'person', name: 'Dirección Creativa', role: 'Apoyo' },
-          ],
-        },
-      ],
-    },
-  ];
+  const pEquipo = await prisma.orgTeam.create({ data: { areaId: produccion.id, name: 'Equipo de Producción', icon: '🎬', colPosition: 1, sortOrder: 0, desc: 'Llevan la producción de los encuentros y eventos de su campus.' }});
+  await mem(kengev.id,     null, pEquipo.id, 'member', 0);
+  await mem(naty.id,       null, pEquipo.id, 'member', 1);
+  await mem(benja.id,      null, pEquipo.id, 'member', 2);
+  await mem(alejandroM.id, null, pEquipo.id, 'member', 3);
+  await mem(andresZ.id,    null, pEquipo.id, 'member', 4);
+  await mem(anderson.id,   null, pEquipo.id, 'member', 5);
 
-  // ── CREATIVA ───────────────────────────────────────────────────
-  const creativaTree: NodeDef[] = [
-    {
-      type: 'leader',
-      name: 'Pr. Nico Burgos',
-      role: 'Director Creativo\ny Pastor Campus Virtual',
-      description: 'Define la dirección creativa de la organización con una mirada innovadora, asegurando que cada solución comunicacional esté alineada con la visión y genere conexión real con las personas. También lidera y cuida la comunidad online de la organización, velando por su atención pastoral.',
-      children: [
-        {
-          type: 'group', name: 'Equipo Creativo', role: 'Proyectos Especiales', icon: '✨', col: 1,
-          description: 'Trabaja junto al Director Creativo en eventos especiales, proyectos de alto impacto y desafíos comunicacionales que requieren un desarrollo creativo más profundo.',
-          children: [
-            { type: 'person', name: 'Fer Herrera', role: 'Creativo' },
-            { type: 'person', name: 'Claudio Navea', role: 'Creativo' },
-            { type: 'person', name: 'Pastores Principales', role: 'Apoyo' },
-          ],
-        },
-        {
-          type: 'group', name: 'Diseño Gráfico', role: 'Branding', icon: '🎨', col: 2,
-          description: 'Responsables del branding de la organización y de responder a los requerimientos gráficos que surgen desde los distintos equipos y proyectos.',
-          children: [
-            { type: 'person', name: 'Sara Montero', role: 'Encargada de Diseño' },
-            { type: 'person', name: 'Voluntarios de Diseño', role: 'Equipo Gráfico' },
-          ],
-        },
-        {
-          type: 'group', name: 'Streaming Global', role: 'Transmisiones en Vivo', icon: '📡', col: 3,
-          description: 'Lideran el despliegue técnico y creativo de las transmisiones en vivo, cubriendo todos los eventos y encuentros de la organización que requieran streaming.',
-          children: [
-            { type: 'person', name: 'César Osses', role: 'Productor de Streaming' },
-            { type: 'person', name: 'Camarógrafos\nSwitchman\nSonido', role: 'Equipo Técnico' },
-          ],
-        },
-        {
-          type: 'group', name: 'Desarrollo Web', role: 'Plataformas Digitales', icon: '💻', col: 4,
-          description: 'Gestionan áreas específicas que requieren dirección creativa para su desarrollo, asegurando que cada plataforma comunique con coherencia y propósito.',
-          children: [
-            { type: 'person', name: 'Caro Cepeda', role: 'Páginas Web' },
-            { type: 'person', name: 'Benja Saavedra', role: 'Admin YouTube' },
-            { type: 'person', name: 'Mateo Quiroz', role: 'Experiencias Zoom' },
-          ],
-        },
-      ],
-    },
-  ];
+  const pVisuales = await prisma.orgTeam.create({ data: { areaId: produccion.id, name: 'Equipo de Visuales', icon: '📺', colPosition: 1, sortOrder: 1, desc: 'Sirven de forma presencial en los encuentros y eventos.' }});
+  await mem(caro.id,      null, pVisuales.id, 'team_leader', 0);
+  await mem(bayron.id,    null, pVisuales.id, 'team_leader', 1);
+  await mem(mariangela.id,null, pVisuales.id, 'team_leader', 2);
 
-  // ── MARKETING ──────────────────────────────────────────────────
-  const marketingTree: NodeDef[] = [
-    {
-      type: 'leader',
-      name: 'Claudio Navea',
-      role: 'Director de Marketing Digital',
-      description: 'Dirige el área, levanta campañas y les da seguimiento activo, asegurando que cada iniciativa esté orientada a resultados concretos.',
-      children: [
-        {
-          type: 'group', name: 'Equipo de Marketing', role: 'Producción de Campañas', icon: '📣', col: 1,
-          description: 'Creativos especializados que ejecutan tareas específicas de producción para las campañas, incluyendo video y ajustes de diseño orientados al marketing.',
-          children: [
-            { type: 'person', name: 'Benja Saavedra', role: 'Audiovisual' },
-            { type: 'person', name: 'Vacante', role: 'Diseñador Gráfico' },
-          ],
-        },
-        {
-          type: 'group', name: 'Asesores de Estrategia', role: 'Perspectiva Externa', icon: '💡', col: 2,
-          description: 'Aportan perspectiva externa y proponen mejoras a las estrategias del área, colaborando con el director para afinar el enfoque de cada campaña.',
-          children: [
-            { type: 'person', name: 'Isa Zambrano', role: 'Asesor/a' },
-            { type: 'person', name: 'Marco Mella', role: 'Asesor/a' },
-            { type: 'person', name: 'Victor Reyes', role: 'Asesor/a' },
-          ],
-        },
-      ],
-    },
-  ];
+  const pIlum = await prisma.orgTeam.create({ data: { areaId: produccion.id, name: 'Equipo de Iluminación', icon: '💡', colPosition: 1, sortOrder: 2, desc: 'Sirven de forma presencial en los encuentros y eventos.' }});
+  await mem(adri.id, null, pIlum.id, 'team_leader', 0);
 
-  await seedArea(worship.id, worshipTree);
-  await seedArea(produccion.id, produccionTree);
-  await seedArea(media.id, mediaTree);
-  await seedArea(creativa.id, creativaTree);
-  await seedArea(marketing.id, marketingTree);
+  const pSonido = await prisma.orgTeam.create({ data: { areaId: produccion.id, name: 'Equipo de Sonido', icon: '🔊', colPosition: 1, sortOrder: 3, desc: 'Sirven de forma presencial en los encuentros y eventos.' }});
+  await mem(benja.id,   null, pSonido.id, 'team_leader', 0);
+  await mem(andresZ.id, null, pSonido.id, 'member', 1);
+  await mem(anderson.id,null, pSonido.id, 'member', 2);
 
-  console.log('✅ Orgchart seed completed');
+  const pEspec = await prisma.orgTeam.create({ data: { areaId: produccion.id, name: 'Productores Específicos', icon: '🎯', colPosition: 2, sortOrder: 4, desc: 'Responsables de experiencias y encuentros específicos.' }});
+  await mem(mateoQ.id, null, pEspec.id, 'team_leader', 0);
+  await mem(josue.id,  null, pEspec.id, 'team_leader', 1);
+  await mem(fer.id,    null, pEspec.id, 'team_leader', 2);
+
+  // ── MEDIA ─────────────────────────────────────────────────────
+  await mem(patriciaN.id, media.id, null, 'area_leader', 0);
+  await mem(natyS.id,     media.id, null, 'area_leader', 1);
+
+  const mEnc = await prisma.orgTeam.create({ data: { areaId: media.id, name: 'Enc. de Media', icon: '📋', colPosition: 1, sortOrder: 0, desc: 'Coordinan el área de forma local, gestionando requerimientos y calendario.' }});
+  await mem(aileen.id,     null, mEnc.id, 'team_leader', 0);
+  await mem(natyS.id,      null, mEnc.id, 'team_leader', 1);
+  await mem(mariangela.id, null, mEnc.id, 'team_leader', 2);
+  await mem(bastian.id,    null, mEnc.id, 'team_leader', 3);
+  await mem(pauliV.id,     null, mEnc.id, 'team_leader', 4);
+  await mem(carlosL.id,    null, mEnc.id, 'team_leader', 5);
+
+  const mAV = await prisma.orgTeam.create({ data: { areaId: media.id, name: 'Equipo Audiovisual', icon: '🎥', colPosition: 1, sortOrder: 1, desc: 'Sirven de forma presencial en los encuentros y eventos.' }});
+  await mem(gabyR.id,      null, mAV.id, 'team_leader', 0);
+  await mem(mariangela.id, null, mAV.id, 'member', 1);
+
+  const mCuentas = await prisma.orgTeam.create({ data: { areaId: media.id, name: 'Enc. Cuentas Instagram', icon: '📱', colPosition: 2, sortOrder: 2, desc: 'Gestionan la grilla de contenido de Instagram por campus.' }});
+  await mem(aileen.id,     null, mCuentas.id, 'team_leader', 0);
+  await mem(caro.id,       null, mCuentas.id, 'team_leader', 1);
+  await mem(mariangela.id, null, mCuentas.id, 'team_leader', 2);
+  await mem(pauliV.id,     null, mCuentas.id, 'team_leader', 3);
+
+  const mFocal = await prisma.orgTeam.create({ data: { areaId: media.id, name: 'Equipo Focalizado', icon: '🌐', colPosition: 3, sortOrder: 3, desc: 'Equipo 100% focalizado en contenido para la cuenta central y web.' }});
+  await mem(gabyR.id, null, mFocal.id, 'team_leader', 0);
+
+  // ── CREATIVA ──────────────────────────────────────────────────
+  await mem(nico.id, creativa.id, null, 'area_leader', 0);
+
+  const cEquipo = await prisma.orgTeam.create({ data: { areaId: creativa.id, name: 'Equipo Creativo', icon: '✨', colPosition: 1, sortOrder: 0, desc: 'Trabaja en eventos especiales y proyectos de alto impacto.' }});
+  await mem(fer.id,    null, cEquipo.id, 'member', 0);
+  await mem(claudio.id,null, cEquipo.id, 'member', 1);
+
+  const cDis = await prisma.orgTeam.create({ data: { areaId: creativa.id, name: 'Diseño Gráfico', icon: '🎨', colPosition: 2, sortOrder: 1, desc: 'Responsables del branding y requerimientos gráficos.' }});
+  await mem(saraM.id, null, cDis.id, 'team_leader', 0);
+
+  const cStream = await prisma.orgTeam.create({ data: { areaId: creativa.id, name: 'Streaming Global', icon: '📡', colPosition: 3, sortOrder: 2, desc: 'Lideran el despliegue técnico y creativo de las transmisiones en vivo.' }});
+  await mem(cesarO.id, null, cStream.id, 'team_leader', 0);
+
+  const cWeb = await prisma.orgTeam.create({ data: { areaId: creativa.id, name: 'Desarrollo Web', icon: '💻', colPosition: 4, sortOrder: 3, desc: 'Gestionan las plataformas digitales con dirección creativa.' }});
+  await mem(caro.id,   null, cWeb.id, 'member', 0);
+  await mem(benja.id,  null, cWeb.id, 'member', 1);
+  await mem(mateoQ.id, null, cWeb.id, 'member', 2);
+
+  // ── MARKETING ─────────────────────────────────────────────────
+  await mem(claudio.id, mktg.id, null, 'area_leader', 0);
+
+  const mkEquipo = await prisma.orgTeam.create({ data: { areaId: mktg.id, name: 'Equipo de Marketing', icon: '📣', colPosition: 1, sortOrder: 0, desc: 'Ejecutan tareas de producción para las campañas de marketing.' }});
+  await mem(benja.id, null, mkEquipo.id, 'member', 0);
+
+  const mkAsesores = await prisma.orgTeam.create({ data: { areaId: mktg.id, name: 'Asesores de Estrategia', icon: '💡', colPosition: 2, sortOrder: 1, desc: 'Aportan perspectiva externa y proponen mejoras a las estrategias.' }});
+  await mem(saraM.id, null, mkAsesores.id, 'member', 0);
+
+  console.log('✅ Seed completado — áreas, equipos y membresías creados');
 }
 
 main()

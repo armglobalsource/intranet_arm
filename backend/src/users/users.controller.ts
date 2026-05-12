@@ -16,12 +16,6 @@ export class UsersController {
     return this.service.findAllRoles();
   }
 
-  @Get('job-titles')
-  @ApiOperation({ summary: 'Listar cargos únicos existentes' })
-  findAllJobTitles() {
-    return this.service.findAllJobTitles();
-  }
-
   @Get()
   @ApiOperation({ summary: 'Listar usuarios (con búsqueda opcional)' })
   @ApiQuery({ name: 'search', required: false, description: 'Filtrar por nombre, apellido, email o cargo' })

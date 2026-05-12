@@ -145,7 +145,7 @@ export class OrgChartService {
         OR: [
           { firstName: { contains: q.trim(), mode: 'insensitive' } },
           { lastName:  { contains: q.trim(), mode: 'insensitive' } },
-          { jobTitle:  { contains: q.trim(), mode: 'insensitive' } },
+          { jobTitles: { some: { jobTitle: { name: { contains: q.trim(), mode: 'insensitive' } } } } },
         ],
         orgMemberships: { some: {} },
       },

@@ -15,6 +15,9 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  /** true once Zustand has rehydrated from localStorage */
+  _hasHydrated: boolean;
+  setHasHydrated: (val: boolean) => void;
   setSession: (user: User, accessToken: string, refreshToken: string) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   logout: () => void;
@@ -27,6 +30,9 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      _hasHydrated: false,
+
+      setHasHydrated: (val) => set({ _hasHydrated: val }),
 
       setSession: (user, accessToken, refreshToken) =>
         set({ user, accessToken, refreshToken, isAuthenticated: true }),
@@ -39,6 +45,11 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      // Called when Zustand finishes reading localStorage
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+      // _hasHydrated is runtime-only — never persist it
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,

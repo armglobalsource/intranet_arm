@@ -11,8 +11,12 @@ async function bootstrap() {
 
   // ── Seguridad ────────────────────────────────────────────────
   app.use(helmet());
+  const allowedOrigins = (config.get<string>('FRONTEND_URL', 'http://localhost:3000'))
+    .split(',')
+    .map((o) => o.trim())
+    .concat(['http://localhost:3002']);
   app.enableCors({
-    origin: config.get<string>('FRONTEND_URL', 'http://localhost:3000'),
+    origin: allowedOrigins,
     credentials: true,
   });
 
