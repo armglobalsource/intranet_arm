@@ -39,6 +39,9 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.claude
 
 # ── Testing ───────────────────────────────────────────────────
 coverage/
+
+package-lock.json
