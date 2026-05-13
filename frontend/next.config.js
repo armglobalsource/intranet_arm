@@ -1,9 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   images: {
     remotePatterns: [
-      { protocol: 'http',  hostname: 'localhost', port: '9000' },
-      { protocol: 'https', hostname: process.env.MINIO_PUBLIC_HOST || 'storage.empresa.com' },
+      // Desarrollo local con MinIO
+      { protocol: 'http', hostname: 'localhost', port: '9000' },
+      // Google Cloud Storage (producción)
+      { protocol: 'https', hostname: 'storage.googleapis.com' },
+      // GCS con dominio personalizado
+      {
+        protocol: 'https',
+        hostname: process.env.GCS_PUBLIC_HOST || 'storage.googleapis.com',
+      },
     ],
   },
 };

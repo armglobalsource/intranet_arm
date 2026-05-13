@@ -21,21 +21,44 @@ export interface CreateUserDto {
   bio?:           string;
 }
 
+export interface PaginatedUsers {
+  data:       User[];
+  total:      number;
+  page:       number;
+  limit:      number;
+  totalPages: number;
+}
+
 export const userKeys = {
-  all:    ['users'] as const,
-  list:   (search?: string) => ['users', 'list', search ?? ''] as const,
-  detail: (id: number)      => ['users', 'detail', id] as const,
-  roles:  ['users', 'roles'] as const,
+  all:       ['users'] as const,
+  list:      (search?: string, page?: number, limit?: number) =>
+               ['users', 'list', search ?? '', page ?? 1, limit ?? 50] as const,
+  detail:    (id: number) => ['users', 'detail', id] as const,
+  roles:     ['users', 'roles'] as const,
 };
 
+/** Devuelve solo el array de usuarios (compatibilidad con código existente). */
 export function useUsers(search?: string) {
   return useQuery<User[]>({
     queryKey: userKeys.list(search),
     queryFn: () =>
       api
-        .get('/users', { params: search ? { search } : undefined })
+        .get<PaginatedUsers>('/users', { params: { search: search || undefined, limit: 200 } })
+        .then((r) => r.data.data),
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+/** Devuelve la respuesta paginada completa (total, páginas, etc.). */
+export function useUsersPaginated(search?: string, page = 1, limit = 50) {
+  return useQuery<PaginatedUsers>({
+    queryKey: userKeys.list(search, page, limit),
+    queryFn: () =>
+      api
+        .get<PaginatedUsers>('/users', { params: { search: search || undefined, page, limit } })
         .then((r) => r.data),
     staleTime: 2 * 60 * 1000,
+    placeholderData: (prev) => prev,
   });
 }
 
