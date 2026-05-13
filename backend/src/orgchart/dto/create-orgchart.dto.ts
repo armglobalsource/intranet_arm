@@ -31,6 +31,7 @@ export class CreateOrgTeamDto {
 export class UpdateOrgTeamDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(150) name?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(10) icon?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) iconUrl?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() desc?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() colPosition?: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() sortOrder?: number;

@@ -1,36 +1,30 @@
-# Para desarrollo local: solo infraestructura (DB + MinIO)
-# Uso: docker compose -f docker-compose.dev.yml up -d
+# Desarrollo local — solo levanta backend y frontend
+# La base de datos usa Supabase (configurada en backend/.env)
+# Uso: docker compose -f docker-compose.dev.yml up
 name: intranet-dev
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: intranet_postgres_dev
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: intranet_backend_dev
     restart: unless-stopped
+    env_file: ./backend/.env
     environment:
-      POSTGRES_USER:     intranet_user
-      POSTGRES_PASSWORD: intranet_pass
-      POSTGRES_DB:       intranet_db
-    volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      NODE_ENV: development
     ports:
-      - "5432:5432"
+      - "3001:3001"
 
-  minio:
-    image: minio/minio:latest
-    container_name: intranet_minio_dev
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+    container_name: intranet_frontend_dev
     restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER:     minio_access_key
-      MINIO_ROOT_PASSWORD: minio_secret_key
-    volumes:
-      - minio_dev_data:/data
+    depends_on:
+      - backend
     ports:
-      - "9000:9000"
-      - "9001:9001"   # http://localhost:9001 — consola MinIO
-
-volumes:
-  postgres_dev_data:
-  minio_dev_data:
+      - "3000:3000"

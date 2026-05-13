@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { OrgChartService } from './orgchart.service';
 import {
@@ -64,6 +65,14 @@ export class OrgChartController {
   @Delete('teams/:id')
   @ApiOperation({ summary: 'Desactivar equipo (soft delete)' })
   deleteTeam(@Param('id', ParseIntPipe) id: number) { return this.service.deleteTeam(id); }
+
+  @Post('teams/:id/logo')
+  @ApiOperation({ summary: 'Subir logo/imagen de un equipo' })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 2 * 1024 * 1024 } }))
+  uploadTeamLogo(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) { return this.service.uploadTeamLogo(id, file); }
 
   // ── MEMBRESÍAS ───────────────────────────────────────────────
 

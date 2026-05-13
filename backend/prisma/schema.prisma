@@ -57,7 +57,7 @@ model Campus {
 
   users User[]
 
-  @@map("campuses")
+  @@map("campus")
 }
 
 // ─── CARGOS ───────────────────────────────────────────────────
@@ -284,6 +284,7 @@ model OrgTeam {
   areaId      Int      @map("area_id")
   name        String   @db.VarChar(150)
   icon        String?  @db.VarChar(10)
+  iconUrl     String?  @db.VarChar(500) @map("icon_url")
   desc        String?
   colPosition Int      @default(1) @map("col_position")
   sortOrder   Int      @default(0) @map("sort_order")

@@ -16,6 +16,8 @@ import { useActiveCampuses }                  from '@/hooks/useCampus';
 import type { User, UpdateUserDto } from '@/types/user';
 import type { CreateUserDto }                 from '@/hooks/useUsers';
 import { primaryJobTitle, userJobTitleNames } from '@/types/user';
+import { useOrgAllTeams, useCreateOrgMembership } from '@/hooks/useOrgChart';
+import type { OrgTeam } from '@/types/orgchart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -155,6 +157,30 @@ function CampusSelect({ value, onChange }: CampusSelectProps) {
       <option value="">Sin campus asignado</option>
       {campuses.map((c) => (
         <option key={c.id} value={c.id}>{c.name}</option>
+      ))}
+    </select>
+  );
+}
+
+// ── TeamSelect ────────────────────────────────────────────────────────────────
+
+interface TeamSelectProps {
+  value:    number | null;
+  onChange: (id: number | null) => void;
+}
+
+function TeamSelect({ value, onChange }: TeamSelectProps) {
+  const { data: teams = [] } = useOrgAllTeams();
+  const activeTeams = teams.filter((t) => t.isActive);
+  return (
+    <select
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition bg-white"
+    >
+      <option value="">Sin equipo asignado</option>
+      {activeTeams.map((t) => (
+        <option key={t.id} value={t.id}>{t.icon ? `${t.icon} ` : ''}{t.name}</option>
       ))}
     </select>
   );
@@ -305,6 +331,7 @@ interface CreatePersonaModalProps {
 function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreatePersonaModalProps) {
   const { data: roles = [] } = useRoles();
   const createUser           = useCreateUser();
+  const createMembership     = useCreateOrgMembership();
 
   const [email,       setEmail]       = useState('');
   const [password,    setPassword]    = useState('');
@@ -312,6 +339,7 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
   const [lastName,    setLastName]    = useState('');
   const [roleId,      setRoleId]      = useState(0);
   const [campusId,    setCampusId]    = useState<number | null>(null);
+  const [teamId,      setTeamId]      = useState<number | null>(null);
   const [jobTitleIds, setJobTitleIds] = useState<number[]>([]);
   const [phone,       setPhone]       = useState('');
   const [country,     setCountry]     = useState('');
@@ -337,7 +365,17 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
       bio:     bio.trim()     || undefined,
     };
     createUser.mutate(payload, {
-      onSuccess: () => { setSaveState('saved'); setTimeout(onClose, 900); },
+      onSuccess: (newUser) => {
+        if (teamId) {
+          createMembership.mutate(
+            { userId: newUser.id, teamId, role: 'member' },
+            { onSettled: () => { setSaveState('saved'); setTimeout(onClose, 900); } },
+          );
+        } else {
+          setSaveState('saved');
+          setTimeout(onClose, 900);
+        }
+      },
       onError: (err: any) => {
         const msg = err?.response?.data?.message ?? 'Error al crear el usuario';
         setErrorMsg(Array.isArray(msg) ? msg.join(', ') : msg);
@@ -435,6 +473,14 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
               Campus <span className="text-slate-300 font-normal">— opcional</span>
             </label>
             <CampusSelect value={campusId} onChange={setCampusId} />
+          </div>
+
+          {/* Equipo */}
+          <div>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Equipo <span className="text-slate-300 font-normal">— opcional</span>
+            </label>
+            <TeamSelect value={teamId} onChange={setTeamId} />
           </div>
 
           {/* Teléfono + País */}

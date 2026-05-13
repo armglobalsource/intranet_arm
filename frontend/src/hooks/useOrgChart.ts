@@ -128,6 +128,20 @@ export function useCreateOrgMembership() {
   });
 }
 
+export function useUploadTeamLogo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) => {
+      const form = new FormData();
+      form.append('file', file);
+      return api.post(`/orgchart/teams/${id}/logo`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['orgchart'] }),
+  });
+}
+
 export function useDeleteOrgMembership() {
   const qc = useQueryClient();
   return useMutation({

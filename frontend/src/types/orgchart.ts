@@ -9,6 +9,8 @@ export interface OrgUser {
   jobTitles: { jobTitle: { name: string } }[];
   phone?: string | null;
   country?: string | null;
+  bio?: string | null;
+  campus?: { id: number; name: string } | null;
   status?: 'active' | 'inactive' | 'suspended';
 }
 
@@ -32,6 +34,7 @@ export interface OrgTeam {
   areaId: number;
   name: string;
   icon?: string | null;
+  iconUrl?: string | null;
   desc?: string | null;
   colPosition: number;
   sortOrder: number;

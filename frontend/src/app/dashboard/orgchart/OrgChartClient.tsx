@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { api } from '@/lib/api';
 import {
   useOrgAreas, useOrgAreaTree, useOrgSearch,
   useUpdateOrgArea, useUpdateOrgTeam,
   useCreateOrgMembership, useDeleteOrgMembership,
+  useUploadTeamLogo,
 } from '@/hooks/useOrgChart';
 import type { OrgArea, OrgAreaTree, OrgTeam, OrgMembership, OrgUser, OrgSearchUser, OrgRole } from '@/types/orgchart';
 import { orgUserJobTitle } from '@/types/orgchart';
@@ -107,17 +108,27 @@ function MemberCard({ membership, color, canEdit, onSelect, onRemove }: MemberCa
 // ── TeamCard ───────────────────────────────────────────────────────────────────
 
 interface TeamCardProps {
-  team:       OrgTeam;
-  color:      string;
-  canEdit:    boolean;
-  onSelect:   (m: OrgMembership) => void;
+  team:         OrgTeam;
+  color:        string;
+  canEdit:      boolean;
+  forceOpen:    boolean | null;
+  isDragging?:  boolean;
+  dragHandle?:  React.ReactNode;
+  onSelect:     (m: OrgMembership) => void;
   onSelectTeam: (t: OrgTeam) => void;
 }
 
-function TeamCard({ team, color, canEdit, onSelect, onSelectTeam }: TeamCardProps) {
+function TeamCard({ team, color, canEdit, forceOpen, isDragging, dragHandle, onSelect, onSelectTeam }: TeamCardProps) {
   const [open,     setOpen]     = useState(true);
   const [descOpen, setDescOpen] = useState(false);
   const deleteMembership = useDeleteOrgMembership();
+
+  useEffect(() => {
+    if (forceOpen !== null) {
+      setOpen(forceOpen);
+      setDescOpen(forceOpen);
+    }
+  }, [forceOpen]);
 
   const leaders = team.memberships.filter((m) => m.role === 'team_leader');
   const members = team.memberships.filter((m) => m.role === 'member');
@@ -129,14 +140,20 @@ function TeamCard({ team, color, canEdit, onSelect, onSelectTeam }: TeamCardProp
   }
 
   return (
-    <div>
+    <div style={{ opacity: isDragging ? 0.5 : 1 }}>
       {/* Header del equipo */}
       <div
         className="flex items-center gap-2.5 bg-slate-800 rounded-[10px] px-3 py-2.5 shadow-sm cursor-pointer transition-shadow hover:shadow-md"
         onClick={() => onSelectTeam(team)}
       >
-        <div className="w-[36px] h-[36px] rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center text-base">
-          {team.icon ?? '👥'}
+        {/* Drag handle — solo en modo edición */}
+        {dragHandle}
+
+        <div className="w-[36px] h-[36px] rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center text-base overflow-hidden">
+          {team.iconUrl
+            ? <img src={team.iconUrl} alt={team.name} className="w-full h-full object-cover" />
+            : (team.icon ?? '👥')
+          }
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-white leading-snug truncate">{team.name}</div>
@@ -196,6 +213,7 @@ function TeamCard({ team, color, canEdit, onSelect, onSelectTeam }: TeamCardProp
   );
 }
 
+
 // ── AreaLeaderCard ─────────────────────────────────────────────────────────────
 
 function AreaLeaderCard({ membership, color, onSelect }: { membership: OrgMembership; color: string; onSelect: (m: OrgMembership) => void }) {
@@ -230,13 +248,81 @@ interface TreeViewProps {
 }
 
 function TreeView({ data, canEdit, onSelectUser, onSelectTeam }: TreeViewProps) {
-  const maxCol = data.teams.reduce((m, t) => Math.max(m, t.colPosition ?? 1), 1);
+  const updateTeam = useUpdateOrgTeam();
+
+  const [localTeams, setLocalTeams] = useState<OrgTeam[]>(data.teams);
+  useEffect(() => { setLocalTeams(data.teams); }, [data.teams]);
+
+  const [forceOpen, setForceOpen] = useState<boolean | null>(null);
+
+  const maxCol = Math.max(1, ...localTeams.map((t) => t.colPosition ?? 1));
   const byCol: Record<number, OrgTeam[]> = {};
   for (let c = 1; c <= maxCol; c++) byCol[c] = [];
-  data.teams.forEach((t) => byCol[t.colPosition ?? 1].push(t));
+  localTeams.forEach((t) => { byCol[t.colPosition ?? 1].push(t); });
+  // sort each column by sortOrder
+  Object.values(byCol).forEach((arr) => arr.sort((a, b) => a.sortOrder - b.sortOrder));
+
+  function swapInCol(teamId: number, dir: 'up' | 'down') {
+    const col = localTeams.find((t) => t.id === teamId)?.colPosition ?? 1;
+    const colArr = [...byCol[col]];
+    const idx = colArr.findIndex((t) => t.id === teamId);
+    const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= colArr.length) return;
+
+    [colArr[idx], colArr[swapIdx]] = [colArr[swapIdx], colArr[idx]];
+
+    const updated = localTeams.map((t) => {
+      const ni = colArr.findIndex((c) => c.id === t.id);
+      return ni !== -1 ? { ...t, sortOrder: ni } : t;
+    });
+    setLocalTeams(updated);
+    updateTeam.mutate({ id: colArr[idx].id,     data: { sortOrder: idx } });
+    updateTeam.mutate({ id: colArr[swapIdx].id, data: { sortOrder: swapIdx } });
+  }
+
+  function changeCol(teamId: number, delta: number) {
+    const team = localTeams.find((t) => t.id === teamId);
+    if (!team) return;
+    const newCol = (team.colPosition ?? 1) + delta;
+    if (newCol < 1 || newCol > maxCol + 1) return;
+
+    // Put at end of target column
+    const targetColTeams = localTeams.filter((t) => t.id !== teamId && (t.colPosition ?? 1) === newCol);
+    const newSortOrder = targetColTeams.length;
+
+    const updated = localTeams.map((t) =>
+      t.id === teamId ? { ...t, colPosition: newCol, sortOrder: newSortOrder } : t,
+    );
+    setLocalTeams(updated);
+    updateTeam.mutate({ id: teamId, data: { colPosition: newCol, sortOrder: newSortOrder } });
+  }
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Controles expand/collapse */}
+      {localTeams.length > 0 && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setForceOpen(true)}
+            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 px-2.5 py-1 rounded-lg transition-all"
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+            Expandir todo
+          </button>
+          <button
+            onClick={() => setForceOpen(false)}
+            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 px-2.5 py-1 rounded-lg transition-all"
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="18 15 12 9 6 15"/>
+            </svg>
+            Contraer todo
+          </button>
+        </div>
+      )}
+
       {/* Líderes del área */}
       {data.leaders.length > 0 && (
         <div className="flex flex-wrap gap-3">
@@ -250,21 +336,69 @@ function TreeView({ data, canEdit, onSelectUser, onSelectTeam }: TreeViewProps) 
       <div className={`flex flex-col ${maxCol > 1 ? 'lg:flex-row' : ''} gap-3 items-start`}>
         {Array.from({ length: maxCol }, (_, i) => i + 1).map((col) => (
           <div key={col} className="flex flex-col gap-3 flex-1 min-w-0">
-            {byCol[col].map((team) => (
-              <TeamCard
-                key={team.id}
-                team={team}
-                color={data.color}
-                canEdit={canEdit}
-                onSelect={onSelectUser}
-                onSelectTeam={onSelectTeam}
-              />
-            ))}
+            {byCol[col].map((team, idx) => {
+              const editControls = canEdit ? (
+                <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {/* Mover arriba/abajo dentro de la columna */}
+                  <div className="flex flex-col">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); swapInCol(team.id, 'up'); }}
+                      disabled={idx === 0}
+                      className="w-5 h-4 flex items-center justify-center text-white/40 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                      title="Subir"
+                    >
+                      <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); swapInCol(team.id, 'down'); }}
+                      disabled={idx === byCol[col].length - 1}
+                      className="w-5 h-4 flex items-center justify-center text-white/40 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                      title="Bajar"
+                    >
+                      <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                  </div>
+                  {/* Mover entre columnas */}
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); changeCol(team.id, -1); }}
+                      disabled={col <= 1}
+                      className="w-4 h-6 flex items-center justify-center text-white/30 hover:text-white disabled:opacity-15 disabled:cursor-not-allowed transition-colors"
+                      title="Mover a columna anterior"
+                    >
+                      <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <span className="text-[9px] font-bold text-white/25 w-4 text-center">C{col}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); changeCol(team.id, 1); }}
+                      disabled={col >= maxCol && byCol[col].length <= 1}
+                      className="w-4 h-6 flex items-center justify-center text-white/30 hover:text-white disabled:opacity-15 disabled:cursor-not-allowed transition-colors"
+                      title="Mover a columna siguiente"
+                    >
+                      <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
+                </div>
+              ) : null;
+
+              return (
+                <TeamCard
+                  key={team.id}
+                  team={team}
+                  color={data.color}
+                  canEdit={canEdit}
+                  forceOpen={forceOpen}
+                  dragHandle={editControls}
+                  onSelect={onSelectUser}
+                  onSelectTeam={onSelectTeam}
+                />
+              );
+            })}
           </div>
         ))}
       </div>
 
-      {data.teams.length === 0 && (
+      {localTeams.length === 0 && (
         <p className="text-slate-400 text-sm p-4">Sin equipos en esta área</p>
       )}
     </div>
@@ -336,36 +470,86 @@ function UserDetailPanel({ membership, color, canEdit, onClose }: UserDetailPane
             <UserAvatar user={user} color={color} size={56} />
             <div className="flex-1 min-w-0">
               <div className="text-lg font-bold text-slate-900 leading-snug">{fullName(user)}</div>
-              {orgUserJobTitle(user) && <div className="text-xs text-slate-400 mt-1 italic">{orgUserJobTitle(user)}</div>}
+              {user.jobTitles.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {user.jobTitles.map((jt, i) => (
+                    <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded-full text-white" style={{ background: color }}>
+                      {jt.jobTitle.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Info de contacto */}
+          {/* Info personal */}
           <div className="rounded-xl border border-slate-200 overflow-hidden">
             <div className="flex flex-col divide-y divide-slate-100">
+              {/* Email */}
               <a href={`mailto:${user.email}`} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-slate-50 transition-colors group">
                 <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-400 group-hover:text-blue-500 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                 </svg>
                 <span className="text-[12px] text-slate-600 truncate group-hover:text-blue-600 transition-colors">{user.email}</span>
               </a>
-              {user.phone && (
+              {/* Teléfono */}
+              {user.phone ? (
                 <a href={`tel:${user.phone}`} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-slate-50 transition-colors group">
                   <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-400 group-hover:text-blue-500 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                   </svg>
                   <span className="text-[12px] text-slate-600 group-hover:text-blue-600 transition-colors">{user.phone}</span>
                 </a>
+              ) : (
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                  <span className="text-[12px] text-slate-300 italic">Sin teléfono</span>
+                </div>
               )}
-              {user.country && (
+              {/* País */}
+              {user.country ? (
                 <div className="flex items-center gap-2.5 px-3.5 py-2.5">
                   <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                   </svg>
                   <span className="text-[12px] text-slate-600">{user.country}</span>
                 </div>
+              ) : (
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                  <span className="text-[12px] text-slate-300 italic">Sin país</span>
+                </div>
+              )}
+              {/* Campus */}
+              {user.campus ? (
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  <span className="text-[12px] text-slate-600">{user.campus.name}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  <span className="text-[12px] text-slate-300 italic">Sin campus</span>
+                </div>
               )}
             </div>
+          </div>
+
+          {/* Biografía */}
+          <div className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Biografía</p>
+            {user.bio
+              ? <p className="text-[12.5px] text-slate-600 leading-relaxed">{user.bio}</p>
+              : <p className="text-[12px] text-slate-300 italic">Sin biografía</p>
+            }
           </div>
 
           {/* Campos editables — solo en modo edición */}
@@ -467,7 +651,10 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
   const [addQuery,   setAddQuery]   = useState('');
   const [addResults, setAddResults] = useState<OrgUser[]>([]);
   const [searching,  setSearching]  = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const updateTeam      = useUpdateOrgTeam();
+  const uploadLogo      = useUploadTeamLogo();
   const createMembership = useCreateOrgMembership();
   const deleteMembership = useDeleteOrgMembership();
 
@@ -487,6 +674,13 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
       .finally(() => setSearching(false));
     return () => ctrl.abort();
   }, [addQuery]);
+
+  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoPreview(URL.createObjectURL(file));
+    uploadLogo.mutate({ id: team.id, file });
+  }
 
   function handleSave() {
     setSaveStatus('saving');
@@ -517,8 +711,34 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
 
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0" style={{ borderTop: `3px solid ${color}` }}>
           <div className="flex items-center gap-2.5">
-            <span className="text-xl">{team.icon ?? '👥'}</span>
-            <span className="text-sm font-bold text-slate-900 truncate max-w-[220px]">{team.name}</span>
+            {/* Logo del equipo */}
+            <div className="relative flex-shrink-0">
+              <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center bg-slate-100 text-xl">
+                {logoPreview || team.iconUrl
+                  ? <img src={logoPreview ?? team.iconUrl!} alt={team.name} className="w-full h-full object-cover" />
+                  : (team.icon ?? '👥')
+                }
+              </div>
+              {isEditing && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={uploadLogo.isPending}
+                    className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center transition-all disabled:opacity-50"
+                    style={{ background: color }}
+                    title="Cambiar logo"
+                  >
+                    {uploadLogo.isPending
+                      ? <div className="w-2.5 h-2.5 border border-white/40 border-t-white rounded-full animate-spin" />
+                      : <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    }
+                  </button>
+                  <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+                </>
+              )}
+            </div>
+            <span className="text-sm font-bold text-slate-900 truncate max-w-[200px]">{team.name}</span>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 text-sm">✕</button>
         </div>
@@ -653,13 +873,156 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
   );
 }
 
+// ── SearchUserDetailPanel ──────────────────────────────────────────────────────
+
+function SearchUserDetailPanel({ user, areas, onClose }: { user: OrgSearchUser; areas: OrgArea[]; onClose: () => void }) {
+  function getArea(areaId?: number | null) {
+    return areas.find((a) => a.id === areaId);
+  }
+  const primaryColor = getArea(user.orgMemberships[0]?.area?.id)?.color ?? '#64748b';
+
+  return (
+    <>
+      <div className="fixed inset-0 z-30 bg-black/20" style={{ left: '224px' }} onClick={onClose} />
+      <div className="fixed right-0 top-0 bottom-0 bg-white z-40 flex flex-col" style={{ width: '400px', boxShadow: '-4px 0 32px rgba(0,0,0,0.12)' }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0" style={{ borderTop: `3px solid ${primaryColor}` }}>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Perfil del colaborador</span>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 text-sm">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
+
+          {/* Avatar + nombre + cargos */}
+          <div className="flex items-center gap-4">
+            <UserAvatar user={user} color={primaryColor} size={60} />
+            <div className="flex-1 min-w-0">
+              <div className="text-lg font-bold text-slate-900 leading-snug">{fullName(user)}</div>
+              {user.jobTitles.length > 0 ? (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {user.jobTitles.map((jt, i) => (
+                    <span key={i} className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: primaryColor }}>
+                      {jt.jobTitle.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[12px] text-slate-400 italic mt-1">Sin cargo asignado</p>
+              )}
+            </div>
+          </div>
+
+          {/* Áreas y equipos */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2.5">Pertenece a</p>
+            <div className="flex flex-col gap-2">
+              {user.orgMemberships.map((m) => {
+                const area = getArea(m.area?.id);
+                const aColor = area?.color ?? '#64748b';
+                return (
+                  <div key={m.id} className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-slate-100 bg-slate-50">
+                    {area && (
+                      <span className="text-base flex-shrink-0">{area.icon}</span>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      {area && (
+                        <p className="text-[11px] font-bold uppercase tracking-wide truncate" style={{ color: aColor }}>{area.name}</p>
+                      )}
+                      {m.team && (
+                        <p className="text-[12px] font-semibold text-slate-700 truncate">{m.team.name}</p>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white flex-shrink-0" style={{ background: aColor }}>
+                      {ROLE_LABEL[m.role]}
+                    </span>
+                  </div>
+                );
+              })}
+              {user.orgMemberships.length === 0 && (
+                <p className="text-xs text-slate-400 italic">Sin membresías en el organigrama</p>
+              )}
+            </div>
+          </div>
+
+          {/* Info de contacto */}
+          <div className="rounded-xl border border-slate-200 overflow-hidden">
+            <div className="flex flex-col divide-y divide-slate-100">
+              <a href={`mailto:${user.email}`} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-slate-50 transition-colors group">
+                <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-400 group-hover:text-blue-500 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
+                <span className="text-[12px] text-slate-600 truncate group-hover:text-blue-600 transition-colors">{user.email}</span>
+              </a>
+              {user.phone ? (
+                <a href={`tel:${user.phone}`} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-slate-50 transition-colors group">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-400 group-hover:text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                  <span className="text-[12px] text-slate-600 group-hover:text-blue-600 transition-colors">{user.phone}</span>
+                </a>
+              ) : (
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                  <span className="text-[12px] text-slate-300 italic">Sin teléfono</span>
+                </div>
+              )}
+              {user.country ? (
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                  <span className="text-[12px] text-slate-600">{user.country}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                  <span className="text-[12px] text-slate-300 italic">Sin país</span>
+                </div>
+              )}
+              {user.campus ? (
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  <span className="text-[12px] text-slate-600">{user.campus.name}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  <span className="text-[12px] text-slate-300 italic">Sin campus</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Biografía */}
+          <div className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Biografía</p>
+            {user.bio
+              ? <p className="text-[12.5px] text-slate-600 leading-relaxed">{user.bio}</p>
+              : <p className="text-[12px] text-slate-300 italic">Sin biografía</p>
+            }
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── SearchBar ──────────────────────────────────────────────────────────────────
 
-function SearchBar({ areas, onSelectSlug }: { areas: OrgArea[]; onSelectSlug: (slug: string) => void }) {
+function SearchBar({ areas, onSelectUser }: { areas: OrgArea[]; onSelectUser: (u: OrgSearchUser) => void }) {
   const [q,      setQ]      = useState('');
   const [ddOpen, setDdOpen] = useState(false);
   const wrapRef             = useRef<HTMLDivElement>(null);
-  const { data: results }   = useOrgSearch(q);
+  const { data: results, isFetching } = useOrgSearch(q);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -669,20 +1032,14 @@ function SearchBar({ areas, onSelectSlug }: { areas: OrgArea[]; onSelectSlug: (s
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  function getAreaColor(areaId?: number | null) {
-    return areas.find((a) => a.id === areaId)?.color ?? '#64748b';
-  }
-  function getAreaName(areaId?: number | null) {
-    return areas.find((a) => a.id === areaId)?.name ?? '';
-  }
-  function getAreaSlug(areaId?: number | null) {
-    return areas.find((a) => a.id === areaId)?.slug ?? '';
+  function getArea(areaId?: number | null) {
+    return areas.find((a) => a.id === areaId);
   }
 
   return (
-    <div ref={wrapRef} className="relative w-[320px]">
+    <div ref={wrapRef} className="relative w-full max-w-2xl mx-auto">
       <div className="relative">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4.5 h-4.5 pointer-events-none w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
         <input
@@ -690,44 +1047,67 @@ function SearchBar({ areas, onSelectSlug }: { areas: OrgArea[]; onSelectSlug: (s
           value={q}
           onChange={(e) => { setQ(e.target.value); setDdOpen(true); }}
           onFocus={() => q.length >= 2 && setDdOpen(true)}
-          placeholder="Buscar persona en todos los organigramas…"
-          className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+          placeholder="Buscar persona por nombre o cargo…"
+          className="w-full pl-12 pr-12 py-3.5 border-2 border-slate-200 rounded-2xl text-sm bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 transition shadow-sm"
         />
-        {q && <button onClick={() => { setQ(''); setDdOpen(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:bg-slate-100 text-xs">✕</button>}
+        {isFetching && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2">
+            <div className="w-4 h-4 border-2 border-slate-200 border-t-blue-400 rounded-full animate-spin" />
+          </div>
+        )}
+        {q && !isFetching && (
+          <button onClick={() => { setQ(''); setDdOpen(false); }} className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 text-sm transition-colors">✕</button>
+        )}
       </div>
 
       {ddOpen && q.length >= 2 && (
-        <div className="absolute top-full mt-1.5 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-72 overflow-y-auto">
-          {!results?.length ? (
-            <div className="px-4 py-3.5 text-sm text-slate-400 text-center">Sin resultados para &ldquo;{q}&rdquo;</div>
+        <div className="absolute top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 max-h-80 overflow-y-auto">
+          {!results?.length && !isFetching ? (
+            <div className="px-5 py-5 text-sm text-slate-400 text-center flex flex-col items-center gap-2">
+              <svg className="w-8 h-8 text-slate-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              Sin resultados para &ldquo;{q}&rdquo;
+            </div>
           ) : (
-            results.flatMap((u) =>
-              u.orgMemberships.map((m, idx) => (
+            results?.map((u) => {
+              const firstArea = getArea(u.orgMemberships[0]?.area?.id);
+              const color = firstArea?.color ?? '#64748b';
+              return (
                 <button
-                  key={`${u.id}-${idx}`}
-                  onMouseDown={() => {
-                    const slug = getAreaSlug(m.area?.id);
-                    if (slug) onSelectSlug(slug);
-                    setDdOpen(false);
-                    setQ(`${u.firstName} ${u.lastName}`);
-                  }}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-slate-50 border-b border-slate-100 last:border-0 text-left"
+                  key={u.id}
+                  onMouseDown={() => { onSelectUser(u); setDdOpen(false); setQ(''); }}
+                  className="w-full flex items-center gap-3.5 px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 text-left transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-bold text-white" style={{ background: getAreaColor(m.area?.id) }}>
-                    {initials(u)}
-                  </div>
+                  <UserAvatar user={u} color={color} size={40} />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-slate-900 truncate">{fullName(u)}</div>
-                    <div className="text-xs text-slate-500 truncate">{m.team?.name ?? ROLE_LABEL[m.role]}</div>
+                    {u.jobTitles.length > 0 && (
+                      <div className="text-[11px] text-slate-400 truncate mt-0.5">{u.jobTitles[0].jobTitle.name}</div>
+                    )}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {u.orgMemberships.slice(0, 3).map((m, i) => {
+                        const a = getArea(m.area?.id);
+                        if (!a) return null;
+                        return (
+                          <span key={i} className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-full text-white" style={{ background: a.color }}>
+                            {a.icon} {a.name}
+                          </span>
+                        );
+                      })}
+                      {u.orgMemberships.length > 3 && (
+                        <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-500">
+                          +{u.orgMemberships.length - 3}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {m.area && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white flex-shrink-0" style={{ background: getAreaColor(m.area.id) }}>
-                      {m.area.icon} {getAreaName(m.area.id)}
-                    </span>
-                  )}
+                  <svg className="w-4 h-4 text-slate-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
                 </button>
-              ))
-            )
+              );
+            })
           )}
         </div>
       )}
@@ -775,18 +1155,20 @@ function AreaTab({ area, active, onClick }: { area: OrgArea; active: boolean; on
 // ── AreaPage ───────────────────────────────────────────────────────────────────
 
 interface AreaPageProps {
-  slug:         string;
-  canEdit:      boolean;
-  onSelectUser: (m: OrgMembership) => void;
-  onSelectTeam: (t: OrgTeam) => void;
+  slug:            string;
+  canEdit:         boolean;
+  onSelectUser:    (m: OrgMembership) => void;
+  onSelectTeam:    (t: OrgTeam) => void;
+  editingArea:     boolean;
+  onToggleEdit:    () => void;
+  onRegisterSave:  (fn: () => void) => void;
 }
 
-function AreaPage({ slug, canEdit, onSelectUser, onSelectTeam }: AreaPageProps) {
+function AreaPage({ slug, canEdit, onSelectUser, onSelectTeam, editingArea, onToggleEdit, onRegisterSave }: AreaPageProps) {
   const { data, isLoading, error } = useOrgAreaTree(slug);
   const updateArea  = useUpdateOrgArea();
   const areaNameRef = useRef<HTMLSpanElement>(null);
   const areaDescRef = useRef<HTMLParagraphElement>(null);
-  const [editingArea, setEditingArea] = useState(false);
 
   const isEditing = canEdit && editingArea;
 
@@ -796,9 +1178,13 @@ function AreaPage({ slug, canEdit, onSelectUser, onSelectTeam }: AreaPageProps) 
     const desc = areaDescRef.current?.textContent?.trim() || undefined;
     updateArea.mutate(
       { id: data.id, data: { name, desc } },
-      { onSuccess: () => setEditingArea(false) },
+      { onSuccess: onToggleEdit },
     );
   }
+
+  useEffect(() => {
+    onRegisterSave(handleSaveArea);
+  });
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" /></div>;
@@ -858,48 +1244,9 @@ function AreaPage({ slug, canEdit, onSelectUser, onSelectTeam }: AreaPageProps) 
           </p>
         )}
 
-        {/* Controles de edición del área — solo admin */}
-        {canEdit && (
-          <div className="flex items-center gap-2 mt-1">
-            {!editingArea ? (
-              <button
-                onClick={() => setEditingArea(true)}
-                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 px-3 py-1.5 rounded-lg transition-all shadow-sm"
-              >
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-                Habilitar edición del área
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleSaveArea}
-                  disabled={updateArea.isPending}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white px-3.5 py-1.5 rounded-lg transition-all shadow-sm disabled:opacity-60"
-                  style={{ background: data.color }}
-                >
-                  {updateArea.isPending ? (
-                    <><div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />Guardando...</>
-                  ) : (
-                    <><svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>Guardar cambios</>
-                  )}
-                </button>
-                <button
-                  onClick={() => setEditingArea(false)}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg transition-all"
-                >
-                  Cancelar
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
         {isEditing && (
-          <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-lg">
-            Edición activa — haz clic en nombre o descripción para modificar
+          <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-lg mt-1">
+            Haz clic en nombre o descripción del área para editar el texto
           </p>
         )}
       </div>
@@ -922,8 +1269,11 @@ export function OrgChartClient() {
   const user    = useAuthStore((s) => s.user);
   const canEdit = user?.role?.name?.toLowerCase() === 'admin';
 
-  const [activeSlug, setActiveSlug] = useState<string | null>(null);
-  const [selected,   setSelected]   = useState<SelectedItem | null>(null);
+  const [activeSlug,      setActiveSlug]      = useState<string | null>(null);
+  const [selected,        setSelected]        = useState<SelectedItem | null>(null);
+  const [searchSelected,  setSearchSelected]  = useState<OrgSearchUser | null>(null);
+  const [editingArea,     setEditingArea]     = useState(false);
+  const areaSaveFnRef = useRef<(() => void) | null>(null);
 
   function getColor(areaId?: number) {
     return areas?.find((a) => a.id === areaId)?.color ?? '#64748b';
@@ -949,31 +1299,71 @@ export function OrgChartClient() {
       {/* Tabs */}
       <div className="bg-slate-900 px-5 flex items-center gap-0.5 overflow-x-auto scrollbar-none border-b border-white/5 flex-shrink-0">
         <button
-          onClick={() => { setActiveSlug(null); setSelected(null); }}
+          onClick={() => { setActiveSlug(null); setSelected(null); setEditingArea(false); }}
           className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-all ${activeSlug === null ? 'text-white border-white/60' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
         >
           <span className="w-2 h-2 rounded-full bg-slate-400 flex-shrink-0" />
           Vista General
         </button>
         {areas?.map((area) => (
-          <AreaTab key={area.slug} area={area} active={activeSlug === area.slug} onClick={() => { setActiveSlug(area.slug); setSelected(null); }} />
+          <AreaTab key={area.slug} area={area} active={activeSlug === area.slug} onClick={() => { setActiveSlug(area.slug); setSelected(null); setEditingArea(false); }} />
         ))}
+
+        {/* Botón editar — solo visible en un área específica */}
+        {canEdit && activeSlug !== null && (
+          <div className="ml-auto pl-4 flex-shrink-0">
+            {!editingArea ? (
+              <button
+                onClick={() => setEditingArea(true)}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-all"
+                style={{ background: activeArea?.color ?? '#334155' }}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Editar área
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  Modo edición activo
+                </span>
+                <button
+                  onClick={() => areaSaveFnRef.current?.()}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-all"
+                  style={{ background: activeArea?.color ?? '#334155' }}
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  Guardar
+                </button>
+                <button
+                  onClick={() => setEditingArea(false)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-slate-400 border border-white/10 hover:bg-white/5 transition-all"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Contenido */}
       <div className="flex-1 overflow-y-auto bg-slate-50">
         {activeSlug === null ? (
           <div>
-            <div className="px-6 pt-6 pb-4">
-              <div className="flex items-end justify-between mb-4">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">ARM Global</p>
-                  <h1 className="text-xl font-bold text-slate-900">Áreas Creativas</h1>
-                </div>
-                <SearchBar areas={areas ?? []} onSelectSlug={(slug) => { setActiveSlug(slug); setSelected(null); }} />
+            {/* Hero con buscador */}
+            <div className="bg-white border-b border-slate-100 px-6 pt-8 pb-7 flex flex-col items-center gap-3">
+              <div className="text-center mb-1">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">ARM Global</p>
+                <h1 className="text-2xl font-bold text-slate-900">Organigramas</h1>
               </div>
+              <SearchBar areas={areas ?? []} onSelectUser={(u) => { setSearchSelected(u); setSelected(null); }} />
+              <p className="text-[11.5px] text-slate-400">Busca por nombre o cargo en todos los organigramas</p>
             </div>
-            <div className="px-6 pb-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="px-6 pt-6 pb-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {areas?.map((area) => (
                 <OverviewCard key={area.slug} area={area} onClick={() => setActiveSlug(area.slug)} />
               ))}
@@ -985,12 +1375,23 @@ export function OrgChartClient() {
             canEdit={canEdit}
             onSelectUser={(m) => handleSelectUser(m, activeColor)}
             onSelectTeam={(t) => handleSelectTeam(t, activeColor)}
+            editingArea={editingArea}
+            onToggleEdit={() => setEditingArea((v) => !v)}
+            onRegisterSave={(fn) => { areaSaveFnRef.current = fn; }}
           />
         )}
       </div>
 
       {/* Panel lateral */}
-      {selected?.kind === 'membership' && (
+      {searchSelected && (
+        <SearchUserDetailPanel
+          key={searchSelected.id}
+          user={searchSelected}
+          areas={areas ?? []}
+          onClose={() => setSearchSelected(null)}
+        />
+      )}
+      {!searchSelected && selected?.kind === 'membership' && (
         <UserDetailPanel
           key={selected.data.id}
           membership={selected.data}
@@ -999,7 +1400,7 @@ export function OrgChartClient() {
           onClose={() => setSelected(null)}
         />
       )}
-      {selected?.kind === 'team' && (
+      {!searchSelected && selected?.kind === 'team' && (
         <TeamDetailPanel
           key={selected.data.id}
           team={selected.data}

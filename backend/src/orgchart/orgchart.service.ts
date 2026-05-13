@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { StorageService } from '../common/storage/storage.service';
 import {
   CreateOrgAreaDto, UpdateOrgAreaDto,
   CreateOrgTeamDto, UpdateOrgTeamDto,
@@ -9,13 +10,17 @@ import {
 const USER_SELECT = {
   id: true, firstName: true, lastName: true,
   email: true, avatarUrl: true,
-  phone: true, country: true, status: true,
+  phone: true, country: true, bio: true, status: true,
+  campus: { select: { id: true, name: true } },
   jobTitles: { select: { jobTitle: { select: { name: true } } }, orderBy: { sortOrder: 'asc' as const } },
 };
 
 @Injectable()
 export class OrgChartService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
 
   // ── ÁREAS ────────────────────────────────────────────────────
 
@@ -102,6 +107,15 @@ export class OrgChartService {
   async deleteTeam(id: number) {
     await this.findTeamOrFail(id);
     return this.prisma.orgTeam.update({ where: { id }, data: { isActive: false } });
+  }
+
+  async uploadTeamLogo(id: number, file: Express.Multer.File) {
+    await this.findTeamOrFail(id);
+    const ext = file.originalname.split('.').pop() ?? 'png';
+    const key = `team-logos/${id}-${Date.now()}.${ext}`;
+    await this.storage.uploadAvatar(key, file.buffer, file.mimetype);
+    const iconUrl = await this.storage.getPresignedUrl('avatars', key, 60 * 60 * 24 * 365);
+    return this.prisma.orgTeam.update({ where: { id }, data: { iconUrl } });
   }
 
   // ── MEMBRESÍAS ───────────────────────────────────────────────
