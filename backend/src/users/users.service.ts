@@ -25,25 +25,57 @@ const USER_SELECT = {
   jobTitles:  { select: JOB_TITLE_SELECT, orderBy: { sortOrder: 'asc' as const } },
 } as const;
 
+export interface PaginatedUsers {
+  data: unknown[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  findAll(userId: number, roleId: number, search?: string) {
-    return this.prisma.user.findMany({
-      select: USER_SELECT,
-      where: search
-        ? {
-            OR: [
-              { firstName: { contains: search, mode: 'insensitive' } },
-              { lastName:  { contains: search, mode: 'insensitive' } },
-              { email:     { contains: search, mode: 'insensitive' } },
-              { jobTitles: { some: { jobTitle: { name: { contains: search, mode: 'insensitive' } } } } },
-            ],
-          }
-        : undefined,
-      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
-    });
+  async findAll(
+    _userId: number,
+    _roleId: number,
+    search?: string,
+    page = 1,
+    limit = 50,
+  ): Promise<PaginatedUsers> {
+    const safeLimit = Math.min(limit, 200);
+    const skip = (page - 1) * safeLimit;
+
+    const where = search
+      ? {
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' as const } },
+            { lastName:  { contains: search, mode: 'insensitive' as const } },
+            { email:     { contains: search, mode: 'insensitive' as const } },
+            { jobTitles: { some: { jobTitle: { name: { contains: search, mode: 'insensitive' as const } } } } },
+          ],
+        }
+      : undefined;
+
+    const [data, total] = await Promise.all([
+      this.prisma.user.findMany({
+        select: USER_SELECT,
+        where,
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+        skip,
+        take: safeLimit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
+    };
   }
 
   async findOne(id: number) {

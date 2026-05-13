@@ -1,4 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller, Get, Post, Patch, Delete,
+  Body, Param, Query, ParseIntPipe, DefaultValuePipe,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
@@ -17,10 +20,17 @@ export class UsersController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar usuarios (con búsqueda opcional)' })
-  @ApiQuery({ name: 'search', required: false, description: 'Filtrar por nombre, apellido, email o cargo' })
-  findAll(@CurrentUser() user: any, @Query('search') search?: string) {
-    return this.service.findAll(user.sub, user.roleId, search);
+  @ApiOperation({ summary: 'Listar usuarios paginados (con búsqueda opcional)' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page',   required: false, type: Number })
+  @ApiQuery({ name: 'limit',  required: false, type: Number })
+  findAll(
+    @CurrentUser() user: any,
+    @Query('search') search?: string,
+    @Query('page',  new DefaultValuePipe(1),  ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
+  ) {
+    return this.service.findAll(user.sub, user.roleId, search, page, limit);
   }
 
   @Get(':id')

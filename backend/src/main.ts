@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -18,7 +19,12 @@ async function bootstrap() {
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
+
+  // ── Filtro global de excepciones ─────────────────────────────
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // ── Versionado de API ────────────────────────────────────────
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
@@ -27,9 +33,9 @@ async function bootstrap() {
   // ── Validación global ────────────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,          // elimina campos no declarados en el DTO
+      whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true,          // convierte tipos automáticamente
+      transform: true,
       transformOptions: { enableImplicitConversion: true },
     }),
   );
@@ -44,12 +50,22 @@ async function bootstrap() {
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('api/docs', app, document);
-    console.log(`📚 Swagger disponible en: http://localhost:${config.get('PORT', 3001)}/api/docs`);
+    console.log(`Swagger disponible en: http://localhost:${config.get('PORT', 3001)}/api/docs`);
   }
 
+  // ── Graceful shutdown (Cloud Run envía SIGTERM) ───────────────
+  app.enableShutdownHooks();
+
   const port = config.get<number>('PORT', 3001);
-  await app.listen(port);
-  console.log(`🚀 Backend escuchando en: http://localhost:${port}/api/v1`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`Backend escuchando en puerto ${port}`);
+
+  // Cloud Run da 10s tras SIGTERM; cerramos conexiones limpiamente
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM recibido — cerrando servidor...');
+    await app.close();
+    process.exit(0);
+  });
 }
 
 bootstrap();

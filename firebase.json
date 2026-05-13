@@ -1,0 +1,40 @@
+{
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "intranet-backend",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "intranet-frontend",
+          "region": "us-central1"
+        }
+      }
+    ],
+    "headers": [
+      {
+        "source": "/api/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-store" }
+        ]
+      },
+      {
+        "source": "**/*.@(js|css|woff2|woff|ttf)",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
+      }
+    ]
+  }
+}
