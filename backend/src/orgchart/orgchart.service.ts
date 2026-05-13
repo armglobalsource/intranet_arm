@@ -77,6 +77,14 @@ export class OrgChartService {
     return this.prisma.orgArea.update({ where: { id }, data: { isActive: false } });
   }
 
+  async uploadAreaLogo(id: number, file: Express.Multer.File) {
+    await this.findAreaOrFail(id);
+    const ext = (file.originalname.split('.').pop() ?? 'webp').toLowerCase();
+    const key = `area-logos/${id}-${Date.now()}.${ext}`;
+    const iconUrl = await this.storage.uploadPublic(key, file.buffer, file.mimetype);
+    return this.prisma.orgArea.update({ where: { id }, data: { iconUrl } });
+  }
+
   // ── EQUIPOS ──────────────────────────────────────────────────
 
   getTeams() {
@@ -111,10 +119,9 @@ export class OrgChartService {
 
   async uploadTeamLogo(id: number, file: Express.Multer.File) {
     await this.findTeamOrFail(id);
-    const ext = file.originalname.split('.').pop() ?? 'png';
+    const ext = (file.originalname.split('.').pop() ?? 'png').toLowerCase();
     const key = `team-logos/${id}-${Date.now()}.${ext}`;
-    await this.storage.uploadAvatar(key, file.buffer, file.mimetype);
-    const iconUrl = await this.storage.getPresignedUrl('avatars', key, 60 * 60 * 24 * 365);
+    const iconUrl = await this.storage.uploadPublic(key, file.buffer, file.mimetype);
     return this.prisma.orgTeam.update({ where: { id }, data: { iconUrl } });
   }
 
@@ -148,6 +155,34 @@ export class OrgChartService {
     return this.prisma.orgMembership.delete({ where: { id } });
   }
 
+  // ── PERFIL COMPLETO DE USUARIO EN EL ORGANIGRAMA ─────────────
+
+  private readonly MEMBERSHIP_INCLUDE = {
+    area: { select: { id: true, name: true, color: true, slug: true, icon: true } },
+    team: {
+      select: {
+        id: true,
+        name: true,
+        area: { select: { id: true, name: true, color: true, slug: true, icon: true } },
+      },
+    },
+  } as const;
+
+  async getUserOrgProfile(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        ...USER_SELECT,
+        orgMemberships: {
+          include: this.MEMBERSHIP_INCLUDE,
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+    if (!user) throw new NotFoundException(`Usuario ${userId} no encontrado`);
+    return user;
+  }
+
   // ── BÚSQUEDA ─────────────────────────────────────────────────
 
   async search(q: string) {
@@ -166,10 +201,7 @@ export class OrgChartService {
       select: {
         ...USER_SELECT,
         orgMemberships: {
-          include: {
-            area: { select: { id: true, name: true, color: true, slug: true } },
-            team: { select: { id: true, name: true } },
-          },
+          include: this.MEMBERSHIP_INCLUDE,
         },
       },
       take: 40,

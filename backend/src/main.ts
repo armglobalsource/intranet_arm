@@ -3,12 +3,22 @@ import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
+import * as express from 'express';
+import * as path from 'path';
+import * as fs from 'fs';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+
+  // ── Archivos estáticos locales (solo desarrollo) ─────────────
+  if (config.get('STORAGE', 'local') === 'local') {
+    const uploadsDir = path.resolve(process.cwd(), 'uploads');
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    app.use('/uploads', express.static(uploadsDir));
+  }
 
   // ── Seguridad ────────────────────────────────────────────────
   app.use(helmet());

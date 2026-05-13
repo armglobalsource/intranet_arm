@@ -267,6 +267,7 @@ model OrgArea {
   name      String    @db.VarChar(150)
   color     String    @db.VarChar(20)
   icon      String    @db.VarChar(10)
+  iconUrl   String?   @map("icon_url")
   desc      String?
   sortOrder Int       @default(0) @map("sort_order")
   isActive  Boolean   @default(true) @map("is_active")
@@ -284,7 +285,7 @@ model OrgTeam {
   areaId      Int      @map("area_id")
   name        String   @db.VarChar(150)
   icon        String?  @db.VarChar(10)
-  iconUrl     String?  @db.VarChar(500) @map("icon_url")
+  iconUrl     String?  @map("icon_url")
   desc        String?
   colPosition Int      @default(1) @map("col_position")
   sortOrder   Int      @default(0) @map("sort_order")
@@ -299,13 +300,14 @@ model OrgTeam {
 }
 
 model OrgMembership {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @map("user_id")
-  areaId    Int?     @map("area_id")
-  teamId    Int?     @map("team_id")
-  role      OrgRole
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at")
+  id          Int     @id @default(autoincrement())
+  userId      Int     @map("user_id")
+  areaId      Int?    @map("area_id")
+  teamId      Int?    @map("team_id")
+  role        OrgRole
+  customTitle String? @map("custom_title") @db.VarChar(200)
+  sortOrder   Int     @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   area OrgArea? @relation(fields: [areaId], references: [id], onDelete: Cascade)

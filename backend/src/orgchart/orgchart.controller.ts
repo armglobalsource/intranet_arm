@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { OrgChartService } from './orgchart.service';
 import {
@@ -42,6 +43,14 @@ export class OrgChartController {
   @ApiOperation({ summary: 'Desactivar área y sus equipos (soft delete)' })
   deleteArea(@Param('id', ParseIntPipe) id: number) { return this.service.deleteArea(id); }
 
+  @Post('areas/:id/logo')
+  @ApiOperation({ summary: 'Subir imagen/logo de un área' })
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } }))
+  uploadAreaLogo(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) { return this.service.uploadAreaLogo(id, file); }
+
   // ── EQUIPOS ──────────────────────────────────────────────────
 
   @Get('teams')
@@ -68,7 +77,7 @@ export class OrgChartController {
 
   @Post('teams/:id/logo')
   @ApiOperation({ summary: 'Subir logo/imagen de un equipo' })
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 2 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } }))
   uploadTeamLogo(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
@@ -89,6 +98,14 @@ export class OrgChartController {
   @Delete('memberships/:id')
   @ApiOperation({ summary: 'Eliminar membresía (quita al usuario del área/equipo)' })
   deleteMembership(@Param('id', ParseIntPipe) id: number) { return this.service.deleteMembership(id); }
+
+  // ── PERFIL USUARIO ───────────────────────────────────────────
+
+  @Get('users/:userId')
+  @ApiOperation({ summary: 'Perfil completo de un usuario en el organigrama (todas sus membresías)' })
+  getUserOrgProfile(@Param('userId', ParseIntPipe) userId: number) {
+    return this.service.getUserOrgProfile(userId);
+  }
 
   // ── BÚSQUEDA ─────────────────────────────────────────────────
 

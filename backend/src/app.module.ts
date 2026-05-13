@@ -25,6 +25,8 @@ const envSchema = Joi.object({
   JWT_REFRESH_TTL:      Joi.number().default(28800),
   FRONTEND_URL:         Joi.string().default('http://localhost:3000'),
   GCS_PROJECT_ID:       Joi.string().when('NODE_ENV', { is: 'production', then: Joi.required() }),
+  STORAGE:              Joi.string().valid('local', 'gcs').default('local'),
+  BACKEND_URL:          Joi.string().default('http://localhost:3001'),
   GCS_BUCKET_DOCUMENTS: Joi.string().default('intranet-documents'),
   GCS_BUCKET_AVATARS:   Joi.string().default('intranet-avatars'),
   THROTTLE_TTL:         Joi.number().default(60000),
