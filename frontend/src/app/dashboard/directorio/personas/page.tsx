@@ -16,7 +16,7 @@ import { useActiveCampuses }                  from '@/hooks/useCampus';
 import type { User, UpdateUserDto } from '@/types/user';
 import type { CreateUserDto }                 from '@/hooks/useUsers';
 import { primaryJobTitle, userJobTitleNames } from '@/types/user';
-import { useOrgAllTeams, useCreateOrgMembership } from '@/hooks/useOrgChart';
+import { useOrgAllTeams, useCreateOrgMembership, useDeleteOrgMembership, useOrgUserProfile } from '@/hooks/useOrgChart';
 import type { OrgTeam } from '@/types/orgchart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -29,7 +29,8 @@ const AVATAR_COLORS = [
   { bg: '#FAECE7', text: '#993C1D' },
   { bg: '#FBEAF0', text: '#993556' },
 ];
-const ROLE_LABELS: Record<string, string> = { admin: 'Administrador', user: 'Usuario' };
+const ROLE_LABELS: Record<string, string>     = { admin: 'Administrador', user: 'Usuario' };
+const ORG_ROLE_LABELS: Record<string, string> = { area_leader: 'Líder de área', team_leader: 'Líder de equipo', member: 'Miembro' };
 
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function userInitials(u: User) { return (u.firstName[0] + (u.lastName?.[0] ?? '')).toUpperCase(); }
@@ -165,20 +166,22 @@ function CampusSelect({ value, onChange }: CampusSelectProps) {
 // ── TeamSelect ────────────────────────────────────────────────────────────────
 
 interface TeamSelectProps {
-  value:    number | null;
-  onChange: (id: number | null) => void;
+  value:       number | null;
+  onChange:    (id: number | null) => void;
+  excludeIds?: Set<number>;
+  placeholder?: string;
 }
 
-function TeamSelect({ value, onChange }: TeamSelectProps) {
+function TeamSelect({ value, onChange, excludeIds, placeholder = 'Sin equipo asignado' }: TeamSelectProps) {
   const { data: teams = [] } = useOrgAllTeams();
-  const activeTeams = teams.filter((t) => t.isActive);
+  const activeTeams = teams.filter((t) => t.isActive && (!excludeIds || !excludeIds.has(t.id)));
   return (
     <select
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition bg-white"
     >
-      <option value="">Sin equipo asignado</option>
+      <option value="">{placeholder}</option>
       {activeTeams.map((t) => (
         <option key={t.id} value={t.id}>{t.icon ? `${t.icon} ` : ''}{t.name}</option>
       ))}
@@ -189,41 +192,75 @@ function TeamSelect({ value, onChange }: TeamSelectProps) {
 // ── EditPersonaModal ──────────────────────────────────────────────────────────
 
 interface EditPersonaModalProps {
-  user:         User;
-  allJobTitles: JobTitle[];
+  user:             User;
+  allJobTitles:     JobTitle[];
   onCreateJobTitle: (name: string) => Promise<JobTitle>;
-  onClose:      () => void;
+  onClose:          () => void;
 }
 
 function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: EditPersonaModalProps) {
+  const { data: roles = [] }   = useRoles();
+  const { data: orgProfile }   = useOrgUserProfile(user.id);
+  const createMembership       = useCreateOrgMembership();
+  const deleteMembership       = useDeleteOrgMembership();
+  const updateUser             = useUpdateUser();
+
   const currentJobTitleIds = user.jobTitles.map((jt) => jt.jobTitle.id);
 
-  const [firstName,    setFirstName]    = useState(user.firstName);
-  const [lastName,     setLastName]     = useState(user.lastName);
-  const [phone,        setPhone]        = useState(user.phone ?? '');
-  const [country,      setCountry]      = useState(user.country ?? '');
-  const [bio,          setBio]          = useState(user.bio ?? '');
-  const [campusId,     setCampusId]     = useState<number | null>(user.campusId ?? null);
-  const [jobTitleIds,  setJobTitleIds]  = useState<number[]>(currentJobTitleIds);
-  const [saveState,    setSaveState]    = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [firstName,   setFirstName]   = useState(user.firstName);
+  const [lastName,    setLastName]    = useState(user.lastName);
+  const [email,       setEmail]       = useState(user.email);
+  const [password,    setPassword]    = useState('');
+  const [showPass,    setShowPass]    = useState(false);
+  const [roleId,      setRoleId]      = useState(user.role?.id ?? 0);
+  const [phone,       setPhone]       = useState(user.phone ?? '');
+  const [country,     setCountry]     = useState(user.country ?? '');
+  const [bio,         setBio]         = useState(user.bio ?? '');
+  const [campusId,    setCampusId]    = useState<number | null>(user.campusId ?? null);
+  const [jobTitleIds, setJobTitleIds] = useState<number[]>(currentJobTitleIds);
+  const [saveState,   setSaveState]   = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [errorMsg,    setErrorMsg]    = useState('');
 
-  const updateUser = useUpdateUser();
+  // Estado para agregar equipo
+  const [addTeamId,  setAddTeamId]  = useState<number | null>(null);
+  const [addingTeam, setAddingTeam] = useState(false);
+
+  // Membresías actuales del perfil
+  const memberships     = orgProfile?.orgMemberships ?? [];
+  const existingTeamIds = new Set(memberships.map((m) => m.teamId).filter(Boolean) as number[]);
 
   function handleSubmit() {
     setSaveState('saving');
+    setErrorMsg('');
     const payload: UpdateUserDto = {
-      firstName:   firstName.trim() || undefined,
-      lastName:    lastName.trim()  || undefined,
-      phone:       phone.trim()     || undefined,
-      country:     country.trim()   || undefined,
-      bio:         bio.trim()       || undefined,
-      campusId:    campusId,
-      jobTitleIds: jobTitleIds,
+      firstName:   firstName.trim()        || undefined,
+      lastName:    lastName.trim()         || undefined,
+      email:       email.trim()            || undefined,
+      password:    password.length >= 6 ? password : undefined,
+      roleId:      roleId > 0 ? roleId     : undefined,
+      phone:       phone.trim()            || undefined,
+      country:     country.trim()          || undefined,
+      bio:         bio.trim()              || undefined,
+      campusId,
+      jobTitleIds,
     };
     updateUser.mutate({ id: user.id, data: payload }, {
       onSuccess: () => { setSaveState('saved'); setTimeout(onClose, 800); },
-      onError:   () => setSaveState('idle'),
+      onError: (err: any) => {
+        const msg = err?.response?.data?.message ?? 'Error al guardar';
+        setErrorMsg(Array.isArray(msg) ? msg.join(', ') : msg);
+        setSaveState('idle');
+      },
     });
+  }
+
+  function handleAddTeam() {
+    if (!addTeamId || addingTeam) return;
+    setAddingTeam(true);
+    createMembership.mutate(
+      { userId: user.id, teamId: addTeamId, role: 'member' },
+      { onSettled: () => { setAddingTeam(false); setAddTeamId(null); } },
+    );
   }
 
   useEffect(() => {
@@ -234,9 +271,15 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
 
   const { bg, text } = avatarColor(user.id);
 
+  const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition';
+  const labelCls = 'block text-[11px] font-medium text-slate-500 mb-1';
+  const sectionCls = 'text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5';
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[460px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[520px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
           {user.avatarUrl
             ? <img src={user.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
@@ -244,29 +287,72 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
           }
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-slate-900 text-[14px] truncate">{user.firstName} {user.lastName}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{user.email}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Editar información completa</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 text-sm">✕</button>
         </div>
 
-        <div className="p-5 flex flex-col gap-3.5 max-h-[75vh] overflow-y-auto">
+        <div className="p-5 flex flex-col gap-3.5 max-h-[80vh] overflow-y-auto">
+
+          {/* ── Sección Cuenta ── */}
+          <p className={sectionCls}>Cuenta</p>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Nombre</label>
-              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" />
+              <label className={labelCls}>Nombre</label>
+              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Apellido</label>
-              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" />
+              <label className={labelCls}>Apellido</label>
+              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputCls} />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-              Cargos <span className="text-slate-300 font-normal">— puede tener varios</span>
+            <label className={labelCls}>Email</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
+          </div>
+
+          <div>
+            <label className={labelCls}>
+              Contraseña <span className="text-slate-300 font-normal">— dejar en blanco para no cambiar (mín. 6 caracteres)</span>
             </label>
+            <div className="relative">
+              <input
+                type={showPass ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className={`${inputCls} pr-10`}
+              />
+              <button type="button" onClick={() => setShowPass((p) => !p)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                {showPass
+                  ? <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                  : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                }
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Rol del sistema</label>
+            <select value={roleId || ''} onChange={(e) => setRoleId(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white">
+              <option value="">Seleccionar rol...</option>
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>{ROLE_LABELS[r.name] ?? r.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="border-t border-slate-100" />
+
+          {/* ── Sección Perfil ── */}
+          <p className={sectionCls}>Perfil</p>
+
+          <div>
+            <label className={labelCls}>Cargos <span className="text-slate-300 font-normal">— puede tener varios</span></label>
             <MultiJobTitleSelect
               selectedIds={jobTitleIds}
               onChange={setJobTitleIds}
@@ -276,31 +362,89 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-              Campus <span className="text-slate-300 font-normal">— opcional</span>
-            </label>
+            <label className={labelCls}>Campus <span className="text-slate-300 font-normal">— opcional</span></label>
             <CampusSelect value={campusId} onChange={setCampusId} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Teléfono</label>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" placeholder="+57 300 000 0000" />
+              <label className={labelCls}>Teléfono</label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} placeholder="+57 300 000 0000" />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">País</label>
-              <input type="text" value={country} onChange={(e) => setCountry(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" placeholder="Colombia, Chile..." />
+              <label className={labelCls}>País</label>
+              <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className={inputCls} placeholder="Colombia, Chile..." />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Biografía</label>
+            <label className={labelCls}>Biografía</label>
             <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition resize-none" />
           </div>
 
+          <div className="border-t border-slate-100" />
+
+          {/* ── Sección Organigrama ── */}
+          <p className={sectionCls}>Organigrama — equipos</p>
+
+          {/* Membresías actuales */}
+          {memberships.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {memberships.map((m) => {
+                const name  = m.team?.name ?? m.area?.name ?? '—';
+                const label = ORG_ROLE_LABELS[m.role] ?? m.role;
+                return (
+                  <span key={m.id}
+                    className="inline-flex items-center gap-1.5 bg-violet-50 text-violet-800 border border-violet-200 text-[11px] font-medium px-2.5 py-1 rounded-full">
+                    {name}
+                    <span className="text-violet-400">·</span>
+                    <span className="text-violet-500 font-normal">{label}</span>
+                    <button
+                      type="button"
+                      onClick={() => deleteMembership.mutate(m.id)}
+                      className="w-3.5 h-3.5 flex items-center justify-center text-violet-400 hover:text-red-500 transition-colors ml-0.5"
+                      title="Quitar del equipo"
+                    >×</button>
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-[12px] text-slate-400 italic">Sin equipos asignados</p>
+          )}
+
+          {/* Agregar a nuevo equipo */}
+          <div className="flex gap-2 items-center">
+            <div className="flex-1">
+              <TeamSelect
+                value={addTeamId}
+                onChange={setAddTeamId}
+                excludeIds={existingTeamIds}
+                placeholder="Agregar a un equipo..."
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleAddTeam}
+              disabled={!addTeamId || addingTeam}
+              className="flex-shrink-0 px-3 py-2 rounded-lg bg-violet-600 text-white text-[12px] font-semibold hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {addingTeam ? '...' : 'Agregar'}
+            </button>
+          </div>
+
+          {/* Error */}
+          {errorMsg && (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-50 border border-red-200">
+              <svg className="w-4 h-4 text-red-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span className="text-[12px] text-red-700">{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Botones */}
           <div className="flex items-center gap-2 pt-1">
             <button onClick={handleSubmit} disabled={saveState !== 'idle'}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all disabled:opacity-70"
@@ -314,6 +458,7 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
               Cancelar
             </button>
           </div>
+
         </div>
       </div>
     </div>

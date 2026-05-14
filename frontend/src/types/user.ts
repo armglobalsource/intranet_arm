@@ -42,6 +42,9 @@ export interface User {
 export interface UpdateUserDto {
   firstName?:   string;
   lastName?:    string;
+  email?:       string;
+  password?:    string;
+  roleId?:      number;
   campusId?:    number | null;
   jobTitleIds?: number[];
   phone?:       string;
