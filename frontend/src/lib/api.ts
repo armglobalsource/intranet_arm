@@ -1,8 +1,15 @@
 import axios from 'axios';
 import { useAuthStore } from './store/auth.store';
 
+// En ambientes desplegados (Firebase Hosting) se usa URL relativa /api/v1
+// y Firebase Hosting enruta al backend correcto según el dominio (dev o prod).
+// En desarrollo local se usa http://localhost:3001/api/v1.
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === 'production' ? '/api/v1' : 'http://localhost:3001/api/v1');
+
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1',
+  baseURL: BASE_URL,
   withCredentials: false,
 });
 

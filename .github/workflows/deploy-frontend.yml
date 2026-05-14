@@ -46,8 +46,8 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:${{ github.ref_name == 'main' && 'latest' || 'dev' }}
-          build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          # No se pasa NEXT_PUBLIC_API_URL: el frontend usa /api/v1 (URL relativa)
+          # y Firebase Hosting enruta al backend correcto en cada dominio.
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

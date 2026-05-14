@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrgChartService } from './orgchart.service';
 import {
   CreateOrgAreaDto, UpdateOrgAreaDto,
@@ -11,6 +12,7 @@ import {
 
 @ApiTags('OrgChart')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller({ path: 'orgchart', version: '1' })
 export class OrgChartController {
   constructor(private readonly service: OrgChartService) {}
