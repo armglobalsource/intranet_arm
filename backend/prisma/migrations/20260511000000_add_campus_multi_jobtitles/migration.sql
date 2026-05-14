@@ -1,3 +1,14 @@
+-- CreateTable: job_titles (IF NOT EXISTS para compatibilidad con DBs existentes)
+CREATE TABLE IF NOT EXISTS "job_titles" (
+    "id"         SERIAL       NOT NULL,
+    "name"       VARCHAR(150) NOT NULL,
+    "is_active"  BOOLEAN      NOT NULL DEFAULT true,
+    "sort_order" INTEGER      NOT NULL DEFAULT 0,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "job_titles_pkey"        PRIMARY KEY ("id"),
+    CONSTRAINT "job_titles_name_unique" UNIQUE ("name")
+);
+
 -- CreateTable: campuses
 CREATE TABLE "campuses" (
     "id"         SERIAL       NOT NULL,
