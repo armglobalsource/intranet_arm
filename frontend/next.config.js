@@ -3,10 +3,13 @@ const nextConfig = {
   output: 'standalone',
   images: {
     remotePatterns: [
-      // Desarrollo local con MinIO
-      { protocol: 'http', hostname: 'localhost', port: '9000' },
-      // Google Cloud Storage (producción)
+      // Backend local — logos de equipo/área en desarrollo
+      { protocol: 'http', hostname: 'localhost', port: '3001' },
+      // Cloud Run backend (producción)
+      { protocol: 'https', hostname: '*.run.app' },
+      // Firebase Storage / Google Cloud Storage (producción)
       { protocol: 'https', hostname: 'storage.googleapis.com' },
+      { protocol: 'https', hostname: 'firebasestorage.googleapis.com' },
       // GCS con dominio personalizado
       {
         protocol: 'https',
