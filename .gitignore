@@ -44,8 +44,8 @@ Thumbs.db
 # ── Testing ───────────────────────────────────────────────────
 coverage/
 
-# ── Database dumps ────────────────────────────────────────────
-*.sql
+# ── Database dumps (excluye migraciones de Prisma) ────────────
 prod_data.sql
+/prod_data.sql
 
 package-lock.json
