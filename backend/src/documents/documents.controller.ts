@@ -1,11 +1,13 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Documents')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller({ path: 'documents', version: '1' })
 export class DocumentsController {
   constructor(private readonly service: DocumentsService) {}

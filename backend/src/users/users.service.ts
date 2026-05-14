@@ -105,12 +105,24 @@ export class UsersService {
 
   async update(id: number, dto: UpdateUserDto) {
     await this.prisma.user.findUniqueOrThrow({ where: { id } });
-    const { jobTitleIds, ...rest } = dto;
+    const { jobTitleIds, password, email, ...rest } = dto;
+
+    // Verificar unicidad del email si se está cambiando
+    if (email) {
+      const existing = await this.prisma.user.findUnique({ where: { email } });
+      if (existing && existing.id !== id) {
+        throw new ConflictException('Ya existe un usuario con ese email');
+      }
+    }
+
+    const passwordHash = password ? await bcrypt.hash(password, 12) : undefined;
 
     return this.prisma.user.update({
       where: { id },
       data: {
         ...rest,
+        ...(email        ? { email }        : {}),
+        ...(passwordHash ? { passwordHash } : {}),
         ...(jobTitleIds !== undefined
           ? {
               jobTitles: {

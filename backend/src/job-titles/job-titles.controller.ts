@@ -1,12 +1,14 @@
 import {
-  Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post,
+  Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JobTitlesService } from './job-titles.service';
 import { CreateJobTitleDto, UpdateJobTitleDto } from './dto/job-title.dto';
 
 @ApiTags('JobTitles')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller({ path: 'job-titles', version: '1' })
 export class JobTitlesController {
   constructor(private readonly service: JobTitlesService) {}

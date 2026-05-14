@@ -57,7 +57,7 @@ model Campus {
 
   users User[]
 
-  @@map("campus")
+  @@map("campuses")
 }
 
 // ─── CARGOS ───────────────────────────────────────────────────

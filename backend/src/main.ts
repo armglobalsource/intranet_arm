@@ -22,12 +22,24 @@ async function bootstrap() {
 
   // ── Seguridad ────────────────────────────────────────────────
   app.use(helmet());
+  // FRONTEND_URL puede ser una lista separada por comas (ej: prod,dev)
   const allowedOrigins = (config.get<string>('FRONTEND_URL', 'http://localhost:3000'))
     .split(',')
     .map((o) => o.trim())
-    .concat(['http://localhost:3002']);
+    .filter(Boolean)
+    .concat([
+      'http://localhost:3000',
+      'http://localhost:3002',
+      'https://intranet-arm.web.app',
+      'https://intranet-arm-dev.web.app',
+    ]);
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Permitir requests sin origin (ej: Postman, server-to-server)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origen no permitido — ${origin}`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

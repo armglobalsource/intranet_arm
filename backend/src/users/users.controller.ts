@@ -1,14 +1,16 @@
 import {
   Controller, Get, Post, Patch, Delete,
-  Body, Param, Query, ParseIntPipe, DefaultValuePipe,
+  Body, Param, Query, ParseIntPipe, DefaultValuePipe, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Users')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
   constructor(private readonly service: UsersService) {}

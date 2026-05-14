@@ -1,8 +1,15 @@
 import axios from 'axios';
 import { useAuthStore } from './store/auth.store';
 
+// En ambientes desplegados (Firebase Hosting) se usa URL relativa /api/v1
+// y Firebase Hosting enruta al backend correcto según el dominio (dev o prod).
+// En desarrollo local se usa http://localhost:3001/api/v1.
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === 'production' ? '/api/v1' : 'http://localhost:3001/api/v1');
+
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1',
+  baseURL: BASE_URL,
   withCredentials: false,
 });
 
@@ -12,6 +19,13 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+// Helper para redirigir al login (solo en cliente)
+function redirectToLogin() {
+  if (typeof window !== 'undefined') {
+    window.location.href = '/auth/login';
+  }
+}
 
 // Auto-refresh on 401
 api.interceptors.response.use(
@@ -23,7 +37,7 @@ api.interceptors.response.use(
       const refreshToken = useAuthStore.getState().refreshToken;
       if (!refreshToken) {
         useAuthStore.getState().logout();
-        window.location.href = '/auth/login';
+        redirectToLogin();
         return Promise.reject(err);
       }
       try {
@@ -34,9 +48,10 @@ api.interceptors.response.use(
         useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
         original.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(original);
-      } catch {
+      } catch (refreshErr) {
         useAuthStore.getState().logout();
-        window.location.href = '/auth/login';
+        redirectToLogin();
+        return Promise.reject(refreshErr);
       }
     }
     return Promise.reject(err);
