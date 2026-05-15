@@ -1,33 +1,61 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { FirebaseService } from '../common/firebase/firebase.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private fb: FirebaseService) {}
 
-  findAll(userId: number, roleId: number) {
-    // TODO: aplicar filtros según rol y permisos
-    return this.prisma.notification.findMany();
+  async findAll(userId: number, roleId: number) {
+    // Return notifications for this user (or all for admins, role=1)
+    const col = this.fb.db.collection('notifications');
+    const snap = roleId === 1
+      ? await col.limit(200).get()
+      : await col.where('userId', '==', userId).limit(100).get();
+    return this.fb.toDocs(snap).sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
   }
 
   async findOne(id: number) {
-    const item = await this.prisma.notification.findUnique({ where: { id } });
-    if (!item) throw new NotFoundException(`Notification con id ${id} no encontrado`);
-    return item;
+    const snap = await this.fb.db.collection('notifications').doc(String(id)).get();
+    if (!snap.exists) throw new NotFoundException(`Notification con id ${id} no encontrado`);
+    return this.fb.toObj(snap);
   }
 
-  create(dto: CreateNotificationDto, userId: number) {
-    return this.prisma.notification.create({ data: { ...dto } as any });
+  async create(dto: CreateNotificationDto, userId: number) {
+    const id = await this.fb.nextId('notifications');
+    const data = {
+      id,
+      userId:  dto.userId,
+      title:   dto.title,
+      body:    dto.body    ?? null,
+      link:    dto.link    ?? null,
+      channel: dto.channel ?? 'in_app',
+      read:    false,
+      createdAt: this.fb.now(),
+      updatedAt: this.fb.now(),
+    };
+    await this.fb.db.collection('notifications').doc(String(id)).set(data);
+    return { ...data, id };
   }
 
   async update(id: number, dto: Partial<CreateNotificationDto>) {
     await this.findOne(id);
-    return this.prisma.notification.update({ where: { id }, data: dto as any });
+    const data: Record<string, any> = { updatedAt: this.fb.now() };
+    if (dto.title   !== undefined) data['title']   = dto.title;
+    if (dto.body    !== undefined) data['body']     = dto.body;
+    if (dto.link    !== undefined) data['link']     = dto.link;
+    if (dto.channel !== undefined) data['channel']  = dto.channel;
+    await this.fb.db.collection('notifications').doc(String(id)).update(data);
+    return this.findOne(id);
   }
 
   async remove(id: number) {
     await this.findOne(id);
-    return this.prisma.notification.delete({ where: { id } });
+    await this.fb.db.collection('notifications').doc(String(id)).delete();
+    return { id };
   }
 }

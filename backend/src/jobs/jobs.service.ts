@@ -1,72 +1,52 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as PgBoss from 'pg-boss';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { FirebaseService } from '../common/firebase/firebase.service';
 
 @Injectable()
-export class JobsService implements OnModuleInit, OnModuleDestroy {
+export class JobsService implements OnModuleInit {
   private readonly logger = new Logger(JobsService.name);
-  private boss: PgBoss;
 
-  constructor(private config: ConfigService) {}
+  constructor(private fb: FirebaseService) {}
 
-  async onModuleInit() {
-    this.boss = new PgBoss(this.config.get<string>('DATABASE_URL')!);
-
-    this.boss.on('error', (err) => this.logger.error('pg-boss error', err));
-
-    await this.boss.start();
-    this.logger.log('pg-boss iniciado');
-
-    // Registrar workers
-    await this.registerWorkers();
-
-    // Cron: limpiar tokens revocados expirados (diario a las 3AM)
-    await this.boss.schedule('cleanup-revoked-tokens', '0 3 * * *');
+  onModuleInit() {
+    this.logger.log('JobsService iniciado (Firestore mode)');
+    // Limpieza lazy de tokens en cada arranque (no bloquea el inicio)
+    this.cleanupExpiredTokens().catch((e) => this.logger.warn('cleanup error', e));
   }
 
-  async onModuleDestroy() {
-    await this.boss.stop();
-  }
-
-  // ── Encolar jobs ────────────────────────────────────────────
+  // ── Jobs ──────────────────────────────────────────────────────────────────
 
   async queueEmail(payload: { to: string; subject: string; html: string }) {
-    return this.boss.send('send-email', payload, { retryLimit: 3, retryDelay: 30 });
+    // Fire-and-forget: en producción reemplazar con Cloud Tasks o Nodemailer directo
+    this.logger.log(`📧 Email encolado para: ${payload.to}`);
   }
 
   async queueFileProcessing(payload: { documentId: number; minioKey: string }) {
-    return this.boss.send('process-file', payload, { retryLimit: 2 });
+    this.logger.log(`📄 Procesando archivo documentId=${payload.documentId}`);
   }
 
   async queueSearchIndexing(payload: { type: 'content' | 'document'; id: number }) {
-    return this.boss.send('index-search', payload, { retryLimit: 3 });
+    this.logger.log(`🔍 Indexando ${payload.type} id=${payload.id}`);
   }
 
-  // ── Workers ─────────────────────────────────────────────────
+  // ── Limpieza de tokens expirados ──────────────────────────────────────────
 
-  private async registerWorkers() {
-    await this.boss.work('send-email', async (job) => {
-      const { to, subject, html } = job.data as any;
-      this.logger.log(`📧 Enviando email a: ${to} | Asunto: ${subject}`);
-      // TODO: implementar con Nodemailer usando ConfigService
-    });
+  private async cleanupExpiredTokens() {
+    const now = new Date();
 
-    await this.boss.work('process-file', async (job) => {
-      const { documentId, minioKey } = job.data as any;
-      this.logger.log(`📄 Procesando archivo documentId=${documentId}`);
-      // TODO: generación de thumbnails, extracción de metadata, etc.
-    });
+    const [revoked, refreshed] = await Promise.all([
+      this.fb.db.collection('revoked_tokens')
+        .where('expiresAt', '<', now).limit(100).get(),
+      this.fb.db.collection('refresh_tokens')
+        .where('expiresAt', '<', now).limit(100).get(),
+    ]);
 
-    await this.boss.work('index-search', async (job) => {
-      const { type, id } = job.data as any;
-      this.logger.log(`🔍 Indexando ${type} id=${id}`);
-      // Los índices GIN de PostgreSQL se actualizan automáticamente con los triggers
-      // Este job es para indexación en Elasticsearch cuando se implemente en Fase 3
-    });
+    if (revoked.empty && refreshed.empty) return;
 
-    await this.boss.work('cleanup-revoked-tokens', async () => {
-      this.logger.log('🧹 Limpiando tokens revocados expirados');
-      // TODO: DELETE FROM revoked_tokens WHERE expires_at < NOW() via PrismaService
-    });
+    const batch = this.fb.db.batch();
+    revoked.docs.forEach((d)  => batch.delete(d.ref));
+    refreshed.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+
+    this.logger.log(`🧹 Tokens eliminados: ${revoked.size + refreshed.size}`);
   }
 }
