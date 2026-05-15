@@ -66,12 +66,12 @@ export function Sidebar() {
       className="w-56 flex flex-col shrink-0"
     >
       {/* Logo */}
-      <div style={{ borderBottom: '1px solid #1f1f1f' }} className="px-5 py-5 flex items-center justify-center">
+      <div style={{ borderBottom: '1px solid #1f1f1f' }} className="px-4 pt-4 pb-2 flex items-center justify-center">
         <Image
           src="/logo.png"
           alt="Logo"
-          width={130}
-          height={44}
+          width={100}
+          height={28}
           className="object-contain"
           priority
         />
