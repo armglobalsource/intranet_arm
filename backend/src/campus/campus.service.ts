@@ -1,55 +1,77 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { FirebaseService } from '../common/firebase/firebase.service';
 import { CreateCampusDto, UpdateCampusDto } from './dto/campus.dto';
+
+const COL = 'campuses';
 
 @Injectable()
 export class CampusService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private fb: FirebaseService) {}
 
-  findAll() {
-    return this.prisma.campus.findMany({
-      orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
-    });
+  async findAll() {
+    const snap = await this.fb.db.collection(COL).orderBy('name').get();
+    const all = this.fb.toDocs(snap);
+    return all.sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0) || a.name.localeCompare(b.name));
   }
 
-  findActive() {
-    return this.prisma.campus.findMany({
-      where:   { isActive: true },
-      orderBy: { name: 'asc' },
-      select:  { id: true, name: true, address: true },
-    });
+  async findActive() {
+    const snap = await this.fb.db.collection(COL)
+      .where('isActive', '==', true)
+      .orderBy('name')
+      .get();
+    return this.fb.toDocs(snap).map(({ id, name, address }) => ({ id, name, address }));
   }
 
   async findOne(id: number) {
-    const item = await this.prisma.campus.findUnique({ where: { id } });
-    if (!item) throw new NotFoundException(`Campus con id ${id} no encontrado`);
-    return item;
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    if (!snap.exists) throw new NotFoundException(`Campus con id ${id} no encontrado`);
+    return this.fb.toObj(snap);
   }
 
   async create(dto: CreateCampusDto) {
-    const existing = await this.prisma.campus.findFirst({
-      where: { name: { equals: dto.name.trim(), mode: 'insensitive' } },
-    });
-    if (existing) throw new ConflictException(`Ya existe un campus con el nombre "${dto.name}"`);
-    return this.prisma.campus.create({ data: { name: dto.name.trim(), address: dto.address?.trim() } });
+    const name = dto.name.trim();
+    // Verificar duplicado (case-insensitive)
+    const snap = await this.fb.db.collection(COL)
+      .where('nameLower', '==', name.toLowerCase())
+      .limit(1).get();
+    if (!snap.empty) throw new ConflictException(`Ya existe un campus con el nombre "${name}"`);
+
+    const id = await this.fb.nextId(COL);
+    const doc = {
+      id, name,
+      nameLower: name.toLowerCase(),
+      address:   dto.address?.trim() ?? null,
+      isActive:  true,
+      createdAt: this.fb.now(),
+      updatedAt: this.fb.now(),
+    };
+    await this.fb.db.collection(COL).doc(String(id)).set(doc);
+    return this.fb.toObj(await this.fb.db.collection(COL).doc(String(id)).get());
   }
 
   async update(id: number, dto: UpdateCampusDto) {
-    await this.prisma.campus.findUniqueOrThrow({ where: { id } });
+    await this.findOne(id);
     if (dto.name) {
-      const conflict = await this.prisma.campus.findFirst({
-        where: { name: { equals: dto.name.trim(), mode: 'insensitive' }, id: { not: id } },
-      });
-      if (conflict) throw new ConflictException(`Ya existe un campus con el nombre "${dto.name}"`);
+      const name = dto.name.trim();
+      const snap = await this.fb.db.collection(COL)
+        .where('nameLower', '==', name.toLowerCase())
+        .limit(1).get();
+      if (!snap.empty && snap.docs[0].data().id !== id) {
+        throw new ConflictException(`Ya existe un campus con el nombre "${name}"`);
+      }
     }
-    return this.prisma.campus.update({
-      where: { id },
-      data:  { ...dto, name: dto.name?.trim(), address: dto.address?.trim() },
-    });
+    const data: any = { updatedAt: this.fb.now() };
+    if (dto.name    !== undefined) { data.name = dto.name.trim(); data.nameLower = dto.name.trim().toLowerCase(); }
+    if (dto.address !== undefined) data.address = dto.address?.trim() ?? null;
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+
+    await this.fb.db.collection(COL).doc(String(id)).update(data);
+    return this.findOne(id);
   }
 
   async remove(id: number) {
-    await this.prisma.campus.findUniqueOrThrow({ where: { id } });
-    return this.prisma.campus.delete({ where: { id } });
+    await this.findOne(id);
+    await this.fb.db.collection(COL).doc(String(id)).delete();
+    return { id };
   }
 }

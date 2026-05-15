@@ -1,33 +1,40 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { FirebaseService } from '../common/firebase/firebase.service';
 import { CreateContentDto } from './dto/create-content.dto';
+
+const COL = 'content';
 
 @Injectable()
 export class ContentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private fb: FirebaseService) {}
 
-  findAll(userId: number, roleId: number) {
-    // TODO: aplicar filtros según rol y permisos
-    return this.prisma.content.findMany();
+  async findAll(_userId: number, _roleId: number) {
+    const snap = await this.fb.db.collection(COL).orderBy('createdAt', 'desc').get();
+    return this.fb.toDocs(snap);
   }
 
   async findOne(id: number) {
-    const item = await this.prisma.content.findUnique({ where: { id } });
-    if (!item) throw new NotFoundException(`Content con id ${id} no encontrado`);
-    return item;
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    if (!snap.exists) throw new NotFoundException(`Content con id ${id} no encontrado`);
+    return this.fb.toObj(snap);
   }
 
-  create(dto: CreateContentDto, userId: number) {
-    return this.prisma.content.create({ data: { ...dto } as any });
+  async create(dto: CreateContentDto, userId: number) {
+    const id = await this.fb.nextId(COL);
+    const doc = { id, ...dto, authorId: userId, createdAt: this.fb.now(), updatedAt: this.fb.now() };
+    await this.fb.db.collection(COL).doc(String(id)).set(doc);
+    return this.findOne(id);
   }
 
   async update(id: number, dto: Partial<CreateContentDto>) {
     await this.findOne(id);
-    return this.prisma.content.update({ where: { id }, data: dto as any });
+    await this.fb.db.collection(COL).doc(String(id)).update({ ...dto, updatedAt: this.fb.now() });
+    return this.findOne(id);
   }
 
   async remove(id: number) {
     await this.findOne(id);
-    return this.prisma.content.delete({ where: { id } });
+    await this.fb.db.collection(COL).doc(String(id)).delete();
+    return { id };
   }
 }

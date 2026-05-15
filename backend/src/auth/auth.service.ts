@@ -1,12 +1,14 @@
 import {
-  Injectable, UnauthorizedException, BadRequestException, Logger,
+  Injectable, UnauthorizedException, Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { FirebaseService } from '../common/firebase/firebase.service';
+import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 import { randomUUID, createHash } from 'crypto';
 import { LoginDto } from './dto/login.dto';
+import * as admin from 'firebase-admin';
 
 export interface JwtPayload {
   sub: number;
@@ -15,84 +17,94 @@ export interface JwtPayload {
   jti: string;
 }
 
+const RT_COL  = 'refresh_tokens';
+const REV_COL = 'revoked_tokens';
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
-    private prisma: PrismaService,
+    private fb: FirebaseService,
+    private users: UsersService,
     private jwt: JwtService,
     private config: ConfigService,
   ) {}
 
   async login(dto: LoginDto, ipAddress?: string, userAgent?: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-      include: { role: true },
-    });
-
+    const user = await this.users.findByEmail(dto.email);
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
-
     if (user.status !== 'active') {
       throw new UnauthorizedException('Cuenta suspendida o inactiva');
     }
 
-    // Actualizar último login
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    await this.users.updateLastLogin(user.id);
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role.name, ipAddress, userAgent);
-    return { user: this.sanitizeUser(user), ...tokens };
+    const roleName = user.role?.name ?? 'user';
+    const tokens = await this.generateTokens(user.id, user.email, roleName, ipAddress, userAgent);
+
+    const { passwordHash, ...safeUser } = user;
+    return { user: safeUser, ...tokens };
   }
 
   async refresh(rawRefreshToken: string) {
     const tokenHash = this.hashToken(rawRefreshToken);
-    const stored = await this.prisma.refreshToken.findUnique({
-      where: { tokenHash },
-      include: { user: { include: { role: true } } },
-    });
+    const snap = await this.fb.db.collection(RT_COL)
+      .where('tokenHash', '==', tokenHash).limit(1).get();
 
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+    if (snap.empty) throw new UnauthorizedException('Refresh token inválido o expirado');
+    const stored = snap.docs[0].data();
+    if (stored.revokedAt || stored.expiresAt.toDate() < new Date()) {
       throw new UnauthorizedException('Refresh token inválido o expirado');
     }
 
-    // Rotación: revocar el actual y emitir uno nuevo
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
-      data: { revokedAt: new Date() },
-    });
+    // Revocar token actual
+    await snap.docs[0].ref.update({ revokedAt: this.fb.now() });
 
-    return this.generateTokens(stored.userId, stored.user.email, stored.user.role.name);
+    const user = await this.users.findOne(stored.userId);
+    return this.generateTokens(stored.userId, user.email, user.role?.name ?? 'user');
   }
 
   async logout(userId: number, rawRefreshToken: string, accessJti: string, accessExp: number) {
     const tokenHash = this.hashToken(rawRefreshToken);
 
-    await this.prisma.refreshToken.updateMany({
-      where: { userId, tokenHash },
-      data: { revokedAt: new Date() },
+    // Revocar refresh tokens del usuario con ese hash
+    const snap = await this.fb.db.collection(RT_COL)
+      .where('userId', '==', userId)
+      .where('tokenHash', '==', tokenHash).get();
+    const batch = this.fb.db.batch();
+    snap.docs.forEach((d) => batch.update(d.ref, { revokedAt: this.fb.now() }));
+
+    // Revocar access token
+    const revId = await this.fb.nextId(REV_COL);
+    batch.set(this.fb.db.collection(REV_COL).doc(String(revId)), {
+      id: revId, jti: accessJti,
+      expiresAt: admin.firestore.Timestamp.fromDate(new Date(accessExp * 1000)),
     });
 
-    // Revocar access token hasta su expiración natural
-    await this.prisma.revokedToken.create({
-      data: { jti: accessJti, expiresAt: new Date(accessExp * 1000) },
-    });
+    await batch.commit();
   }
 
   async isTokenRevoked(jti: string): Promise<boolean> {
-    const revoked = await this.prisma.revokedToken.findUnique({ where: { jti } });
-    return !!revoked;
+    const snap = await this.fb.db.collection(REV_COL)
+      .where('jti', '==', jti).limit(1).get();
+    if (snap.empty) return false;
+    // Limpiar si ya expiró
+    const doc = snap.docs[0].data();
+    if (doc.expiresAt.toDate() < new Date()) {
+      await snap.docs[0].ref.delete();
+      return false;
+    }
+    return true;
   }
 
   private async generateTokens(
     userId: number, email: string, role: string,
     ipAddress?: string, userAgent?: string,
   ) {
-    const jti = randomUUID();
+    const jti        = randomUUID();
     const accessTtl  = this.config.get<number>('JWT_ACCESS_TTL',  900);
     const refreshTtl = this.config.get<number>('JWT_REFRESH_TTL', 28800);
 
@@ -100,11 +112,17 @@ export class AuthService {
     const accessToken = this.jwt.sign(payload, { expiresIn: `${accessTtl}s` });
 
     const rawRefreshToken = randomUUID();
-    const tokenHash = this.hashToken(rawRefreshToken);
-    const expiresAt = new Date(Date.now() + refreshTtl * 1000);
+    const tokenHash  = this.hashToken(rawRefreshToken);
+    const expiresAt  = new Date(Date.now() + refreshTtl * 1000);
+    const rtId       = await this.fb.nextId(RT_COL);
 
-    await this.prisma.refreshToken.create({
-      data: { userId, tokenHash, expiresAt, ipAddress, userAgent },
+    await this.fb.db.collection(RT_COL).doc(String(rtId)).set({
+      id: rtId, userId, tokenHash,
+      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+      ipAddress: ipAddress ?? null,
+      userAgent: userAgent ?? null,
+      revokedAt: null,
+      createdAt: this.fb.now(),
     });
 
     return { accessToken, refreshToken: rawRefreshToken, expiresIn: accessTtl };
@@ -112,10 +130,5 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
-  }
-
-  private sanitizeUser(user: any) {
-    const { passwordHash, ...safe } = user;
-    return safe;
   }
 }
