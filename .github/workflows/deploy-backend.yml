@@ -19,7 +19,6 @@ jobs:
     name: Build & Deploy Backend
     runs-on: ubuntu-latest
 
-    # Selecciona el ambiente según la rama
     environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
 
     steps:
