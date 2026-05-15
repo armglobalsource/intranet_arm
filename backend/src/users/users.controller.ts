@@ -15,12 +15,6 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class UsersController {
   constructor(private readonly service: UsersService) {}
 
-  @Get('roles')
-  @ApiOperation({ summary: 'Listar roles disponibles' })
-  findAllRoles() {
-    return this.service.findAllRoles();
-  }
-
   @Get()
   @ApiOperation({ summary: 'Listar usuarios paginados (con búsqueda opcional)' })
   @ApiQuery({ name: 'search', required: false })

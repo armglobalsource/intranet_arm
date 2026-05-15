@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/api';
 import {
   useOrgAreas, useOrgAreaTree, useOrgSearch, useOrgUserProfile,
@@ -1572,7 +1573,8 @@ type SelectedItem =
 export function OrgChartClient() {
   const { data: areas, isLoading: areasLoading } = useOrgAreas();
   const user    = useAuthStore((s) => s.user);
-  const canEdit = user?.role?.name?.toLowerCase() === 'admin';
+  const { can } = usePermissions();
+  const canEdit = can('orgchart:edit');
 
   const [activeSlug,      setActiveSlug]      = useState<string | null>(null);
   const [selected,        setSelected]        = useState<SelectedItem | null>(null);

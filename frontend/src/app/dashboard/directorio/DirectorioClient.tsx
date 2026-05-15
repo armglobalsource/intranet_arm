@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useOrgAreas, useOrgTeams } from '@/hooks/useOrgChart';
 import { useAllJobTitles } from '@/hooks/useJobTitles';
 import { useUsers } from '@/hooks/useUsers';
+import { useSystemRoles } from '@/hooks/useRoles';
+import { usePermissions } from '@/hooks/usePermissions';
 
 
 // ── Hub card ──────────────────────────────────────────────────────────────────
@@ -17,13 +19,14 @@ interface HubCardProps {
   count?:      number;
   countLabel?: string;
   loading?:    boolean;
+  className?:  string;
 }
 
-function HubCard({ href, icon, title, description, accentColor, count, countLabel, loading }: HubCardProps) {
+function HubCard({ href, icon, title, description, accentColor, count, countLabel, loading, className }: HubCardProps) {
   return (
     <Link
       href={href}
-      className="group relative bg-white border border-slate-200 rounded-2xl p-6 flex flex-col gap-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+      className={`group relative bg-white border border-slate-200 rounded-2xl p-6 flex flex-col gap-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden ${className ?? ''}`}
     >
       {/* Accent band */}
       <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: accentColor }} />
@@ -79,6 +82,8 @@ export function DirectorioClient() {
   const { data: teams,   isLoading: loadingTeams }   = useOrgTeams();
   const { data: cargos,  isLoading: loadingCargos }  = useAllJobTitles();
   const { data: persons, isLoading: loadingPersons } = useUsers();
+  const { data: roles,   isLoading: loadingRoles }   = useSystemRoles();
+  const { can } = usePermissions();
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -88,7 +93,7 @@ export function DirectorioClient() {
         <p className="text-sm text-slate-400 mt-1">Gestiona las personas, cargos y estructura del organigrama</p>
       </div>
 
-      {/* 4 hub cards */}
+      {/* hub cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <HubCard
           href="/dashboard/directorio/personas"
@@ -133,6 +138,20 @@ export function DirectorioClient() {
           countLabel="equipos"
           loading={loadingTeams}
         />
+
+        {can('roles:view') && (
+          <HubCard
+            href="/dashboard/directorio/roles"
+            icon="🔐"
+            title="Roles del Sistema"
+            description="Define los roles que controlan el acceso y funcionalidades del sistema."
+            accentColor="#4F46E5"
+            count={roles?.length}
+            countLabel="roles"
+            loading={loadingRoles}
+            className="sm:col-span-2"
+          />
+        )}
       </div>
     </div>
   );

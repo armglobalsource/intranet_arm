@@ -15,6 +15,7 @@ import { HealthModule } from './health/health.module';
 import { StorageModule } from './common/storage/storage.module';
 import { JobTitlesModule } from './job-titles/job-titles.module';
 import { CampusModule } from './campus/campus.module';
+import { RolesModule } from './roles/roles.module';
 
 const envSchema = Joi.object({
   NODE_ENV:             Joi.string().valid('development', 'production', 'test').default('development'),
@@ -59,6 +60,7 @@ const envSchema = Joi.object({
     HealthModule,
     JobTitlesModule,
     CampusModule,
+    RolesModule,
   ],
 })
 export class AppModule {}

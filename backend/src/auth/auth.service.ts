@@ -11,10 +11,12 @@ import { LoginDto } from './dto/login.dto';
 import * as admin from 'firebase-admin';
 
 export interface JwtPayload {
-  sub: number;
-  email: string;
-  role: string;
-  jti: string;
+  sub:         number;
+  email:       string;
+  role:        string;
+  roleId:      number;
+  permissions: string[];
+  jti:         string;
 }
 
 const RT_COL  = 'refresh_tokens';
@@ -43,10 +45,11 @@ export class AuthService {
     await this.users.updateLastLogin(user.id);
 
     const roleName = user.role?.name ?? 'user';
-    const tokens = await this.generateTokens(user.id, user.email, roleName, ipAddress, userAgent);
+    const roleId   = user.roleId ?? user.role?.id ?? 0;
+    const { permissions, ...tokens } = await this.generateTokens(user.id, user.email, roleName, roleId, ipAddress, userAgent);
 
     const { passwordHash, ...safeUser } = user;
-    return { user: safeUser, ...tokens };
+    return { user: { ...safeUser, permissions }, ...tokens };
   }
 
   async refresh(rawRefreshToken: string) {
@@ -64,7 +67,8 @@ export class AuthService {
     await snap.docs[0].ref.update({ revokedAt: this.fb.now() });
 
     const user = await this.users.findOne(stored.userId);
-    return this.generateTokens(stored.userId, user.email, user.role?.name ?? 'user');
+    const roleId = user.roleId ?? user.role?.id ?? 0;
+    return this.generateTokens(stored.userId, user.email, user.role?.name ?? 'user', roleId);
   }
 
   async logout(userId: number, rawRefreshToken: string, accessJti: string, accessExp: number) {
@@ -101,14 +105,20 @@ export class AuthService {
   }
 
   private async generateTokens(
-    userId: number, email: string, role: string,
+    userId: number, email: string, role: string, roleId: number,
     ipAddress?: string, userAgent?: string,
   ) {
     const jti        = randomUUID();
     const accessTtl  = this.config.get<number>('JWT_ACCESS_TTL',  900);
     const refreshTtl = this.config.get<number>('JWT_REFRESH_TTL', 28800);
 
-    const payload: JwtPayload = { sub: userId, email, role, jti };
+    // Cargar permisos del rol desde Firestore
+    const roleSnap   = await this.fb.db.collection('roles').doc(String(roleId)).get();
+    const permissions: string[] = roleSnap.exists
+      ? (roleSnap.data()!.permissions ?? [])
+      : [];
+
+    const payload: JwtPayload = { sub: userId, email, role, roleId, permissions, jti };
     const accessToken = this.jwt.sign(payload, { expiresIn: `${accessTtl}s` });
 
     const rawRefreshToken = randomUUID();
@@ -125,7 +135,7 @@ export class AuthService {
       createdAt: this.fb.now(),
     });
 
-    return { accessToken, refreshToken: rawRefreshToken, expiresIn: accessTtl };
+    return { accessToken, refreshToken: rawRefreshToken, expiresIn: accessTtl, permissions };
   }
 
   private hashToken(token: string): string {
