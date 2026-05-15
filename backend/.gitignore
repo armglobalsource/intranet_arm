@@ -1,2 +1,3 @@
 uploads/
 service-account.json
+backend/.env
