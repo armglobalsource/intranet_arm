@@ -20,13 +20,6 @@ function formatUser(raw: any) {
 export class UsersService {
   constructor(private fb: FirebaseService) {}
 
-  // ── Roles ─────────────────────────────────────────────────────────────────
-
-  async findAllRoles() {
-    const snap = await this.fb.db.collection('roles').get();
-    return this.fb.toDocs(snap);
-  }
-
   // ── Usuarios ──────────────────────────────────────────────────────────────
 
   async findAll(_userId: number, _roleId: number, search?: string, page = 1, limit = 50) {

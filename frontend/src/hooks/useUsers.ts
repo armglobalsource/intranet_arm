@@ -68,7 +68,7 @@ export { useActiveJobTitleNames as useJobTitles } from './useJobTitles';
 export function useRoles() {
   return useQuery<Role[]>({
     queryKey: userKeys.roles,
-    queryFn:  () => api.get('/users/roles').then((r) => r.data),
+    queryFn:  () => api.get('/roles').then((r) => r.data),
     staleTime: 10 * 60 * 1000,
   });
 }

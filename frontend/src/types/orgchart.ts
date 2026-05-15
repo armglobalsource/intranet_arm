@@ -69,11 +69,11 @@ export interface OrgMembershipFull {
   userId: number;
   areaId?: number | null;
   teamId?: number | null;
-  area?: { id: number; name: string; color: string; slug: string; icon: string } | null;
+  area?: { id: number; name: string; color: string; slug: string; icon: string; iconUrl?: string | null } | null;
   team?: {
     id: number;
     name: string;
-    area?: { id: number; name: string; color: string; slug: string; icon: string } | null;
+    area?: { id: number; name: string; color: string; slug: string; icon: string; iconUrl?: string | null } | null;
   } | null;
 }
 

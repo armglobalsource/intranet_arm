@@ -3,6 +3,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { OrgChartService } from './orgchart.service';
 import {
   CreateOrgAreaDto, UpdateOrgAreaDto,
@@ -12,7 +14,7 @@ import {
 
 @ApiTags('OrgChart')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller({ path: 'orgchart', version: '1' })
 export class OrgChartController {
   constructor(private readonly service: OrgChartService) {}
@@ -32,20 +34,24 @@ export class OrgChartController {
   getAreaTree(@Param('slug') slug: string) { return this.service.getAreaTree(slug); }
 
   @Post('areas')
+  @RequirePermission('orgchart:edit')
   @ApiOperation({ summary: 'Crear área' })
   createArea(@Body() dto: CreateOrgAreaDto) { return this.service.createArea(dto); }
 
   @Patch('areas/:id')
+  @RequirePermission('orgchart:edit')
   @ApiOperation({ summary: 'Actualizar área' })
   updateArea(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateOrgAreaDto) {
     return this.service.updateArea(id, dto);
   }
 
   @Delete('areas/:id')
+  @RequirePermission('orgchart:delete')
   @ApiOperation({ summary: 'Desactivar área y sus equipos (soft delete)' })
   deleteArea(@Param('id', ParseIntPipe) id: number) { return this.service.deleteArea(id); }
 
   @Post('areas/:id/logo')
+  @RequirePermission('orgchart:edit')
   @ApiOperation({ summary: 'Subir imagen/logo de un área' })
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } }))
   uploadAreaLogo(
@@ -64,20 +70,24 @@ export class OrgChartController {
   getAllTeams() { return this.service.getAllTeams(); }
 
   @Post('teams')
+  @RequirePermission('orgchart:edit')
   @ApiOperation({ summary: 'Crear equipo dentro de un área' })
   createTeam(@Body() dto: CreateOrgTeamDto) { return this.service.createTeam(dto); }
 
   @Patch('teams/:id')
+  @RequirePermission('orgchart:edit')
   @ApiOperation({ summary: 'Actualizar equipo' })
   updateTeam(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateOrgTeamDto) {
     return this.service.updateTeam(id, dto);
   }
 
   @Delete('teams/:id')
+  @RequirePermission('orgchart:delete')
   @ApiOperation({ summary: 'Desactivar equipo (soft delete)' })
   deleteTeam(@Param('id', ParseIntPipe) id: number) { return this.service.deleteTeam(id); }
 
   @Post('teams/:id/logo')
+  @RequirePermission('orgchart:edit')
   @ApiOperation({ summary: 'Subir logo/imagen de un equipo' })
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } }))
   uploadTeamLogo(
@@ -88,16 +98,19 @@ export class OrgChartController {
   // ── MEMBRESÍAS ───────────────────────────────────────────────
 
   @Post('memberships')
+  @RequirePermission('orgchart:edit')
   @ApiOperation({ summary: 'Agregar usuario a un área o equipo con un rol' })
   createMembership(@Body() dto: CreateOrgMembershipDto) { return this.service.createMembership(dto); }
 
   @Patch('memberships/:id')
+  @RequirePermission('orgchart:edit')
   @ApiOperation({ summary: 'Actualizar rol o sortOrder de una membresía' })
   updateMembership(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateOrgMembershipDto) {
     return this.service.updateMembership(id, dto);
   }
 
   @Delete('memberships/:id')
+  @RequirePermission('orgchart:edit')
   @ApiOperation({ summary: 'Eliminar membresía (quita al usuario del área/equipo)' })
   deleteMembership(@Param('id', ParseIntPipe) id: number) { return this.service.deleteMembership(id); }
 

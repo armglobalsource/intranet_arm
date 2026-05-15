@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/api';
 import {
   useOrgAreas, useOrgAreaTree, useOrgSearch, useOrgUserProfile,
@@ -171,21 +172,16 @@ function TeamCard({ team, color, canEdit, forceOpen, isDragging, dragHandle, onS
     <div style={{ opacity: isDragging ? 0.5 : 1 }}>
       {/* Header del equipo */}
       <div
-        className="flex items-center gap-2.5 bg-slate-800 rounded-[10px] px-3 py-2.5 shadow-sm cursor-pointer transition-shadow hover:shadow-md"
+        className="flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 shadow-sm cursor-pointer transition-shadow hover:shadow-md"
+        style={{ background: '#d1d0cc' }}
         onClick={() => onSelectTeam(team)}
       >
         {/* Drag handle — solo en modo edición */}
         {dragHandle}
 
-        <div className="w-[36px] h-[36px] rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center text-base overflow-hidden">
-          {team.iconUrl
-            ? <img src={team.iconUrl} alt={team.name} className="w-full h-full object-cover" />
-            : (team.icon ?? '👥')
-          }
-        </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold text-white leading-snug truncate">{team.name}</div>
-          <div className="text-[10.5px] text-white/40 mt-0.5 uppercase tracking-wide">
+          <div className="text-[13px] font-semibold text-slate-800 leading-snug truncate">{team.name}</div>
+          <div className="text-[10.5px] text-slate-500 mt-0.5 uppercase tracking-wide">
             {leaders.length} líder{leaders.length !== 1 ? 'es' : ''} · {members.length} miembro{members.length !== 1 ? 's' : ''}
           </div>
         </div>
@@ -194,7 +190,7 @@ function TeamCard({ team, color, canEdit, forceOpen, isDragging, dragHandle, onS
           <button
             onClick={(e) => { e.stopPropagation(); setDescOpen((v) => !v); }}
             className={`w-[22px] h-[22px] rounded-md flex-shrink-0 border flex items-center justify-center text-[11px] font-bold italic font-serif transition-all ${
-              descOpen ? 'text-white border-transparent' : 'border-white/20 text-white/40 hover:bg-white/10'
+              descOpen ? 'text-white border-transparent' : 'border-slate-400/40 text-slate-500 hover:bg-slate-300/30'
             }`}
             style={descOpen ? { background: color, borderColor: color } : {}}
             title="Ver descripción"
@@ -206,7 +202,7 @@ function TeamCard({ team, color, canEdit, forceOpen, isDragging, dragHandle, onS
         <button
           onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
           className={`w-7 h-7 rounded-[7px] flex-shrink-0 border flex items-center justify-center transition-all ${
-            open ? 'text-white border-transparent' : 'border-white/20 text-white/40 hover:bg-white/10'
+            open ? 'text-white border-transparent' : 'border-slate-400/40 text-slate-500 hover:bg-slate-300/30'
           }`}
           style={open ? { background: color, borderColor: color } : {}}
         >
@@ -430,8 +426,10 @@ function MembershipRow({ m, isCurrent }: { m: OrgMembershipFull; isCurrent: bool
       }
     >
       {/* Icono del área */}
-      <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-base" style={{ background: `${aColor}20` }}>
-        {area?.icon ?? '📌'}
+      <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-base overflow-hidden" style={{ background: `${aColor}20` }}>
+        {area?.iconUrl
+          ? <img src={area.iconUrl} alt={area.name} className="w-full h-full object-cover" />
+          : (area?.icon ?? '📌')}
       </div>
 
       <div className="flex-1 min-w-0">
@@ -768,8 +766,6 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
   const [addQuery,   setAddQuery]   = useState('');
   const [addResults, setAddResults] = useState<OrgUser[]>([]);
   const [searching,  setSearching]  = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
   const updateTeam       = useUpdateOrgTeam();
   const uploadLogo       = useUploadTeamLogo();
   const createMembership  = useCreateOrgMembership();
@@ -792,20 +788,6 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
       .finally(() => setSearching(false));
     return () => ctrl.abort();
   }, [addQuery]);
-
-  async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.files?.[0];
-    if (!raw) return;
-    try {
-      const file    = await resizeImage(raw);
-      const preview = URL.createObjectURL(file);
-      setLogoPreview(preview);
-      uploadLogo.mutate(
-        { id: team.id, file },
-        { onError: () => { setLogoPreview(null); alert('Error al subir la imagen. Intenta nuevamente.'); } },
-      );
-    } catch { alert('No se pudo procesar la imagen.'); }
-  }
 
   function handleSave() {
     setSaveStatus('saving');
@@ -836,34 +818,7 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
 
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0" style={{ borderTop: `3px solid ${color}` }}>
           <div className="flex items-center gap-2.5">
-            {/* Logo del equipo */}
-            <div className="relative flex-shrink-0">
-              <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center bg-slate-100 text-xl">
-                {logoPreview || team.iconUrl
-                  ? <img src={logoPreview ?? team.iconUrl!} alt={team.name} className="w-full h-full object-cover" />
-                  : (team.icon ?? '👥')
-                }
-              </div>
-              {isEditing && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => logoInputRef.current?.click()}
-                    disabled={uploadLogo.isPending}
-                    className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center transition-all disabled:opacity-50"
-                    style={{ background: color }}
-                    title="Cambiar logo"
-                  >
-                    {uploadLogo.isPending
-                      ? <div className="w-2.5 h-2.5 border border-white/40 border-t-white rounded-full animate-spin" />
-                      : <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    }
-                  </button>
-                  <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
-                </>
-              )}
-            </div>
-            <span className="text-sm font-bold text-slate-900 truncate max-w-[200px]">{team.name}</span>
+            <span className="text-sm font-bold text-slate-900 truncate max-w-[240px]">{team.name}</span>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 text-sm">✕</button>
         </div>
@@ -1069,7 +1024,11 @@ function SearchUserDetailPanel({ user, areas, onClose }: { user: OrgSearchUser; 
                 return (
                   <div key={m.id} className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-slate-100 bg-slate-50">
                     {area && (
-                      <span className="text-base flex-shrink-0">{area.icon}</span>
+                      <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center text-base overflow-hidden" style={{ background: `${aColor}20` }}>
+                        {area.iconUrl
+                          ? <img src={area.iconUrl} alt={area.name} className="w-full h-full object-cover" />
+                          : area.icon}
+                      </div>
                     )}
                     <div className="flex-1 min-w-0">
                       {area && (
@@ -1236,8 +1195,11 @@ function SearchBar({ areas, onSelectUser }: { areas: OrgArea[]; onSelectUser: (u
                         const a = membershipArea(m);
                         if (!a) return null;
                         return (
-                          <span key={i} className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-full text-white" style={{ background: a.color }}>
-                            {a.icon} {a.name}
+                          <span key={i} className="inline-flex items-center gap-1 text-[9.5px] font-semibold px-1.5 py-0.5 rounded-full text-white" style={{ background: a.color }}>
+                            {a.iconUrl
+                              ? <img src={a.iconUrl} alt="" className="w-3 h-3 rounded-full object-cover flex-shrink-0" />
+                              : a.icon}
+                            {a.name}
                           </span>
                         );
                       })}
@@ -1266,8 +1228,10 @@ function SearchBar({ areas, onSelectUser }: { areas: OrgArea[]; onSelectUser: (u
 function OverviewCard({ area, onClick }: { area: OrgArea; onClick: () => void }) {
   return (
     <button onClick={onClick} className="bg-white rounded-2xl p-5 flex-1 min-w-[160px] shadow-sm border border-slate-200 hover:shadow-md hover:-translate-y-0.5 transition-all text-left">
-      <div className="w-10 h-10 rounded-xl mb-3 flex items-center justify-center text-lg" style={{ background: `${area.color}18` }}>
-        {area.icon}
+      <div className="w-10 h-10 rounded-xl mb-3 flex items-center justify-center text-lg overflow-hidden flex-shrink-0" style={{ background: `${area.color}18` }}>
+        {area.iconUrl
+          ? <img src={area.iconUrl} alt={area.name} className="w-full h-full object-cover" />
+          : area.icon}
       </div>
       <div className="text-[13px] font-bold mb-1" style={{ color: area.color }}>{area.name}</div>
       <div className="text-[11.5px] text-slate-500 leading-relaxed line-clamp-3">{area.desc}</div>
@@ -1572,7 +1536,8 @@ type SelectedItem =
 export function OrgChartClient() {
   const { data: areas, isLoading: areasLoading } = useOrgAreas();
   const user    = useAuthStore((s) => s.user);
-  const canEdit = user?.role?.name?.toLowerCase() === 'admin';
+  const { can } = usePermissions();
+  const canEdit = can('orgchart:edit');
 
   const [activeSlug,      setActiveSlug]      = useState<string | null>(null);
   const [selected,        setSelected]        = useState<SelectedItem | null>(null);
@@ -1632,11 +1597,12 @@ export function OrgChartClient() {
             {/* Hero con buscador */}
             <div className="bg-white border-b border-slate-100 px-6 pt-8 pb-7 flex flex-col items-center gap-3">
               <div className="text-center mb-1">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">ARM Global</p>
-                <h1 className="text-2xl font-bold text-slate-900">Organigramas</h1>
+                <h1 className="inline-block bg-slate-900 text-white text-[13px] font-black uppercase tracking-widest px-5 py-2 rounded-full">Organigrama</h1>
               </div>
+              <p className="text-[12.5px] text-slate-400 text-center max-w-sm">
+                Selecciona un área para ver el detalle o busca una persona por su nombre en todas las áreas.
+              </p>
               <SearchBar areas={areas ?? []} onSelectUser={(u) => { setSearchSelected(u); setSelected(null); }} />
-              <p className="text-[11.5px] text-slate-400">Busca por nombre o cargo en todos los organigramas</p>
             </div>
             <div className="px-6 pt-6 pb-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {areas?.map((area) => (
