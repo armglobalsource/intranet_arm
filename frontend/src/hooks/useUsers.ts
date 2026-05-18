@@ -113,3 +113,17 @@ export function useDeleteUser() {
     onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
   });
 }
+
+export function useUploadUserAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) => {
+      const form = new FormData();
+      form.append('file', file);
+      return api.post<User>(`/users/${id}/avatar`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
+  });
+}

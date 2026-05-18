@@ -1,12 +1,46 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import Link from 'next/link';
 import {
   useSystemRoles, useCreateRole, useUpdateRole, useDeleteRole,
   type SystemRole,
 } from '@/hooks/useRoles';
 import { PERMISSION_CATALOG } from '@/lib/permissions';
+
+const PAGE_SIZE = 20;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function permLabel(perm: string): string {
+  const [resource, action] = perm.split(':');
+  const cat = (PERMISSION_CATALOG as any)[resource];
+  if (!cat) return perm;
+  return cat.actions?.[action] ?? `${cat.label}: ${action}`;
+}
+
+function PermBadges({ permissions }: { permissions: string[] }) {
+  if (permissions.includes('*')) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10.5px] font-semibold">
+        ✦ Acceso total
+      </span>
+    );
+  }
+  if (permissions.length === 0) {
+    return <span className="text-[11px] italic text-slate-300">Sin permisos</span>;
+  }
+  const shown = permissions.slice(0, 2);
+  const rest  = permissions.length - shown.length;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {shown.map((p) => (
+        <span key={p} className="inline-flex px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10.5px]">{permLabel(p)}</span>
+      ))}
+      {rest > 0 && <span className="text-[10.5px] text-slate-400 self-center">+{rest} más</span>}
+    </div>
+  );
+}
 
 // ── PermissionsPanel ──────────────────────────────────────────────────────────
 
@@ -16,12 +50,12 @@ interface PermissionsPanelProps {
 }
 
 function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
-  const update = useUpdateRole();
+  const update     = useUpdateRole();
   const isWildcard = rol.permissions.includes('*');
 
-  const [selected,   setSelected]   = useState<Set<string>>(new Set(rol.permissions));
-  const [wildcard,   setWildcard]   = useState(isWildcard);
-  const [saveState,  setSaveState]  = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [selected,  setSelected]  = useState<Set<string>>(new Set(rol.permissions));
+  const [wildcard,  setWildcard]  = useState(isWildcard);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   function toggle(perm: string) {
     setSelected((prev) => {
@@ -31,10 +65,7 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
     });
   }
 
-  function toggleWildcard() {
-    setWildcard((w) => !w);
-    setSelected(new Set());
-  }
+  function toggleWildcard() { setWildcard((w) => !w); setSelected(new Set()); }
 
   function handleSave() {
     setSaveState('saving');
@@ -58,7 +89,6 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[620px] overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
 
-        {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50 flex-shrink-0">
           <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-lg">🛡️</div>
           <div className="flex-1">
@@ -68,7 +98,6 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
           <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100 text-sm">✕</button>
         </div>
 
-        {/* Acceso total */}
         <div className="px-5 py-3 border-b border-slate-100 flex-shrink-0">
           <label className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${wildcard ? 'bg-indigo-50 border border-indigo-200' : 'border border-slate-200 hover:bg-slate-50'}`}>
             <div
@@ -84,12 +113,10 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
           </label>
         </div>
 
-        {/* Grid de permisos */}
         <div className={`overflow-y-auto flex-1 px-5 py-4 ${wildcard ? 'opacity-40 pointer-events-none' : ''}`}>
           <div className="flex flex-col gap-4">
             {Object.entries(PERMISSION_CATALOG).map(([resource, cfg]) => (
               <div key={resource}>
-                {/* Recurso header */}
                 <div className="mb-2">
                   <div className="flex items-center gap-2">
                     <p className="text-[11.5px] font-bold text-slate-700 uppercase tracking-wider">{cfg.label}</p>
@@ -99,25 +126,19 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
                     <p className="text-[11px] text-slate-400 mt-0.5">{(cfg as any).description}</p>
                   )}
                 </div>
-                {/* Acciones */}
                 <div className="grid grid-cols-2 gap-2">
                   {Object.entries(cfg.actions).map(([action, label]) => {
                     const perm    = `${resource}:${action}`;
                     const checked = selected.has(perm);
                     return (
-                      <label
-                        key={perm}
-                        onClick={() => toggle(perm)}
+                      <label key={perm} onClick={() => toggle(perm)}
                         className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer border transition-colors ${
-                          checked
-                            ? 'bg-indigo-50 border-indigo-200'
-                            : 'border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
+                          checked ? 'bg-indigo-50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'
+                        }`}>
                         <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${checked ? 'bg-indigo-600' : 'border-2 border-slate-300'}`}>
                           {checked && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                         </div>
-                        <p className="text-[12px] font-medium text-slate-800 leading-tight">{label}</p>
+                        <p className="text-[12px] font-medium text-slate-800 leading-tight">{label as string}</p>
                       </label>
                     );
                   })}
@@ -127,7 +148,6 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center gap-2 px-5 py-4 border-t border-slate-100 flex-shrink-0 bg-slate-50">
           <span className="text-[12px] text-slate-400 flex-1">
             {wildcard ? 'Acceso total activado' : `${selected.size} permiso${selected.size !== 1 ? 's' : ''} seleccionado${selected.size !== 1 ? 's' : ''}`}
@@ -135,12 +155,9 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
           <button onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-200 text-[13px] text-slate-500 hover:bg-slate-100 transition-colors">
             Cancelar
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saveState === 'saving' || saveState === 'saved'}
+          <button onClick={handleSave} disabled={saveState === 'saving' || saveState === 'saved'}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-white transition-all disabled:opacity-60"
-            style={{ background: saveState === 'saved' ? '#1D9E75' : saveState === 'error' ? '#DC2626' : '#4F46E5' }}
-          >
+            style={{ background: saveState === 'saved' ? '#1D9E75' : saveState === 'error' ? '#DC2626' : '#4F46E5' }}>
             {saveState === 'idle'   && 'Guardar permisos'}
             {saveState === 'saving' && <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>Guardando...</>}
             {saveState === 'saved'  && '✓ Guardado'}
@@ -160,17 +177,17 @@ interface RolModalProps {
 }
 
 function RolModal({ rol, onClose }: RolModalProps) {
-  const isEdit = !!rol;
+  const isEdit      = !!rol;
+  const isSystemRol = isEdit && rol!.isSystem;
+
   const [name,        setName]        = useState(rol?.name ?? '');
   const [description, setDescription] = useState(rol?.description ?? '');
   const [saveState,   setSaveState]   = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [errorMsg,    setErrorMsg]    = useState('');
 
-  const create = useCreateRole();
-  const update = useUpdateRole();
-
-  const canSubmit   = name.trim().length >= 2;
-  const isSystemRol = isEdit && rol!.isSystem;
+  const create    = useCreateRole();
+  const update    = useUpdateRole();
+  const canSubmit = name.trim().length >= 2;
 
   function handleSubmit() {
     if (!canSubmit) return;
@@ -184,7 +201,6 @@ function RolModal({ rol, onClose }: RolModalProps) {
       setTimeout(() => setSaveState('idle'), 2500);
     };
     const onSuccess = () => { setSaveState('saved'); setTimeout(onClose, 800); };
-
     const data = { name: name.trim(), description: description.trim() || undefined };
     if (isEdit) update.mutate({ id: rol!.id, data }, { onSuccess, onError });
     else        create.mutate(data, { onSuccess, onError });
@@ -218,28 +234,20 @@ function RolModal({ rol, onClose }: RolModalProps) {
             </div>
           )}
           <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-              Nombre del rol <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text" value={name} onChange={(e) => setName(e.target.value)}
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">Nombre del rol <span className="text-red-400">*</span></label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
               disabled={isSystemRol} autoFocus={!isSystemRol}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
               className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition disabled:bg-slate-50 disabled:text-slate-400"
-              placeholder="Ej: branding, editor, supervisor..."
-            />
+              placeholder="Ej: branding, editor, supervisor..." />
             <p className="text-[11px] text-slate-400 mt-1">Identificador interno del rol</p>
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-              Descripción <span className="text-slate-400 font-normal">(opcional)</span>
-            </label>
-            <textarea
-              value={description} onChange={(e) => setDescription(e.target.value)}
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">Descripción <span className="text-slate-400 font-normal">(opcional)</span></label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)}
               autoFocus={isSystemRol} rows={2}
               className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition resize-none"
-              placeholder="Describe las responsabilidades y accesos de este rol..."
-            />
+              placeholder="Describe las responsabilidades y accesos de este rol..." />
           </div>
           {errorMsg && (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-50 border border-red-200">
@@ -250,11 +258,9 @@ function RolModal({ rol, onClose }: RolModalProps) {
             </div>
           )}
           <div className="flex items-center gap-2 pt-1">
-            <button
-              onClick={handleSubmit} disabled={!canSubmit || saveState === 'saving' || saveState === 'saved'}
+            <button onClick={handleSubmit} disabled={!canSubmit || saveState === 'saving' || saveState === 'saved'}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all disabled:opacity-60"
-              style={{ background: saveState === 'saved' ? '#1D9E75' : saveState === 'error' ? '#DC2626' : '#4F46E5' }}
-            >
+              style={{ background: saveState === 'saved' ? '#1D9E75' : saveState === 'error' ? '#DC2626' : '#4F46E5' }}>
               {saveState === 'idle'   && (isEdit ? 'Guardar cambios' : '+ Crear rol')}
               {saveState === 'saving' && <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>Guardando...</>}
               {saveState === 'saved'  && '✓ ¡Guardado!'}
@@ -271,35 +277,127 @@ function RolModal({ rol, onClose }: RolModalProps) {
   );
 }
 
-// ── PermBadges ────────────────────────────────────────────────────────────────
+// ── DeleteConfirmModal ────────────────────────────────────────────────────────
 
-function permLabel(perm: string): string {
-  const [resource, action] = perm.split(':');
-  const cat = (PERMISSION_CATALOG as any)[resource];
-  if (!cat) return perm;
-  const actionLabel = cat.actions?.[action];
-  return actionLabel ?? `${cat.label}: ${action}`;
+interface DeleteConfirmModalProps {
+  rol:       SystemRole;
+  onConfirm: () => void;
+  onCancel:  () => void;
+  isPending: boolean;
 }
 
-function PermBadges({ permissions }: { permissions: string[] }) {
-  if (permissions.includes('*')) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10.5px] font-semibold">
-        ✦ Acceso total
-      </span>
-    );
-  }
-  if (permissions.length === 0) {
-    return <span className="text-[11px] italic text-slate-300">Sin permisos</span>;
-  }
-  const shown = permissions.slice(0, 2);
-  const rest  = permissions.length - shown.length;
+function DeleteConfirmModal({ rol, onConfirm, onCancel, isPending }: DeleteConfirmModalProps) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [onCancel]);
+
   return (
-    <div className="flex flex-wrap gap-1">
-      {shown.map((p) => (
-        <span key={p} className="inline-flex px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10.5px]">{permLabel(p)}</span>
-      ))}
-      {rest > 0 && <span className="text-[10.5px] text-slate-400 self-center">+{rest} más</span>}
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[380px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 flex flex-col items-center gap-4 text-center">
+          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
+            <svg className="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-[15px] font-bold text-slate-900">¿Eliminar rol?</p>
+            <p className="text-[12.5px] text-slate-500 mt-1.5 leading-relaxed">
+              Estás a punto de eliminar el rol{' '}
+              <span className="font-mono font-semibold text-slate-700">"{rol.name}"</span>.
+              Esta acción no se puede deshacer.
+            </p>
+          </div>
+          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-100 w-full">
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-base flex-shrink-0">🔓</div>
+            <div className="min-w-0 text-left">
+              <p className="text-[12px] font-mono font-semibold text-slate-800 truncate">{rol.name}</p>
+              {rol.description && <p className="text-[11px] text-slate-400 truncate">{rol.description}</p>}
+            </div>
+          </div>
+          <div className="flex gap-2 w-full pt-1">
+            <button onClick={onCancel} disabled={isPending}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50">
+              Cancelar
+            </button>
+            <button onClick={onConfirm} disabled={isPending}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-[13px] font-semibold text-white transition-colors disabled:opacity-50">
+              {isPending
+                ? <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>Eliminando...</>
+                : 'Sí, eliminar'
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── FilterSelect ──────────────────────────────────────────────────────────────
+
+function FilterSelect({ value, onChange, placeholder, children }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  children: React.ReactNode;
+}) {
+  const active = value !== '';
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`pl-3 pr-8 py-2 rounded-xl border text-[12.5px] font-medium appearance-none transition focus:outline-none focus:ring-2 focus:ring-indigo-100 bg-white ${
+          active
+            ? 'border-indigo-400 text-indigo-700 bg-indigo-50'
+            : 'border-slate-200 text-slate-600 hover:border-slate-300'
+        }`}
+      >
+        <option value="">{placeholder}</option>
+        {children}
+      </select>
+      <svg className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none ${active ? 'text-indigo-500' : 'text-slate-400'}`}
+        viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </div>
+  );
+}
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+
+function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null;
+
+  const pages: (number | '…')[] = [];
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= page - 1 && i <= page + 1)) pages.push(i);
+    else if (pages[pages.length - 1] !== '…') pages.push('…');
+  }
+
+  const btnCls = (active: boolean, disabled?: boolean) =>
+    `min-w-[32px] h-8 px-2 rounded-lg text-[12px] font-medium transition-colors flex items-center justify-center ${
+      disabled ? 'text-slate-300 cursor-not-allowed' :
+      active   ? 'bg-slate-900 text-white' :
+                 'text-slate-600 hover:bg-slate-100'
+    }`;
+
+  return (
+    <div className="flex items-center justify-center gap-1 py-4">
+      <button onClick={() => onChange(page - 1)} disabled={page === 1} className={btnCls(false, page === 1)}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      {pages.map((p, i) =>
+        p === '…'
+          ? <span key={`e${i}`} className="w-8 text-center text-slate-400 text-[12px]">…</span>
+          : <button key={p} onClick={() => onChange(p)} className={btnCls(p === page)}>{p}</button>
+      )}
+      <button onClick={() => onChange(page + 1)} disabled={page === totalPages} className={btnCls(false, page === totalPages)}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
     </div>
   );
 }
@@ -307,63 +405,97 @@ function PermBadges({ permissions }: { permissions: string[] }) {
 // ── RolesPage ─────────────────────────────────────────────────────────────────
 
 export default function RolesPage() {
-  const router = useRouter();
   const { data: roles = [], isLoading } = useSystemRoles();
   const update = useUpdateRole();
   const remove = useDeleteRole();
 
-  const [modal,      setModal]      = useState<'create' | 'edit' | null>(null);
-  const [permsFor,   setPermsFor]   = useState<SystemRole | null>(null);
-  const [selected,   setSelected]   = useState<SystemRole | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
-  const [search,     setSearch]     = useState('');
+  const [modal,         setModal]         = useState<'create' | 'edit' | null>(null);
+  const [permsFor,      setPermsFor]      = useState<SystemRole | null>(null);
+  const [selected,      setSelected]      = useState<SystemRole | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<SystemRole | null>(null);
+  const [togglingId,    setTogglingId]    = useState<number | null>(null);
 
-  function openEdit(r: SystemRole) { setSelected(r); setModal('edit'); }
-  function openCreate()            { setSelected(null); setModal('create'); }
-  function closeModal()            { setModal(null); setSelected(null); }
+  const [search,        setSearch]        = useState('');
+  const [debounced,     setDebounced]     = useState('');
+  const [tipoFilter,    setTipoFilter]    = useState('');
+  const [permisoFilter, setPermisoFilter] = useState('');
+  const [statusFilter,  setStatusFilter]  = useState('');
+  const [page,          setPage]          = useState(1);
+  const debRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    clearTimeout(debRef.current);
+    debRef.current = setTimeout(() => setDebounced(search), 250);
+    return () => clearTimeout(debRef.current);
+  }, [search]);
+
+  useEffect(() => setPage(1), [debounced, tipoFilter, permisoFilter, statusFilter]);
+
+  function openEdit(r: SystemRole)  { setSelected(r); setModal('edit'); }
+  function openCreate()              { setSelected(null); setModal('create'); }
+  function closeModal()              { setModal(null); setSelected(null); }
 
   function handleToggle(r: SystemRole) {
+    if (r.isSystem) return;
     setTogglingId(r.id);
     update.mutate({ id: r.id, data: { isActive: !r.isActive } }, { onSettled: () => setTogglingId(null) });
   }
 
-  function handleDelete(r: SystemRole) {
-    if (r.isSystem) return;
-    if (deletingId !== r.id) { setDeletingId(r.id); return; }
-    remove.mutate(r.id, { onSettled: () => setDeletingId(null) });
+  function handleDeleteConfirm() {
+    if (!confirmDelete) return;
+    remove.mutate(confirmDelete.id, { onSuccess: () => setConfirmDelete(null) });
   }
 
-  const filtered = roles.filter(
-    (r) => !search.trim() ||
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.description?.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = useMemo(() => {
+    let list = roles;
+    if (debounced.trim()) list = list.filter((r) =>
+      r.name.toLowerCase().includes(debounced.toLowerCase()) ||
+      r.description?.toLowerCase().includes(debounced.toLowerCase()),
+    );
+    if (tipoFilter === 'system') list = list.filter((r) => r.isSystem);
+    if (tipoFilter === 'custom') list = list.filter((r) => !r.isSystem);
+    if (permisoFilter) list = list.filter((r) =>
+      r.permissions.includes('*') || r.permissions.some((p) => p.startsWith(permisoFilter + ':')),
+    );
+    if (statusFilter === 'active')   list = list.filter((r) => r.isActive);
+    if (statusFilter === 'inactive') list = list.filter((r) => !r.isActive);
+    return list;
+  }, [roles, debounced, tipoFilter, permisoFilter, statusFilter]);
 
-  const total  = roles.length;
-  const active = roles.filter((r) => r.isActive).length;
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const hasFilters = tipoFilter || permisoFilter || statusFilter;
+
+  // Resources for the permission filter
+  const permResources = Object.entries(PERMISSION_CATALOG).map(([key, cfg]) => ({ key, label: cfg.label }));
 
   return (
-    <div className="min-h-full bg-slate-50 p-6">
+    <div className="space-y-5">
+
+      {/* Back */}
+      <Link
+        href="/dashboard/directorio"
+        className="inline-flex items-center gap-1.5 text-[12.5px] text-slate-400 hover:text-slate-700 transition-colors group"
+      >
+        <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Directorio
+      </Link>
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/dashboard/directorio')}
-            className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors flex-shrink-0">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-          </button>
-          <div>
-            <h1 className="text-[22px] font-bold text-slate-900 leading-tight">Roles del Sistema</h1>
-            <p className="text-slate-400 text-[13px] mt-0.5">
-              {isLoading ? 'Cargando...' : `${active} activos · ${total} en total`}
-            </p>
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Roles del Sistema</h1>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {filtered.length !== roles.length
+              ? `${filtered.length} de ${roles.length} rol${roles.length !== 1 ? 'es' : ''}`
+              : `${roles.length} rol${roles.length !== 1 ? 'es' : ''} configurado${roles.length !== 1 ? 's' : ''}`
+            }
+          </p>
         </div>
         <button onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-semibold transition-colors">
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all bg-indigo-600 hover:bg-indigo-700">
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
@@ -372,8 +504,8 @@ export default function RolesPage() {
       </div>
 
       {/* Info banner */}
-      <div className="mb-5 flex items-start gap-3 px-4 py-3 rounded-xl bg-indigo-50 border border-indigo-100">
-        <span className="text-indigo-400 mt-0.5 text-lg">🔐</span>
+      <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-indigo-50 border border-indigo-100">
+        <span className="text-indigo-400 mt-0.5 text-lg flex-shrink-0">🔐</span>
         <div>
           <p className="text-[13px] font-medium text-indigo-900">Roles del sistema vs. Cargos</p>
           <p className="text-[12px] text-indigo-600 mt-0.5 leading-relaxed">
@@ -383,169 +515,206 @@ export default function RolesPage() {
         </div>
       </div>
 
-      {/* Búsqueda */}
-      <div className="relative mb-5">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar rol por nombre o descripción…"
-          className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white transition"/>
-        {search && (
-          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+      {/* Search + Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre o descripción..."
+            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-[12.5px] focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition bg-white" />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm">✕</button>
+          )}
+        </div>
+
+        <FilterSelect value={tipoFilter} onChange={setTipoFilter} placeholder="Tipo">
+          <option value="system">Sistema</option>
+          <option value="custom">Custom</option>
+        </FilterSelect>
+
+        <FilterSelect value={permisoFilter} onChange={setPermisoFilter} placeholder="Permisos">
+          {permResources.map(({ key, label }) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </FilterSelect>
+
+        <FilterSelect value={statusFilter} onChange={setStatusFilter} placeholder="Estado">
+          <option value="active">Activo</option>
+          <option value="inactive">Inactivo</option>
+        </FilterSelect>
+
+        {hasFilters && (
+          <button
+            onClick={() => { setTipoFilter(''); setPermisoFilter(''); setStatusFilter(''); }}
+            className="text-[12px] text-slate-400 hover:text-slate-700 underline underline-offset-2 transition-colors"
+          >
+            Limpiar filtros
           </button>
         )}
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[160px_1fr_2fr_80px_80px_150px] gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50">
-          {['ROL', 'TIPO', 'PERMISOS', 'USUARIOS', 'ESTADO', 'ACCIONES'].map((h) => (
-            <span key={h} className="text-[10.5px] font-bold tracking-widest text-slate-400 uppercase">{h}</span>
-          ))}
+      {/* Table */}
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin"/>
         </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  {['Rol', 'Tipo', 'Permisos', 'Usuarios', 'Estado', 'Acciones'].map((h) => (
+                    <th key={h} className="text-left px-4 py-3 text-[10.5px] font-bold uppercase tracking-widest text-slate-400">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.map((rol) => {
+                  const isToggling = togglingId === rol.id;
+                  return (
+                    <tr
+                      key={rol.id}
+                      className={`border-b border-slate-100 last:border-0 transition-colors ${!rol.isActive ? 'opacity-60 bg-slate-50/40' : 'hover:bg-slate-50/60'}`}
+                    >
+                      {/* Rol */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${rol.isSystem ? 'bg-indigo-100' : 'bg-slate-100'}`}>
+                            {rol.isSystem ? '🔒' : '🔓'}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-semibold font-mono text-slate-900 truncate">{rol.name}</p>
+                            {rol.description && <p className="text-[11px] text-slate-400 truncate max-w-[160px]">{rol.description}</p>}
+                          </div>
+                        </div>
+                      </td>
 
-        {isLoading ? (
-          <div className="py-16 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin"/>
+                      {/* Tipo */}
+                      <td className="px-4 py-3">
+                        {rol.isSystem
+                          ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[11.5px] font-medium"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500"/>Sistema</span>
+                          : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-[11.5px] font-medium"><span className="w-1.5 h-1.5 rounded-full bg-slate-400"/>Custom</span>
+                        }
+                      </td>
+
+                      {/* Permisos */}
+                      <td className="px-4 py-3"><PermBadges permissions={rol.permissions}/></td>
+
+                      {/* Usuarios */}
+                      <td className="px-4 py-3">
+                        <span className="text-[12.5px] text-slate-500">{rol.userCount ?? 0}</span>
+                      </td>
+
+                      {/* Estado */}
+                      <td className="px-4 py-3">
+                        {rol.isActive
+                          ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11.5px] font-medium"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"/>Activo</span>
+                          : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-[11.5px] font-medium"><span className="w-1.5 h-1.5 rounded-full bg-slate-400"/>Inactivo</span>
+                        }
+                      </td>
+
+                      {/* Acciones */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+
+                          {/* Configurar permisos */}
+                          <button onClick={() => setPermsFor(rol)} title="Configurar permisos"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                          </button>
+
+                          {/* Editar */}
+                          <button onClick={() => openEdit(rol)} title="Editar"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                          </button>
+
+                          {/* Toggle activo */}
+                          <button
+                            onClick={() => handleToggle(rol)}
+                            disabled={isToggling || rol.isSystem}
+                            title={rol.isSystem ? 'Los roles del sistema no pueden deshabilitarse' : rol.isActive ? 'Desactivar' : 'Activar'}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                              rol.isActive ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            {isToggling
+                              ? <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"/>
+                              : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
+                                </svg>
+                            }
+                          </button>
+
+                          {/* Eliminar */}
+                          <button
+                            onClick={() => !rol.isSystem && setConfirmDelete(rol)}
+                            disabled={rol.isSystem}
+                            title={rol.isSystem ? 'Los roles del sistema no pueden eliminarse' : 'Eliminar'}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-14 text-center">
+                      <p className="text-slate-400 text-sm">
+                        {search || hasFilters ? 'Sin resultados para los filtros aplicados.' : 'No hay roles creados aún.'}
+                      </p>
+                      {hasFilters && (
+                        <button
+                          onClick={() => { setTipoFilter(''); setPermisoFilter(''); setStatusFilter(''); setSearch(''); }}
+                          className="mt-2 text-[12px] text-indigo-500 hover:text-indigo-700 underline underline-offset-2"
+                        >
+                          Limpiar todos los filtros
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="py-16 flex flex-col items-center justify-center text-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-2xl">🔐</div>
-            <div>
-              <p className="text-[13px] font-medium text-slate-700">
-                {search ? `Sin resultados para "${search}"` : 'No hay roles creados'}
-              </p>
-              <p className="text-[12px] text-slate-400 mt-1">
-                {search ? 'Prueba con otro término' : 'Crea el primer rol con el botón de arriba'}
-              </p>
+
+          {totalPages > 1 && (
+            <div className="border-t border-slate-100 px-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[11.5px] text-slate-400">
+                  Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length}
+                </span>
+                <Pagination page={page} totalPages={totalPages} onChange={setPage}/>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {filtered.map((rol) => {
-              const isInactive   = !rol.isActive;
-              const isToggling   = togglingId === rol.id;
-              const isDelConfirm = deletingId === rol.id;
-
-              return (
-                <div key={rol.id}
-                  className={`grid grid-cols-[160px_1fr_2fr_80px_80px_150px] gap-3 items-center px-5 py-3.5 transition-colors ${
-                    isInactive ? 'opacity-55 bg-slate-50/60' : 'hover:bg-slate-50/50'
-                  }`}
-                >
-                  {/* Nombre */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${rol.isSystem ? 'bg-indigo-100' : 'bg-slate-100'}`}>
-                      {rol.isSystem ? '🔒' : '🔓'}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[12.5px] font-semibold text-slate-900 truncate font-mono">{rol.name}</p>
-                      {rol.description && <p className="text-[10.5px] text-slate-400 truncate">{rol.description}</p>}
-                    </div>
-                  </div>
-
-                  {/* Tipo */}
-                  {rol.isSystem
-                    ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium w-fit">
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"/>Sistema
-                      </span>
-                    : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] font-medium w-fit">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"/>Custom
-                      </span>
-                  }
-
-                  {/* Permisos */}
-                  <PermBadges permissions={rol.permissions}/>
-
-                  {/* Usuarios */}
-                  <span className="text-[12.5px] text-slate-500 font-mono">{rol.userCount ?? 0}</span>
-
-                  {/* Estado */}
-                  {rol.isActive
-                    ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-medium w-fit">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"/>Activo
-                      </span>
-                    : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] font-medium w-fit">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"/>Inactivo
-                      </span>
-                  }
-
-                  {/* Acciones */}
-                  <div className="flex items-center gap-1">
-
-                    {/* Permisos */}
-                    <button onClick={() => setPermsFor(rol)} title="Configurar permisos"
-                      className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-colors">
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                      </svg>
-                    </button>
-
-                    {/* Editar */}
-                    <button onClick={() => openEdit(rol)} title="Editar"
-                      className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                      </svg>
-                    </button>
-
-                    {/* Habilitar / Deshabilitar */}
-                    <button
-                      onClick={() => handleToggle(rol)}
-                      disabled={isToggling || rol.isSystem}
-                      title={rol.isSystem ? 'Los roles del sistema no pueden deshabilitarse' : isInactive ? 'Habilitar' : 'Deshabilitar'}
-                      className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-                        isInactive ? 'border-emerald-200 text-emerald-500 hover:bg-emerald-50' : 'border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      {isToggling
-                        ? <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin"/>
-                        : isInactive
-                          ? <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
-                            </svg>
-                          : <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                            </svg>
-                      }
-                    </button>
-
-                    {/* Eliminar */}
-                    <button onClick={() => handleDelete(rol)} disabled={rol.isSystem}
-                      title={rol.isSystem ? 'Los roles del sistema no pueden eliminarse' : isDelConfirm ? 'Confirmar eliminación' : 'Eliminar'}
-                      className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-                        isDelConfirm ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100' : 'border-slate-200 text-slate-400 hover:text-red-500 hover:bg-red-50 hover:border-red-200'
-                      }`}
-                    >
-                      {isDelConfirm
-                        ? <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        : <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                            <path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                          </svg>
-                      }
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {deletingId !== null && (
-        <p className="mt-3 text-center text-[12px] text-slate-400">
-          Haz clic en ✓ nuevamente para confirmar la eliminación
-        </p>
+          )}
+        </div>
       )}
 
+      {/* Modales */}
       {modal    && <RolModal rol={modal === 'edit' ? selected : null} onClose={closeModal}/>}
       {permsFor && <PermissionsPanel rol={permsFor} onClose={() => setPermsFor(null)}/>}
+      {confirmDelete && (
+        <DeleteConfirmModal
+          rol={confirmDelete}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setConfirmDelete(null)}
+          isPending={remove.isPending}
+        />
+      )}
     </div>
   );
 }

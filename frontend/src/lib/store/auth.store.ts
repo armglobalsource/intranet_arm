@@ -6,7 +6,14 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
+  phone?: string | null;
+  country?: string | null;
+  bio?: string | null;
+  birthDate?: string | null;
+  gender?: string | null;
+  campusId?: number | null;
+  campus?: { id: number; name: string; address?: string | null } | null;
   role: { name: string };
   permissions: string[];
 }
@@ -21,6 +28,7 @@ interface AuthState {
   setHasHydrated: (val: boolean) => void;
   setSession: (user: User, accessToken: string, refreshToken: string) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
+  updateUser: (patch: Partial<User>) => void;
   logout: () => void;
 }
 
@@ -40,6 +48,9 @@ export const useAuthStore = create<AuthState>()(
 
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken }),
+
+      updateUser: (patch) =>
+        set((s) => ({ user: s.user ? { ...s.user, ...patch } : s.user })),
 
       logout: () =>
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false }),

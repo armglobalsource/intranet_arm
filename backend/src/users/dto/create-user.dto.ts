@@ -30,5 +30,7 @@ export class UpdateUserDto {
   @ApiProperty() @IsOptional() @IsString()                   phone?:         string;
   @ApiProperty() @IsOptional() @IsString()                   country?:       string;
   @ApiProperty() @IsOptional() @IsString()                   bio?:           string;
+  @ApiProperty() @IsOptional() @IsString()                   birthDate?:     string | null;
+  @ApiProperty() @IsOptional() @IsEnum(['male', 'female', 'other', 'prefer_not_to_say']) gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null;
   @ApiProperty() @IsOptional() @IsEnum(['active', 'inactive', 'suspended']) status?: UserStatus;
 }
