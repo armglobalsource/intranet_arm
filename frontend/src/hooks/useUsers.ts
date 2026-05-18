@@ -68,7 +68,7 @@ export { useActiveJobTitleNames as useJobTitles } from './useJobTitles';
 export function useRoles() {
   return useQuery<Role[]>({
     queryKey: userKeys.roles,
-    queryFn:  () => api.get('/users/roles').then((r) => r.data),
+    queryFn:  () => api.get('/roles').then((r) => r.data),
     staleTime: 10 * 60 * 1000,
   });
 }
@@ -110,6 +110,20 @@ export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.delete(`/users/${id}`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
+  });
+}
+
+export function useUploadUserAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) => {
+      const form = new FormData();
+      form.append('file', file);
+      return api.post<User>(`/users/${id}/avatar`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
   });
 }

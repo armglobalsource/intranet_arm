@@ -1,138 +1,226 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import { FirebaseService } from '../common/firebase/firebase.service';
+import { StorageService } from '../common/storage/storage.service';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 
-const JOB_TITLE_SELECT = { jobTitle: { select: { id: true, name: true } } };
+const COL = 'users';
 
-const USER_SELECT = {
-  id: true,
-  email: true,
-  firstName: true,
-  lastName: true,
-  avatarUrl: true,
-  phone: true,
-  country: true,
-  bio: true,
-  status: true,
-  departmentId: true,
-  campusId: true,
-  createdAt: true,
-  updatedAt: true,
-  department: { select: { id: true, name: true } },
-  campus:     { select: { id: true, name: true, address: true } },
-  role:       { select: { id: true, name: true } },
-  jobTitles:  { select: JOB_TITLE_SELECT, orderBy: { sortOrder: 'asc' as const } },
-} as const;
-
-export interface PaginatedUsers {
-  data: unknown[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+/** Da formato a un doc de Firestore al shape esperado por el frontend */
+function formatUser(raw: any) {
+  if (!raw) return null;
+  const { passwordHash, nameLower, ...rest } = raw;
+  // Asegurar jobTitles en formato { jobTitle: { id, name } }[]
+  const jobTitles = (raw.jobTitles ?? []).map((jt: any) => ({
+    jobTitle: { id: jt.jobTitleId, name: jt.name },
+  }));
+  return { ...rest, jobTitles };
 }
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(UsersService.name);
 
-  async findAll(
-    _userId: number,
-    _roleId: number,
-    search?: string,
-    page = 1,
-    limit = 50,
-  ): Promise<PaginatedUsers> {
+  constructor(private fb: FirebaseService, private storage: StorageService) {}
+
+  // ── Usuarios ──────────────────────────────────────────────────────────────
+
+  async findAll(_userId: number, _roleId: number, search?: string, page = 1, limit = 50) {
     const safeLimit = Math.min(limit, 200);
-    const skip = (page - 1) * safeLimit;
+    let all = await this.fb.db.collection(COL).get();
+    let docs = this.fb.toDocs(all).sort((a, b) =>
+      (a.firstName ?? '').localeCompare(b.firstName ?? '') ||
+      (a.lastName  ?? '').localeCompare(b.lastName  ?? ''),
+    );
 
-    const where = search
-      ? {
-          OR: [
-            { firstName: { contains: search, mode: 'insensitive' as const } },
-            { lastName:  { contains: search, mode: 'insensitive' as const } },
-            { email:     { contains: search, mode: 'insensitive' as const } },
-            { jobTitles: { some: { jobTitle: { name: { contains: search, mode: 'insensitive' as const } } } } },
-          ],
-        }
-      : undefined;
+    if (search) {
+      const q = search.toLowerCase();
+      docs = docs.filter((u) =>
+        u.firstName?.toLowerCase().includes(q) ||
+        u.lastName?.toLowerCase().includes(q)  ||
+        u.email?.toLowerCase().includes(q)     ||
+        (u.jobTitles ?? []).some((jt: any) => jt.name?.toLowerCase().includes(q)),
+      );
+    }
 
-    const [data, total] = await Promise.all([
-      this.prisma.user.findMany({
-        select: USER_SELECT,
-        where,
-        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
-        skip,
-        take: safeLimit,
-      }),
-      this.prisma.user.count({ where }),
-    ]);
+    const total = docs.length;
+    const skip  = (page - 1) * safeLimit;
+    const data  = docs.slice(skip, skip + safeLimit).map(formatUser);
 
-    return {
-      data,
-      total,
-      page,
-      limit: safeLimit,
-      totalPages: Math.ceil(total / safeLimit),
-    };
+    return { data, total, page, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) };
   }
 
   async findOne(id: number) {
-    const item = await this.prisma.user.findUnique({ where: { id }, select: USER_SELECT });
-    if (!item) throw new NotFoundException(`User con id ${id} no encontrado`);
-    return item;
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    if (!snap.exists) throw new NotFoundException(`User con id ${id} no encontrado`);
+    return formatUser(this.fb.toObj(snap));
   }
 
-  async create(dto: CreateUserDto, userId: number) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+  async findByEmail(email: string) {
+    const snap = await this.fb.db.collection(COL)
+      .where('email', '==', email.toLowerCase()).limit(1).get();
+    if (snap.empty) return null;
+    return this.fb.toObj(snap.docs[0]);
+  }
+
+  async create(dto: CreateUserDto, _createdBy: number) {
+    const email = dto.email.trim().toLowerCase();
+    const existing = await this.findByEmail(email);
     if (existing) throw new ConflictException('Ya existe un usuario con ese email');
 
-    const { password, jobTitleIds, ...rest } = dto;
-    const passwordHash = await bcrypt.hash(password, 12);
+    // Cargar role y campus para denormalizar
+    const roleSnap = await this.fb.db.collection('roles').doc(String(dto.roleId)).get();
+    const role     = roleSnap.exists ? { id: dto.roleId, name: roleSnap.data()!.name } : null;
 
-    return this.prisma.user.create({
-      data: {
-        ...rest,
-        passwordHash,
-        jobTitles: jobTitleIds?.length
-          ? { create: jobTitleIds.map((jobTitleId, i) => ({ jobTitleId, sortOrder: i })) }
-          : undefined,
-      },
-      select: USER_SELECT,
-    });
+    const campusSnap = dto.campusId
+      ? await this.fb.db.collection('campuses').doc(String(dto.campusId)).get()
+      : null;
+    const campus = campusSnap?.exists
+      ? { id: dto.campusId, name: campusSnap.data()!.name, address: campusSnap.data()!.address ?? null }
+      : null;
+
+    // Cargar jobTitles para denormalizar
+    const jobTitles = await this.resolveJobTitles(dto.jobTitleIds ?? []);
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const id           = await this.fb.nextId(COL);
+
+    const doc = {
+      id, email, passwordHash,
+      firstName:    dto.firstName.trim(),
+      lastName:     dto.lastName.trim(),
+      nameLower:    `${dto.firstName} ${dto.lastName}`.toLowerCase(),
+      roleId:       dto.roleId,
+      role,
+      campusId:     dto.campusId ?? null,
+      campus,
+      jobTitles,
+      phone:        dto.phone?.trim()   ?? null,
+      country:      dto.country?.trim() ?? null,
+      bio:          dto.bio?.trim()     ?? null,
+      avatarUrl:    null,
+      status:       'active',
+      departmentId: null,
+      lastLoginAt:  null,
+      createdAt:    this.fb.now(),
+      updatedAt:    this.fb.now(),
+    };
+
+    await this.fb.db.collection(COL).doc(String(id)).set(doc);
+    return this.findOne(id);
   }
 
   async update(id: number, dto: UpdateUserDto) {
-    await this.prisma.user.findUniqueOrThrow({ where: { id } });
-    const { jobTitleIds, ...rest } = dto;
+    const current = await this.fb.db.collection(COL).doc(String(id)).get();
+    if (!current.exists) throw new NotFoundException(`User con id ${id} no encontrado`);
 
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        ...rest,
-        ...(jobTitleIds !== undefined
-          ? {
-              jobTitles: {
-                deleteMany: {},
-                create: jobTitleIds.map((jobTitleId, i) => ({ jobTitleId, sortOrder: i })),
-              },
-            }
-          : {}),
-      },
-      select: USER_SELECT,
-    });
+    const data: any = { updatedAt: this.fb.now() };
+
+    if (dto.email !== undefined) {
+      const email = dto.email.trim().toLowerCase();
+      const snap  = await this.fb.db.collection(COL).where('email', '==', email).limit(1).get();
+      if (!snap.empty && snap.docs[0].data().id !== id) {
+        throw new ConflictException('Ya existe un usuario con ese email');
+      }
+      data.email = email;
+    }
+    if (dto.password) data.passwordHash = await bcrypt.hash(dto.password, 12);
+    if (dto.firstName !== undefined) {
+      data.firstName = dto.firstName.trim();
+      data.nameLower = `${dto.firstName} ${dto.lastName ?? current.data()!.lastName}`.toLowerCase();
+    }
+    if (dto.lastName  !== undefined) {
+      data.lastName  = dto.lastName.trim();
+      data.nameLower = `${dto.firstName ?? current.data()!.firstName} ${dto.lastName}`.toLowerCase();
+    }
+    if (dto.phone     !== undefined) data.phone     = dto.phone?.trim()     ?? null;
+    if (dto.country   !== undefined) data.country   = dto.country?.trim()   ?? null;
+    if (dto.bio       !== undefined) data.bio       = dto.bio?.trim()       ?? null;
+    if (dto.birthDate !== undefined) data.birthDate = dto.birthDate?.trim() ?? null;
+    if (dto.gender    !== undefined) data.gender    = dto.gender            ?? null;
+    if (dto.status    !== undefined) data.status    = dto.status;
+    if (dto.campusId  !== undefined) {
+      data.campusId = dto.campusId;
+      if (dto.campusId) {
+        const snap = await this.fb.db.collection('campuses').doc(String(dto.campusId)).get();
+        data.campus = snap.exists
+          ? { id: dto.campusId, name: snap.data()!.name, address: snap.data()!.address ?? null }
+          : null;
+      } else {
+        data.campus = null;
+      }
+    }
+    if (dto.roleId !== undefined) {
+      const snap = await this.fb.db.collection('roles').doc(String(dto.roleId)).get();
+      data.roleId = dto.roleId;
+      data.role   = snap.exists ? { id: dto.roleId, name: snap.data()!.name } : null;
+    }
+    if (dto.jobTitleIds !== undefined) {
+      data.jobTitles = await this.resolveJobTitles(dto.jobTitleIds);
+    }
+
+    await this.fb.db.collection(COL).doc(String(id)).update(data);
+    return this.findOne(id);
   }
 
   async remove(id: number) {
-    await this.prisma.user.findUniqueOrThrow({ where: { id } });
-    return this.prisma.user.delete({ where: { id } });
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    if (!snap.exists) throw new NotFoundException(`User con id ${id} no encontrado`);
+    await this.fb.db.collection(COL).doc(String(id)).delete();
+    return { id };
   }
 
-  findAllRoles() {
-    return this.prisma.role.findMany({
-      select: { id: true, name: true, description: true },
-      orderBy: { id: 'asc' },
-    });
+  async updateLastLogin(id: number) {
+    await this.fb.db.collection(COL).doc(String(id)).update({ lastLoginAt: this.fb.now() });
+  }
+
+  async uploadAvatar(id: number, file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No se recibió ningún archivo');
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
+    if (!allowed.includes(file.mimetype)) {
+      throw new BadRequestException(`Tipo no permitido: ${file.mimetype}`);
+    }
+
+    try {
+      const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+      if (!snap.exists) throw new NotFoundException(`User ${id} no encontrado`);
+
+      const key = `avatars/user-${id}-${Date.now()}${this.extOf(file.mimetype)}`;
+      this.logger.log(`Subiendo avatar: key=${key}, size=${file.size}, mime=${file.mimetype}`);
+
+      const avatarUrl = await this.storage.uploadPublic(key, file.buffer, file.mimetype);
+      this.logger.log(`Avatar guardado: ${avatarUrl}`);
+
+      await this.fb.db.collection(COL).doc(String(id)).update({ avatarUrl, updatedAt: this.fb.now() });
+      return this.findOne(id);
+    } catch (err) {
+      this.logger.error('uploadAvatar falló', err instanceof Error ? err.stack : String(err));
+      throw err;
+    }
+  }
+
+  private extOf(mime: string) {
+    const map: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png':  '.png',
+      'image/webp': '.webp',
+      'image/gif':  '.gif',
+      'image/heic': '.heic',
+      'image/heif': '.heif',
+    };
+    return map[mime] ?? '.jpg';
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  private async resolveJobTitles(ids: number[]) {
+    if (!ids.length) return [];
+    const snaps = await Promise.all(
+      ids.map((jid) => this.fb.db.collection('job_titles').doc(String(jid)).get()),
+    );
+    return snaps
+      .filter((s) => s.exists)
+      .map((s, i) => ({ jobTitleId: ids[i], name: s.data()!.name, sortOrder: i }));
   }
 }

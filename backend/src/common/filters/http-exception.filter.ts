@@ -18,7 +18,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const message = exception instanceof HttpException
       ? exception.getResponse()
-      : 'Error interno del servidor';
+      : (exception instanceof Error ? exception.message : 'Error interno del servidor');
 
     if (status >= 500) {
       this.logger.error(`${req.method} ${req.url}`, exception instanceof Error ? exception.stack : String(exception));

@@ -1,8 +1,11 @@
 import {
   Controller, Get, Post, Patch, Delete,
   Body, Param, Query, ParseIntPipe, DefaultValuePipe, UseGuards,
+  UseInterceptors, UploadedFile,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
@@ -14,12 +17,6 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
   constructor(private readonly service: UsersService) {}
-
-  @Get('roles')
-  @ApiOperation({ summary: 'Listar roles disponibles' })
-  findAllRoles() {
-    return this.service.findAllRoles();
-  }
 
   @Get()
   @ApiOperation({ summary: 'Listar usuarios paginados (con búsqueda opcional)' })
@@ -57,5 +54,15 @@ export class UsersController {
   @ApiOperation({ summary: 'Eliminar un usuario' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
+  }
+
+  @Post(':id/avatar')
+  @ApiOperation({ summary: 'Subir foto de perfil de un usuario (máx 10 MB)' })
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
+  uploadAvatar(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.service.uploadAvatar(id, file);
   }
 }

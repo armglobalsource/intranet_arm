@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
+import { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { api } from '@/lib/api';
 
@@ -54,9 +55,22 @@ function DirIcon({ active }: { active: boolean }) {
 }
 
 export function Sidebar() {
-  const pathname = usePathname();
-  const router   = useRouter();
+  const pathname  = usePathname();
+  const router    = useRouter();
   const { logout, refreshToken, user } = useAuthStore();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   const initials = user
     ? (user.firstName[0] + user.lastName[0]).toUpperCase()
@@ -81,12 +95,12 @@ export function Sidebar() {
       className="w-56 flex flex-col shrink-0"
     >
       {/* Logo */}
-      <div style={{ borderBottom: '1px solid #1f1f1f' }} className="px-5 py-5 flex items-center justify-center">
+      <div style={{ borderBottom: '1px solid #1f1f1f' }} className="px-4 pt-4 pb-2 flex items-center justify-center">
         <Image
           src="/logo.png"
           alt="Logo"
-          width={130}
-          height={44}
+          width={100}
+          height={28}
           className="object-contain"
           priority
         />
@@ -112,9 +126,45 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Usuario */}
-      <div style={{ borderTop: '1px solid #1f1f1f' }} className="px-4 py-3">
-        <div className="flex items-center gap-2.5">
+      {/* Usuario con menú */}
+      <div ref={menuRef} style={{ borderTop: '1px solid #1f1f1f' }} className="relative px-3 py-3">
+        {/* Dropdown */}
+        {menuOpen && (
+          <div
+            className="absolute bottom-full left-3 right-3 mb-1 rounded-lg overflow-hidden shadow-lg"
+            style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }}
+          >
+            <Link
+              href="/dashboard/perfil"
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-2.5 px-3 py-2.5 text-[12px] text-white/60 hover:text-white hover:bg-white/5 transition-all"
+            >
+              <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              Mi perfil
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[12px] text-white/40 hover:text-white/60 hover:bg-white/5 transition-all"
+            >
+              <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              Cerrar sesión
+            </button>
+          </div>
+        )}
+
+        <button
+          onClick={() => setMenuOpen((o) => !o)}
+          className="flex items-center gap-2.5 w-full rounded-lg px-1 py-1 hover:bg-white/5 transition-all text-left"
+        >
           {user?.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -134,22 +184,13 @@ export function Sidebar() {
             <p className="text-white/75 text-[12px] font-medium truncate leading-none">{fullName}</p>
             {role && <p className="text-white/30 text-[10px] mt-0.5 truncate">{role}</p>}
           </div>
-        </div>
-      </div>
-
-      {/* Cerrar sesión */}
-      <div className="px-3 pb-3">
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] text-white/30 hover:text-white/55 hover:bg-white/5 transition-all"
-        >
-          <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
+          <svg
+            className={`w-3 h-3 flex-shrink-0 text-white/20 transition-transform ${menuOpen ? 'rotate-180' : ''}`}
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round"
+          >
+            <polyline points="18 15 12 9 6 15" />
           </svg>
-          Cerrar sesión
         </button>
       </div>
     </aside>

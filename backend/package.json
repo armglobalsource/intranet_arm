@@ -12,11 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "db:migrate": "prisma migrate dev",
-    "db:migrate:deploy": "prisma migrate deploy",
-    "db:generate": "prisma generate",
-    "db:studio": "prisma studio",
-    "db:seed": "ts-node --project tsconfig.json prisma/seed.ts"
+    "db:migrate": "echo 'Migración no aplica — usando Firestore'",
+    "db:seed": "echo 'Seed no aplica — usar scripts/migrate-to-firestore.js'"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
@@ -29,23 +26,19 @@
     "@nestjs/platform-express": "^10.3.0",
     "@nestjs/swagger": "^7.3.0",
     "@nestjs/throttler": "^5.1.2",
-    "@prisma/client": "^5.11.0",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "firebase-admin": "^13.10.0",
     "helmet": "^7.1.0",
     "joi": "^18.2.1",
     "nodemailer": "^6.9.13",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
-    "pg-boss": "^9.0.3",
     "reflect-metadata": "^0.2.1",
     "rxjs": "^7.8.1",
     "uuid": "^9.0.1"
-  },
-  "prisma": {
-    "seed": "ts-node --project tsconfig.json prisma/seed.ts"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.2",
@@ -60,7 +53,6 @@
     "@typescript-eslint/eslint-plugin": "^7.4.0",
     "@typescript-eslint/parser": "^7.4.0",
     "eslint": "^8.57.0",
-    "prisma": "^5.11.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.3",
     "vitest": "^1.4.0"

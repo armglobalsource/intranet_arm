@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import * as Joi from 'joi';
-import { PrismaModule } from './common/prisma/prisma.module';
+import { FirebaseModule } from './common/firebase/firebase.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ContentModule } from './content/content.module';
@@ -15,23 +15,25 @@ import { HealthModule } from './health/health.module';
 import { StorageModule } from './common/storage/storage.module';
 import { JobTitlesModule } from './job-titles/job-titles.module';
 import { CampusModule } from './campus/campus.module';
+import { RolesModule } from './roles/roles.module';
 
 const envSchema = Joi.object({
   NODE_ENV:             Joi.string().valid('development', 'production', 'test').default('development'),
   PORT:                 Joi.number().default(3001),
-  DATABASE_URL:         Joi.string().uri({ scheme: ['postgresql', 'postgres'] }).required(),
+  FIREBASE_PROJECT_ID:  Joi.string().default('intranet-arm'),
+  FIREBASE_KEY_FILE:    Joi.string().default('./service-account.json'),
   JWT_SECRET:           Joi.string().min(32).required(),
   JWT_ACCESS_TTL:       Joi.number().default(900),
   JWT_REFRESH_TTL:      Joi.number().default(28800),
   FRONTEND_URL:         Joi.string().default('http://localhost:3000'),
-  GCS_PROJECT_ID:       Joi.string().when('NODE_ENV', { is: 'production', then: Joi.required() }),
+  GCS_PROJECT_ID:       Joi.string().optional(),
   STORAGE:              Joi.string().valid('local', 'gcs').default('local'),
   BACKEND_URL:          Joi.string().default('http://localhost:3001'),
   GCS_BUCKET_DOCUMENTS: Joi.string().default('intranet-documents'),
   GCS_BUCKET_AVATARS:   Joi.string().default('intranet-avatars'),
   THROTTLE_TTL:         Joi.number().default(60000),
   THROTTLE_LIMIT:       Joi.number().default(100),
-}).unknown(true); // permite otras vars del OS sin error
+}).unknown(true);
 
 @Module({
   imports: [
@@ -39,15 +41,13 @@ const envSchema = Joi.object({
       isGlobal: true,
       envFilePath: '.env',
       validationSchema: envSchema,
-      validationOptions: {
-        abortEarly: false, // muestra todos los errores, no solo el primero
-      },
+      validationOptions: { abortEarly: false },
     }),
     ThrottlerModule.forRoot([{
-      ttl:   parseInt(process.env.THROTTLE_TTL  || '60000'),
+      ttl:   parseInt(process.env.THROTTLE_TTL   || '60000'),
       limit: parseInt(process.env.THROTTLE_LIMIT || '100'),
     }]),
-    PrismaModule,
+    FirebaseModule,
     StorageModule,
     AuthModule,
     UsersModule,
@@ -60,6 +60,7 @@ const envSchema = Joi.object({
     HealthModule,
     JobTitlesModule,
     CampusModule,
+    RolesModule,
   ],
 })
 export class AppModule {}

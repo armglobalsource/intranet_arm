@@ -20,6 +20,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Helper para redirigir al login (solo en cliente)
+function redirectToLogin() {
+  if (typeof window !== 'undefined') {
+    window.location.href = '/auth/login';
+  }
+}
+
 // Auto-refresh on 401
 api.interceptors.response.use(
   (res) => res,
@@ -30,7 +37,7 @@ api.interceptors.response.use(
       const refreshToken = useAuthStore.getState().refreshToken;
       if (!refreshToken) {
         useAuthStore.getState().logout();
-        window.location.href = '/auth/login';
+        redirectToLogin();
         return Promise.reject(err);
       }
       try {
@@ -41,9 +48,10 @@ api.interceptors.response.use(
         useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
         original.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(original);
-      } catch {
+      } catch (refreshErr) {
         useAuthStore.getState().logout();
-        window.location.href = '/auth/login';
+        redirectToLogin();
+        return Promise.reject(refreshErr);
       }
     }
     return Promise.reject(err);
