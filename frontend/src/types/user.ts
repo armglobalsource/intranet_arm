@@ -19,6 +19,8 @@ export interface UserJobTitle {
   name: string;
 }
 
+export type UserGender = 'male' | 'female' | 'other' | 'prefer_not_to_say';
+
 export interface User {
   id: number;
   email: string;
@@ -28,6 +30,8 @@ export interface User {
   phone?: string | null;
   country?: string | null;
   bio?: string | null;
+  birthDate?: string | null;
+  gender?: UserGender | null;
   status: 'active' | 'inactive' | 'suspended';
   departmentId?: number | null;
   campusId?: number | null;
@@ -50,6 +54,8 @@ export interface UpdateUserDto {
   phone?:       string;
   country?:     string;
   bio?:         string;
+  birthDate?:   string | null;
+  gender?:      UserGender | null;
   status?:      'active' | 'inactive' | 'suspended';
 }
 

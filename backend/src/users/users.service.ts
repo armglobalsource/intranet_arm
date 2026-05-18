@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
+import { StorageService } from '../common/storage/storage.service';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -18,7 +19,9 @@ function formatUser(raw: any) {
 
 @Injectable()
 export class UsersService {
-  constructor(private fb: FirebaseService) {}
+  private readonly logger = new Logger(UsersService.name);
+
+  constructor(private fb: FirebaseService, private storage: StorageService) {}
 
   // ── Usuarios ──────────────────────────────────────────────────────────────
 
@@ -130,9 +133,11 @@ export class UsersService {
       data.lastName  = dto.lastName.trim();
       data.nameLower = `${dto.firstName ?? current.data()!.firstName} ${dto.lastName}`.toLowerCase();
     }
-    if (dto.phone     !== undefined) data.phone    = dto.phone?.trim()   ?? null;
-    if (dto.country   !== undefined) data.country  = dto.country?.trim() ?? null;
-    if (dto.bio       !== undefined) data.bio       = dto.bio?.trim()     ?? null;
+    if (dto.phone     !== undefined) data.phone     = dto.phone?.trim()     ?? null;
+    if (dto.country   !== undefined) data.country   = dto.country?.trim()   ?? null;
+    if (dto.bio       !== undefined) data.bio       = dto.bio?.trim()       ?? null;
+    if (dto.birthDate !== undefined) data.birthDate = dto.birthDate?.trim() ?? null;
+    if (dto.gender    !== undefined) data.gender    = dto.gender            ?? null;
     if (dto.status    !== undefined) data.status    = dto.status;
     if (dto.campusId  !== undefined) {
       data.campusId = dto.campusId;
@@ -167,6 +172,44 @@ export class UsersService {
 
   async updateLastLogin(id: number) {
     await this.fb.db.collection(COL).doc(String(id)).update({ lastLoginAt: this.fb.now() });
+  }
+
+  async uploadAvatar(id: number, file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No se recibió ningún archivo');
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
+    if (!allowed.includes(file.mimetype)) {
+      throw new BadRequestException(`Tipo no permitido: ${file.mimetype}`);
+    }
+
+    try {
+      const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+      if (!snap.exists) throw new NotFoundException(`User ${id} no encontrado`);
+
+      const key = `avatars/user-${id}-${Date.now()}${this.extOf(file.mimetype)}`;
+      this.logger.log(`Subiendo avatar: key=${key}, size=${file.size}, mime=${file.mimetype}`);
+
+      const avatarUrl = await this.storage.uploadPublic(key, file.buffer, file.mimetype);
+      this.logger.log(`Avatar guardado: ${avatarUrl}`);
+
+      await this.fb.db.collection(COL).doc(String(id)).update({ avatarUrl, updatedAt: this.fb.now() });
+      return this.findOne(id);
+    } catch (err) {
+      this.logger.error('uploadAvatar falló', err instanceof Error ? err.stack : String(err));
+      throw err;
+    }
+  }
+
+  private extOf(mime: string) {
+    const map: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png':  '.png',
+      'image/webp': '.webp',
+      'image/gif':  '.gif',
+      'image/heic': '.heic',
+      'image/heif': '.heif',
+    };
+    return map[mime] ?? '.jpg';
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
