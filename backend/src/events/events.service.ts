@@ -46,6 +46,7 @@ export class EventsService {
       endDate:     dto.endDate      ?? null,
       time:        dto.time         ?? null,
       category:    dto.category,
+      customLabel: dto.customLabel  ?? null,
       location:    dto.location     ?? null,
       createdBy:   userId,
       createdAt:   this.fb.now(),

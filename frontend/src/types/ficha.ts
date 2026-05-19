@@ -23,7 +23,7 @@ export const SECTION_LABELS: Record<SectionName, string> = {
   pastoral:    'Equipo Pastoral',
   produccion:  'Producción',
   streaming:   'Streaming',
-  escena:      'AR Worship / Banda',
+  escena:      'AR Worship',
   setList:     'Set List',
   horarios:    'Horarios',
   anuncios:    'Info Encuentro',
@@ -62,11 +62,12 @@ export interface Ficha {
   sections:         Record<SectionName, Section>;
   completionStatus: CompletionStatus;
   status:           FichaStatus;
-  createdBy:        number;
-  createdByName:    string;
-  createdAt:        any;
-  lastModifiedBy:   number;
-  lastModifiedAt:   any;
+  createdBy:          number;
+  createdByName:      string;
+  createdAt:          any;
+  lastModifiedBy:     number;
+  lastModifiedByName?: string;
+  lastModifiedAt:     any;
 }
 
 export interface FichaListItem {

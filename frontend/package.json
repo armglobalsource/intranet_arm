@@ -27,6 +27,7 @@
     "react-hook-form": "^7.51.2",
     "react-organizational-chart": "^2.2.1",
     "tailwind-merge": "^2.2.2",
+    "xlsx": "^0.18.5",
     "zod": "^3.22.4",
     "zustand": "^4.5.2"
   },

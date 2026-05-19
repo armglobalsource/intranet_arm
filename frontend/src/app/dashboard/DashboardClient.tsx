@@ -1,10 +1,13 @@
 'use client';
 
 import { useFichas } from '@/hooks/useFichas';
+import { useAuthStore } from '@/lib/store/auth.store';
 import { CalendarioAnual } from './CalendarioAnual';
 
 export function DashboardClient() {
   const { data: fichas, isLoading } = useFichas();
+  const { user } = useAuthStore();
+  const firstName = user?.firstName ?? '';
   const completadas = fichas?.filter((f) => f.status === 'complete').length ?? 0;
 
   const stats = [
@@ -17,8 +20,12 @@ export function DashboardClient() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">Bienvenido a la intranet corporativa</p>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Bienvenido a Casa{firstName ? `, ${firstName}` : ''}
+        </h1>
+        <p className="text-gray-500 text-sm mt-1">
+          Bienvenido al campus virtual de ARM Global, aquí encontrarás todo acerca de tu iglesia global y local.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

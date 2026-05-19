@@ -277,9 +277,10 @@ export class FichasService {
     return this.findOne(fichaId);
   }
 
-  async update(fichaId: string, dto: UpdateFichaDto, userId: number) {
+  async update(fichaId: string, dto: UpdateFichaDto, userId: number, userName?: string) {
     await this.findOne(fichaId);
     const data: any = { lastModifiedBy: userId, lastModifiedAt: this.fb.now() };
+    if (userName !== undefined) data.lastModifiedByName = userName;
     if (dto.title  !== undefined) data.title  = dto.title;
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.date   !== undefined) data.date   = this.fb.ts(new Date(dto.date));
@@ -340,8 +341,9 @@ export class FichasService {
         ...ficha.sections[sectionName],
         ...dtoPlain,
       },
-      lastModifiedBy: userId,
-      lastModifiedAt: this.fb.now(),
+      lastModifiedBy:     userId,
+      lastModifiedByName: userName,
+      lastModifiedAt:     this.fb.now(),
     };
     await this.fb.db.collection(COL).doc(fichaId).update(update);
 
@@ -371,8 +373,9 @@ export class FichasService {
       [`sections.${sectionName}.completedBy`]: userId,
       [`sections.${sectionName}.completedAt`]: this.fb.now(),
       [`completionStatus.${sectionName}`]:     true,
-      lastModifiedBy: userId,
-      lastModifiedAt: this.fb.now(),
+      lastModifiedBy:     userId,
+      lastModifiedByName: userName,
+      lastModifiedAt:     this.fb.now(),
     };
     const allDone = SECTIONS.every(s =>
       s === sectionName ? true : ficha.completionStatus?.[s] === true,

@@ -43,15 +43,13 @@ function OrgIcon({ active }: { active: boolean }) {
   );
 }
 
-function DirIcon({ active }: { active: boolean }) {
+function ConfigIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-      stroke={active ? '#fff' : 'rgba(255,255,255,0.4)'}
-      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   );
 }
@@ -82,13 +80,25 @@ function FichaIcon({ active }: { active: boolean }) {
   );
 }
 
+function StatsIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.35)';
+  return (
+    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6"  y1="20" x2="6"  y2="14" />
+    </svg>
+  );
+}
+
 // ── Estructura de navegación ──────────────────────────────────────────────────
 
 const NAV: NavItem[] = [
-  { href: '/dashboard',                    label: 'Inicio',             icon: HomeIcon      },
-  { href: '/dashboard/orgchart',           label: 'Organigrama',        icon: OrgIcon       },
-  { href: '/dashboard/directorio',         label: 'Directorio',         icon: DirIcon       },
-  { href: '/dashboard/produccion-general', label: 'Producción General', icon: ProduccionIcon },
+  { href: '/dashboard',                                     label: 'Inicio',             icon: HomeIcon       },
+  { href: '/dashboard/orgchart',                            label: 'Organigrama',        icon: OrgIcon        },
+  { href: '/dashboard/produccion-general',                  label: 'Producción General', icon: ProduccionIcon },
+  { href: '/dashboard/produccion-general/estadisticas',     label: 'Estadísticas',       icon: StatsIcon      },
 ];
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -141,11 +151,12 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5 pt-4">
         {NAV.map(({ href, label, icon: Icon }) => {
-          // Inicio: solo activo en /dashboard exacto
-          // Producción General: activo también en fichas-tecnicas
           const active =
-            (href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)) ||
-            (href === '/dashboard/produccion-general' && pathname.startsWith('/dashboard/fichas-tecnicas'));
+            (href === '/dashboard'
+              ? pathname === '/dashboard'
+              : href === '/dashboard/produccion-general'
+                ? (pathname === '/dashboard/produccion-general' || pathname.startsWith('/dashboard/fichas-tecnicas'))
+                : pathname.startsWith(href));
           return (
             <Link
               key={href}
@@ -161,6 +172,26 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Configuración */}
+      <div className="px-3 pb-1">
+        {(() => {
+          const href   = '/dashboard/directorio';
+          const active = pathname.startsWith(href);
+          return (
+            <Link
+              href={href}
+              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+              }`}
+            >
+              <ConfigIcon active={active} />
+              Configuración
+            </Link>
+          );
+        })()}
+      </div>
 
       {/* Usuario con menú */}
       <div ref={menuRef} style={{ borderTop: '1px solid #1f1f1f' }}

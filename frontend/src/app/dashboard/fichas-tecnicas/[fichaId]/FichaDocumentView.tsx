@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { Ficha, Row, SectionName, Encuentro } from '@/types/ficha';
+import { useUpdateFicha } from '@/hooks/useFichas';
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
 
@@ -31,16 +32,30 @@ const D = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function parseLocalDate(raw: any): Date {
+  if (typeof raw?.toDate === 'function') return raw.toDate();
+  if (raw instanceof Date)               return raw;
+  if (raw?.seconds)                      return new Date(raw.seconds * 1000);
+  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [y, m, d] = raw.split('-').map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0); // mediodía local evita desfases UTC
+  }
+  return new Date(raw);
+}
+
 function formatDate(raw: any): string {
   if (!raw) return '—';
-  let d: Date;
-  if (typeof raw?.toDate === 'function') d = raw.toDate();
-  else if (raw instanceof Date)           d = raw;
-  else if (raw?.seconds)                  d = new Date(raw.seconds * 1000);
-  else                                    d = new Date(raw);
-  return d.toLocaleDateString('es-CL', {
+  return parseLocalDate(raw).toLocaleDateString('es-CL', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   }).replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function formatDateTime(raw: any): string {
+  if (!raw) return '—';
+  const d = parseLocalDate(raw);
+  const date = d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  return `${date}, ${time}`;
 }
 
 function val(row: Row, colId: string): string {
@@ -732,6 +747,54 @@ export function FichaDocumentView({
 
   const [copied, setCopied] = useState(false);
 
+  // ── Edición inline del título ─────────────────────────────────────────────
+  const { mutate: updateFicha } = useUpdateFicha();
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [localTitle,   setLocalTitle]   = useState(title);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setLocalTitle(title); }, [title]);
+  useEffect(() => { if (editingTitle) titleInputRef.current?.select(); }, [editingTitle]);
+
+  function commitTitle() {
+    const trimmed = localTitle.trim();
+    if (!trimmed || trimmed === title) { setLocalTitle(title); setEditingTitle(false); return; }
+    updateFicha({ fichaId: String(ficha.fichaId), title: trimmed });
+    setEditingTitle(false);
+  }
+
+  // ── Edición inline de la fecha ────────────────────────────────────────────
+  // date puede ser ISO string "2026-05-24" o timestamp; normalizar a "YYYY-MM-DD"
+  function toInputDate(raw: any): string {
+    if (!raw) return '';
+    if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    const d = parseLocalDate(raw);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  const [editingDate, setEditingDate] = useState(false);
+  const [localDate,   setLocalDate]   = useState(() => toInputDate(date));
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setLocalDate(toInputDate(date)); }, [date]);
+  useEffect(() => {
+    if (editingDate) requestAnimationFrame(() => {
+      dateInputRef.current?.focus();
+      dateInputRef.current?.showPicker?.();
+    });
+  }, [editingDate]);
+
+  function commitDate() {
+    if (!localDate || localDate === toInputDate(date)) { setEditingDate(false); return; }
+    const [y, mo, d] = localDate.split('-').map(Number);
+    const localNoon = new Date(y, mo - 1, d, 12, 0, 0).toISOString();
+    updateFicha({ fichaId: String(ficha.fichaId), date: localNoon });
+    setEditingDate(false);
+  }
+
   function handleShare() {
     const url = `${window.location.origin}/ficha/${String(ficha.fichaId)}`;
 
@@ -906,7 +969,42 @@ export function FichaDocumentView({
               style={{ height: 40, width: 'auto', objectFit: 'contain', display: 'block', maxWidth: '40%' }}
             />
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: D.textPrimary }}>{formatDate(date)}</div>
+              {editable && editingDate ? (
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  value={localDate}
+                  onChange={(e) => setLocalDate(e.target.value)}
+                  onBlur={commitDate}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter')  { e.preventDefault(); commitDate(); }
+                    if (e.key === 'Escape') { setLocalDate(toInputDate(date)); setEditingDate(false); }
+                  }}
+                  style={{
+                    fontSize: 14, fontWeight: 600, color: D.textPrimary,
+                    background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 6, padding: '2px 8px', outline: 'none',
+                    colorScheme: 'dark',
+                  }}
+                />
+              ) : (
+                <div
+                  onClick={() => editable && setEditingDate(true)}
+                  title={editable ? 'Clic para editar fecha' : undefined}
+                  style={{
+                    fontSize: 15, fontWeight: 600, color: D.textPrimary,
+                    cursor: editable ? 'text' : 'default',
+                    borderRadius: 6, padding: '2px 6px',
+                    border: editable ? '1px solid transparent' : 'none',
+                    transition: 'border-color 0.15s, background 0.15s',
+                    display: 'inline-block',
+                  }}
+                  onMouseEnter={(e) => { if (editable) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'; }}
+                  onMouseLeave={(e) => { if (editable) (e.currentTarget as HTMLElement).style.borderColor = 'transparent'; }}
+                >
+                  {formatDate(localDate || date)}
+                </div>
+              )}
               {selectedEncuentro?.time && (
                 <div style={{ fontSize: 12, color: D.textSecond, marginTop: 3 }}>{selectedEncuentro.time} hrs</div>
               )}
@@ -919,13 +1017,46 @@ export function FichaDocumentView({
             padding: '1rem 2rem 1.2rem', gap: 16,
           }}>
             {/* Campus + título */}
-            <div>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600, marginBottom: 4 }}>
-                Campus {campusName}
+                {/^(campus|arm)\s/i.test(campusName ?? '') ? campusName : `Campus ${campusName}`}
               </div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: D.textPrimary, letterSpacing: '-0.01em' }}>
-                {title}
-              </div>
+
+              {editable && editingTitle ? (
+                <input
+                  ref={titleInputRef}
+                  value={localTitle}
+                  onChange={(e) => setLocalTitle(e.target.value)}
+                  onBlur={commitTitle}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter')  { e.preventDefault(); commitTitle(); }
+                    if (e.key === 'Escape') { setLocalTitle(title); setEditingTitle(false); }
+                  }}
+                  style={{
+                    fontSize: 22, fontWeight: 700, color: D.textPrimary, letterSpacing: '-0.01em',
+                    background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 6, padding: '2px 8px', outline: 'none', width: '100%',
+                  }}
+                />
+              ) : (
+                <div
+                  onClick={() => editable && setEditingTitle(true)}
+                  title={editable ? 'Clic para editar título' : undefined}
+                  style={{
+                    fontSize: 22, fontWeight: 700, color: D.textPrimary, letterSpacing: '-0.01em',
+                    cursor: editable ? 'text' : 'default',
+                    borderRadius: 6,
+                    padding: '2px 4px',
+                    marginLeft: -4,
+                    border: editable ? '1px solid transparent' : 'none',
+                    transition: 'border-color 0.15s, background 0.15s',
+                  }}
+                  onMouseEnter={(e) => { if (editable) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'; }}
+                  onMouseLeave={(e) => { if (editable) (e.currentTarget as HTMLElement).style.borderColor = 'transparent'; }}
+                >
+                  {localTitle}
+                </div>
+              )}
             </div>
 
             {/* ── Botones de acción (ocultos en impresión) ── */}
@@ -1053,6 +1184,32 @@ export function FichaDocumentView({
 
           <VoluntariosCard rows={sec('voluntarios')} {...editProps('voluntarios')} />
           <AnunciosCard    rows={sec('anuncios')}    {...editProps('anuncios')} />
+        </div>
+
+        {/* ── Footer de auditoría ── */}
+        <div
+          className="ficha-no-print"
+          style={{
+            borderTop: `0.5px solid ${D.divider}`,
+            padding: '8px 20px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 20,
+          }}
+        >
+          {ficha.createdAt && (
+            <span style={{ fontSize: 10, color: D.textMuted }}>
+              Creado por <span style={{ color: D.textSecond }}>{ficha.createdByName}</span>
+              {' · '}{formatDateTime(ficha.createdAt)}
+            </span>
+          )}
+          {ficha.lastModifiedAt && (
+            <span style={{ fontSize: 10, color: D.textMuted }}>
+              Última edición
+              {ficha.lastModifiedByName ? <> por <span style={{ color: D.textSecond }}>{ficha.lastModifiedByName}</span></> : ''}
+              {' · '}{formatDateTime(ficha.lastModifiedAt)}
+            </span>
+          )}
         </div>
 
       </div>

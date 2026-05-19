@@ -26,6 +26,8 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const debounceRefs =
     useRef<Partial<Record<SectionName, ReturnType<typeof setTimeout>>>>({});
 
+  const [isEditing, setIsEditing] = useState(false);
+
   const { mutate: updateSection } = useUpdateSection();
   const { mutate: completeSection } = useCompleteSection();
 
@@ -45,9 +47,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   }, [ficha?.sections]);
 
   const canEdit = isAdmin || can('fichas:edit') || can('fichas:admin');
-  // En modo editor la ficha es siempre editable si tiene permisos
-  // Si está completa, el usuario puede editar igual (para correcciones)
-  const editable = canEdit;
+  const editable = canEdit && isEditing;
 
   // ── Status de secciones ────────────────────────────────────────────────────
   const sectionStatus = Object.fromEntries(
@@ -147,7 +147,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
           updateSection(
             { fichaId, sectionName: sectionName as SectionName, rows },
             {
-              onSuccess: () => { setSaveState('saved'); setTimeout(() => setSaveState('idle'), 2000); },
+              onSuccess: () => { setSaveState('saved'); setTimeout(() => { setSaveState('idle'); setIsEditing(false); }, 800); },
               onError:   () => { setSaveState('error');  setTimeout(() => setSaveState('idle'), 3000); },
             },
           );
@@ -156,7 +156,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     }
     if (!hasPending) {
       setSaveState('saved');
-      setTimeout(() => setSaveState('idle'), 1500);
+      setTimeout(() => { setSaveState('idle'); setIsEditing(false); }, 800);
     }
   }, [fichaId, localSections, updateSection]);
 
@@ -217,6 +217,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
       <FichaDocumentView
         ficha={ficha}
         editable={editable}
+        onEdit={canEdit ? () => setIsEditing(true) : undefined}
         onSave={handleSaveAll}
         localSections={localSections}
         onCellChange={handleCellChange}

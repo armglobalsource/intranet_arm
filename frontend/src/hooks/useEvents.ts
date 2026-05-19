@@ -6,23 +6,31 @@ import { api } from '@/lib/api';
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 export type EventCategory =
-  | 'culto'
+  | 'encuentro'
   | 'conferencia'
+  | 'evento_especial'
+  | 'adn'
+  | 'evento_social'
+  | 'amor_casa'
+  | 'personalizado'
+  // legacy (datos existentes)
+  | 'culto'
   | 'retiro'
   | 'capacitacion'
   | 'social'
   | 'otro';
 
 export interface ArmEvent {
-  id:          string;
-  title:       string;
+  id:           string;
+  title:        string;
   description?: string | null;
-  date:        string;       // "YYYY-MM-DD"
-  endDate?:    string | null;// "YYYY-MM-DD"
-  time?:       string | null;// "HH:MM"
-  category:    EventCategory;
-  location?:   string | null;
-  createdBy:   number;
+  date:         string;
+  endDate?:     string | null;
+  time?:        string | null;
+  category:     EventCategory;
+  customLabel?: string | null;
+  location?:    string | null;
+  createdBy:    number;
 }
 
 export type CreateEventPayload = Omit<ArmEvent, 'id' | 'createdBy'>;
@@ -36,7 +44,6 @@ const KEYS = {
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
 
-/** Lista de eventos para un año dado */
 export function useEvents(year: number) {
   return useQuery<ArmEvent[]>({
     queryKey: KEYS.list(year),
@@ -48,7 +55,6 @@ export function useEvents(year: number) {
   });
 }
 
-/** Crear evento (solo admin) */
 export function useCreateEvent() {
   const qc = useQueryClient();
   return useMutation({
@@ -61,7 +67,6 @@ export function useCreateEvent() {
   });
 }
 
-/** Eliminar evento (solo admin) */
 export function useDeleteEvent() {
   const qc = useQueryClient();
   return useMutation({

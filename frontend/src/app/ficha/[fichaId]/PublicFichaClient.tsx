@@ -17,7 +17,7 @@ export function PublicFichaClient({ fichaId }: { fichaId: string }) {
 
   useEffect(() => {
     if (!fichaId) { setError('ID de ficha inválido'); setLoading(false); return; }
-    fetch(`${API_BASE}/fichas/${fichaId}/public`)
+    fetch(`${API_BASE}/fichas/public/${fichaId}`)
       .then(async (r) => {
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));

@@ -10,6 +10,7 @@ import {
   EventCategory,
   CreateEventPayload,
 } from '@/hooks/useEvents';
+import { useActiveCampuses } from '@/hooks/useCampus';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -20,16 +21,31 @@ const MONTH_NAMES = [
 
 const DAY_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 
-const CATEGORIES: Record<EventCategory, { label: string; color: string; bg: string }> = {
-  culto:        { label: 'Culto',        color: '#7c3aed', bg: '#f5f3ff' },
-  conferencia:  { label: 'Conferencia',  color: '#2563eb', bg: '#eff6ff' },
-  retiro:       { label: 'Retiro',       color: '#059669', bg: '#ecfdf5' },
-  capacitacion: { label: 'Capacitación', color: '#d97706', bg: '#fffbeb' },
-  social:       { label: 'Social',       color: '#db2777', bg: '#fdf2f8' },
-  otro:         { label: 'Otro',         color: '#6b7280', bg: '#f9fafb' },
+const CATEGORIES: Record<string, { label: string; color: string; bg: string }> = {
+  encuentro:      { label: 'Encuentro',        color: '#7c3aed', bg: '#f5f3ff' },
+  conferencia:    { label: 'Conferencia',       color: '#2563eb', bg: '#eff6ff' },
+  evento_especial:{ label: 'Evento Especial',   color: '#059669', bg: '#ecfdf5' },
+  adn:            { label: 'ADN',               color: '#d97706', bg: '#fffbeb' },
+  evento_social:  { label: 'Evento Social',     color: '#db2777', bg: '#fdf2f8' },
+  amor_casa:      { label: 'Amor por la Casa',  color: '#0891b2', bg: '#ecfeff' },
+  personalizado:  { label: 'Personalizado',     color: '#6b7280', bg: '#f9fafb' },
+  // legacy
+  culto:          { label: 'Encuentro',         color: '#7c3aed', bg: '#f5f3ff' },
+  retiro:         { label: 'Evento Especial',   color: '#059669', bg: '#ecfdf5' },
+  capacitacion:   { label: 'ADN',               color: '#d97706', bg: '#fffbeb' },
+  social:         { label: 'Evento Social',     color: '#db2777', bg: '#fdf2f8' },
+  otro:           { label: 'Amor por la Casa',  color: '#0891b2', bg: '#ecfeff' },
 };
 
-const CATEGORY_OPTIONS = Object.entries(CATEGORIES) as [EventCategory, { label: string; color: string; bg: string }][];
+const CATEGORY_OPTIONS: [EventCategory, { label: string; color: string; bg: string }][] = [
+  ['encuentro',       CATEGORIES.encuentro],
+  ['conferencia',     CATEGORIES.conferencia],
+  ['evento_especial', CATEGORIES.evento_especial],
+  ['adn',             CATEGORIES.adn],
+  ['evento_social',   CATEGORIES.evento_social],
+  ['amor_casa',       CATEGORIES.amor_casa],
+  ['personalizado',   CATEGORIES.personalizado],
+];
 
 // ── Utilidades de fecha ───────────────────────────────────────────────────────
 
@@ -262,7 +278,7 @@ function EventCard({ event, isAdmin, year, onDelete }: EventCardProps) {
             className="text-[10px] font-bold px-2 py-0.5 rounded-full"
             style={{ background: cat.color, color: '#fff' }}
           >
-            {cat.label}
+            {event.customLabel ?? cat.label}
           </span>
           <h4 className="text-[13px] font-semibold text-slate-900 truncate">{event.title}</h4>
         </div>
@@ -383,13 +399,17 @@ function AddEventModal({ defaultDate, onClose, onCreated }: AddEventModalProps) 
   const today  = new Date();
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
 
+  const { data: campuses = [], isError: campusError } = useActiveCampuses();
+  const [locationMode, setLocationMode] = useState<'campus' | 'custom'>('campus');
+
   const [form, setForm] = useState<CreateEventPayload>({
     title:       '',
     description: '',
     date:        defaultDate ?? todayStr,
     endDate:     '',
     time:        '',
-    category:    'culto',
+    category:    'encuentro',
+    customLabel: '',
     location:    '',
   });
 
@@ -406,13 +426,15 @@ function AddEventModal({ defaultDate, onClose, onCreated }: AddEventModalProps) 
     if (!form.date)         { setError('La fecha de inicio es obligatoria'); return; }
 
     const payload: CreateEventPayload = {
-      title:       form.title.trim(),
-      description: form.description?.trim() || null,
-      date:        form.date,
-      endDate:     form.endDate?.trim()  || null,
-      time:        form.time?.trim()     || null,
-      category:    form.category,
-      location:    form.location?.trim() || null,
+      title:    form.title.trim(),
+      date:     form.date,
+      category: form.category,
+      ...(form.description?.trim()  && { description: form.description.trim() }),
+      ...(form.endDate?.trim()       && { endDate:     form.endDate.trim() }),
+      ...(form.time?.trim()          && { time:        form.time.trim() }),
+      ...(form.location?.trim()      && { location:    form.location.trim() }),
+      ...(form.category === 'personalizado' && form.customLabel?.trim()
+        && { customLabel: form.customLabel.trim() }),
     };
 
     try {
@@ -478,6 +500,21 @@ function AddEventModal({ defaultDate, onClose, onCreated }: AddEventModalProps) 
             </div>
           </div>
 
+          {/* Etiqueta personalizada */}
+          {form.category === 'personalizado' && (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                Etiqueta personalizada
+              </label>
+              <input
+                className="input"
+                placeholder="Ej: Retiro de Mujeres"
+                value={form.customLabel ?? ''}
+                onChange={(e) => set('customLabel', e.target.value)}
+              />
+            </div>
+          )}
+
           {/* Fechas + hora */}
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -521,12 +558,49 @@ function AddEventModal({ defaultDate, onClose, onCreated }: AddEventModalProps) 
             <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
               Lugar
             </label>
-            <input
-              className="input"
-              placeholder="Ej: Auditorio principal · Santiago"
-              value={form.location ?? ''}
-              onChange={(e) => set('location', e.target.value)}
-            />
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => { setLocationMode('campus'); set('location', ''); }}
+                className={`text-[11px] font-semibold px-3 py-1 rounded-full border transition-all ${locationMode === 'campus' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
+              >
+                Campus
+              </button>
+              <button
+                type="button"
+                onClick={() => { setLocationMode('custom'); set('location', ''); }}
+                className={`text-[11px] font-semibold px-3 py-1 rounded-full border transition-all ${locationMode === 'custom' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
+              >
+                Otro lugar
+              </button>
+            </div>
+            {locationMode === 'campus' ? (
+              campusError ? (
+                <p className="text-[11.5px] text-red-400">No se pudieron cargar los campus. Usa "Otro lugar".</p>
+              ) : campuses.length === 0 ? (
+                <p className="text-[11.5px] text-slate-400">No hay campus registrados. Agrégalos en Configuración → Campus.</p>
+              ) : (
+                <select
+                  className="input"
+                  value={form.location ?? ''}
+                  onChange={(e) => set('location', e.target.value)}
+                >
+                  <option value="">— Sin especificar —</option>
+                  {campuses.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.siglas ? `${c.siglas} — ${c.name}` : c.name}
+                    </option>
+                  ))}
+                </select>
+              )
+            ) : (
+              <input
+                className="input"
+                placeholder="Ej: Auditorio principal · Santiago"
+                value={form.location ?? ''}
+                onChange={(e) => set('location', e.target.value)}
+              />
+            )}
           </div>
 
           {/* Descripción */}

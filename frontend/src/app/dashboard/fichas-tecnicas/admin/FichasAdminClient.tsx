@@ -1,37 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import { useFichas, useCreateFicha, useDeleteFicha, useCloneFicha } from '@/hooks/useFichas';
 import { usePermissions } from '@/hooks/usePermissions';
 import { statusColor, statusLabel, completionPercent } from '@/types/ficha';
 import type { FichaListItem, FichaType, Encuentro } from '@/types/ficha';
-import { api } from '@/lib/api';
+import { useAllCampuses } from '@/hooks/useCampus';
+import type { Campus } from '@/hooks/useCampus';
 
-// ── Campus loader ─────────────────────────────────────────────────────────────
+// ── Campus helpers ────────────────────────────────────────────────────────────
 
 interface EncuentrosDia {
-  dia: string;
-  tipo: 'unico' | 'multi';
-  fichaType?: FichaType;   // 'oracion' para Encuentro de Oración
+  dia:       string;
+  tipo:      'unico' | 'multi';
+  fichaType?: FichaType;
   encuentros: Encuentro[];
 }
 
-interface CampusOption {
-  id: string;
-  name: string;
-  fichaType?: 'unico' | 'multi' | 'both';
-  encuentrosConfig?: EncuentrosDia[];   // array — un objeto por día de servicio
-}
+const ENCOUNTER_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'];
 
-function useCampuses() {
-  return useQuery<CampusOption[]>({
-    queryKey: ['campuses-fichas'],
-    queryFn: () => api.get('/campus').then((r) => r.data),
-    staleTime: 60_000,
+/** Convierte los horarios del mantenedor en config de días para el form de fichas */
+function buildEncuentrosConfig(campus: Campus): EncuentrosDia[] {
+  const schedules = campus.schedules ?? [];
+  if (schedules.length === 0) return [];
+
+  // Agrupar por día
+  const byDay: Record<string, typeof schedules> = {};
+  schedules.forEach((s) => {
+    byDay[s.dia] = byDay[s.dia] ?? [];
+    byDay[s.dia].push(s);
   });
+
+  const ORDER = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+  return Object.entries(byDay)
+    .sort(([a], [b]) => ORDER.indexOf(a) - ORDER.indexOf(b))
+    .map(([dia, slots]) => {
+      const isMulti    = slots.length > 1;
+      const fichaType  = (slots[0].fichaType as FichaType | undefined) ?? (isMulti ? 'multi' : 'unico');
+      const encuentros: Encuentro[] = slots.map((s, i) => ({
+        id:     isMulti ? `e${i + 1}` : 'unico',
+        label:  s.descripcion || (isMulti ? `Encuentro ${i + 1}` : dia),
+        time:   s.hora,
+        isLive: false,
+        color:  ENCOUNTER_COLORS[i % ENCOUNTER_COLORS.length],
+      }));
+      return { dia, tipo: isMulti ? 'multi' : 'unico', fichaType, encuentros };
+    });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -48,35 +65,36 @@ function formatDate(raw: any): string {
 
 // ── Colores para encuentros personalizados ────────────────────────────────────
 
-const ENCOUNTER_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'];
-
 interface CustomEncuentro { label: string; time: string; }
 
 // ── CreateFichaForm ───────────────────────────────────────────────────────────
 
 function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }) {
-  const { data: campuses, isLoading: loadingCampus } = useCampuses();
+  const { data: rawCampuses = [], isLoading: loadingCampus } = useAllCampuses();
   const { mutate: createFicha, isPending } = useCreateFicha();
 
-  // -1 = evento especial
-  const [campusId, setCampusId]   = useState('');
-  const [diaIdx, setDiaIdx]       = useState<number>(0);
-  const [type, setType]           = useState<FichaType>('multi');
-  const [title, setTitle]         = useState('');
-  const [date, setDate]           = useState('');
+  // Solo campus activos
+  const campuses = rawCampuses.filter((c) => c.isActive);
+
+  const [campusId, setCampusId] = useState('');
+  const [diaIdx,   setDiaIdx]   = useState<number>(0);
+  const [type,     setType]     = useState<FichaType>('multi');
+  const [title,    setTitle]    = useState('');
+  const [date,     setDate]     = useState('');
 
   // Estado para evento especial
-  const [customName, setCustomName]           = useState('');   // nombre del evento
-  const [customEncuentros, setCustomEncuentros] = useState<CustomEncuentro[]>([
-    { label: '', time: '' },
-  ]);
-  const [customMulti, setCustomMulti] = useState(false);
+  const [customName,       setCustomName]       = useState('');
+  const [customEncuentros, setCustomEncuentros] = useState<CustomEncuentro[]>([{ label: '', time: '' }]);
+  const [customMulti,      setCustomMulti]      = useState(false);
 
   const isCustom = diaIdx === -1;
 
-  // Campus seleccionado
-  const selectedCampus = campuses?.find((c) => String(c.id) === campusId);
-  const diasDisponibles: EncuentrosDia[] = selectedCampus?.encuentrosConfig ?? [];
+  // Campus seleccionado y su config derivada del mantenedor
+  const selectedCampus   = campuses.find((c) => String(c.id) === campusId);
+  const diasDisponibles  = useMemo(
+    () => selectedCampus ? buildEncuentrosConfig(selectedCampus) : [],
+    [selectedCampus],
+  );
   const diaSeleccionado: EncuentrosDia | undefined = isCustom ? undefined : diasDisponibles[diaIdx];
 
   // Encuentros resultantes
@@ -96,10 +114,11 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
   function handleCampusChange(id: string) {
     setCampusId(id);
     setDiaIdx(0);
-    const campus = campuses?.find((c) => String(c.id) === id);
-    const primerDia = campus?.encuentrosConfig?.[0];
-    if (primerDia) {
-      setType(primerDia.fichaType ?? (primerDia.tipo === 'unico' ? 'unico' : 'multi'));
+    const campus = campuses.find((c) => String(c.id) === id);
+    if (campus) {
+      const config = buildEncuentrosConfig(campus);
+      const primer = config[0];
+      setType(primer?.fichaType ?? (primer?.tipo === 'unico' ? 'unico' : 'multi'));
     } else {
       setType('multi');
     }
@@ -107,10 +126,7 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
 
   function handleDiaChange(idx: number) {
     setDiaIdx(idx);
-    if (idx === -1) {
-      setType('unico');
-      return;
-    }
+    if (idx === -1) { setType('unico'); return; }
     const dia = diasDisponibles[idx];
     if (dia) setType(dia.fichaType ?? (dia.tipo === 'unico' ? 'unico' : 'multi'));
   }
@@ -131,15 +147,16 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
     e.preventDefault();
     if (!campusId || !title || !date) return;
     if (isCustom && encuentros.length === 0) return;
-    const campus = campuses?.find((c) => String(c.id) === campusId);
+    const campus = campuses.find((c) => String(c.id) === campusId);
     if (!campus) return;
 
     const finalType: FichaType = isCustom
       ? (customMulti && encuentros.length > 1 ? 'multi' : 'unico')
       : type;
 
+    // Siempre usar el nombre exacto del mantenedor como campusName
     createFicha(
-      { campusId, campusName: campus.name, type: finalType, title, date, encuentros },
+      { campusId: String(campus.id), campusName: campus.name, type: finalType, title, date, encuentros },
       { onSuccess: (data) => onCreated(data.fichaId ?? data.id ?? '') },
     );
   }

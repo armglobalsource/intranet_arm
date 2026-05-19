@@ -131,7 +131,7 @@ export function ProduccionGeneralClient() {
           href="/dashboard/fichas-tecnicas"
           icon={
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
-              stroke="#6366f1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              stroke="#0f172a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
               <line x1="16" y1="13" x2="8" y2="13" />
@@ -140,7 +140,7 @@ export function ProduccionGeneralClient() {
           }
           title="Fichas Técnicas"
           description="Formularios de producción semanal por campus. Coordina equipos, horarios y set list en tiempo real."
-          accentColor="#6366f1"
+          accentColor="#0f172a"
           stat={statFichas}
           loading={isLoading}
         />

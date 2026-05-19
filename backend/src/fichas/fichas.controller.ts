@@ -21,7 +21,7 @@ export class FichasController {
   }
 
   @Public()
-  @Get(':fichaId/public')
+  @Get('public/:fichaId')
   findOnePublic(@Param('fichaId') fichaId: string) {
     return this.fichasService.findOne(fichaId);
   }
@@ -38,7 +38,7 @@ export class FichasController {
 
   @Patch(':fichaId')
   update(@Param('fichaId') fichaId: string, @Body() dto: UpdateFichaDto, @CurrentUser() user: any) {
-    return this.fichasService.update(fichaId, dto, user.sub);
+    return this.fichasService.update(fichaId, dto, user.sub, user.email);
   }
 
   @Delete(':fichaId')

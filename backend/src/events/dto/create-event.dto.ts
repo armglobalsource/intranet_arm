@@ -1,12 +1,19 @@
 import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export enum EventCategory {
-  CULTO        = 'culto',
-  CONFERENCIA  = 'conferencia',
-  RETIRO       = 'retiro',
-  CAPACITACION = 'capacitacion',
-  SOCIAL       = 'social',
-  OTRO         = 'otro',
+  ENCUENTRO     = 'encuentro',
+  CONFERENCIA   = 'conferencia',
+  EVENTO_ESP    = 'evento_especial',
+  ADN           = 'adn',
+  EVENTO_SOCIAL = 'evento_social',
+  AMOR_CASA     = 'amor_casa',
+  PERSONALIZADO = 'personalizado',
+  // legacy — mantenidos para datos existentes
+  CULTO         = 'culto',
+  RETIRO        = 'retiro',
+  CAPACITACION  = 'capacitacion',
+  SOCIAL        = 'social',
+  OTRO          = 'otro',
 }
 
 export class CreateEventDto {
@@ -34,6 +41,11 @@ export class CreateEventDto {
 
   @IsEnum(EventCategory)
   category: EventCategory;
+
+  /** Etiqueta personalizada (cuando category = 'personalizado') */
+  @IsOptional()
+  @IsString()
+  customLabel?: string;
 
   @IsOptional()
   @IsString()

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useFichas, useDeleteFicha } from '@/hooks/useFichas';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { useActiveCampuses } from '@/hooks/useCampus';
 import {
   completionPercent, statusColor, statusLabel,
   SECTION_LABELS,
@@ -54,6 +55,19 @@ function StatusBadge({ status }: { status: FichaStatus }) {
   );
 }
 
+// ── Colores por sección ───────────────────────────────────────────────────────
+
+const SECTION_COLORS: Record<SectionName, string> = {
+  pastoral:    '#A78BFA', // violeta
+  produccion:  '#FB923C', // naranja
+  streaming:   '#60A5FA', // azul
+  escena:      '#F472B6', // rosado
+  setList:     '#FACC15', // amarillo
+  horarios:    '#34D399', // verde esmeralda
+  anuncios:    '#F87171', // coral
+  voluntarios: '#A3E635', // lima
+};
+
 // ── ProgressBar ───────────────────────────────────────────────────────────────
 
 function ProgressBar({ completionStatus }: { completionStatus: Record<string, boolean> }) {
@@ -63,8 +77,8 @@ function ProgressBar({ completionStatus }: { completionStatus: Record<string, bo
   return (
     <div className="mt-3">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] text-gray-400">Completitud</span>
-        <span className="text-[10px] font-medium text-gray-600">{pct}%</span>
+        <span className="text-[10px] text-white/40">Completitud</span>
+        <span className="text-[10px] font-medium text-white/60">{pct}%</span>
       </div>
       {/* Segmentos por sección */}
       <div className="flex gap-0.5 h-1.5 rounded-full overflow-hidden">
@@ -73,9 +87,7 @@ function ProgressBar({ completionStatus }: { completionStatus: Record<string, bo
             key={sec}
             className="flex-1 rounded-full transition-all duration-300"
             style={{
-              background: completionStatus[sec]
-                ? '#1D9E75'
-                : 'rgba(0,0,0,0.08)',
+              background: completionStatus[sec] ? '#1D9E75' : 'rgba(255,255,255,0.1)',
             }}
             title={`${SECTION_LABELS[sec]}: ${completionStatus[sec] ? 'Completado' : 'Pendiente'}`}
           />
@@ -83,19 +95,23 @@ function ProgressBar({ completionStatus }: { completionStatus: Record<string, bo
       </div>
       {/* Leyenda compacta */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-        {sections.map((sec) => (
-          <span
-            key={sec}
-            className="flex items-center gap-1 text-[9px]"
-            style={{ color: completionStatus[sec] ? '#1D9E75' : '#9CA3AF' }}
-          >
+        {sections.map((sec) => {
+          const color = SECTION_COLORS[sec] ?? '#9CA3AF';
+          const done  = completionStatus[sec];
+          return (
             <span
-              className="inline-block w-1.5 h-1.5 rounded-full"
-              style={{ background: completionStatus[sec] ? '#1D9E75' : '#D1D5DB' }}
-            />
-            {SECTION_LABELS[sec]}
-          </span>
-        ))}
+              key={sec}
+              className="flex items-center gap-1 text-[9px]"
+              style={{ color: done ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)' }}
+            >
+              <span
+                className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ background: done ? color : 'rgba(255,255,255,0.15)' }}
+              />
+              {SECTION_LABELS[sec]}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
@@ -105,27 +121,53 @@ function ProgressBar({ completionStatus }: { completionStatus: Record<string, bo
 
 function FichaCard({ ficha, canDelete }: { ficha: FichaListItem; canDelete: boolean }) {
   const [confirming, setConfirming] = useState(false);
+  const [copied,     setCopied]     = useState(false);
   const { mutate: deleteFicha, isPending: deleting } = useDeleteFicha();
   const isComplete = ficha.status === 'complete';
 
   function handleDelete() {
-    deleteFicha(ficha.fichaId, {
-      onSuccess: () => setConfirming(false),
-    });
+    deleteFicha(ficha.fichaId, { onSuccess: () => setConfirming(false) });
+  }
+
+  function handleShare() {
+    const url = `${window.location.origin}/ficha/${String(ficha.fichaId)}`;
+    const markCopied = () => { setCopied(true); setTimeout(() => setCopied(false), 2500); };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(markCopied).catch(() => fallbackCopy(url, markCopied));
+    } else {
+      fallbackCopy(url, markCopied);
+    }
+  }
+
+  function fallbackCopy(url: string, onSuccess: () => void) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) { onSuccess(); return; }
+    } catch {}
+    window.prompt('Copia este link:', url);
   }
 
   return (
-    <div className="card p-4 hover:shadow-md transition-shadow group flex flex-col gap-3">
+    <div
+      className="rounded-2xl p-4 flex flex-col gap-3 transition-all duration-200 hover:scale-[1.01] hover:shadow-xl"
+      style={{ background: '#111111', border: '1px solid rgba(255,255,255,0.07)' }}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-800 truncate">{ficha.title}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{formatDate(ficha.date)}</p>
+          <p className="text-sm font-semibold text-white truncate">{ficha.title}</p>
+          <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{formatDate(ficha.date)}</p>
         </div>
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
           <StatusBadge status={ficha.status} />
           <span
             className="text-[9px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded"
-            style={{ background: 'rgba(0,0,0,0.04)', color: '#6B7280' }}
+            style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.4)' }}
           >
             {ficha.type === 'oracion' ? '🙏 Oración' : ficha.type === 'unico' ? 'Único' : 'Multi'}
           </span>
@@ -137,21 +179,17 @@ function FichaCard({ ficha, canDelete }: { ficha: FichaListItem; canDelete: bool
       {/* Confirmación de eliminación */}
       {confirming && (
         <div className="rounded-lg p-3 flex flex-col gap-2"
-          style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
-          <p className="text-xs text-red-700 font-medium">¿Eliminar esta ficha? No se puede deshacer.</p>
+          style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)' }}>
+          <p className="text-xs font-medium" style={{ color: '#FCA5A5' }}>¿Eliminar esta ficha? No se puede deshacer.</p>
           <div className="flex gap-2">
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
+            <button onClick={handleDelete} disabled={deleting}
               className="flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors disabled:opacity-50"
-              style={{ background: '#EF4444', color: 'white' }}
-            >
+              style={{ background: '#EF4444', color: 'white' }}>
               {deleting ? 'Eliminando…' : 'Sí, eliminar'}
             </button>
-            <button
-              onClick={() => setConfirming(false)}
-              className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-            >
+            <button onClick={() => setConfirming(false)}
+              className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors"
+              style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
               Cancelar
             </button>
           </div>
@@ -159,39 +197,54 @@ function FichaCard({ ficha, canDelete }: { ficha: FichaListItem; canDelete: bool
       )}
 
       {/* Acciones */}
-      <div className="flex gap-2 pt-1 border-t border-gray-100">
+      <div className="flex gap-2 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
         {isComplete ? (
           <Link
             href={`/dashboard/fichas-tecnicas/${ficha.fichaId}/view`}
             className="flex-1 text-center text-xs font-semibold py-1.5 rounded-lg transition-colors"
-            style={{ background: 'rgba(29,158,117,0.1)', color: '#1D9E75' }}
+            style={{ background: 'rgba(29,158,117,0.15)', color: '#1D9E75' }}
           >
             Ver ficha completa
           </Link>
         ) : (
           <Link
             href={`/dashboard/fichas-tecnicas/${ficha.fichaId}`}
-            className="flex-1 text-center text-xs font-medium py-1.5 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
+            className="flex-1 text-center text-xs font-medium py-1.5 rounded-lg transition-colors"
+            style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)' }}
           >
             Abrir editor
           </Link>
         )}
-        <Link
-          href={`/dashboard/fichas-tecnicas/${ficha.fichaId}/view`}
-          className="px-2.5 py-1.5 rounded-lg bg-gray-50 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-          title="Ver ficha"
+
+        {/* Compartir */}
+        <button
+          onClick={handleShare}
+          title="Copiar link público"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+          style={{
+            background: copied ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.07)',
+            color:      copied ? '#1D9E75' : 'rgba(255,255,255,0.5)',
+            border:     `1px solid ${copied ? 'rgba(29,158,117,0.35)' : 'rgba(255,255,255,0.1)'}`,
+          }}
         >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-        </Link>
+          {copied ? (
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+          )}
+        </button>
+
         {canDelete && (
           <button
             onClick={() => setConfirming((v) => !v)}
-            className="px-2.5 py-1.5 rounded-lg bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            className="px-2.5 py-1.5 rounded-lg transition-colors"
             title="Eliminar ficha"
+            style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.1)' }}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -218,7 +271,7 @@ function CampusGroup({
   fichas: FichaListItem[];
   canDelete: boolean;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const totalPct = fichas.length
     ? Math.round(fichas.reduce((a, f) => a + completionPercent(f.completionStatus), 0) / fichas.length)
     : 0;
@@ -302,11 +355,34 @@ export function FichasTecnicasClient() {
   }, [isAdmin, can, user]);
 
   const { data: fichas, isLoading, error, refetch } = useFichas(campusIdFilter);
+  const { data: campusList = [] } = useActiveCampuses();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
 
-  // Filtrar y agrupar fichas por campus
+  // Mapa de normalización: id numérico → nombre canónico
+  // y nombre normalizado → nombre canónico
+  const campusNormMap = useMemo(() => {
+    const byId:   Record<string, string> = {};
+    const byNorm: Record<string, string> = {};
+    campusList.forEach((c) => {
+      byId[String(c.id)] = c.name;
+      // normalizar: minúsculas, quitar prefijo "campus " o "arm "
+      const norm = c.name.toLowerCase().replace(/^(campus|arm)\s+/, '').trim();
+      byNorm[norm] = c.name;
+    });
+    return { byId, byNorm };
+  }, [campusList]);
+
+  /** Devuelve el nombre canónico del campus para agrupar */
+  function canonicalName(f: FichaListItem): string {
+    if (campusNormMap.byId[f.campusId]) return campusNormMap.byId[f.campusId];
+    const norm = f.campusName.toLowerCase().replace(/^(campus|arm)\s+/, '').trim();
+    if (campusNormMap.byNorm[norm]) return campusNormMap.byNorm[norm];
+    return f.campusName;
+  }
+
+  // Filtrar y agrupar fichas por campus (usando nombre canónico)
   const grouped = useMemo(() => {
     if (!fichas) return {};
     let filtered = fichas;
@@ -324,13 +400,14 @@ export function FichasTecnicasClient() {
     }
 
     return filtered.reduce<Record<string, FichaListItem[]>>((acc, f) => {
-      acc[f.campusName] = acc[f.campusName] ?? [];
-      acc[f.campusName].push(f);
+      const key = canonicalName(f);
+      acc[key] = acc[key] ?? [];
+      acc[key].push(f);
       return acc;
     }, {});
-  }, [fichas, statusFilter, search]);
+  }, [fichas, statusFilter, search, campusNormMap]);
 
-  const campusNames = Object.keys(grouped).sort();
+  const campusNames = Object.keys(grouped).sort((a, b) => grouped[b].length - grouped[a].length);
   const canCreate = isAdmin || can('fichas:create') || can('fichas:admin');
   const canDelete = isAdmin || can('fichas:admin');
 

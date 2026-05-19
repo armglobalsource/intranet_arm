@@ -6,6 +6,7 @@ import { useAllJobTitles } from '@/hooks/useJobTitles';
 import { useUsers } from '@/hooks/useUsers';
 import { useSystemRoles } from '@/hooks/useRoles';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAllCampuses } from '@/hooks/useCampus';
 
 
 // ── Stat pill ─────────────────────────────────────────────────────────────────
@@ -95,11 +96,12 @@ function HubCard({ href, icon, title, description, accentColor, count, countLabe
 // ── DirectorioClient ──────────────────────────────────────────────────────────
 
 export function DirectorioClient() {
-  const { data: areas,   isLoading: loadingAreas }   = useOrgAreas();
-  const { data: teams,   isLoading: loadingTeams }   = useOrgTeams();
-  const { data: cargos,  isLoading: loadingCargos }  = useAllJobTitles();
-  const { data: persons, isLoading: loadingPersons } = useUsers();
-  const { data: roles,   isLoading: loadingRoles }   = useSystemRoles();
+  const { data: areas,    isLoading: loadingAreas }    = useOrgAreas();
+  const { data: teams,    isLoading: loadingTeams }    = useOrgTeams();
+  const { data: cargos,   isLoading: loadingCargos }   = useAllJobTitles();
+  const { data: persons,  isLoading: loadingPersons }  = useUsers();
+  const { data: roles,    isLoading: loadingRoles }    = useSystemRoles();
+  const { data: campuses, isLoading: loadingCampuses } = useAllCampuses();
   const { can } = usePermissions();
 
   return (
@@ -110,7 +112,7 @@ export function DirectorioClient() {
           Directorio
         </h1>
         <p className="text-[12.5px] text-slate-400 text-center max-w-xs mt-0.5">
-          Administración central de personas, estructura y acceso del sistema.
+          Panel de administración central de personas, estructura y acceso del sistema.
         </p>
         <div className="flex gap-2 flex-wrap justify-center mt-2">
           <StatPill count={persons?.length} label="personas"  loading={loadingPersons} />
@@ -169,6 +171,17 @@ export function DirectorioClient() {
           count={teams?.length}
           countLabel="equipos"
           loading={loadingTeams}
+        />
+
+        <HubCard
+          href="/dashboard/directorio/campus"
+          icon="🏛️"
+          title="Campus"
+          description="Registra cada campus con sus pastores, horarios, contacto y dirección."
+          accentColor="#0891B2"
+          count={campuses?.length}
+          countLabel="campus"
+          loading={loadingCampuses}
         />
 
         {can('roles:view') && (
