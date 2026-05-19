@@ -108,12 +108,25 @@ function StatsIcon({ active }: { active: boolean }) {
 
 // ── Estructura de navegación ──────────────────────────────────────────────────
 
-const NAV: NavItem[] = [
-  { href: '/dashboard',                                     label: 'Inicio',             icon: HomeIcon       },
-  { href: '/dashboard/orgchart',                            label: 'Organigrama',        icon: OrgIcon        },
-  { href: '/dashboard/mis-fichas',                          label: 'Mis Fichas',         icon: MiFichaIcon    },
-  { href: '/dashboard/produccion-general',                  label: 'Producción General', icon: ProduccionIcon },
-  { href: '/dashboard/produccion-general/estadisticas',     label: 'Estadísticas',       icon: StatsIcon      },
+interface NavGroup {
+  href:      string;
+  label:     string;
+  icon:      (p: { active: boolean }) => React.JSX.Element;
+  children?: { href: string; label: string; icon: (p: { active: boolean }) => React.JSX.Element }[];
+}
+
+const NAV: NavGroup[] = [
+  {
+    href:  '/dashboard',
+    label: 'Inicio',
+    icon:  HomeIcon,
+    children: [
+      { href: '/dashboard/mis-fichas', label: 'Mis Fichas', icon: MiFichaIcon },
+    ],
+  },
+  { href: '/dashboard/orgchart',                        label: 'Organigrama',        icon: OrgIcon        },
+  { href: '/dashboard/produccion-general',              label: 'Producción General', icon: ProduccionIcon },
+  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',       icon: StatsIcon      },
 ];
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -164,26 +177,54 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 space-y-0.5 pt-4">
-        {NAV.map(({ href, label, icon: Icon }) => {
+      <nav className="flex-1 p-3 pt-4 space-y-0.5">
+        {NAV.map(({ href, label, icon: Icon, children }) => {
           const active =
-            (href === '/dashboard'
+            href === '/dashboard'
               ? pathname === '/dashboard'
               : href === '/dashboard/produccion-general'
-                ? (pathname === '/dashboard/produccion-general' || pathname.startsWith('/dashboard/fichas-tecnicas'))
-                : pathname.startsWith(href));
+                ? pathname === '/dashboard/produccion-general' || pathname.startsWith('/dashboard/fichas-tecnicas')
+                : pathname.startsWith(href);
+
+          // ¿Algún hijo está activo?
+          const childActive = children?.some((c) => pathname.startsWith(c.href)) ?? false;
+
           return (
-            <Link
-              key={href}
-              href={href}
-              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
-              }`}
-            >
-              <Icon active={active} />
-              {label}
-            </Link>
+            <div key={href}>
+              <Link
+                href={href}
+                style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                }`}
+              >
+                <Icon active={active} />
+                {label}
+              </Link>
+
+              {/* Sub-ítems */}
+              {children && children.map(({ href: chref, label: clabel, icon: CIcon }) => {
+                const cActive = pathname.startsWith(chref);
+                return (
+                  <Link
+                    key={chref}
+                    href={chref}
+                    style={cActive ? { background: 'rgba(255,255,255,0.06)' } : {}}
+                    className={`flex items-center gap-2.5 pl-8 pr-3 py-2 mt-0.5 rounded-lg text-xs font-medium transition-all ${
+                      cActive ? 'text-white/90' : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                    }`}
+                  >
+                    {/* línea vertical conectora */}
+                    <span
+                      className="flex-shrink-0 w-px h-3 rounded-full"
+                      style={{ background: cActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)' }}
+                    />
+                    <CIcon active={cActive} />
+                    {clabel}
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
