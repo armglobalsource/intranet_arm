@@ -50,7 +50,7 @@ frontend/playwright-report/
 prod_data.sql
 /prod_data.sql
 
-package-lock.json
+# package-lock.json se commitea para que npm ci funcione en CI/CD
 
 # ── Playwright MCP / build cache ──────────────────────────────
 .playwright-mcp/
