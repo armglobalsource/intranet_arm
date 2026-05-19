@@ -758,24 +758,23 @@ export function FichaDocumentView({
         {/* ── Header ── */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-          padding: '0 2rem 1.25rem 0',
+          padding: '1.5rem 2rem',
           background: D.headerBg,
           borderBottom: `0.5px solid ${D.cardBorder}`,
         }}>
           <div>
-            {/* Logo + campus */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-              <img
-                src="/logo2.png"
-                alt="ARM Global"
-                style={{ height: 120, width: 'auto', objectFit: 'contain', margin: 0, padding: 0, display: 'block' }}
-              />
-              <span style={{
-                fontSize: 11, color: D.textSecond, textTransform: 'uppercase',
-                letterSpacing: '0.1em', fontWeight: 500,
-              }}>
-                Campus {campusName}
-              </span>
+            {/* Logo */}
+            <img
+              src="/logo2.png"
+              alt="ARM Global"
+              style={{ height: 48, width: 'auto', objectFit: 'contain', display: 'block', marginBottom: 10 }}
+            />
+            {/* Campus */}
+            <div style={{
+              fontSize: 10, color: D.textMuted, textTransform: 'uppercase',
+              letterSpacing: '0.12em', fontWeight: 600, marginBottom: 4,
+            }}>
+              Campus {campusName}
             </div>
             {/* Título */}
             <div style={{ fontSize: 22, fontWeight: 700, color: D.textPrimary, letterSpacing: '-0.01em' }}>
