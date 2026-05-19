@@ -1,4 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import {
+  Controller, Get, Post, Patch, Delete,
+  Body, Param, ParseIntPipe, UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ContentsService } from './content.service';
@@ -16,6 +19,21 @@ export class ContentsController {
   @ApiOperation({ summary: 'Listar todos los registros' })
   findAll(@CurrentUser() user: any) {
     return this.service.findAll(user.sub, user.roleId);
+  }
+
+  /** Noticias globales publicadas (campusId == null) */
+  @Get('news/global')
+  @ApiOperation({ summary: 'Noticias globales publicadas' })
+  findGlobal() {
+    return this.service.findPublished('global');
+  }
+
+  /** Noticias del campus del usuario autenticado */
+  @Get('news/campus')
+  @ApiOperation({ summary: 'Noticias del campus del usuario' })
+  findCampus(@CurrentUser() user: any) {
+    const campusId = user?.campusId ? String(user.campusId) : undefined;
+    return this.service.findPublished('campus', campusId);
   }
 
   @Get(':id')
