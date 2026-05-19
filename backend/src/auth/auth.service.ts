@@ -20,6 +20,7 @@ export interface JwtPayload {
   roleId:      number;
   permissions: string[];
   jti:         string;
+  campusId?:   number | null;
 }
 
 const RT_COL  = 'refresh_tokens';
@@ -237,7 +238,11 @@ export class AuthService {
       ? (roleSnap.data()!.permissions ?? [])
       : [];
 
-    const payload: JwtPayload = { sub: userId, email, role, roleId, permissions, jti };
+    // Cargar campusId del usuario
+    const userSnap = await this.fb.db.collection('users').doc(String(userId)).get();
+    const campusId: number | null = userSnap.exists ? (userSnap.data()!.campusId ?? null) : null;
+
+    const payload: JwtPayload = { sub: userId, email, role, roleId, permissions, jti, campusId };
     const accessToken = this.jwt.sign(payload, { expiresIn: `${accessTtl}s` });
 
     const rawRefreshToken = randomUUID();
