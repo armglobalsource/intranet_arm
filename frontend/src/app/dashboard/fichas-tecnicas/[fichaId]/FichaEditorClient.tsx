@@ -483,12 +483,12 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { can, isAdmin } = usePermissions();
   const { ficha, loading, error } = useFichaRealtime(fichaId);
   const [saveState, setSaveState] = useState<SaveState>('idle');
-  const [viewMode, setViewMode] = useState<'document' | 'editor'>('editor');
+  // null = no ha elegido explícitamente → derivar del estado de la ficha
+  const [userViewMode, setUserViewMode] = useState<'document' | 'editor' | null>(null);
 
-  // Cuando carga la ficha, si está completa mostrar vista documento por defecto
-  useEffect(() => {
-    if (ficha?.status === 'complete') setViewMode('document');
-  }, [ficha?.status]);
+  // Vista efectiva: si el usuario no eligió, se determina por el status de la ficha
+  const viewMode: 'document' | 'editor' =
+    userViewMode ?? (ficha?.status === 'complete' ? 'document' : 'editor');
 
   const canEdit = isAdmin || can('fichas:edit') || can('fichas:admin');
 
@@ -533,7 +533,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             Fichas Técnicas
           </Link>
           <button
-            onClick={() => setViewMode('editor')}
+            onClick={() => setUserViewMode('editor')}
             className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-all hover:bg-gray-50"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
@@ -545,7 +545,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
           </button>
         </div>
 
-        <FichaDocumentView ficha={ficha} onEdit={() => setViewMode('editor')} />
+        <FichaDocumentView ficha={ficha} onEdit={() => setUserViewMode('editor')} />
       </div>
     );
   }
@@ -596,7 +596,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             </span>
             {ficha.status === 'complete' && (
               <button
-                onClick={() => setViewMode('document')}
+                onClick={() => setUserViewMode('document')}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                 style={{ background: '#1D9E75', color: '#fff' }}
               >
