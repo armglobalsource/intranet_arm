@@ -754,80 +754,91 @@ export function FichaDocumentView({
 
         @page {
           size: A4 portrait;
-          margin: 10mm 12mm;
+          margin: 6mm 8mm;
         }
 
         @media print {
-          /* Asegurar colores exactos en impresión */
+          /* Colores exactos */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            line-height: 1.3 !important;
           }
 
-          /* Elementos que no deben imprimirse */
+          /* Ocultar controles */
           .ficha-no-print { display: none !important; }
 
           /* Contenedor raíz */
-          .ficha-doc-root {
-            max-width: 100% !important;
-            margin: 0 !important;
-          }
+          .ficha-doc-root { max-width: 100% !important; margin: 0 !important; }
 
-          /* Documento principal → fondo blanco */
+          /* Documento → fondo blanco, sin borde redondeado */
           .ficha-doc {
             background: #ffffff !important;
-            border: 1px solid #e0e0e0 !important;
-            border-radius: 6px !important;
+            border: none !important;
+            border-radius: 0 !important;
             overflow: visible !important;
           }
 
-          /* Todos los textos → oscuros */
-          .ficha-doc,
-          .ficha-doc div,
-          .ficha-doc span,
-          .ficha-doc p,
-          .ficha-doc strong,
-          .ficha-doc input {
-            color: #1a1a1a !important;
+          /* Textos → oscuros */
+          .ficha-doc, .ficha-doc div, .ficha-doc span,
+          .ficha-doc p, .ficha-doc strong, .ficha-doc input {
+            color: #111 !important;
           }
 
-          /* Header → gris claro */
+          /* Header compacto */
           .ficha-hdr {
-            background: #f4f4f4 !important;
+            background: #f2f2f2 !important;
             border-bottom: 1px solid #ddd !important;
           }
           .ficha-hdr-top {
+            padding: 6px 12px !important;
             border-bottom: 1px solid #e8e8e8 !important;
           }
+          .ficha-hdr-top img { height: 22px !important; }
+          .ficha-hdr-top div[style] { font-size: 9px !important; }
 
-          /* Logo blanco → negro para impresión */
-          .ficha-logo {
-            filter: brightness(0) !important;
+          /* Fila campus + título */
+          .ficha-hdr > div:last-child {
+            padding: 5px 12px 6px !important;
           }
 
-          /* Cuerpo */
-          .ficha-body {
-            padding: 0.8rem 1rem !important;
-          }
+          /* Logo blanco → negro */
+          .ficha-logo { filter: brightness(0) !important; }
 
-          /* Tarjetas → fondo blanco con borde visible, sin corte de página */
+          /* Cuerpo muy compacto */
+          .ficha-body { padding: 6px 8px !important; }
+
+          /* Grilla: gap mínimo */
+          .ficha-grid { gap: 5px !important; }
+
+          /* Tarjetas: sin fondo, borde fino, padding mínimo, no cortar */
           .ficha-card {
             background: #ffffff !important;
-            border: 1px solid #ddd !important;
-            border-radius: 6px !important;
+            border: 0.5px solid #ccc !important;
+            border-radius: 4px !important;
+            padding: 5px 7px !important;
+            margin-bottom: 5px !important;
             break-inside: avoid !important;
             page-break-inside: avoid !important;
-            -webkit-column-break-inside: avoid !important;
           }
 
-          /* Grilla principal */
-          .ficha-grid {
-            gap: 10px !important;
+          /* Título de sección más pequeño */
+          .ficha-card > div:first-child {
+            font-size: 7px !important;
+            margin-bottom: 4px !important;
           }
 
-          /* Inputs → línea tenue */
+          /* Filas de roles: menos padding */
+          .ficha-card div[style*="padding: 6px"] {
+            padding: 2px 0 !important;
+          }
+
+          /* Fuentes globales reducidas */
+          .ficha-doc { font-size: 9px !important; }
+
+          /* Inputs: línea tenue */
           .ficha-cell-input {
-            border-bottom: 1px solid #bbb !important;
+            border-bottom: 0.5px solid #aaa !important;
             background: transparent !important;
           }
         }
