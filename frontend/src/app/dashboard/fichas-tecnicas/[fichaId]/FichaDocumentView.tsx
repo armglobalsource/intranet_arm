@@ -85,7 +85,7 @@ const S = {
   } as React.CSSProperties,
   cardTitle: {
     fontSize: 10, fontWeight: 600, textTransform: 'uppercase' as const,
-    letterSpacing: '0.12em', color: D.textMuted, marginBottom: 10,
+    letterSpacing: '0.12em', color: '#dbd7cf', marginBottom: 10,
   } as React.CSSProperties,
   roleRow: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
