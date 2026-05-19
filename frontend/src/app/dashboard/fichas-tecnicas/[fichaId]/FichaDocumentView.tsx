@@ -764,7 +764,7 @@ export function FichaDocumentView({
         }}>
           <div>
             {/* Logo + campus */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
               <img
                 src="/logo2.png"
                 alt="ARM Global"
