@@ -23,12 +23,14 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  needsProfileCompletion: boolean;
   /** true once Zustand has rehydrated from localStorage */
   _hasHydrated: boolean;
   setHasHydrated: (val: boolean) => void;
-  setSession: (user: User, accessToken: string, refreshToken: string) => void;
+  setSession: (user: User, accessToken: string, refreshToken: string, needsProfileCompletion?: boolean) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   updateUser: (patch: Partial<User>) => void;
+  clearProfileCompletion: () => void;
   logout: () => void;
 }
 
@@ -39,12 +41,13 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      needsProfileCompletion: false,
       _hasHydrated: false,
 
       setHasHydrated: (val) => set({ _hasHydrated: val }),
 
-      setSession: (user, accessToken, refreshToken) =>
-        set({ user, accessToken, refreshToken, isAuthenticated: true }),
+      setSession: (user, accessToken, refreshToken, needsProfileCompletion = false) =>
+        set({ user, accessToken, refreshToken, isAuthenticated: true, needsProfileCompletion }),
 
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken }),
@@ -52,8 +55,10 @@ export const useAuthStore = create<AuthState>()(
       updateUser: (patch) =>
         set((s) => ({ user: s.user ? { ...s.user, ...patch } : s.user })),
 
+      clearProfileCompletion: () => set({ needsProfileCompletion: false }),
+
       logout: () =>
-        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false }),
+        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false, needsProfileCompletion: false }),
     }),
     {
       name: 'auth-storage',
@@ -67,6 +72,7 @@ export const useAuthStore = create<AuthState>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
+        needsProfileCompletion: state.needsProfileCompletion,
       }),
     },
   ),

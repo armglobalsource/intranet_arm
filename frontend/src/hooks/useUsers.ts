@@ -10,7 +10,7 @@ export interface Role {
 
 export interface CreateUserDto {
   email:          string;
-  password:       string;
+  password?:      string;
   firstName:      string;
   lastName:       string;
   roleId:         number;

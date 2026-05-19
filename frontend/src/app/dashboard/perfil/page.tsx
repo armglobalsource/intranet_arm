@@ -7,6 +7,21 @@ import { useUpdateUser, useUploadUserAvatar } from '@/hooks/useUsers';
 import { useActiveCampuses } from '@/hooks/useCampus';
 import type { UserGender } from '@/types/user';
 
+const PERMISSION_LABELS: Record<string, string> = {
+  'orgchart:view':    'Ver organigrama',
+  'orgchart:manage':  'Gestionar organigrama',
+  'users:view':       'Ver usuarios',
+  'users:manage':     'Gestionar usuarios',
+  'content:view':     'Ver contenido',
+  'content:manage':   'Gestionar contenido',
+  'documents:view':   'Ver documentos',
+  'documents:manage': 'Gestionar documentos',
+  'directory:view':   'Ver directorio',
+  'directory:manage': 'Gestionar directorio',
+  'roles:manage':     'Gestionar roles',
+  'campus:manage':    'Gestionar campus',
+};
+
 const GENDER_LABELS: Record<UserGender, string> = {
   male:              'Masculino',
   female:            'Femenino',
@@ -147,7 +162,7 @@ export default function PerfilPage() {
   });
 
   const initials = user
-    ? (user.firstName[0] + user.lastName[0]).toUpperCase()
+    ? ((user.firstName?.[0] ?? '') + (user.lastName?.[0] ?? '')).toUpperCase() || '??'
     : '??';
 
   function startEdit() {
@@ -385,7 +400,7 @@ export default function PerfilPage() {
             <SectionCard title="Permisos">
               <div className="flex flex-wrap gap-1.5">
                 {permissions.map((p) => (
-                  <Badge key={p} label={p} color="slate" />
+                  <Badge key={p} label={PERMISSION_LABELS[p] ?? p} color="slate" />
                 ))}
               </div>
             </SectionCard>

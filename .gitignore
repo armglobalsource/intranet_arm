@@ -43,6 +43,8 @@ Thumbs.db
 
 # ── Testing ───────────────────────────────────────────────────
 coverage/
+frontend/test-results/
+frontend/playwright-report/
 
 # ── Database dumps (excluye migraciones de Prisma) ────────────
 prod_data.sql

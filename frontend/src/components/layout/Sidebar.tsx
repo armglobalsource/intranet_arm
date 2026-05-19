@@ -111,7 +111,9 @@ export function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const initials = user ? (user.firstName[0] + user.lastName[0]).toUpperCase() : '??';
+  const initials = user
+    ? ((user.firstName?.[0] ?? '') + (user.lastName?.[0] ?? '')).toUpperCase() || '??'
+    : '??';
   const fullName = user ? `${user.firstName} ${user.lastName}` : '';
   const role     = user?.role?.name ?? '';
 
