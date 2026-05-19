@@ -199,8 +199,8 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Breadcrumb + botón guardar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2">
         <Link
           href="/dashboard/fichas-tecnicas"
           className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
@@ -211,52 +211,13 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
           </svg>
           Fichas Técnicas
         </Link>
-
-        {editable && (
-          <button
-            onClick={handleSaveAll}
-            disabled={saveState === 'saving'}
-            className="flex items-center gap-1.5 text-sm font-semibold px-4 py-1.5 rounded-lg transition-all disabled:opacity-60"
-            style={{
-              background: saveState === 'saved' ? '#1D9E75' : '#1a1a18',
-              color: '#fff',
-            }}
-          >
-            {saveState === 'saving' ? (
-              <>
-                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                </svg>
-                Guardando…
-              </>
-            ) : saveState === 'saved' ? (
-              <>
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Guardado
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                  <polyline points="17 21 17 13 7 13 7 21" />
-                  <polyline points="7 3 7 8 15 8" />
-                </svg>
-                Guardar cambios
-              </>
-            )}
-          </button>
-        )}
       </div>
 
       {/* Vista documento (editable o read-only) */}
       <FichaDocumentView
         ficha={ficha}
         editable={editable}
+        onSave={handleSaveAll}
         localSections={localSections}
         onCellChange={handleCellChange}
         onAddRow={handleAddRow}

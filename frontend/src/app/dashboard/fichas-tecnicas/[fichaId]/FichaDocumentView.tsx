@@ -689,6 +689,7 @@ function EncuentroTabs({
 export interface FichaDocumentViewProps {
   ficha:  Ficha;
   onEdit?: () => void;
+  onSave?: () => void;
   editable?: boolean;
   localSections?: Partial<Record<SectionName, Row[]>>;
   onCellChange?: (section: SectionName, rowId: string, colId: string, value: string) => void;
@@ -700,7 +701,7 @@ export interface FichaDocumentViewProps {
 }
 
 export function FichaDocumentView({
-  ficha, onEdit,
+  ficha, onEdit, onSave,
   editable, localSections, onCellChange, onAddRow, onDeleteRow, onSectionComplete,
   sectionStatus, saveState,
 }: FichaDocumentViewProps) {
@@ -727,19 +728,22 @@ export function FichaDocumentView({
     onComplete:   onSectionComplete ? () => onSectionComplete(name) : undefined,
   });
 
-  const saveLabel =
-    saveState === 'saving' ? '⟳ Guardando…'
-    : saveState === 'saved'  ? '✓ Guardado'
-    : saveState === 'error'  ? '✕ Error'
-    : null;
-  const saveColor =
-    saveState === 'saving' ? D.textSecond
-    : saveState === 'saved'  ? C.green
-    : saveState === 'error'  ? '#ef4444'
-    : 'transparent';
+  const [copied, setCopied] = useState(false);
+
+  function handleShare() {
+    const url = `${window.location.origin}/ficha/${ficha.fichaId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const isSaving = saveState === 'saving';
+  const isSaved  = saveState === 'saved';
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
       <EncuentroTabs encuentros={encuentros ?? []} selected={selectedId} onChange={setSelectedId} />
 
@@ -773,33 +777,110 @@ export function FichaDocumentView({
                 <div style={{ fontSize: 12, color: D.textSecond, marginTop: 3 }}>{selectedEncuentro.time} hrs</div>
               )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {editable && saveLabel && (
-                <span style={{ fontSize: 11, fontWeight: 500, color: saveColor, transition: 'color 0.2s' }}>
-                  {saveLabel}
-                </span>
+            {/* ── Botones de acción ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+
+              {/* Guardar (solo modo edición) */}
+              {editable && onSave && (
+                <button
+                  onClick={onSave}
+                  disabled={isSaving}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '6px 13px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    border: 'none', cursor: isSaving ? 'default' : 'pointer',
+                    transition: 'all 0.2s',
+                    background: isSaved ? C.green : 'rgba(255,255,255,0.1)',
+                    color: D.textPrimary,
+                    opacity: isSaving ? 0.7 : 1,
+                  }}
+                >
+                  {isSaving ? (
+                    <>
+                      <svg style={{ animation: 'spin 1s linear infinite' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                      Guardando…
+                    </>
+                  ) : isSaved ? (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      Guardado
+                    </>
+                  ) : (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
+                      Guardar
+                    </>
+                  )}
+                </button>
               )}
+
+              {/* Editar (solo modo vista) */}
               {!editable && onEdit && (
                 <button
                   onClick={onEdit}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '6px 13px', borderRadius: 8, fontSize: 12, fontWeight: 600,
                     background: 'rgba(255,255,255,0.08)', color: D.textPrimary,
                     border: `0.5px solid ${D.cardBorder}`, cursor: 'pointer',
-                    transition: 'background 0.15s',
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.13)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; }}
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
-                  Editar ficha
+                  Editar
                 </button>
               )}
+
+              {/* Imprimir */}
+              <button
+                onClick={() => window.print()}
+                title="Imprimir / PDF"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  background: 'rgba(255,255,255,0.06)', color: D.textSecond,
+                  border: `0.5px solid ${D.cardBorder}`, cursor: 'pointer',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9" />
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                  <rect x="6" y="14" width="12" height="8" />
+                </svg>
+                Imprimir
+              </button>
+
+              {/* Compartir */}
+              <button
+                onClick={handleShare}
+                title="Copiar link público"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  background: copied ? 'rgba(29,158,117,0.15)' : 'rgba(255,255,255,0.06)',
+                  color: copied ? C.green : D.textSecond,
+                  border: `0.5px solid ${copied ? 'rgba(29,158,117,0.3)' : D.cardBorder}`,
+                  cursor: 'pointer', transition: 'all 0.2s',
+                }}
+              >
+                {copied ? (
+                  <>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    ¡Copiado!
+                  </>
+                ) : (
+                  <>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                    Compartir
+                  </>
+                )}
+              </button>
+
             </div>
           </div>
         </div>
