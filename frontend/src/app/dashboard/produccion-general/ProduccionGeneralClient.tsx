@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { useFichas } from '@/hooks/useFichas';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import type { Noticia } from '@/hooks/useNoticias';
 
 // ── HubCard ───────────────────────────────────────────────────────────────────
 
@@ -74,16 +77,30 @@ function HubCard({ href, icon, title, description, accentColor, stat, loading }:
 
 export function ProduccionGeneralClient() {
   const { data: fichas, isLoading } = useFichas();
+  const { data: noticias, isLoading: loadingNoticias } = useQuery<Noticia[]>({
+    queryKey: ['noticias-admin'],
+    queryFn:  () => api.get('/content/news').then((r) => r.data),
+    staleTime: 60_000,
+  });
 
   const total      = fichas?.length ?? 0;
   const completas  = fichas?.filter((f) => f.status === 'complete').length ?? 0;
   const enProgreso = fichas?.filter((f) => f.status === 'in_progress').length ?? 0;
+
+  const totalNoticias     = noticias?.length ?? 0;
+  const publicadas        = noticias?.filter((n) => n.status === 'published').length ?? 0;
 
   const statFichas = isLoading
     ? undefined
     : total > 0
     ? `${completas}/${total} completas`
     : 'Sin fichas';
+
+  const statNoticias = loadingNoticias
+    ? undefined
+    : totalNoticias > 0
+    ? `${publicadas} publicadas`
+    : 'Sin noticias';
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -143,6 +160,23 @@ export function ProduccionGeneralClient() {
           accentColor="#0f172a"
           stat={statFichas}
           loading={isLoading}
+        />
+
+        <HubCard
+          href="/dashboard/produccion-general/noticias"
+          icon={
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
+              stroke="#4F46E5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l6 6v8a2 2 0 0 1-2 2z" />
+              <polyline points="17 20 17 13 7 13 7 20" />
+              <polyline points="7 4 7 8 15 8" />
+            </svg>
+          }
+          title="Noticias"
+          description="Publica y gestiona noticias globales y por campus. Comparte imágenes, videos e Instagram."
+          accentColor="#4F46E5"
+          stat={statNoticias}
+          loading={loadingNoticias}
         />
 
         <ComingSoonCard icon="🎛️" title="Inventario Técnico"  accentColor="#f59e0b" />
