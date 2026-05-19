@@ -95,23 +95,39 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto, ipAddress?: string, userAgent?: string) {
-    const existing = await this.users.findByEmail(dto.email);
-    if (existing) throw new ConflictException('Ya existe un usuario con ese email');
+    let user = await this.users.findByEmail(dto.email);
 
-    const user = await this.users.selfRegister({
-      email:     dto.email,
-      password:  dto.password,
-      firstName: dto.firstName,
-      lastName:  dto.lastName,
-    });
+    if (user) {
+      // Cuenta pre-creada por admin sin contraseña: el usuario la está reclamando
+      if (user.passwordHash) {
+        throw new ConflictException('Este email ya tiene una cuenta. Usa "Iniciar sesión".');
+      }
+      // Actualizar nombre (si estaba vacío) y establecer contraseña
+      user = await this.users.claimAccount(user.id, {
+        firstName: dto.firstName || user.firstName,
+        lastName:  dto.lastName  || user.lastName,
+      });
+    } else {
+      user = await this.users.selfRegister({
+        email:     dto.email,
+        password:  dto.password,
+        firstName: dto.firstName,
+        lastName:  dto.lastName,
+      });
+    }
+
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('Cuenta suspendida o inactiva');
+    }
 
     await this.users.updateLastLogin(user.id);
     const roleName = user.role?.name ?? 'employee';
     const roleId   = user.roleId ?? 2;
     const { permissions, ...tokens } = await this.generateTokens(user.id, user.email, roleName, roleId, ipAddress, userAgent);
 
+    const needsProfileCompletion = !user.gender || !user.avatarUrl;
     const { passwordHash, ...safeUser } = user;
-    return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion: true };
+    return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion };
   }
 
   async checkEmail(email: string) {
@@ -152,6 +168,15 @@ export class AuthService {
         lastName:  googleUser.lastName,
         avatarUrl: googleUser.avatarUrl,
       });
+    } else {
+      // Sincronizar datos de Google: foto siempre, nombre solo si estaba vacío
+      const patch: Record<string, string> = {};
+      if (googleUser.avatarUrl)               patch.avatarUrl = googleUser.avatarUrl;
+      if (!user.firstName && googleUser.firstName) patch.firstName = googleUser.firstName;
+      if (!user.lastName  && googleUser.lastName)  patch.lastName  = googleUser.lastName;
+      if (Object.keys(patch).length > 0) {
+        user = await this.users.patchGoogleFields(user.id, patch);
+      }
     }
 
     if (user.status !== 'active') {
@@ -166,6 +191,10 @@ export class AuthService {
     const needsProfileCompletion = !user.gender;
     const { passwordHash, ...safeUser } = user;
     return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion };
+  }
+
+  async getMe(userId: number) {
+    return this.users.findOne(userId);
   }
 
   async completeProfile(userId: number, dto: CompleteProfileDto) {

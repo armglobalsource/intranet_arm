@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
-import { api } from '@/lib/api';
+import { api, apiErrorMessage } from '@/lib/api';
 
 const schema = z.object({
   email:    z.string().email('Email inválido'),
@@ -44,7 +44,7 @@ export default function LoginPage() {
       router.replace('/dashboard/orgchart');
     } catch (err: any) {
       setError('root', {
-        message: err.response?.data?.message || 'Email o contraseña incorrectos',
+        message: apiErrorMessage(err, 'Email o contraseña incorrectos'),
       });
     }
   };
@@ -181,12 +181,15 @@ export default function LoginPage() {
 
           </form>
 
-          <p className="text-center text-sm text-white/30 mt-6">
-            ¿No tienes cuenta?{' '}
-            <Link href="/auth/register" className="text-white/60 hover:text-white transition-colors">
-              Regístrate
-            </Link>
-          </p>
+          <Link
+            href="/auth/register"
+            style={{ background: 'transparent', border: '1px solid #2a2a2a' }}
+            className="w-full mt-3 py-2.5 rounded-lg text-sm font-semibold text-white/60
+              flex items-center justify-center hover:border-white/20 hover:text-white
+              transition-all active:scale-[0.98]"
+          >
+            Registrarme
+          </Link>
 
         </div>
       </div>

@@ -7,14 +7,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
-import { api } from '@/lib/api';
+import { api, apiErrorMessage } from '@/lib/api';
 
 const schema = z.object({
-  firstName: z.string().min(1, 'Requerido'),
-  lastName:  z.string().min(1, 'Requerido'),
-  gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say'], {
-    required_error: 'Selecciona una opción',
-  }),
+  gender:    z.enum(['male', 'female']).optional(),
   phone:     z.string().optional(),
   birthDate: z.string().optional(),
   password:  z.string().min(6, 'Mínimo 6 caracteres').optional().or(z.literal('')),
@@ -22,28 +18,29 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const GENDER_OPTIONS = [
-  { value: 'male',              label: 'Masculino' },
-  { value: 'female',            label: 'Femenino' },
-  { value: 'other',             label: 'Otro' },
-  { value: 'prefer_not_to_say', label: 'Prefiero no decir' },
+  { value: 'male',   label: 'Masculino' },
+  { value: 'female', label: 'Femenino'  },
 ] as const;
 
 export default function CompleteProfilePage() {
-  const router                = useRouter();
-  const params                = useSearchParams();
-  const setSession            = useAuthStore((s) => s.setSession);
-  const setTokens             = useAuthStore((s) => s.setTokens);
+  const router                 = useRouter();
+  const params                 = useSearchParams();
+  const setSession             = useAuthStore((s) => s.setSession);
+  const setTokens              = useAuthStore((s) => s.setTokens);
+  const updateUser             = useAuthStore((s) => s.updateUser);
   const clearProfileCompletion = useAuthStore((s) => s.clearProfileCompletion);
-  const storeUser             = useAuthStore((s) => s.user);
-  const storeAccess           = useAuthStore((s) => s.accessToken);
-  const storeRefresh          = useAuthStore((s) => s.refreshToken);
-  const hasHydrated           = useAuthStore((s) => s._hasHydrated);
-  const [showPwd, setShowPwd] = useState(false);
+  const storeAccess            = useAuthStore((s) => s.accessToken);
+  const storeRefresh           = useAuthStore((s) => s.refreshToken);
+  const hasHydrated            = useAuthStore((s) => s._hasHydrated);
+  const [showPwd, setShowPwd]  = useState(false);
   const [hasPassword, setHasPassword] = useState(true);
+  const [loading, setLoading]  = useState(true);
 
-  // Tokens pueden venir del store (registro manual) o de la URL (Google OAuth)
   const accessFromUrl  = params.get('access');
   const refreshFromUrl = params.get('refresh');
+
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setError } =
+    useForm<FormData>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -51,66 +48,45 @@ export default function CompleteProfilePage() {
     const access  = accessFromUrl  ?? storeAccess;
     const refresh = refreshFromUrl ?? storeRefresh;
 
-    if (!access || !refresh) {
-      router.replace('/auth/login');
-      return;
-    }
+    if (!access || !refresh) { router.replace('/auth/login'); return; }
 
-    // Si vienen de la URL (Google OAuth), primero cargar el usuario y guardar en store
     if (accessFromUrl) {
       api.get('/auth/me', { headers: { Authorization: `Bearer ${access}` } })
         .then((res) => {
           setSession(res.data, access, refresh, true);
           setHasPassword(!!res.data.passwordHash);
+          setLoading(false);
         })
         .catch(() => router.replace('/auth/login?error=oauth_failed'));
     } else {
-      // Ya tenemos el usuario en store, verificar si tiene contraseña
-      setHasPassword(true); // usuario registrado con email/pass siempre tiene password
+      setLoading(false);
     }
   }, [hasHydrated, accessFromUrl, refreshFromUrl, storeAccess, storeRefresh, router, setSession]);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    setError,
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      firstName: storeUser?.firstName ?? '',
-      lastName:  storeUser?.lastName  ?? '',
-    },
-  });
-
   const onSubmit = async (data: FormData) => {
     try {
-      const payload: Record<string, string> = {
-        firstName: data.firstName,
-        lastName:  data.lastName,
-        gender:    data.gender,
-      };
+      const payload: Record<string, string> = {};
+      if (data.gender)    payload.gender    = data.gender;
       if (data.phone)     payload.phone     = data.phone;
       if (data.birthDate) payload.birthDate = data.birthDate;
       if (data.password)  payload.password  = data.password;
 
       const res = await api.post('/auth/complete-profile', payload);
+      if (res.data.user) updateUser(res.data.user);
       clearProfileCompletion();
-
-      // Actualizar tokens si el servidor devuelve nuevos
-      if (res.data.accessToken) {
-        setTokens(res.data.accessToken, res.data.refreshToken);
-      }
-
+      if (res.data.accessToken) setTokens(res.data.accessToken, res.data.refreshToken);
       router.replace('/dashboard/orgchart');
     } catch (err: any) {
-      setError('root', {
-        message: err.response?.data?.message || 'Error al guardar el perfil',
-      });
+      setError('root', { message: apiErrorMessage(err, 'Error al guardar el perfil') });
     }
   };
 
-  if (!hasHydrated) {
+  const handleSkip = () => {
+    clearProfileCompletion();
+    router.replace('/dashboard/orgchart');
+  };
+
+  if (!hasHydrated || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0d0d0d' }}>
         <span className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
@@ -143,46 +119,10 @@ export default function CompleteProfilePage() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
-            {/* Nombre y apellido */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
-                  Nombre
-                </label>
-                <input
-                  {...register('firstName')}
-                  type="text"
-                  autoComplete="given-name"
-                  style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#fff' }}
-                  className="w-full px-3.5 py-2.5 rounded-lg text-sm placeholder-white/20
-                    focus:outline-none focus:border-white/30 transition-colors"
-                />
-                {errors.firstName && (
-                  <p className="text-red-400 text-xs mt-1">{errors.firstName.message}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
-                  Apellido
-                </label>
-                <input
-                  {...register('lastName')}
-                  type="text"
-                  autoComplete="family-name"
-                  style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#fff' }}
-                  className="w-full px-3.5 py-2.5 rounded-lg text-sm placeholder-white/20
-                    focus:outline-none focus:border-white/30 transition-colors"
-                />
-                {errors.lastName && (
-                  <p className="text-red-400 text-xs mt-1">{errors.lastName.message}</p>
-                )}
-              </div>
-            </div>
-
             {/* Género — requerido */}
             <div>
               <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
-                Género <span className="text-red-400">*</span>
+                Género <span className="text-white/25 normal-case font-normal">(opcional)</span>
               </label>
               <select
                 {...register('gender')}
@@ -190,7 +130,7 @@ export default function CompleteProfilePage() {
                 className="w-full px-3.5 py-2.5 rounded-lg text-sm
                   focus:outline-none focus:border-white/30 transition-colors"
               >
-                <option value="" style={{ color: '#888' }}>Selecciona una opción</option>
+                <option value="">Selecciona una opción</option>
                 {GENDER_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
@@ -230,7 +170,7 @@ export default function CompleteProfilePage() {
               />
             </div>
 
-            {/* Contraseña — solo si el usuario no tiene una (ej: login con Google) */}
+            {/* Contraseña — solo si el usuario no tiene una (ej: registrado con Google) */}
             {!hasPassword && (
               <div>
                 <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
@@ -273,23 +213,34 @@ export default function CompleteProfilePage() {
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{ background: isSubmitting ? '#2a2a2a' : '#fff' }}
-              className="w-full mt-2 py-2.5 rounded-lg text-sm font-semibold
-                text-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed
-                hover:bg-gray-100 active:scale-[0.98]"
-            >
-              {isSubmitting ? (
-                <span className="flex items-center justify-center gap-2" style={{ color: '#888' }}>
-                  <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-                  Guardando...
-                </span>
-              ) : (
-                'Continuar'
-              )}
-            </button>
+            <div className="flex gap-3 mt-2">
+              <button
+                type="button"
+                onClick={handleSkip}
+                style={{ border: '1px solid #2a2a2a' }}
+                className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white/40
+                  hover:text-white/70 hover:border-white/20 transition-all active:scale-[0.98]"
+              >
+                Omitir
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                style={{ background: isSubmitting ? '#2a2a2a' : '#fff' }}
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold
+                  text-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                  hover:bg-gray-100 active:scale-[0.98]"
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2" style={{ color: '#888' }}>
+                    <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                    Guardando...
+                  </span>
+                ) : (
+                  'Continuar'
+                )}
+              </button>
+            </div>
 
           </form>
         </div>

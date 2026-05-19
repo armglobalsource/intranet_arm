@@ -33,7 +33,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 20 } })
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Auto-registro público con email y contraseña' })
@@ -117,6 +117,6 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener datos del usuario autenticado' })
   me(@CurrentUser() user: any) {
-    return user;
+    return this.authService.getMe(user.sub);
   }
 }

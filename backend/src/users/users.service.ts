@@ -82,7 +82,7 @@ export class UsersService {
     // Cargar jobTitles para denormalizar
     const jobTitles = await this.resolveJobTitles(dto.jobTitleIds ?? []);
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const passwordHash = dto.password ? await bcrypt.hash(dto.password, 12) : null;
     const id           = await this.fb.nextId(COL);
 
     const doc = {
@@ -172,6 +172,29 @@ export class UsersService {
 
   async updateLastLogin(id: number) {
     await this.fb.db.collection(COL).doc(String(id)).update({ lastLoginAt: this.fb.now() });
+  }
+
+  async patchGoogleFields(id: number, patch: Record<string, string>) {
+    const data: Record<string, any> = { ...patch, updatedAt: this.fb.now() };
+    if (patch.firstName || patch.lastName) {
+      const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+      const current = snap.data()!;
+      data.nameLower = `${patch.firstName ?? current.firstName} ${patch.lastName ?? current.lastName}`.toLowerCase();
+    }
+    await this.fb.db.collection(COL).doc(String(id)).update(data);
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    return this.fb.toObj(snap);
+  }
+
+  async claimAccount(id: number, data: { firstName: string; lastName: string }) {
+    await this.fb.db.collection(COL).doc(String(id)).update({
+      firstName: data.firstName.trim(),
+      lastName:  data.lastName.trim(),
+      nameLower: `${data.firstName} ${data.lastName}`.toLowerCase(),
+      updatedAt: this.fb.now(),
+    });
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    return this.fb.toObj(snap);
   }
 
   async selfRegister(data: {

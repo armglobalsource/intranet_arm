@@ -1,6 +1,15 @@
 import axios from 'axios';
 import { useAuthStore } from './store/auth.store';
 
+/** Extrae un mensaje de error legible de una respuesta de API */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  const msg = (err as any)?.response?.data?.message;
+  if (!msg) return fallback;
+  if (Array.isArray(msg)) return msg[0] ?? fallback;
+  if (typeof msg === 'string') return msg;
+  return fallback;
+}
+
 // En ambientes desplegados (Firebase Hosting) se usa URL relativa /api/v1
 // y Firebase Hosting enruta al backend correcto según el dominio (dev o prod).
 // En desarrollo local se usa http://localhost:3001/api/v1.

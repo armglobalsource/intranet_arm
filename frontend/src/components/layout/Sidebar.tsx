@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 
 const NAV = [
   { href: '/dashboard/orgchart',   label: 'Organigrama', icon: OrgIcon },
-  { href: '/dashboard/directorio', label: 'Directorio',  icon: DirIcon },
+  { href: '/dashboard/directorio', label: 'Configuración', icon: DirIcon },
 ];
 
 function OrgIcon({ active }: { active: boolean }) {
@@ -58,7 +58,7 @@ export function Sidebar() {
   }, []);
 
   const initials = user
-    ? (user.firstName[0] + user.lastName[0]).toUpperCase()
+    ? ((user.firstName?.[0] ?? '') + (user.lastName?.[0] ?? '')).toUpperCase() || '??'
     : '??';
   const fullName = user ? `${user.firstName} ${user.lastName}` : '';
   const role     = user?.role?.name ?? '';
