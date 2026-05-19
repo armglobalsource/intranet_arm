@@ -733,7 +733,7 @@ export function FichaDocumentView({
   const [copied, setCopied] = useState(false);
 
   function handleShare() {
-    const url = `${window.location.origin}/ficha/${ficha.fichaId}`;
+    const url = `${window.location.origin}/ficha/${String(ficha.fichaId)}`;
 
     const markCopied = () => {
       setCopied(true);
