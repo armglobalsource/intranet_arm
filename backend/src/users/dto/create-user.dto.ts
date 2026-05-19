@@ -8,7 +8,7 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
 
 export class CreateUserDto {
   @ApiProperty() @IsNotEmpty() @IsEmail()                    email:          string;
-  @ApiProperty() @IsNotEmpty() @IsString() @MinLength(6)     password:       string;
+  @ApiProperty() @IsOptional() @IsString() @MinLength(6)     password?:      string;
   @ApiProperty() @IsNotEmpty() @IsString() @MaxLength(100)   firstName:      string;
   @ApiProperty() @IsNotEmpty() @IsString() @MaxLength(100)   lastName:       string;
   @ApiProperty() @IsNotEmpty() @IsInt()                      roleId:         number;

@@ -482,14 +482,14 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
   const [saveState,   setSaveState]   = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [errorMsg,    setErrorMsg]    = useState('');
 
-  const canSubmit = email.trim() && password.length >= 6 && firstName.trim() && lastName.trim() && roleId > 0;
+  const canSubmit = email.trim() && firstName.trim() && lastName.trim() && roleId > 0;
 
   function handleSubmit() {
     if (!canSubmit) return;
     setSaveState('saving');
     setErrorMsg('');
     const payload: CreateUserDto = {
-      email: email.trim(), password,
+      email: email.trim(), password: password || undefined,
       firstName: firstName.trim(), lastName: lastName.trim(),
       roleId,
       campusId:    campusId    ?? undefined,
@@ -558,7 +558,7 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Contraseña <span className="text-red-400">*</span> <span className="text-slate-300 font-normal">— mín. 6 caracteres</span></label>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">Contraseña <span className="text-slate-400 font-normal">(opcional) — mín. 6 caracteres</span></label>
             <div className="relative">
               <input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 pr-10 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition" placeholder="••••••••" />

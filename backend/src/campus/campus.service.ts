@@ -15,11 +15,11 @@ export class CampusService {
   }
 
   async findActive() {
-    const snap = await this.fb.db.collection(COL)
-      .where('isActive', '==', true)
-      .orderBy('name')
-      .get();
-    return this.fb.toDocs(snap).map(({ id, name, address }) => ({ id, name, address }));
+    const snap = await this.fb.db.collection(COL).get();
+    return this.fb.toDocs(snap)
+      .filter((c) => c.isActive)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(({ id, name, address }) => ({ id, name, address }));
   }
 
   async findOne(id: number) {
