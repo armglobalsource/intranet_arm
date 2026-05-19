@@ -174,7 +174,7 @@ function MonthGrid({ year, month, events, selectedDay, today, onSelect }: MonthG
           const hasEvents = dayEvents.length > 0;
 
           // Colores únicos para los dots (deduplicados por categoría)
-          const dotColors = [...new Set(dayEvents.map((e) => CATEGORIES[e.category]?.color ?? '#6b7280'))].slice(0, 3);
+          const dotColors = Array.from(new Set(dayEvents.map((e) => CATEGORIES[e.category]?.color ?? '#6b7280'))).slice(0, 3);
 
           return (
             <button

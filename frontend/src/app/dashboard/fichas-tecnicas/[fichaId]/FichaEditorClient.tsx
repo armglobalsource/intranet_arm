@@ -6,6 +6,7 @@ import { useFichaRealtime, useUpdateSection, useCompleteSection } from '@/hooks/
 import { usePermissions } from '@/hooks/usePermissions';
 import { SECTION_LABELS, statusColor, statusLabel } from '@/types/ficha';
 import { SongInput } from '@/components/fichas/SongInput';
+import { FichaDocumentView } from './FichaDocumentView';
 import type { FichaType, Section, Row, SectionName, Encuentro } from '@/types/ficha';
 
 function getSectionLabel(name: SectionName, fichaType: FichaType): string {
@@ -482,6 +483,12 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { can, isAdmin } = usePermissions();
   const { ficha, loading, error } = useFichaRealtime(fichaId);
   const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [viewMode, setViewMode] = useState<'document' | 'editor'>('editor');
+
+  // Cuando carga la ficha, si está completa mostrar vista documento por defecto
+  useEffect(() => {
+    if (ficha?.status === 'complete') setViewMode('document');
+  }, [ficha?.status]);
 
   const canEdit = isAdmin || can('fichas:edit') || can('fichas:admin');
 
@@ -508,6 +515,40 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   }
 
   const { bg, text } = statusColor(ficha.status);
+
+  // ── Vista documento (ficha completa) ──────────────────────────────────────
+  if (viewMode === 'document') {
+    return (
+      <div className="space-y-4">
+        {/* Breadcrumb */}
+        <div className="flex items-center justify-between">
+          <Link
+            href="/dashboard/fichas-tecnicas"
+            className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5" /><polyline points="12 19 5 12 12 5" />
+            </svg>
+            Fichas Técnicas
+          </Link>
+          <button
+            onClick={() => setViewMode('editor')}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-all hover:bg-gray-50"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            Modo edición
+          </button>
+        </div>
+
+        <FichaDocumentView ficha={ficha} onEdit={() => setViewMode('editor')} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -553,18 +594,20 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             >
               {statusLabel(ficha.status)}
             </span>
-            <Link
-              href={`/dashboard/fichas-tecnicas/${fichaId}/view`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors hover:bg-gray-50"
-              style={{ borderColor: '#e5e7eb', color: '#374151' }}
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              Ver ficha
-            </Link>
+            {ficha.status === 'complete' && (
+              <button
+                onClick={() => setViewMode('document')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={{ background: '#1D9E75', color: '#fff' }}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                Vista documento
+              </button>
+            )}
           </div>
         </div>
 
