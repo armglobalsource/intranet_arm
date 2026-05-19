@@ -1565,7 +1565,7 @@ export function OrgChartClient() {
   const activeColor  = activeArea?.color ?? '#64748b';
 
   return (
-    <div className="flex flex-col h-full -mx-6 -mb-6">
+    <div className="flex flex-col h-full -mx-6 -mt-6 -mb-6">
       {/* Tabs */}
       <div className="px-5 flex items-center gap-0.5 overflow-x-auto scrollbar-none border-b border-white/5 flex-shrink-0" style={{ background: '#0d0d0d' }}>
         <button
