@@ -763,9 +763,21 @@ export function FichaDocumentView({
           borderBottom: `0.5px solid ${D.cardBorder}`,
         }}>
           <div>
-            <div style={{ fontSize: 11, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 4 }}>
-              ARM Global — Campus {campusName}
+            {/* Logo + campus */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <img
+                src="/logo2.png"
+                alt="ARM Global"
+                style={{ height: 30, width: 'auto', objectFit: 'contain' }}
+              />
+              <span style={{
+                fontSize: 11, color: D.textSecond, textTransform: 'uppercase',
+                letterSpacing: '0.1em', fontWeight: 500,
+              }}>
+                Campus {campusName}
+              </span>
             </div>
+            {/* Título */}
             <div style={{ fontSize: 22, fontWeight: 700, color: D.textPrimary, letterSpacing: '-0.01em' }}>
               {title}
             </div>
