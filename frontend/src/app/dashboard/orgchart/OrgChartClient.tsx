@@ -1565,9 +1565,9 @@ export function OrgChartClient() {
   const activeColor  = activeArea?.color ?? '#64748b';
 
   return (
-    <div className="flex flex-col h-full -m-6">
+    <div className="flex flex-col h-full -mx-6 -mb-6">
       {/* Tabs */}
-      <div className="bg-slate-900 px-5 flex items-center gap-0.5 overflow-x-auto scrollbar-none border-b border-white/5 flex-shrink-0">
+      <div className="px-5 flex items-center gap-0.5 overflow-x-auto scrollbar-none border-b border-white/5 flex-shrink-0" style={{ background: '#0d0d0d' }}>
         <button
           onClick={() => { setActiveSlug(null); setSelected(null); setEditingArea(false); }}
           className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-all ${activeSlug === null ? 'text-white border-white/60' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
