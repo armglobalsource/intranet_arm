@@ -767,7 +767,7 @@ export function FichaDocumentView({
             borderBottom: `0.5px solid ${D.divider}`,
           }}>
             <img
-              src="/logo_negro.png"
+              src="/logo2.png"
               alt="ARM Global"
               style={{ height: 200, width: 'auto', objectFit: 'contain', display: 'block' }}
             />
