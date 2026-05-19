@@ -49,3 +49,7 @@ prod_data.sql
 /prod_data.sql
 
 package-lock.json
+
+# ── Playwright MCP / build cache ──────────────────────────────
+.playwright-mcp/
+frontend/tsconfig.tsbuildinfo

@@ -4,14 +4,30 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
+// useEffect es usado por el menú de usuario
 import { useAuthStore } from '@/lib/store/auth.store';
 import { api } from '@/lib/api';
 
-const NAV = [
-  { href: '/dashboard/orgchart',        label: 'Organigrama',     icon: OrgIcon },
-  { href: '/dashboard/directorio',      label: 'Directorio',      icon: DirIcon },
-  { href: '/dashboard/fichas-tecnicas', label: 'Fichas Técnicas', icon: FichaIcon },
-];
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+
+interface NavItem {
+  href:  string;
+  label: string;
+  icon:  (p: { active: boolean }) => React.JSX.Element;
+}
+
+// ── Iconos ────────────────────────────────────────────────────────────────────
+
+function HomeIcon({ active }: { active: boolean }) {
+  return (
+    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={active ? '#fff' : 'rgba(255,255,255,0.4)'}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+      <polyline points="9 21 9 13 15 13 15 21" />
+    </svg>
+  );
+}
 
 function OrgIcon({ active }: { active: boolean }) {
   return (
@@ -23,20 +39,6 @@ function OrgIcon({ active }: { active: boolean }) {
       <rect x="9" y="16" width="6" height="4" rx="1" />
       <rect x="17" y="16" width="6" height="4" rx="1" />
       <path d="M4 16v-4h16v4" /><path d="M12 6v6" />
-    </svg>
-  );
-}
-
-function FichaIcon({ active }: { active: boolean }) {
-  return (
-    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-      stroke={active ? '#fff' : 'rgba(255,255,255,0.4)'}
-      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <polyline points="10 9 9 9 8 9" />
     </svg>
   );
 }
@@ -54,9 +56,46 @@ function DirIcon({ active }: { active: boolean }) {
   );
 }
 
+function ProduccionIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
+  return (
+    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 7l-4-5-4 5" />
+      <circle cx="12" cy="14" r="2" />
+      <path d="M9.5 14h-3M17.5 14h-3" />
+    </svg>
+  );
+}
+
+function FichaIcon({ active }: { active: boolean }) {
+  return (
+    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={active ? '#fff' : 'rgba(255,255,255,0.35)'}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </svg>
+  );
+}
+
+// ── Estructura de navegación ──────────────────────────────────────────────────
+
+const NAV: NavItem[] = [
+  { href: '/dashboard',                    label: 'Inicio',             icon: HomeIcon      },
+  { href: '/dashboard/orgchart',           label: 'Organigrama',        icon: OrgIcon       },
+  { href: '/dashboard/directorio',         label: 'Directorio',         icon: DirIcon       },
+  { href: '/dashboard/produccion-general', label: 'Producción General', icon: ProduccionIcon },
+];
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+
 export function Sidebar() {
-  const pathname  = usePathname();
-  const router    = useRouter();
+  const pathname = usePathname();
+  const router   = useRouter();
   const { logout, refreshToken, user } = useAuthStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -72,17 +111,13 @@ export function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const initials = user
-    ? (user.firstName[0] + user.lastName[0]).toUpperCase()
-    : '??';
+  const initials = user ? (user.firstName[0] + user.lastName[0]).toUpperCase() : '??';
   const fullName = user ? `${user.firstName} ${user.lastName}` : '';
   const role     = user?.role?.name ?? '';
 
   async function handleLogout() {
     try {
-      if (refreshToken) {
-        await api.post('/auth/logout', { refreshToken }).catch(() => {});
-      }
+      if (refreshToken) await api.post('/auth/logout', { refreshToken }).catch(() => {});
     } finally {
       logout();
       router.replace('/auth/login');
@@ -95,21 +130,20 @@ export function Sidebar() {
       className="w-56 flex flex-col shrink-0"
     >
       {/* Logo */}
-      <div style={{ borderBottom: '1px solid #1f1f1f' }} className="px-4 pt-4 pb-2 flex items-center justify-center">
-        <Image
-          src="/logo.png"
-          alt="Logo"
-          width={100}
-          height={28}
-          className="object-contain"
-          priority
-        />
+      <div style={{ borderBottom: '1px solid #1f1f1f' }}
+        className="px-4 pt-4 pb-2 flex items-center justify-center">
+        <Image src="/logo.png" alt="Logo" width={100} height={28}
+          className="object-contain" priority />
       </div>
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5 pt-4">
         {NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+          // Inicio: solo activo en /dashboard exacto
+          // Producción General: activo también en fichas-tecnicas
+          const active =
+            (href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)) ||
+            (href === '/dashboard/produccion-general' && pathname.startsWith('/dashboard/fichas-tecnicas'));
           return (
             <Link
               key={href}
@@ -127,8 +161,8 @@ export function Sidebar() {
       </nav>
 
       {/* Usuario con menú */}
-      <div ref={menuRef} style={{ borderTop: '1px solid #1f1f1f' }} className="relative px-3 py-3">
-        {/* Dropdown */}
+      <div ref={menuRef} style={{ borderTop: '1px solid #1f1f1f' }}
+        className="relative px-3 py-3">
         {menuOpen && (
           <div
             className="absolute bottom-full left-3 right-3 mb-1 rounded-lg overflow-hidden shadow-lg"
@@ -167,11 +201,8 @@ export function Sidebar() {
         >
           {user?.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={user.avatarUrl}
-              alt={fullName}
-              className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-            />
+            <img src={user.avatarUrl} alt={fullName}
+              className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
           ) : (
             <div
               className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-semibold"
