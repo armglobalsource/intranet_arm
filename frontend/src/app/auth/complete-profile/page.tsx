@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,7 +22,13 @@ const GENDER_OPTIONS = [
   { value: 'female', label: 'Femenino'  },
 ] as const;
 
-export default function CompleteProfilePage() {
+const Spinner = () => (
+  <div className="min-h-screen flex items-center justify-center" style={{ background: '#0d0d0d' }}>
+    <span className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+  </div>
+);
+
+function CompleteProfileInner() {
   const router                 = useRouter();
   const params                 = useSearchParams();
   const setSession             = useAuthStore((s) => s.setSession);
@@ -86,13 +92,7 @@ export default function CompleteProfilePage() {
     router.replace('/dashboard/orgchart');
   };
 
-  if (!hasHydrated || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0d0d0d' }}>
-        <span className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (!hasHydrated || loading) return <Spinner />;
 
   return (
     <div className="min-h-screen flex" style={{ background: '#0d0d0d' }}>
@@ -119,7 +119,7 @@ export default function CompleteProfilePage() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
-            {/* Género — requerido */}
+            {/* Género */}
             <div>
               <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
                 Género <span className="text-white/25 normal-case font-normal">(opcional)</span>
@@ -140,7 +140,7 @@ export default function CompleteProfilePage() {
               )}
             </div>
 
-            {/* Teléfono — opcional */}
+            {/* Teléfono */}
             <div>
               <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
                 Teléfono <span className="text-white/25 normal-case font-normal">(opcional)</span>
@@ -156,7 +156,7 @@ export default function CompleteProfilePage() {
               />
             </div>
 
-            {/* Fecha de nacimiento — opcional */}
+            {/* Fecha de nacimiento */}
             <div>
               <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
                 Fecha de nacimiento <span className="text-white/25 normal-case font-normal">(opcional)</span>
@@ -170,7 +170,7 @@ export default function CompleteProfilePage() {
               />
             </div>
 
-            {/* Contraseña — solo si el usuario no tiene una (ej: registrado con Google) */}
+            {/* Contraseña — solo si el usuario no tiene una */}
             {!hasPassword && (
               <div>
                 <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
@@ -246,5 +246,17 @@ export default function CompleteProfilePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CompleteProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0d0d0d' }}>
+        <span className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+      </div>
+    }>
+      <CompleteProfileInner />
+    </Suspense>
   );
 }
