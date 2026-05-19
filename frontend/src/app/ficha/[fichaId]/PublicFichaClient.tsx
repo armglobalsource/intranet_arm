@@ -16,9 +16,13 @@ export function PublicFichaClient({ fichaId }: { fichaId: string }) {
   const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
+    if (!fichaId) { setError('ID de ficha inválido'); setLoading(false); return; }
     fetch(`${API_BASE}/fichas/${fichaId}/public`)
-      .then((r) => {
-        if (!r.ok) throw new Error('Ficha no encontrada');
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body?.message ?? `Error ${r.status}`);
+        }
         return r.json();
       })
       .then((data) => { setFicha(data); setLoading(false); })

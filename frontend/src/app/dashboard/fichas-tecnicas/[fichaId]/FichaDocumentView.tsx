@@ -734,10 +734,35 @@ export function FichaDocumentView({
 
   function handleShare() {
     const url = `${window.location.origin}/ficha/${ficha.fichaId}`;
-    navigator.clipboard.writeText(url).then(() => {
+
+    const markCopied = () => {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+      setTimeout(() => setCopied(false), 2500);
+    };
+
+    // Intento 1: Clipboard API moderna
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(markCopied).catch(() => fallbackCopy(url, markCopied));
+    } else {
+      fallbackCopy(url, markCopied);
+    }
+  }
+
+  function fallbackCopy(url: string, onSuccess: () => void) {
+    // Intento 2: execCommand (compatible con más navegadores)
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) { onSuccess(); return; }
+    } catch {}
+    // Último recurso: mostrar URL en un prompt
+    window.prompt('Copia este link:', url);
   }
 
   const isSaving = saveState === 'saving';
