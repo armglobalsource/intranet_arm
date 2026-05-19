@@ -8,19 +8,38 @@ const COL = 'content';
 export class ContentsService {
   constructor(private fb: FirebaseService) {}
 
+  // ── Admin: lista completa ────────────────────────────────────────────────────
+
   async findAll(_userId: number, _roleId: number) {
     const snap = await this.fb.db.collection(COL).orderBy('createdAt', 'desc').get();
     return this.fb.toDocs(snap);
   }
 
-  /**
-   * Noticias publicadas filtradas por scope:
-   *  - scope='global'  → campusId == null (noticias globales)
-   *  - scope='campus'  → campusId == campusId del usuario
-   */
+  /** Lista todas las noticias (admin) con filtros opcionales */
+  async findNews(campusId?: string | 'global', status?: string) {
+    const snap = await this.fb.db
+      .collection(COL)
+      .where('type', '==', 'news')
+      .orderBy('createdAt', 'desc')
+      .limit(200)
+      .get();
+
+    let list = this.fb.toDocs(snap) as any[];
+
+    if (status) list = list.filter((n) => n.status === status);
+
+    if (campusId === 'global') {
+      list = list.filter((n) => n.campusId == null);
+    } else if (campusId) {
+      list = list.filter((n) => n.campusId === campusId);
+    }
+
+    return list;
+  }
+
+  // ── Público: noticias publicadas por scope ───────────────────────────────────
+
   async findPublished(scope: 'global' | 'campus', campusId?: string) {
-    // Query simple por tipo para evitar índices compuestos;
-    // filtramos status y campusId en memoria.
     const snap = await this.fb.db
       .collection(COL)
       .where('type', '==', 'news')
@@ -28,42 +47,54 @@ export class ContentsService {
       .limit(100)
       .get();
 
-    const all = this.fb.toDocs(snap);
-
-    return all
-      .filter((n: any) => {
+    return (this.fb.toDocs(snap) as any[])
+      .filter((n) => {
         if (n.status !== 'published') return false;
         if (scope === 'global') return n.campusId == null;
-        if (scope === 'campus')  return campusId ? n.campusId === campusId : false;
+        if (scope === 'campus') return campusId ? n.campusId === campusId : false;
         return false;
       })
       .slice(0, 10);
   }
 
+  // ── CRUD ─────────────────────────────────────────────────────────────────────
+
   async findOne(id: number) {
     const snap = await this.fb.db.collection(COL).doc(String(id)).get();
-    if (!snap.exists) throw new NotFoundException(`Content con id ${id} no encontrado`);
+    if (!snap.exists) throw new NotFoundException(`Content ${id} no encontrado`);
     return this.fb.toObj(snap);
   }
 
   async create(dto: CreateContentDto, userId: number) {
-    const id = await this.fb.nextId(COL);
+    const id  = await this.fb.nextId(COL);
+    const now = this.fb.now();
     const doc = {
       id,
       ...dto,
-      campusId: dto.campusId ?? null,
-      status:   dto.status   ?? 'draft',
-      authorId: userId,
-      createdAt: this.fb.now(),
-      updatedAt: this.fb.now(),
+      campusId:   dto.campusId   ?? null,
+      status:     dto.status     ?? 'draft',
+      mediaItems: dto.mediaItems ?? [],
+      pinned:     dto.pinned     ?? false,
+      authorId:   userId,
+      publishedAt: dto.status === 'published' ? now : null,
+      createdAt:  now,
+      updatedAt:  now,
     };
     await this.fb.db.collection(COL).doc(String(id)).set(doc);
     return this.findOne(id);
   }
 
   async update(id: number, dto: Partial<CreateContentDto>) {
-    await this.findOne(id);
-    await this.fb.db.collection(COL).doc(String(id)).update({ ...dto, updatedAt: this.fb.now() });
+    const existing = await this.findOne(id) as any;
+    const now = this.fb.now();
+    const patch: any = { ...dto, updatedAt: now };
+
+    // Marcar publishedAt la primera vez que se publica
+    if (dto.status === 'published' && existing.status !== 'published') {
+      patch.publishedAt = now;
+    }
+
+    await this.fb.db.collection(COL).doc(String(id)).update(patch);
     return this.findOne(id);
   }
 

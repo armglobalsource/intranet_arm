@@ -117,6 +117,18 @@ function StatsIcon({ active }: { active: boolean }) {
   );
 }
 
+function NoticiasIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.35)';
+  return (
+    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l6 6v8a2 2 0 0 1-2 2z" />
+      <polyline points="17 20 17 13 7 13 7 20" />
+      <polyline points="7 4 7 8 15 8" />
+    </svg>
+  );
+}
+
 // ── Estructura de navegación ──────────────────────────────────────────────────
 
 interface NavGroup {
@@ -136,9 +148,16 @@ const NAV: NavGroup[] = [
       { href: '/dashboard/mis-fichas', label: 'Mis Fichas', icon: MiFichaIcon },
     ],
   },
-  { href: '/dashboard/orgchart',                        label: 'Organigrama',        icon: OrgIcon        },
-  { href: '/dashboard/produccion-general',              label: 'Producción General', icon: ProduccionIcon },
-  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',       icon: StatsIcon      },
+  { href: '/dashboard/orgchart', label: 'Organigrama', icon: OrgIcon },
+  {
+    href:  '/dashboard/produccion-general',
+    label: 'Producción General',
+    icon:  ProduccionIcon,
+    children: [
+      { href: '/dashboard/produccion-general/noticias',     label: 'Noticias',      icon: NoticiasIcon },
+      { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon    },
+    ],
+  },
 ];
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -191,15 +210,16 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 p-3 pt-4 space-y-0.5">
         {NAV.map(({ href, label, icon: Icon, children }) => {
+          const childActive = children?.some((c) => pathname.startsWith(c.href)) ?? false;
+
           const active =
             href === '/dashboard'
               ? pathname === '/dashboard'
               : href === '/dashboard/produccion-general'
-                ? pathname === '/dashboard/produccion-general' || pathname.startsWith('/dashboard/fichas-tecnicas')
+                ? pathname === '/dashboard/produccion-general'
+                  || pathname.startsWith('/dashboard/fichas-tecnicas')
+                  || childActive
                 : pathname.startsWith(href);
-
-          // ¿Algún hijo está activo?
-          const childActive = children?.some((c) => pathname.startsWith(c.href)) ?? false;
 
           return (
             <div key={href}>
