@@ -113,6 +113,7 @@ function CellInput({ value, onChange, placeholder, style }: {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder ?? '—'}
+      className="ficha-cell-input"
       style={{
         border: 'none',
         borderBottom: `1px dashed ${D.inputBorder}`,
@@ -137,6 +138,7 @@ function DeleteBtn({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       title="Eliminar fila"
+      className="ficha-no-print"
       style={{
         flexShrink: 0, fontSize: 11, lineHeight: 1, color: 'rgba(255,255,255,0.15)',
         background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px',
@@ -242,7 +244,7 @@ function SectionFooter({ sectionName, editable, isCompleted, onAddRow, onComplet
 }) {
   if (!editable) return null;
   return (
-    <div style={{ marginTop: 10, borderTop: `0.5px solid ${D.divider}`, paddingTop: 8 }}>
+    <div className="ficha-no-print" style={{ marginTop: 10, borderTop: `0.5px solid ${D.divider}`, paddingTop: 8 }}>
       {onAddRow && <AddRowInline sectionName={sectionName} onAdd={onAddRow} />}
       <div style={{ marginTop: 8, textAlign: 'right' }}>
         {isCompleted ? (
@@ -283,7 +285,7 @@ function RoleCard({
   if (!editable && !displayed.length) return null;
 
   return (
-    <div style={S.card}>
+    <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>{title}</div>
       {displayed.map((row, i) => (
         <div key={row.id} style={{
@@ -324,7 +326,7 @@ function StreamingCard({
   if (!editable && !displayed.length) return null;
 
   return (
-    <div style={S.card}>
+    <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>Streaming</div>
       {[...director, ...others].map((row, i, arr) => (
         <div key={row.id} style={{
@@ -394,7 +396,7 @@ function EscenaCard({
   const col2 = musicians.slice(half);
 
   return (
-    <div style={S.card}>
+    <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>
         AR Worship / Banda{(!editable && vio) ? ` — VIO: ${val(vio, colId)}` : ''}
       </div>
@@ -491,7 +493,7 @@ function SetListCard({
   if (!editable && !displayed.length) return null;
 
   return (
-    <div style={S.card}>
+    <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>Set List</div>
       {displayed.map((row, i) => (
         <div key={row.id} style={{
@@ -536,7 +538,7 @@ function HorariosCard({
   if (!editable && !displayed.length) return null;
 
   return (
-    <div style={S.card}>
+    <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>Horarios</div>
       {displayed.map((row) => {
         const { color, opacity } = timelineColor(row.label);
@@ -587,7 +589,7 @@ function AnunciosCard({
   if (!editable && !displayed.length) return null;
 
   return (
-    <div style={{ ...S.card, marginBottom: 0 }}>
+    <div className="ficha-card" style={{ ...S.card, marginBottom: 0 }}>
       <div style={S.cardTitle}>Info Encuentro</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px' }}>
         {displayed.map((row, i) => (
@@ -628,7 +630,7 @@ function VoluntariosCard({
   if (!editable && !displayed.length) return null;
 
   return (
-    <div style={{ ...S.card, marginBottom: 14 }}>
+    <div className="ficha-card" style={{ ...S.card, marginBottom: 14 }}>
       <div style={S.cardTitle}>Voluntarios de Servicio</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 24px' }}>
         {displayed.map((row, i) => (
@@ -664,7 +666,7 @@ function EncuentroTabs({
 }: { encuentros: Encuentro[]; selected: string; onChange: (id: string) => void }) {
   if (encuentros.length <= 1) return null;
   return (
-    <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+    <div className="ficha-no-print" style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
       {encuentros.map((e) => (
         <button
           key={e.id}
@@ -742,33 +744,148 @@ export function FichaDocumentView({
   const isSaved  = saveState === 'saved';
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    <div
+      className="ficha-doc-root"
+      style={{ maxWidth: 900, margin: '0 auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
+    >
+      {/* ── Estilos globales y de impresión ── */}
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        @page {
+          size: A4 portrait;
+          margin: 10mm 12mm;
+        }
+
+        @media print {
+          /* Asegurar colores exactos en impresión */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* Ocultar toda la UI de navegación del dashboard */
+          body > *:not(#__next) { display: none !important; }
+          nav, header, aside, footer,
+          [class*="sidebar"], [class*="nav"],
+          [class*="topbar"], [class*="breadcrumb"] {
+            display: none !important;
+          }
+
+          /* Elementos que no deben imprimirse */
+          .ficha-no-print { display: none !important; }
+
+          /* Contenedor raíz */
+          .ficha-doc-root {
+            max-width: 100% !important;
+            margin: 0 !important;
+          }
+
+          /* Documento principal → fondo blanco */
+          .ficha-doc {
+            background: #ffffff !important;
+            border: 1px solid #e0e0e0 !important;
+            border-radius: 6px !important;
+            overflow: visible !important;
+          }
+
+          /* Todos los textos → oscuros */
+          .ficha-doc,
+          .ficha-doc div,
+          .ficha-doc span,
+          .ficha-doc p,
+          .ficha-doc strong,
+          .ficha-doc input {
+            color: #1a1a1a !important;
+          }
+
+          /* Header → gris claro */
+          .ficha-hdr {
+            background: #f4f4f4 !important;
+            border-bottom: 1px solid #ddd !important;
+          }
+          .ficha-hdr-top {
+            border-bottom: 1px solid #e8e8e8 !important;
+          }
+
+          /* Logo blanco → negro para impresión */
+          .ficha-logo {
+            filter: brightness(0) !important;
+          }
+
+          /* Cuerpo */
+          .ficha-body {
+            padding: 0.8rem 1rem !important;
+          }
+
+          /* Tarjetas → fondo blanco con borde visible, sin corte de página */
+          .ficha-card {
+            background: #ffffff !important;
+            border: 1px solid #ddd !important;
+            border-radius: 6px !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            -webkit-column-break-inside: avoid !important;
+          }
+
+          /* Títulos de sección → gris oscuro */
+          .ficha-card [style*="dbd7cf"],
+          .ficha-card [style*="textTransform"] {
+            color: #444444 !important;
+          }
+
+          /* Grilla principal */
+          .ficha-grid {
+            gap: 10px !important;
+          }
+
+          /* Inputs → mostrar como texto con línea inferior tenue */
+          .ficha-cell-input {
+            border-bottom: 1px solid #c0c0c0 !important;
+            background: transparent !important;
+          }
+
+          /* Separadores oscuros → claros */
+          .ficha-doc [style*="rgba(255,255,255,0.06)"] {
+            border-color: #ebebeb !important;
+          }
+        }
+      `}</style>
 
       <EncuentroTabs encuentros={encuentros ?? []} selected={selectedId} onChange={setSelectedId} />
 
       {/* Documento */}
-      <div style={{
-        background: D.bg,
-        borderRadius: 16,
-        border: `0.5px solid ${D.cardBorder}`,
-        overflow: 'hidden',
-      }}>
+      <div
+        className="ficha-doc"
+        style={{
+          background: D.bg,
+          borderRadius: 16,
+          border: `0.5px solid ${D.cardBorder}`,
+          overflow: 'hidden',
+        }}
+      >
 
         {/* ── Header ── */}
-        <div style={{
-          background: D.headerBg,
-          borderBottom: `0.5px solid ${D.cardBorder}`,
-        }}>
+        <div
+          className="ficha-hdr"
+          style={{
+            background: D.headerBg,
+            borderBottom: `0.5px solid ${D.cardBorder}`,
+          }}
+        >
           {/* Fila 1: logo (izq) + fecha (der) */}
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            padding: '1.5rem 2rem 1rem',
-            borderBottom: `0.5px solid ${D.divider}`,
-          }}>
+          <div
+            className="ficha-hdr-top"
+            style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '1.5rem 2rem 1rem',
+              borderBottom: `0.5px solid ${D.divider}`,
+            }}
+          >
             <img
               src="/logo2.png"
               alt="ARM Global"
+              className="ficha-logo"
               style={{ height: 40, width: 'auto', objectFit: 'contain', display: 'block', maxWidth: '40%' }}
             />
             <div style={{ textAlign: 'right' }}>
@@ -794,8 +911,8 @@ export function FichaDocumentView({
               </div>
             </div>
 
-            {/* ── Botones de acción ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {/* ── Botones de acción (ocultos en impresión) ── */}
+            <div className="ficha-no-print" style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
 
               {/* Guardar (solo modo edición) */}
               {editable && onSave && (
@@ -903,8 +1020,8 @@ export function FichaDocumentView({
         </div>{/* fin header */}
 
         {/* ── Cuerpo ── */}
-        <div style={{ padding: '1.5rem 2rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="ficha-body" style={{ padding: '1.5rem 2rem' }}>
+          <div className="ficha-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
               <RoleCard title="Equipo Pastoral" rows={sec('pastoral')}   {...editProps('pastoral')} />
               <RoleCard title="Producción"       rows={sec('produccion')} {...editProps('produccion')} />
