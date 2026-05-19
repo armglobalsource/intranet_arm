@@ -758,7 +758,7 @@ export function FichaDocumentView({
         {/* ── Header ── */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-          padding: '1.5rem 2rem 1.25rem',
+          padding: '0 2rem 1.25rem 0',
           background: D.headerBg,
           borderBottom: `0.5px solid ${D.cardBorder}`,
         }}>
@@ -768,7 +768,7 @@ export function FichaDocumentView({
               <img
                 src="/logo2.png"
                 alt="ARM Global"
-                style={{ height: 120, width: 'auto', objectFit: 'contain' }}
+                style={{ height: 120, width: 'auto', objectFit: 'contain', margin: 0, padding: 0, display: 'block' }}
               />
               <span style={{
                 fontSize: 11, color: D.textSecond, textTransform: 'uppercase',
