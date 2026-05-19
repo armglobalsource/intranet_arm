@@ -768,7 +768,7 @@ export function FichaDocumentView({
               <img
                 src="/logo2.png"
                 alt="ARM Global"
-                style={{ height: 30, width: 'auto', objectFit: 'contain' }}
+                style={{ height: 120, width: 'auto', objectFit: 'contain' }}
               />
               <span style={{
                 fontSize: 11, color: D.textSecond, textTransform: 'uppercase',
