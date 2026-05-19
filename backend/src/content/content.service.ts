@@ -11,50 +11,34 @@ export class ContentsService {
   // ── Admin: lista completa ────────────────────────────────────────────────────
 
   async findAll(_userId: number, _roleId: number) {
-    const snap = await this.fb.db.collection(COL).orderBy('createdAt', 'desc').get();
-    return this.fb.toDocs(snap);
+    return this.fetchAll();
   }
 
   /** Lista todas las noticias (admin) con filtros opcionales */
+  /** Fetch all content and filter in-memory — avoids Firestore composite index requirements */
+  private async fetchAll(): Promise<any[]> {
+    const snap = await this.fb.db.collection(COL).get();
+    const docs = this.fb.toDocs(snap) as any[];
+    return docs.sort((a, b) => {
+      const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt ?? 0).getTime();
+      const tb = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt ?? 0).getTime();
+      return tb - ta;
+    });
+  }
+
   async findNews(campusId?: string | 'global', status?: string) {
-    const snap = await this.fb.db
-      .collection(COL)
-      .where('type', '==', 'news')
-      .orderBy('createdAt', 'desc')
-      .limit(200)
-      .get();
-
-    let list = this.fb.toDocs(snap) as any[];
-
-    if (status) list = list.filter((n) => n.status === status);
-
-    if (campusId === 'global') {
-      list = list.filter((n) => n.campusId == null);
-    } else if (campusId) {
-      list = list.filter((n) => n.campusId === campusId);
-    }
-
+    let list = (await this.fetchAll()).filter((n) => n.type === 'news');
+    if (status)                list = list.filter((n) => n.status === status);
+    if (campusId === 'global') list = list.filter((n) => n.campusId == null);
+    else if (campusId)         list = list.filter((n) => n.campusId === campusId);
     return list;
   }
 
-  // ── Público: noticias publicadas por scope ───────────────────────────────────
-
   async findPublished(scope: 'global' | 'campus', campusId?: string) {
-    const snap = await this.fb.db
-      .collection(COL)
-      .where('type', '==', 'news')
-      .orderBy('createdAt', 'desc')
-      .limit(100)
-      .get();
-
-    return (this.fb.toDocs(snap) as any[])
-      .filter((n) => {
-        if (n.status !== 'published') return false;
-        if (scope === 'global') return n.campusId == null;
-        if (scope === 'campus') return campusId ? n.campusId === campusId : false;
-        return false;
-      })
-      .slice(0, 10);
+    const all = (await this.fetchAll()).filter((n) => n.type === 'news' && n.status === 'published');
+    if (scope === 'global') return all.filter((n) => n.campusId == null).slice(0, 10);
+    if (scope === 'campus') return campusId ? all.filter((n) => n.campusId === campusId).slice(0, 10) : [];
+    return [];
   }
 
   // ── CRUD ─────────────────────────────────────────────────────────────────────
