@@ -757,39 +757,45 @@ export function FichaDocumentView({
 
         {/* ── Header ── */}
         <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-          padding: '1.5rem 2rem',
           background: D.headerBg,
           borderBottom: `0.5px solid ${D.cardBorder}`,
         }}>
-          <div>
-            {/* Logo */}
+          {/* Fila 1: logo (izq) + fecha (der) */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '1.5rem 2rem 1rem',
+            borderBottom: `0.5px solid ${D.divider}`,
+          }}>
             <img
               src="/logo2.png"
               alt="ARM Global"
-              style={{ height: 48, width: 'auto', objectFit: 'contain', display: 'block', marginBottom: 10 }}
+              style={{ height: 72, width: 'auto', objectFit: 'contain', display: 'block' }}
             />
-            {/* Campus */}
-            <div style={{
-              fontSize: 10, color: D.textMuted, textTransform: 'uppercase',
-              letterSpacing: '0.12em', fontWeight: 600, marginBottom: 4,
-            }}>
-              Campus {campusName}
-            </div>
-            {/* Título */}
-            <div style={{ fontSize: 22, fontWeight: 700, color: D.textPrimary, letterSpacing: '-0.01em' }}>
-              {title}
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: D.textPrimary }}>{formatDate(date)}</div>
               {selectedEncuentro?.time && (
                 <div style={{ fontSize: 12, color: D.textSecond, marginTop: 3 }}>{selectedEncuentro.time} hrs</div>
               )}
             </div>
+          </div>
+
+          {/* Fila 2: campus + título (izq) + botones (der) */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '1rem 2rem 1.2rem', gap: 16,
+          }}>
+            {/* Campus + título */}
+            <div>
+              <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600, marginBottom: 4 }}>
+                Campus {campusName}
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: D.textPrimary, letterSpacing: '-0.01em' }}>
+                {title}
+              </div>
+            </div>
+
             {/* ── Botones de acción ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
 
               {/* Guardar (solo modo edición) */}
               {editable && onSave && (
@@ -892,9 +898,9 @@ export function FichaDocumentView({
                 )}
               </button>
 
-            </div>
-          </div>
-        </div>
+            </div>{/* fin botones */}
+          </div>{/* fin fila 2 */}
+        </div>{/* fin header */}
 
         {/* ── Cuerpo ── */}
         <div style={{ padding: '1.5rem 2rem' }}>
