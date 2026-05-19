@@ -174,6 +174,54 @@ export class UsersService {
     await this.fb.db.collection(COL).doc(String(id)).update({ lastLoginAt: this.fb.now() });
   }
 
+  async selfRegister(data: {
+    email: string;
+    password?: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  }) {
+    const email = data.email.trim().toLowerCase();
+    const existing = await this.findByEmail(email);
+    if (existing) throw new ConflictException('Ya existe un usuario con ese email');
+
+    const roleSnap = await this.fb.db.collection('roles').doc('2').get();
+    const role = roleSnap.exists
+      ? { id: 2, name: roleSnap.data()!.name }
+      : { id: 2, name: 'employee' };
+
+    const passwordHash = data.password ? await bcrypt.hash(data.password, 12) : null;
+    const id = await this.fb.nextId(COL);
+
+    const doc = {
+      id, email, passwordHash,
+      firstName:    data.firstName.trim(),
+      lastName:     data.lastName.trim(),
+      nameLower:    `${data.firstName} ${data.lastName}`.toLowerCase(),
+      roleId:       2,
+      role,
+      campusId:     null,
+      campus:       null,
+      jobTitles:    [],
+      phone:        null,
+      country:      null,
+      bio:          null,
+      birthDate:    null,
+      gender:       null,
+      avatarUrl:    data.avatarUrl ?? null,
+      status:       'active',
+      departmentId: null,
+      lastLoginAt:  null,
+      createdAt:    this.fb.now(),
+      updatedAt:    this.fb.now(),
+    };
+
+    await this.fb.db.collection(COL).doc(String(id)).set(doc);
+    // Retorna raw (con passwordHash) igual que findByEmail, para que AuthService lo procese
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    return this.fb.toObj(snap);
+  }
+
   async uploadAvatar(id: number, file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No se recibió ningún archivo');
 

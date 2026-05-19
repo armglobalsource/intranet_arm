@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -179,6 +180,14 @@ export default function LoginPage() {
             </button>
 
           </form>
+
+          <p className="text-center text-sm text-white/30 mt-6">
+            ¿No tienes cuenta?{' '}
+            <Link href="/auth/register" className="text-white/60 hover:text-white transition-colors">
+              Regístrate
+            </Link>
+          </p>
+
         </div>
       </div>
 

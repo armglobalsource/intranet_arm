@@ -1,5 +1,5 @@
 import {
-  Injectable, UnauthorizedException, Logger,
+  Injectable, UnauthorizedException, ConflictException, Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -8,6 +8,9 @@ import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 import { randomUUID, createHash } from 'crypto';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { CompleteProfileDto } from './dto/complete-profile.dto';
+import { UpdateUserDto } from '../users/dto/create-user.dto';
 import * as admin from 'firebase-admin';
 
 export interface JwtPayload {
@@ -89,6 +92,93 @@ export class AuthService {
     });
 
     await batch.commit();
+  }
+
+  async register(dto: RegisterDto, ipAddress?: string, userAgent?: string) {
+    const existing = await this.users.findByEmail(dto.email);
+    if (existing) throw new ConflictException('Ya existe un usuario con ese email');
+
+    const user = await this.users.selfRegister({
+      email:     dto.email,
+      password:  dto.password,
+      firstName: dto.firstName,
+      lastName:  dto.lastName,
+    });
+
+    await this.users.updateLastLogin(user.id);
+    const roleName = user.role?.name ?? 'employee';
+    const roleId   = user.roleId ?? 2;
+    const { permissions, ...tokens } = await this.generateTokens(user.id, user.email, roleName, roleId, ipAddress, userAgent);
+
+    const { passwordHash, ...safeUser } = user;
+    return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion: true };
+  }
+
+  async checkEmail(email: string) {
+    const user = await this.users.findByEmail(email);
+    if (!user) return { exists: false };
+
+    const missingFields: string[] = [];
+    if (!user.gender)      missingFields.push('gender');
+    if (!user.phone)       missingFields.push('phone');
+    if (!user.avatarUrl)   missingFields.push('avatarUrl');
+    if (!user.birthDate)   missingFields.push('birthDate');
+    if (!user.passwordHash) missingFields.push('password');
+
+    return {
+      exists: true,
+      needsProfileCompletion: missingFields.length > 0,
+      missingFields,
+      user: {
+        firstName: user.firstName,
+        lastName:  user.lastName,
+        avatarUrl: user.avatarUrl,
+        email:     user.email,
+      },
+    };
+  }
+
+  async googleAuth(
+    googleUser: { email: string; firstName: string; lastName: string; avatarUrl?: string | null },
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    let user = await this.users.findByEmail(googleUser.email);
+
+    if (!user) {
+      user = await this.users.selfRegister({
+        email:     googleUser.email,
+        firstName: googleUser.firstName,
+        lastName:  googleUser.lastName,
+        avatarUrl: googleUser.avatarUrl,
+      });
+    }
+
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('Cuenta suspendida o inactiva');
+    }
+
+    await this.users.updateLastLogin(user.id);
+    const roleName = user.role?.name ?? 'employee';
+    const roleId   = user.roleId ?? 2;
+    const { permissions, ...tokens } = await this.generateTokens(user.id, user.email, roleName, roleId, ipAddress, userAgent);
+
+    const needsProfileCompletion = !user.gender;
+    const { passwordHash, ...safeUser } = user;
+    return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion };
+  }
+
+  async completeProfile(userId: number, dto: CompleteProfileDto) {
+    const update: UpdateUserDto = {};
+    if (dto.firstName !== undefined) update.firstName = dto.firstName;
+    if (dto.lastName  !== undefined) update.lastName  = dto.lastName;
+    if (dto.gender    !== undefined) update.gender    = dto.gender;
+    if (dto.phone     !== undefined) update.phone     = dto.phone;
+    if (dto.birthDate !== undefined) update.birthDate = dto.birthDate;
+    if (dto.password)                update.password  = dto.password;
+
+    const user = await this.users.update(userId, update);
+    return { user };
   }
 
   async isTokenRevoked(jti: string): Promise<boolean> {
