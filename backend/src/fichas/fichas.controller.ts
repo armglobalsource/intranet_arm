@@ -2,6 +2,7 @@ import {
   Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { FichasService } from './fichas.service';
 import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto } from './dto/ficha.dto';
@@ -17,6 +18,12 @@ export class FichasController {
     @Query('status')   status?: string,
   ) {
     return this.fichasService.findAll(campusId, status);
+  }
+
+  @Public()
+  @Get(':fichaId/public')
+  findOnePublic(@Param('fichaId') fichaId: string) {
+    return this.fichasService.findOne(fichaId);
   }
 
   @Get(':fichaId')

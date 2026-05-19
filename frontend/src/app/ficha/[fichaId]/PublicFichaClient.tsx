@@ -1,34 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { clientDb } from '@/lib/firebase-client';
 import { FichaDocumentView } from '@/app/dashboard/fichas-tecnicas/[fichaId]/FichaDocumentView';
 import type { Ficha } from '@/types/ficha';
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' && window.location.origin.includes('localhost')
+    ? 'http://localhost:3001/api/v1'
+    : '/api/v1');
+
 export function PublicFichaClient({ fichaId }: { fichaId: string }) {
-  const [ficha, setFicha]   = useState<Ficha | null>(null);
+  const [ficha, setFicha]     = useState<Ficha | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
-    const ref = doc(clientDb, 'fichas', fichaId);
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        if (!snap.exists()) {
-          setError('Ficha no encontrada');
-        } else {
-          setFicha({ fichaId: snap.id, ...snap.data() } as unknown as Ficha);
-        }
-        setLoading(false);
-      },
-      () => {
-        setError('No se pudo cargar la ficha');
-        setLoading(false);
-      },
-    );
-    return () => unsub();
+    fetch(`${API_BASE}/fichas/${fichaId}/public`)
+      .then((r) => {
+        if (!r.ok) throw new Error('Ficha no encontrada');
+        return r.json();
+      })
+      .then((data) => { setFicha(data); setLoading(false); })
+      .catch((e) => { setError(e.message); setLoading(false); });
   }, [fichaId]);
 
   if (loading) {
@@ -60,7 +54,7 @@ export function PublicFichaClient({ fichaId }: { fichaId: string }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d0d0d', padding: '2rem 1rem' }}>
-      {/* Header ARM Global */}
+      {/* Header */}
       <div style={{
         maxWidth: 900, margin: '0 auto 1.5rem',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -85,7 +79,7 @@ export function PublicFichaClient({ fichaId }: { fichaId: string }) {
         <span style={{ fontSize: 11, color: '#444' }}>Vista de solo lectura</span>
       </div>
 
-      {/* Ficha */}
+      {/* Ficha (read-only, sin botón editar) */}
       <FichaDocumentView ficha={ficha} />
     </div>
   );
