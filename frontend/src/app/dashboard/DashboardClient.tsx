@@ -1,15 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useFichas } from '@/hooks/useFichas';
+import { useMiFichas } from '@/hooks/useFichas';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { CalendarioAnual } from './CalendarioAnual';
 
 export function DashboardClient() {
-  const { data: fichas, isLoading } = useFichas();
+  const { data: fichas, isLoading } = useMiFichas();
   const { user } = useAuthStore();
   const firstName = user?.firstName ?? '';
-  const completadas = fichas?.filter((f) => f.status === 'complete').length ?? 0;
+
+  const miFichasCount    = fichas?.length ?? 0;
+  const fichasCompletadas = fichas?.filter((f) => f.status === 'complete').length ?? 0;
 
   const initials = user
     ? ((user.firstName?.[0] ?? '') + (user.lastName?.[0] ?? '')).toUpperCase() || '?'
@@ -57,14 +59,36 @@ export function DashboardClient() {
           </div>
         </Link>
 
-        {/* Fichas técnicas listas */}
-        <div className="card p-5 flex items-center gap-4">
-          <span className="text-3xl">📂</span>
-          <div>
-            <p className="text-2xl font-bold text-gray-900">{isLoading ? '…' : String(completadas)}</p>
-            <p className="text-xs text-gray-500">Fichas técnicas listas</p>
+        {/* Mis Fichas Técnicas */}
+        <Link
+          href="/dashboard/mis-fichas"
+          className="card p-5 flex items-center gap-4 hover:shadow-md hover:border-gray-300 transition-all group"
+        >
+          {/* Icono ficha técnica — negro */}
+          <div className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center bg-gray-900 group-hover:bg-black transition-all">
+            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none"
+              stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
           </div>
-        </div>
+          <div className="min-w-0">
+            <p className="text-2xl font-bold text-gray-900 leading-none">
+              {isLoading ? '…' : String(miFichasCount)}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">Mis fichas técnicas</p>
+            {!isLoading && fichasCompletadas > 0 && (
+              <p className="text-[10px] text-emerald-600 font-medium mt-1">
+                {fichasCompletadas} completa{fichasCompletadas !== 1 ? 's' : ''}
+              </p>
+            )}
+            <p className="text-[10px] text-gray-400 font-medium mt-1 group-hover:text-gray-600 transition-colors">
+              Ver fichas →
+            </p>
+          </div>
+        </Link>
 
         {/* Voluntarios activos */}
         <div className="card p-5 flex items-center gap-4">

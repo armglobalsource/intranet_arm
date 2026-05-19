@@ -281,7 +281,7 @@ export default function PerfilPage() {
               </svg>
               Inicio
             </Link>
-            <Badge label={STATUS_LABELS[user.status] ?? user.status} color={statusColor} />
+            <Badge label={STATUS_LABELS[user.status ?? ''] ?? user.status ?? '—'} color={statusColor} />
           </div>
 
           {/* Avatar flotando sobre el banner */}
@@ -459,7 +459,7 @@ export default function PerfilPage() {
             <div className="space-y-3">
               <div>
                 <p className="text-[10px] font-medium mb-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Estado</p>
-                <Badge label={STATUS_LABELS[user.status] ?? user.status} color={statusColor} />
+                <Badge label={STATUS_LABELS[user.status ?? ''] ?? user.status ?? '—'} color={statusColor} />
               </div>
               <div>
                 <p className="text-[10px] font-medium mb-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>ID de usuario</p>

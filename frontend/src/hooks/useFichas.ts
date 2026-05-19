@@ -27,6 +27,19 @@ export function useFichas(campusId?: string) {
   });
 }
 
+// ─── Mis fichas (fichas donde el usuario fue asignado o es creador) ───────────
+
+export function useMiFichas() {
+  return useQuery<FichaListItem[]>({
+    queryKey: ['fichas', 'mine'],
+    queryFn:  async () => {
+      const res = await api.get('/fichas/mine');
+      return res.data;
+    },
+    staleTime: 30_000,
+  });
+}
+
 // ─── Ficha individual en tiempo real (Firestore onSnapshot) ──────────────────
 
 export function useFichaRealtime(fichaId: string) {

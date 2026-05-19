@@ -16,6 +16,9 @@ interface User {
   campus?: { id: number; name: string; address?: string | null } | null;
   role: { name: string };
   permissions: string[];
+  status?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 interface AuthState {

@@ -246,6 +246,20 @@ export class FichasService {
     return this.fb.toDocs(snap);
   }
 
+  async findMine(userId: number, isAdmin: boolean) {
+    const snap = await this.fb.db.collection(COL).orderBy('date', 'desc').limit(200).get();
+    const all  = this.fb.toDocs(snap);
+    if (isAdmin) return all;
+
+    return all.filter((ficha: any) => {
+      // creador de la ficha
+      if (ficha.createdBy === userId) return true;
+      // asignado como responsable de alguna sección
+      const sections = ficha.sections ?? {};
+      return Object.values(sections).some((sec: any) => sec?.assignedTo === userId);
+    });
+  }
+
   async findOne(fichaId: string) {
     const snap = await this.fb.db.collection(COL).doc(fichaId).get();
     if (!snap.exists) throw new NotFoundException(`Ficha ${fichaId} no encontrada`);

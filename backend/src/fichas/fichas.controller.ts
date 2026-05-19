@@ -20,6 +20,12 @@ export class FichasController {
     return this.fichasService.findAll(campusId, status);
   }
 
+  @Get('mine')
+  findMine(@CurrentUser() user: any) {
+    const isAdmin = (user?.permissions ?? []).includes('*');
+    return this.fichasService.findMine(user.sub, isAdmin);
+  }
+
   @Public()
   @Get('public/:fichaId')
   findOnePublic(@Param('fichaId') fichaId: string) {
