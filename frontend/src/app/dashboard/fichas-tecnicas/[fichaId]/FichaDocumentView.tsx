@@ -769,7 +769,7 @@ export function FichaDocumentView({
             <img
               src="/logo2.png"
               alt="ARM Global"
-              style={{ height: 56, width: 'auto', objectFit: 'contain', display: 'block', maxWidth: '50%' }}
+              style={{ height: 56, width: 'auto', objectFit: 'contain', display: 'block', maxWidth: '40%' }}
             />
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: D.textPrimary }}>{formatDate(date)}</div>
