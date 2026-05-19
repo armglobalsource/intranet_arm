@@ -764,14 +764,6 @@ export function FichaDocumentView({
             print-color-adjust: exact !important;
           }
 
-          /* Ocultar toda la UI de navegación del dashboard */
-          body > *:not(#__next) { display: none !important; }
-          nav, header, aside, footer,
-          [class*="sidebar"], [class*="nav"],
-          [class*="topbar"], [class*="breadcrumb"] {
-            display: none !important;
-          }
-
           /* Elementos que no deben imprimirse */
           .ficha-no-print { display: none !important; }
 
@@ -828,26 +820,15 @@ export function FichaDocumentView({
             -webkit-column-break-inside: avoid !important;
           }
 
-          /* Títulos de sección → gris oscuro */
-          .ficha-card [style*="dbd7cf"],
-          .ficha-card [style*="textTransform"] {
-            color: #444444 !important;
-          }
-
           /* Grilla principal */
           .ficha-grid {
             gap: 10px !important;
           }
 
-          /* Inputs → mostrar como texto con línea inferior tenue */
+          /* Inputs → línea tenue */
           .ficha-cell-input {
-            border-bottom: 1px solid #c0c0c0 !important;
+            border-bottom: 1px solid #bbb !important;
             background: transparent !important;
-          }
-
-          /* Separadores oscuros → claros */
-          .ficha-doc [style*="rgba(255,255,255,0.06)"] {
-            border-color: #ebebeb !important;
           }
         }
       `}</style>
