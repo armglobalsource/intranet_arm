@@ -529,17 +529,33 @@ export function FichasTecnicasClient() {
       {!isLoading && fichas && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: 'Total',        value: stats.total,      color: '#374151' },
-            { label: 'Borradores',   value: stats.draft,      color: 'rgba(0,0,0,0.3)' },
-            { label: 'En progreso',  value: stats.inProgress, color: '#7F77DD' },
-            { label: 'Completas',    value: stats.complete,   color: '#1D9E75' },
-            { label: 'Archivadas',   value: stats.archived,   color: '#F59E0B' },
-          ].map((s) => (
-            <div key={s.label} className="card px-4 py-3 flex items-center gap-3">
-              <span className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</span>
-              <span className="text-xs text-gray-400 leading-tight">{s.label}</span>
-            </div>
-          ))}
+            { label: 'Total',       value: stats.total,      color: '#374151',          href: undefined },
+            { label: 'Borradores',  value: stats.draft,      color: 'rgba(0,0,0,0.3)',  href: undefined },
+            { label: 'En progreso', value: stats.inProgress, color: '#7F77DD',          href: undefined },
+            { label: 'Completas',   value: stats.complete,   color: '#1D9E75',          href: undefined },
+            { label: 'Archivadas',  value: stats.archived,   color: '#F59E0B',          href: '/dashboard/fichas-tecnicas/archivadas' },
+          ].map((s) =>
+            s.href ? (
+              <Link
+                key={s.label}
+                href={s.href}
+                className="card px-4 py-3 flex items-center gap-3 transition-all hover:shadow-md hover:border-amber-200 group"
+              >
+                <span className="text-2xl font-bold transition-colors" style={{ color: s.color }}>{s.value}</span>
+                <span className="text-xs text-gray-400 leading-tight group-hover:text-amber-500 transition-colors flex items-center gap-1">
+                  {s.label}
+                  <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14" /><polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </span>
+              </Link>
+            ) : (
+              <div key={s.label} className="card px-4 py-3 flex items-center gap-3">
+                <span className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</span>
+                <span className="text-xs text-gray-400 leading-tight">{s.label}</span>
+              </div>
+            ),
+          )}
         </div>
       )}
 
