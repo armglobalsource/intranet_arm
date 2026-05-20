@@ -419,6 +419,34 @@ export class FichasService {
     return this.findOne(fichaId);
   }
 
+  async archive(fichaId: string, userId: number, userName: string) {
+    await this.findOne(fichaId);
+    await this.fb.db.collection(COL).doc(fichaId).update({
+      archived:           true,
+      archivedBy:         userId,
+      archivedByName:     userName,
+      archivedAt:         this.fb.now(),
+      lastModifiedBy:     userId,
+      lastModifiedByName: userName,
+      lastModifiedAt:     this.fb.now(),
+    });
+    return this.findOne(fichaId);
+  }
+
+  async unarchive(fichaId: string, userId: number, userName: string) {
+    await this.findOne(fichaId);
+    await this.fb.db.collection(COL).doc(fichaId).update({
+      archived:           false,
+      archivedBy:         null,
+      archivedByName:     null,
+      archivedAt:         null,
+      lastModifiedBy:     userId,
+      lastModifiedByName: userName,
+      lastModifiedAt:     this.fb.now(),
+    });
+    return this.findOne(fichaId);
+  }
+
   async getChangelog(fichaId: string) {
     await this.findOne(fichaId);
     const snap = await this.fb.db

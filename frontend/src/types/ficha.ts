@@ -68,6 +68,10 @@ export interface Ficha {
   lastModifiedBy:     number;
   lastModifiedByName?: string;
   lastModifiedAt:     any;
+  archived?:          boolean;
+  archivedBy?:        number | null;
+  archivedByName?:    string | null;
+  archivedAt?:        any | null;
 }
 
 export interface FichaListItem {
@@ -79,6 +83,7 @@ export interface FichaListItem {
   date:             any;
   status:           FichaStatus;
   completionStatus: CompletionStatus;
+  archived?:        boolean;
 }
 
 export type CreateFichaPayload = {

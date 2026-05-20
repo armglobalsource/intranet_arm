@@ -61,6 +61,16 @@ export class FichasController {
     return this.fichasService.clone(fichaId, user.sub, user.email, dto);
   }
 
+  @Patch(':fichaId/archive')
+  archive(@Param('fichaId') fichaId: string, @CurrentUser() user: any) {
+    return this.fichasService.archive(fichaId, user.sub, user.email);
+  }
+
+  @Patch(':fichaId/unarchive')
+  unarchive(@Param('fichaId') fichaId: string, @CurrentUser() user: any) {
+    return this.fichasService.unarchive(fichaId, user.sub, user.email);
+  }
+
   @Patch(':fichaId/sections/:sectionName')
   updateSection(
     @Param('fichaId')     fichaId: string,

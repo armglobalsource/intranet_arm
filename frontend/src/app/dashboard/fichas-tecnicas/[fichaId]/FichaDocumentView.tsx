@@ -707,6 +707,9 @@ export interface FichaDocumentViewProps {
   ficha:  Ficha;
   onEdit?: () => void;
   onSave?: () => void;
+  onArchive?: () => void;
+  onUnarchive?: () => void;
+  canArchive?: boolean;
   editable?: boolean;
   localSections?: Partial<Record<SectionName, Row[]>>;
   onCellChange?: (section: SectionName, rowId: string, colId: string, value: string) => void;
@@ -718,7 +721,7 @@ export interface FichaDocumentViewProps {
 }
 
 export function FichaDocumentView({
-  ficha, onEdit, onSave,
+  ficha, onEdit, onSave, onArchive, onUnarchive, canArchive,
   editable, localSections, onCellChange, onAddRow, onDeleteRow, onSectionComplete,
   sectionStatus, saveState,
 }: FichaDocumentViewProps) {
@@ -934,6 +937,24 @@ export function FichaDocumentView({
 
       <EncuentroTabs encuentros={encuentros ?? []} selected={selectedId} onChange={setSelectedId} />
 
+      {/* Banner ficha archivada */}
+      {ficha.archived && (
+        <div className="ficha-no-print" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          padding: '10px 16px', marginBottom: 8,
+          background: 'rgba(251,191,36,0.08)',
+          border: '0.5px solid rgba(251,191,36,0.25)',
+          borderRadius: 12, fontSize: 12, color: '#F59E0B', fontWeight: 600,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="21 8 21 21 3 21 3 8" />
+            <rect x="1" y="3" width="22" height="5" />
+            <line x1="10" y1="12" x2="14" y2="12" />
+          </svg>
+          Esta ficha está archivada
+        </div>
+      )}
+
       {/* Documento */}
       <div
         className="ficha-doc"
@@ -1133,6 +1154,46 @@ export function FichaDocumentView({
                 </svg>
                 Imprimir
               </button>
+
+              {/* Archivar / Desarchivar */}
+              {canArchive && (
+                ficha.archived ? (
+                  <button
+                    onClick={onUnarchive}
+                    title="Desarchivar ficha"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      background: 'rgba(251,191,36,0.12)', color: '#F59E0B',
+                      border: '0.5px solid rgba(251,191,36,0.25)', cursor: 'pointer', transition: 'all 0.2s',
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="1 4 1 10 7 10" />
+                      <path d="M3.51 15a9 9 0 1 0 .49-4.51" />
+                    </svg>
+                    Desarchivar
+                  </button>
+                ) : (
+                  <button
+                    onClick={onArchive}
+                    title="Archivar ficha"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      background: 'rgba(255,255,255,0.06)', color: D.textSecond,
+                      border: `0.5px solid ${D.cardBorder}`, cursor: 'pointer', transition: 'all 0.2s',
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="21 8 21 21 3 21 3 8" />
+                      <rect x="1" y="3" width="22" height="5" />
+                      <line x1="10" y1="12" x2="14" y2="12" />
+                    </svg>
+                    Archivar
+                  </button>
+                )
+              )}
 
               {/* Compartir */}
               <button

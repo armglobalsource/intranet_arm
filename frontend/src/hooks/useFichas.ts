@@ -111,6 +111,22 @@ export function useCloneFicha() {
   });
 }
 
+export function useArchiveFicha() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fichaId: string) => api.patch(`/fichas/${fichaId}/archive`).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+  });
+}
+
+export function useUnarchiveFicha() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fichaId: string) => api.patch(`/fichas/${fichaId}/unarchive`).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+  });
+}
+
 export function useUpdateSection() {
   return useMutation({
     mutationFn: ({ fichaId, sectionName, ...dto }: { fichaId: string; sectionName: SectionName; [key: string]: any }) =>

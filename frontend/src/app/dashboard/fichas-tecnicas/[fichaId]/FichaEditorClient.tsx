@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useFichaRealtime, useUpdateSection, useCompleteSection } from '@/hooks/useFichas';
+import { useFichaRealtime, useUpdateSection, useCompleteSection, useArchiveFicha, useUnarchiveFicha } from '@/hooks/useFichas';
 import { usePermissions } from '@/hooks/usePermissions';
 import { FichaDocumentView } from './FichaDocumentView';
 import type { Row, SectionName, Section } from '@/types/ficha';
@@ -30,6 +30,8 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
   const { mutate: updateSection } = useUpdateSection();
   const { mutate: completeSection } = useCompleteSection();
+  const { mutate: archiveFicha } = useArchiveFicha();
+  const { mutate: unarchiveFicha } = useUnarchiveFicha();
 
   // ── Sincronizar filas desde Firestore ──────────────────────────────────────
   // Solo sincronizamos secciones que NO tienen una edición pendiente
@@ -219,6 +221,9 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         editable={editable}
         onEdit={canEdit ? () => setIsEditing(true) : undefined}
         onSave={handleSaveAll}
+        onArchive={canEdit ? () => archiveFicha(fichaId) : undefined}
+        onUnarchive={canEdit ? () => unarchiveFicha(fichaId) : undefined}
+        canArchive={canEdit}
         localSections={localSections}
         onCellChange={handleCellChange}
         onAddRow={handleAddRow}

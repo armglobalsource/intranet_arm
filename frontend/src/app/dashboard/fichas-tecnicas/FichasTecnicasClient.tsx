@@ -407,7 +407,8 @@ export function FichasTecnicasClient() {
   // Filtrar y agrupar fichas por campus (usando nombre canónico)
   const grouped = useMemo(() => {
     if (!fichas) return {};
-    let filtered = fichas;
+    // Excluir fichas archivadas del listado principal
+    let filtered = fichas.filter((f) => !f.archived);
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter((f) => f.status === statusFilter);
@@ -435,12 +436,14 @@ export function FichasTecnicasClient() {
 
   // ── Stats rápidos ──────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    if (!fichas) return { total: 0, draft: 0, inProgress: 0, complete: 0 };
+    if (!fichas) return { total: 0, draft: 0, inProgress: 0, complete: 0, archived: 0 };
+    const active = fichas.filter((f) => !f.archived);
     return {
-      total:      fichas.length,
-      draft:      fichas.filter((f) => f.status === 'draft').length,
-      inProgress: fichas.filter((f) => f.status === 'in_progress').length,
-      complete:   fichas.filter((f) => f.status === 'complete').length,
+      total:      active.length,
+      draft:      active.filter((f) => f.status === 'draft').length,
+      inProgress: active.filter((f) => f.status === 'in_progress').length,
+      complete:   active.filter((f) => f.status === 'complete').length,
+      archived:   fichas.filter((f) => f.archived).length,
     };
   }, [fichas]);
 
@@ -475,12 +478,13 @@ export function FichasTecnicasClient() {
 
       {/* Stats */}
       {!isLoading && fichas && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: 'Total',        value: stats.total,      color: '#374151' },
             { label: 'Borradores',   value: stats.draft,      color: 'rgba(0,0,0,0.3)' },
             { label: 'En progreso',  value: stats.inProgress, color: '#7F77DD' },
             { label: 'Completas',    value: stats.complete,   color: '#1D9E75' },
+            { label: 'Archivadas',   value: stats.archived,   color: '#F59E0B' },
           ].map((s) => (
             <div key={s.label} className="card px-4 py-3 flex items-center gap-3">
               <span className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</span>
