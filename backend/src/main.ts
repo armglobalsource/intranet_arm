@@ -78,7 +78,8 @@ async function bootstrap() {
   // ── Graceful shutdown (Cloud Run envía SIGTERM) ───────────────
   app.enableShutdownHooks();
 
-  const port = config.get<number>('PORT', 3001);
+  // Cloud Run inyecta PORT dinámicamente (ej: 8080). Localmente cae a 3001.
+  const port = parseInt(process.env.PORT ?? '') || config.get<number>('PORT', 3001);
   await app.listen(port, '0.0.0.0');
   console.log(`Backend escuchando en puerto ${port}`);
 
