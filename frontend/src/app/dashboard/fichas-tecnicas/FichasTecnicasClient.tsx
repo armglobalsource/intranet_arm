@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useFichas, useDeleteFicha } from '@/hooks/useFichas';
+import { useFichas, useDeleteFicha, useArchiveFicha } from '@/hooks/useFichas';
 import { CloneModal } from '@/components/fichas/CloneModal';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -120,14 +120,20 @@ function ProgressBar({ completionStatus }: { completionStatus: Record<string, bo
 
 // ── FichaCard ─────────────────────────────────────────────────────────────────
 
-function FichaCard({ ficha, canDelete, onClone }: { ficha: FichaListItem; canDelete: boolean; onClone?: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  const [copied,     setCopied]     = useState(false);
-  const { mutate: deleteFicha, isPending: deleting } = useDeleteFicha();
+function FichaCard({ ficha, canDelete, canArchive, onClone }: { ficha: FichaListItem; canDelete: boolean; canArchive?: boolean; onClone?: () => void }) {
+  const [confirming,         setConfirming]         = useState(false);
+  const [confirmingArchive,  setConfirmingArchive]  = useState(false);
+  const [copied,             setCopied]             = useState(false);
+  const { mutate: deleteFicha,  isPending: deleting  } = useDeleteFicha();
+  const { mutate: archiveFicha, isPending: archiving } = useArchiveFicha();
   const isComplete = ficha.status === 'complete';
 
   function handleDelete() {
     deleteFicha(ficha.fichaId, { onSuccess: () => setConfirming(false) });
+  }
+
+  function handleArchive() {
+    archiveFicha(ficha.fichaId, { onSuccess: () => setConfirmingArchive(false) });
   }
 
   function handleShare() {
@@ -176,6 +182,26 @@ function FichaCard({ ficha, canDelete, onClone }: { ficha: FichaListItem; canDel
       </div>
 
       <ProgressBar completionStatus={ficha.completionStatus} />
+
+      {/* Confirmación de archivo */}
+      {confirmingArchive && (
+        <div className="rounded-lg p-3 flex flex-col gap-2"
+          style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
+          <p className="text-xs font-medium" style={{ color: '#FCD34D' }}>¿Archivar esta ficha? Se ocultará del listado principal.</p>
+          <div className="flex gap-2">
+            <button onClick={handleArchive} disabled={archiving}
+              className="flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              style={{ background: 'rgba(251,191,36,0.2)', color: '#F59E0B', border: '1px solid rgba(251,191,36,0.3)' }}>
+              {archiving ? 'Archivando…' : 'Sí, archivar'}
+            </button>
+            <button onClick={() => setConfirmingArchive(false)}
+              className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors"
+              style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Confirmación de eliminación */}
       {confirming && (
@@ -256,9 +282,30 @@ function FichaCard({ ficha, canDelete, onClone }: { ficha: FichaListItem; canDel
           )}
         </button>
 
+        {/* Archivar */}
+        {canArchive && (
+          <button
+            onClick={() => { setConfirming(false); setConfirmingArchive((v) => !v); }}
+            title="Archivar ficha"
+            className="px-2.5 py-1.5 rounded-lg transition-colors"
+            style={{
+              background: confirmingArchive ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.07)',
+              color:      confirmingArchive ? '#F59E0B' : 'rgba(255,255,255,0.35)',
+              border:     `1px solid ${confirmingArchive ? 'rgba(251,191,36,0.25)' : 'rgba(255,255,255,0.1)'}`,
+            }}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="21 8 21 21 3 21 3 8" />
+              <rect x="1" y="3" width="22" height="5" />
+              <line x1="10" y1="12" x2="14" y2="12" />
+            </svg>
+          </button>
+        )}
+
         {canDelete && (
           <button
-            onClick={() => setConfirming((v) => !v)}
+            onClick={() => { setConfirmingArchive(false); setConfirming((v) => !v); }}
             className="px-2.5 py-1.5 rounded-lg transition-colors"
             title="Eliminar ficha"
             style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.1)' }}
@@ -283,11 +330,13 @@ function CampusGroup({
   campusName,
   fichas,
   canDelete,
+  canArchive,
   onClone,
 }: {
   campusName: string;
   fichas: FichaListItem[];
   canDelete: boolean;
+  canArchive?: boolean;
   onClone?: (ficha: FichaListItem) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -346,7 +395,7 @@ function CampusGroup({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
               {fichas.map((f) => (
-                <FichaCard key={f.fichaId} ficha={f} canDelete={canDelete} onClone={onClone ? () => onClone(f) : undefined} />
+                <FichaCard key={f.fichaId} ficha={f} canDelete={canDelete} canArchive={canArchive} onClone={onClone ? () => onClone(f) : undefined} />
               ))}
             </div>
           )}
@@ -583,6 +632,7 @@ export function FichasTecnicasClient() {
               campusName={name}
               fichas={grouped[name]}
               canDelete={canDelete}
+              canArchive={canDelete}
               onClone={canClone ? (f) => setCloneTarget(f) : undefined}
             />
           ))}
