@@ -44,6 +44,11 @@ export class ContentsController {
   @Get('news/campus')
   @ApiOperation({ summary: 'Noticias del campus del usuario' })
   findCampus(@CurrentUser() user: any) {
+    // Admin sin campus asignado: ve todas las noticias de campus
+    const isAdmin = (user?.permissions ?? []).includes('*');
+    if (isAdmin && !user?.campusId) {
+      return this.service.findPublished('campus', undefined, true);
+    }
     const campusId = user?.campusId ? String(user.campusId) : undefined;
     return this.service.findPublished('campus', campusId);
   }

@@ -106,9 +106,9 @@ function MiFichaIcon({ active }: { active: boolean }) {
 }
 
 function StatsIcon({ active }: { active: boolean }) {
-  const c = active ? '#fff' : 'rgba(255,255,255,0.35)';
+  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
   return (
-    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="20" x2="18" y2="10" />
       <line x1="12" y1="20" x2="12" y2="4" />
@@ -148,16 +148,17 @@ const NAV: NavGroup[] = [
       { href: '/dashboard/mis-fichas', label: 'Mis Fichas', icon: MiFichaIcon },
     ],
   },
-  { href: '/dashboard/orgchart', label: 'Organigrama', icon: OrgIcon },
   {
     href:  '/dashboard/produccion-general',
     label: 'Producción General',
     icon:  ProduccionIcon,
     children: [
-      { href: '/dashboard/produccion-general/noticias',     label: 'Noticias',      icon: NoticiasIcon },
-      { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon    },
+      { href: '/dashboard/fichas-tecnicas',             label: 'Fichas Técnicas', icon: FichaIcon    },
+      { href: '/dashboard/produccion-general/noticias', label: 'Noticias',        icon: NoticiasIcon },
     ],
   },
+  { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon   },
+  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon },
 ];
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────

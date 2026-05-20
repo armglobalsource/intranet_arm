@@ -236,7 +236,7 @@ function FichaCard({ ficha, campusColor }: { ficha: FichaListItem; campusColor: 
 // ── CampusSection ─────────────────────────────────────────────────────────────
 
 function CampusSection({ campusName, fichas }: { campusName: string; fichas: FichaListItem[] }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const palette = campusPalette(campusName);
   const completas = fichas.filter((f) => f.status === 'complete').length;
   const proximas  = fichas.filter((f) => isUpcoming(f.date)).length;

@@ -34,10 +34,14 @@ export class ContentsService {
     return list;
   }
 
-  async findPublished(scope: 'global' | 'campus', campusId?: string) {
+  async findPublished(scope: 'global' | 'campus', campusId?: string, allCampuses = false) {
     const all = (await this.fetchAll()).filter((n) => n.type === 'news' && n.status === 'published');
     if (scope === 'global') return all.filter((n) => n.campusId == null).slice(0, 10);
-    if (scope === 'campus') return campusId ? all.filter((n) => n.campusId === campusId).slice(0, 10) : [];
+    if (scope === 'campus') {
+      // Admin sin campus asignado: devuelve todas las noticias de campus
+      if (allCampuses) return all.filter((n) => n.campusId != null).slice(0, 10);
+      return campusId ? all.filter((n) => String(n.campusId) === String(campusId)).slice(0, 10) : [];
+    }
     return [];
   }
 
