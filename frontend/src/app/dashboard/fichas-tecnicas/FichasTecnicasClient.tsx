@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFichas, useDeleteFicha } from '@/hooks/useFichas';
+import { CloneModal } from '@/components/fichas/CloneModal';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useActiveCampuses } from '@/hooks/useCampus';
@@ -119,7 +120,7 @@ function ProgressBar({ completionStatus }: { completionStatus: Record<string, bo
 
 // ── FichaCard ─────────────────────────────────────────────────────────────────
 
-function FichaCard({ ficha, canDelete }: { ficha: FichaListItem; canDelete: boolean }) {
+function FichaCard({ ficha, canDelete, onClone }: { ficha: FichaListItem; canDelete: boolean; onClone?: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const [copied,     setCopied]     = useState(false);
   const { mutate: deleteFicha, isPending: deleting } = useDeleteFicha();
@@ -216,6 +217,22 @@ function FichaCard({ ficha, canDelete }: { ficha: FichaListItem; canDelete: bool
           </Link>
         )}
 
+        {/* Duplicar */}
+        {onClone && (
+          <button
+            onClick={onClone}
+            title="Duplicar ficha"
+            className="px-2.5 py-1.5 rounded-lg transition-all"
+            style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          </button>
+        )}
+
         {/* Compartir */}
         <button
           onClick={handleShare}
@@ -266,10 +283,12 @@ function CampusGroup({
   campusName,
   fichas,
   canDelete,
+  onClone,
 }: {
   campusName: string;
   fichas: FichaListItem[];
   canDelete: boolean;
+  onClone?: (ficha: FichaListItem) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const totalPct = fichas.length
@@ -327,7 +346,7 @@ function CampusGroup({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
               {fichas.map((f) => (
-                <FichaCard key={f.fichaId} ficha={f} canDelete={canDelete} />
+                <FichaCard key={f.fichaId} ficha={f} canDelete={canDelete} onClone={onClone ? () => onClone(f) : undefined} />
               ))}
             </div>
           )}
@@ -358,7 +377,10 @@ export function FichasTecnicasClient() {
   const { data: campusList = [] } = useActiveCampuses();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [search, setSearch] = useState('');
+  const [search,       setSearch]       = useState('');
+  const [cloneTarget,  setCloneTarget]  = useState<FichaListItem | null>(null);
+
+  const canClone = isAdmin || can('fichas:create') || can('fichas:admin');
 
   // Mapa de normalización: id numérico → nombre canónico
   // y nombre normalizado → nombre canónico
@@ -552,9 +574,20 @@ export function FichasTecnicasClient() {
       ) : (
         <div className="space-y-4">
           {campusNames.map((name) => (
-            <CampusGroup key={name} campusName={name} fichas={grouped[name]} canDelete={canDelete} />
+            <CampusGroup
+              key={name}
+              campusName={name}
+              fichas={grouped[name]}
+              canDelete={canDelete}
+              onClone={canClone ? (f) => setCloneTarget(f) : undefined}
+            />
           ))}
         </div>
+      )}
+
+      {/* Modal de clonación */}
+      {cloneTarget && (
+        <CloneModal ficha={cloneTarget} onClose={() => setCloneTarget(null)} />
       )}
     </div>
   );

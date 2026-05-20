@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { FichasService } from './fichas.service';
-import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto } from './dto/ficha.dto';
+import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto } from './dto/ficha.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('fichas')
@@ -53,8 +53,12 @@ export class FichasController {
   }
 
   @Post(':fichaId/clone')
-  clone(@Param('fichaId') fichaId: string, @CurrentUser() user: any) {
-    return this.fichasService.clone(fichaId, user.sub, user.email);
+  clone(
+    @Param('fichaId') fichaId: string,
+    @Body()           dto: CloneFichaDto,
+    @CurrentUser()    user: any,
+  ) {
+    return this.fichasService.clone(fichaId, user.sub, user.email, dto);
   }
 
   @Patch(':fichaId/sections/:sectionName')

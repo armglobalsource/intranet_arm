@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
-import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto } from './dto/ficha.dto';
+import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto } from './dto/ficha.dto';
 
 const COL = 'fichas';
 
@@ -308,23 +308,41 @@ export class FichasService {
     return { fichaId };
   }
 
-  async clone(fichaId: string, userId: number, userName: string) {
+  async clone(fichaId: string, userId: number, userName: string, dto: CloneFichaDto = {}) {
     const original = await this.findOne(fichaId);
     const ref   = this.fb.db.collection(COL).doc();
     const newId = ref.id;
     const sections = JSON.parse(JSON.stringify(original.sections));
+
     for (const name of SECTIONS) {
       if (sections[name]) {
         sections[name].isCompleted = false;
         sections[name].completedBy = null;
         sections[name].completedAt = null;
         sections[name].rows = (sections[name].rows ?? []).map((r: any) => ({ ...r, values: {} }));
+        // Limpiar responsables solo si no se pidió conservarlos
+        if (!dto.keepAssignees) {
+          sections[name].assignedTo   = null;
+          sections[name].assignedName = null;
+        }
       }
     }
+
+    // Generar título automático si se provee fecha
+    let title = dto.title ?? `${original.title} (copia)`;
+    if (!dto.title && dto.date) {
+      const d = new Date(dto.date);
+      const dateStr = d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+      // Usar el título base quitando cualquier "(copia)" previo
+      const baseTitle = original.title.replace(/\s*\(copia\).*$/, '').trim();
+      title = `${baseTitle} — ${dateStr}`;
+    }
+
     const doc = {
       ...original,
       fichaId:          newId,
-      title:            `${original.title} (copia)`,
+      title,
+      date:             dto.date ? this.fb.ts(new Date(dto.date)) : original.date,
       sections,
       completionStatus: buildDefaultCompletion(original.type ?? 'multi'),
       status:           'draft',

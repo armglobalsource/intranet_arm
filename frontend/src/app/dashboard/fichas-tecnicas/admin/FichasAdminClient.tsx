@@ -3,7 +3,8 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useFichas, useCreateFicha, useDeleteFicha, useCloneFicha } from '@/hooks/useFichas';
+import { useFichas, useCreateFicha, useDeleteFicha } from '@/hooks/useFichas';
+import { CloneModal } from '@/components/fichas/CloneModal';
 import { usePermissions } from '@/hooks/usePermissions';
 import { statusColor, statusLabel, completionPercent } from '@/types/ficha';
 import type { FichaListItem, FichaType, Encuentro } from '@/types/ficha';
@@ -504,19 +505,11 @@ export function FichasAdminClient() {
   const router = useRouter();
   const { isAdmin, can } = usePermissions();
   const { data: fichas, isLoading } = useFichas();
-  const { mutate: cloneFicha }  = useCloneFicha();
   const { mutate: deleteFicha } = useDeleteFicha();
 
-  const canAccess = isAdmin || can('fichas:admin') || can('fichas:create');
+  const [cloneTarget, setCloneTarget] = useState<import('@/types/ficha').FichaListItem | null>(null);
 
-  function handleClone(fichaId: string) {
-    cloneFicha(fichaId, {
-      onSuccess: (data) => {
-        const newId = data?.fichaId ?? data?.id;
-        if (newId) router.push(`/dashboard/fichas-tecnicas/${newId}`);
-      },
-    });
-  }
+  const canAccess = isAdmin || can('fichas:admin') || can('fichas:create');
 
   function handleDelete(fichaId: string) {
     deleteFicha(fichaId);
@@ -539,6 +532,7 @@ export function FichasAdminClient() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
@@ -595,7 +589,7 @@ export function FichasAdminClient() {
                     <FichaRow
                       key={f.fichaId}
                       ficha={f}
-                      onClone={handleClone}
+                      onClone={(id) => setCloneTarget(fichas?.find((f) => f.fichaId === id) ?? null)}
                       onDelete={handleDelete}
                     />
                   ))}
@@ -606,5 +600,11 @@ export function FichasAdminClient() {
         </div>
       </div>
     </div>
+
+    {/* Modal de clonación */}
+    {cloneTarget && (
+      <CloneModal ficha={cloneTarget} onClose={() => setCloneTarget(null)} />
+    )}
+    </>
   );
 }

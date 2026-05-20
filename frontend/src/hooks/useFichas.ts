@@ -95,10 +95,18 @@ export function useDeleteFicha() {
   });
 }
 
+export interface CloneFichaOptions {
+  fichaId:        string;
+  date?:          string;   // ISO date string
+  keepAssignees?: boolean;
+  title?:         string;
+}
+
 export function useCloneFicha() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (fichaId: string) => api.post(`/fichas/${fichaId}/clone`).then(r => r.data),
+    mutationFn: ({ fichaId, ...dto }: CloneFichaOptions) =>
+      api.post(`/fichas/${fichaId}/clone`, dto).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
   });
 }

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsIn, IsArray, ValidateNested, IsBoolean, IsNumber, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsArray, ValidateNested, IsBoolean, IsNumber, IsObject, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class EncuentroDto {
@@ -23,6 +23,12 @@ export class UpdateFichaDto {
   @IsOptional() @IsString() title?: string;
   @IsOptional() @IsString() date?: string;
   @IsOptional() @IsIn(['draft', 'in_progress', 'complete']) status?: string;
+}
+
+export class CloneFichaDto {
+  @IsOptional() @IsDateString() date?: string;
+  @IsOptional() @IsBoolean()    keepAssignees?: boolean;
+  @IsOptional() @IsString()     title?: string;
 }
 
 export class RowValueDto {
