@@ -69,6 +69,20 @@ jobs:
           service: ${{ secrets.CLOUD_RUN_BACKEND }}
           region: ${{ env.REGION }}
           image: ${{ env.IMAGE }}:${{ github.sha }}
+          env_vars: |
+            NODE_ENV=production
+            PORT=3001
+            FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_ACCESS_TTL=900
+            JWT_REFRESH_TTL=28800
+            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+            STORAGE=gcs
+            GCS_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+            GCS_BUCKET_DOCUMENTS=${{ secrets.GCS_BUCKET_DOCUMENTS }}
+            GCS_BUCKET_AVATARS=${{ secrets.GCS_BUCKET_AVATARS }}
+            BACKEND_URL=${{ secrets.BACKEND_URL }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
 
       - name: Verify deployment
         run: |
