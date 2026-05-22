@@ -38,12 +38,13 @@ export const MINISTERIAL_PREFIX: Record<MinisterialTitle, string> = {
 };
 
 /** Devuelve el prefijo abreviado del nombramiento, o cadena vacía */
-export function ministerialPrefix(u: { ministerialTitle?: MinisterialTitle | null }): string {
-  return u.ministerialTitle ? MINISTERIAL_PREFIX[u.ministerialTitle] : '';
+export function ministerialPrefix(u: { ministerialTitle?: string | null }): string {
+  const t = u.ministerialTitle as MinisterialTitle | null | undefined;
+  return t ? (MINISTERIAL_PREFIX[t] ?? '') : '';
 }
 
 /** Nombre completo con prefijo ministerial antepuesto si aplica */
-export function displayName(u: { firstName: string; lastName?: string | null; ministerialTitle?: MinisterialTitle | null }): string {
+export function displayName(u: { firstName: string; lastName?: string | null; ministerialTitle?: string | null }): string {
   const prefix = ministerialPrefix(u);
   const name   = [u.firstName, u.lastName].filter(Boolean).join(' ');
   return prefix ? `${prefix} ${name}` : name;
