@@ -25,7 +25,7 @@ function GoogleCallbackInner() {
     api.get('/auth/me', { headers: { Authorization: `Bearer ${access}` } })
       .then((res) => {
         setSession(res.data, access, refresh, false);
-        router.replace('/dashboard/orgchart');
+        router.replace('/dashboard');
       })
       .catch(() => router.replace('/auth/login?error=oauth_failed'));
   }, [params, router, setSession]);

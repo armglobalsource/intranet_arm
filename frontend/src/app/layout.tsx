@@ -6,7 +6,7 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: { default: 'Intranet Corporativa', template: '%s | Intranet' },
+  title: { default: 'Ecosistema ARM', template: '%s | Ecosistema' },
   description: 'Portal interno corporativo',
   robots: { index: false },
 };

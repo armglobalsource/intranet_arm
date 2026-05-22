@@ -12,6 +12,7 @@ interface User {
   bio?: string | null;
   birthDate?: string | null;
   gender?: string | null;
+  ministerialTitle?: string | null;
   campusId?: number | null;
   campus?: { id: number; name: string; address?: string | null } | null;
   role: { name: string };

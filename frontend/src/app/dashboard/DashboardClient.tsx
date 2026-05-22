@@ -5,6 +5,7 @@ import { useMiFichas } from '@/hooks/useFichas';
 import { useNoticiasGlobal, useNoticiasCampus } from '@/hooks/useNoticias';
 import type { Noticia } from '@/hooks/useNoticias';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { displayName } from '@/types/user';
 import { CalendarioAnual } from './CalendarioAnual';
 
 // ── Helper fecha ──────────────────────────────────────────────────────────────
@@ -168,7 +169,7 @@ export function DashboardClient() {
           )}
           <div className="min-w-0">
             <p className="text-sm font-bold text-gray-900 truncate leading-tight">
-              {user ? `${user.firstName} ${user.lastName}` : '—'}
+              {user ? displayName(user) : '—'}
             </p>
             <p className="text-xs text-gray-400 truncate mt-0.5">{user?.role?.name ?? 'Sin rol'}</p>
             {user?.campus?.name && (

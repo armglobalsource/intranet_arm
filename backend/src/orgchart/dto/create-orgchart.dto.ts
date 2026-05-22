@@ -13,6 +13,7 @@ export class CreateOrgAreaDto {
 export class UpdateOrgAreaDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(2) @MaxLength(150) name?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() desc?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() leaderDesc?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(20) color?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(10) icon?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() sortOrder?: number;

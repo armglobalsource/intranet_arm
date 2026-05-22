@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { useUpdateUser, useUploadUserAvatar } from '@/hooks/useUsers';
 import { useActiveCampuses } from '@/hooks/useCampus';
 import type { UserGender } from '@/types/user';
+import { displayName } from '@/types/user';
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 
@@ -314,7 +315,7 @@ export default function PerfilPage() {
             <div className="pb-1 flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h1 className="text-[22px] font-bold text-white leading-none">
-                  {user.firstName} {user.lastName}
+                  {displayName(user)}
                 </h1>
                 {user.role?.name && <Badge label={user.role.name} color="indigo" />}
               </div>
@@ -399,7 +400,7 @@ export default function PerfilPage() {
             ) : (
               <div>
                 <div className="space-y-0 divide-y divide-[#1a1a1a]">
-                  <Row label="Nombre completo" value={`${user.firstName} ${user.lastName}`} />
+                  <Row label="Nombre completo" value={displayName(user)} />
                   <Row label="Email" value={user.email} mono />
                   {user.phone     && <Row label="Teléfono"    value={user.phone} />}
                   {user.country   && <Row label="País"        value={user.country} />}

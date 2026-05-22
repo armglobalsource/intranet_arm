@@ -26,7 +26,7 @@ export default function LoginPage() {
   // If already logged in, skip the login page
   useEffect(() => {
     if (hasHydrated && isAuthenticated) {
-      router.replace('/dashboard/orgchart');
+      router.replace('/dashboard');
     }
   }, [hasHydrated, isAuthenticated, router]);
 
@@ -41,7 +41,7 @@ export default function LoginPage() {
     try {
       const res = await api.post('/auth/login', data);
       setSession(res.data.user, res.data.accessToken, res.data.refreshToken);
-      router.replace('/dashboard/orgchart');
+      router.replace('/dashboard');
     } catch (err: any) {
       setError('root', {
         message: apiErrorMessage(err, 'Email o contraseña incorrectos'),

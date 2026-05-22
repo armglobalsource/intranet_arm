@@ -13,11 +13,13 @@ import {
 import { useAllJobTitles, useCreateJobTitle } from '@/hooks/useJobTitles';
 import type { JobTitle }                      from '@/hooks/useJobTitles';
 import { useActiveCampuses }                  from '@/hooks/useCampus';
-import type { User, UpdateUserDto } from '@/types/user';
+import type { User, UpdateUserDto, MinisterialTitle } from '@/types/user';
+import { MINISTERIAL_LABEL, MINISTERIAL_PREFIX, displayName } from '@/types/user';
 import type { CreateUserDto }                 from '@/hooks/useUsers';
 import { userJobTitleNames } from '@/types/user';
 import { useOrgAllTeams, useCreateOrgMembership, useDeleteOrgMembership, useOrgUserProfile } from '@/hooks/useOrgChart';
 import { api } from '@/lib/api';
+import CountryPicker from '@/components/CountryPicker';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -163,29 +165,68 @@ function CampusSelect({ value, onChange }: CampusSelectProps) {
   );
 }
 
-// ── TeamSelect ────────────────────────────────────────────────────────────────
+// ── TeamSelect (autocomplete) ─────────────────────────────────────────────────
 
 interface TeamSelectProps {
-  value:       number | null;
-  onChange:    (id: number | null) => void;
-  excludeIds?: Set<number>;
+  value:        number | null;
+  onChange:     (id: number | null) => void;
+  excludeIds?:  Set<number>;
   placeholder?: string;
 }
 
-function TeamSelect({ value, onChange, excludeIds, placeholder = 'Sin equipo asignado' }: TeamSelectProps) {
+function TeamSelect({ value, onChange, excludeIds, placeholder = 'Buscar equipo…' }: TeamSelectProps) {
   const { data: teams = [] } = useOrgAllTeams();
-  const activeTeams = teams.filter((t) => t.isActive && (!excludeIds || !excludeIds.has(t.id)));
+  const [input, setInput]   = useState('');
+  const [open,  setOpen]    = useState(false);
+
+  const activeTeams  = teams.filter((t) => t.isActive && (!excludeIds || !excludeIds.has(t.id)));
+  const selectedTeam = activeTeams.find((t) => t.id === value) ?? null;
+
+  const teamLabel = (t: typeof activeTeams[0]) => `${t.icon ? `${t.icon} ` : ''}${t.name}`;
+
+  const filtered = activeTeams
+    .filter((t) => teamLabel(t).toLowerCase().includes(input.toLowerCase()))
+    .slice(0, 8);
+
+  const showDrop = open && filtered.length > 0;
+
   return (
-    <select
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition bg-white"
-    >
-      <option value="">{placeholder}</option>
-      {activeTeams.map((t) => (
-        <option key={t.id} value={t.id}>{t.icon ? `${t.icon} ` : ''}{t.name}</option>
-      ))}
-    </select>
+    <div className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={selectedTeam ? teamLabel(selectedTeam) : input}
+          onChange={(e) => { setInput(e.target.value); onChange(null); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={placeholder}
+          autoComplete="off"
+          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition pr-7"
+        />
+        {value && (
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); onChange(null); setInput(''); }}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-base leading-none"
+          >×</button>
+        )}
+      </div>
+
+      {showDrop && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+          {filtered.map((team) => (
+            <button
+              key={team.id}
+              type="button"
+              onMouseDown={() => { onChange(team.id); setInput(''); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
+            >
+              {teamLabel(team)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -207,19 +248,20 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
 
   const currentJobTitleIds = user.jobTitles.map((jt) => jt.jobTitle.id);
 
-  const [firstName,   setFirstName]   = useState(user.firstName);
-  const [lastName,    setLastName]    = useState(user.lastName);
-  const [email,       setEmail]       = useState(user.email);
+  const [firstName,   setFirstName]   = useState(user.firstName ?? '');
+  const [lastName,    setLastName]    = useState(user.lastName  ?? '');
+  const [email,       setEmail]       = useState(user.email     ?? '');
   const [password,    setPassword]    = useState('');
   const [showPass,    setShowPass]    = useState(false);
   const [roleId,      setRoleId]      = useState(user.role?.id ?? 0);
-  const [phone,       setPhone]       = useState(user.phone ?? '');
-  const [country,     setCountry]     = useState(user.country ?? '');
-  const [bio,         setBio]         = useState(user.bio ?? '');
-  const [campusId,    setCampusId]    = useState<number | null>(user.campusId ?? null);
-  const [jobTitleIds, setJobTitleIds] = useState<number[]>(currentJobTitleIds);
-  const [saveState,   setSaveState]   = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [errorMsg,    setErrorMsg]    = useState('');
+  const [phone,             setPhone]             = useState(user.phone ?? '');
+  const [country,           setCountry]           = useState(user.country ?? '');
+  const [bio,               setBio]               = useState(user.bio ?? '');
+  const [campusId,          setCampusId]          = useState<number | null>(user.campusId ?? null);
+  const [jobTitleIds,       setJobTitleIds]       = useState<number[]>(currentJobTitleIds);
+  const [ministerialTitle,  setMinisterialTitle]  = useState<MinisterialTitle | null>(user.ministerialTitle ?? null);
+  const [saveState,         setSaveState]         = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [errorMsg,          setErrorMsg]          = useState('');
 
   const [addTeamId,  setAddTeamId]  = useState<number | null>(null);
   const [addingTeam, setAddingTeam] = useState(false);
@@ -231,16 +273,17 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
     setSaveState('saving');
     setErrorMsg('');
     const payload: UpdateUserDto = {
-      firstName:   firstName.trim()        || undefined,
-      lastName:    lastName.trim()         || undefined,
-      email:       email.trim()            || undefined,
-      password:    password.length >= 6 ? password : undefined,
-      roleId:      roleId > 0 ? roleId     : undefined,
-      phone:       phone.trim()            || undefined,
-      country:     country.trim()          || undefined,
-      bio:         bio.trim()              || undefined,
+      firstName:        firstName.trim()        || undefined,
+      lastName:         lastName.trim()         || undefined,
+      email:            email.trim()            || undefined,
+      password:         password.length >= 6 ? password : undefined,
+      roleId:           roleId > 0 ? roleId     : undefined,
+      phone:            phone.trim()            || undefined,
+      country:          country.trim()          || undefined,
+      bio:              bio.trim()              || undefined,
       campusId,
       jobTitleIds,
+      ministerialTitle: ministerialTitle ?? null,
     };
     updateUser.mutate({ id: user.id, data: payload }, {
       onSuccess: () => { setSaveState('saved'); setTimeout(onClose, 800); },
@@ -283,7 +326,7 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
             : <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-[13px]" style={{ background: bg, color: text }}>{userInitials(user)}</div>
           }
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-slate-900 text-[14px] truncate">{user.firstName} {user.lastName}</p>
+            <p className="font-semibold text-slate-900 text-[14px] truncate">{displayName(user)}</p>
             <p className="text-[11px] text-slate-400 mt-0.5">Editar información completa</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 text-sm">✕</button>
@@ -342,6 +385,20 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
             </select>
           </div>
 
+          <div>
+            <label className={labelCls}>Nombramiento ministerial <span className="text-slate-300 font-normal">— opcional</span></label>
+            <select
+              value={ministerialTitle ?? ''}
+              onChange={(e) => setMinisterialTitle((e.target.value as MinisterialTitle) || null)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white"
+            >
+              <option value="">Sin nombramiento</option>
+              {(Object.entries(MINISTERIAL_LABEL) as [MinisterialTitle, string][]).map(([val, label]) => (
+                <option key={val} value={val}>{label} ({MINISTERIAL_PREFIX[val]})</option>
+              ))}
+            </select>
+          </div>
+
           <div className="border-t border-slate-100" />
 
           <p className={sectionCls}>Perfil</p>
@@ -368,7 +425,7 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
             </div>
             <div>
               <label className={labelCls}>País</label>
-              <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className={inputCls} placeholder="Colombia, Chile..." />
+              <CountryPicker value={country} onChange={setCountry} placeholder="Chile, Colombia…" />
             </div>
           </div>
 
@@ -472,16 +529,25 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
   const [password,    setPassword]    = useState('');
   const [firstName,   setFirstName]   = useState('');
   const [lastName,    setLastName]    = useState('');
-  const [roleId,      setRoleId]      = useState(0);
-  const [campusId,    setCampusId]    = useState<number | null>(null);
-  const [teamId,      setTeamId]      = useState<number | null>(null);
-  const [jobTitleIds, setJobTitleIds] = useState<number[]>([]);
-  const [phone,       setPhone]       = useState('');
-  const [country,     setCountry]     = useState('');
-  const [bio,         setBio]         = useState('');
-  const [showPass,    setShowPass]    = useState(false);
-  const [saveState,   setSaveState]   = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [errorMsg,    setErrorMsg]    = useState('');
+  const [roleId,            setRoleId]            = useState(0);
+  const [campusId,          setCampusId]          = useState<number | null>(null);
+  const [teamId,            setTeamId]            = useState<number | null>(null);
+  const [jobTitleIds,       setJobTitleIds]       = useState<number[]>([]);
+  const [phone,             setPhone]             = useState('');
+  const [country,           setCountry]           = useState('');
+  const [bio,               setBio]               = useState('');
+  const [ministerialTitle,  setMinisterialTitle]  = useState<MinisterialTitle | null>(null);
+  const [showPass,          setShowPass]          = useState(false);
+  const [saveState,         setSaveState]         = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [errorMsg,          setErrorMsg]          = useState('');
+
+  // Auto-select "usuario" role when roles load
+  useEffect(() => {
+    if (roles.length > 0 && roleId === 0) {
+      const userRole = roles.find((r) => ['user', 'usuario'].includes(r.name.toLowerCase()));
+      if (userRole) setRoleId(userRole.id);
+    }
+  }, [roles, roleId]);
 
   const canSubmit = email.trim() && firstName.trim() && lastName.trim() && roleId > 0;
 
@@ -493,11 +559,12 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
       email: email.trim(), password: password || undefined,
       firstName: firstName.trim(), lastName: lastName.trim(),
       roleId,
-      campusId:    campusId    ?? undefined,
-      jobTitleIds: jobTitleIds.length ? jobTitleIds : undefined,
-      phone:   phone.trim()   || undefined,
-      country: country.trim() || undefined,
-      bio:     bio.trim()     || undefined,
+      campusId:         campusId    ?? undefined,
+      jobTitleIds:      jobTitleIds.length ? jobTitleIds : undefined,
+      phone:            phone.trim()   || undefined,
+      country:          country.trim() || undefined,
+      bio:              bio.trim()     || undefined,
+      ministerialTitle: ministerialTitle ?? undefined,
     };
     createUser.mutate(payload, {
       onSuccess: (newUser) => {
@@ -583,6 +650,22 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
             </select>
           </div>
 
+          <div>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Nombramiento ministerial <span className="text-slate-300 font-normal">— opcional</span>
+            </label>
+            <select
+              value={ministerialTitle ?? ''}
+              onChange={(e) => setMinisterialTitle((e.target.value as MinisterialTitle) || null)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition bg-white"
+            >
+              <option value="">Sin nombramiento</option>
+              {(Object.entries(MINISTERIAL_LABEL) as [MinisterialTitle, string][]).map(([val, label]) => (
+                <option key={val} value={val}>{label} ({MINISTERIAL_PREFIX[val]})</option>
+              ))}
+            </select>
+          </div>
+
           <div className="border-t border-slate-100 pt-1" />
 
           <div>
@@ -619,8 +702,7 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
             </div>
             <div>
               <label className="block text-[11px] font-medium text-slate-500 mb-1">País</label>
-              <input type="text" value={country} onChange={(e) => setCountry(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition" placeholder="Colombia, Chile..." />
+              <CountryPicker value={country} onChange={setCountry} placeholder="Chile, Colombia…" />
             </div>
           </div>
 
@@ -692,7 +774,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isPending }: DeleteConf
             <p className="text-[15px] font-bold text-slate-900">¿Eliminar persona?</p>
             <p className="text-[12.5px] text-slate-500 mt-1.5 leading-relaxed">
               Estás a punto de eliminar a{' '}
-              <span className="font-semibold text-slate-700">{user.firstName} {user.lastName}</span>.
+              <span className="font-semibold text-slate-700">{displayName(user)}</span>.
               Esta acción no se puede deshacer.
             </p>
           </div>
@@ -704,7 +786,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isPending }: DeleteConf
               : <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-semibold" style={{ background: bg, color: text }}>{userInitials(user)}</div>
             }
             <div className="min-w-0 text-left">
-              <p className="text-[12px] font-semibold text-slate-800 truncate">{user.firstName} {user.lastName}</p>
+              <p className="text-[12px] font-semibold text-slate-800 truncate">{displayName(user)}</p>
               <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
             </div>
           </div>
@@ -1276,7 +1358,7 @@ export default function PersonasPage() {
         <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6" />
         </svg>
-        Directorio
+        Configuración
       </Link>
 
       {/* Header */}
@@ -1396,7 +1478,7 @@ export default function PersonasPage() {
                             : <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-[12px] font-semibold" style={{ background: bg, color: text }}>{userInitials(u)}</div>
                           }
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-900 truncate">{u.firstName} {u.lastName}</p>
+                            <p className="text-sm font-semibold text-slate-900 truncate">{displayName(u)}</p>
                             <p className="text-[11px] text-slate-400 truncate">{u.email}</p>
                           </div>
                         </div>

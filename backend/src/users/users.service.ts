@@ -95,9 +95,10 @@ export class UsersService {
       campusId:     dto.campusId ?? null,
       campus,
       jobTitles,
-      phone:        dto.phone?.trim()   ?? null,
-      country:      dto.country?.trim() ?? null,
-      bio:          dto.bio?.trim()     ?? null,
+      phone:             dto.phone?.trim()            ?? null,
+      country:           dto.country?.trim()          ?? null,
+      bio:               dto.bio?.trim()              ?? null,
+      ministerialTitle:  dto.ministerialTitle         ?? null,
       avatarUrl:    null,
       status:       'active',
       departmentId: null,
@@ -133,12 +134,13 @@ export class UsersService {
       data.lastName  = dto.lastName.trim();
       data.nameLower = `${dto.firstName ?? current.data()!.firstName} ${dto.lastName}`.toLowerCase();
     }
-    if (dto.phone     !== undefined) data.phone     = dto.phone?.trim()     ?? null;
-    if (dto.country   !== undefined) data.country   = dto.country?.trim()   ?? null;
-    if (dto.bio       !== undefined) data.bio       = dto.bio?.trim()       ?? null;
-    if (dto.birthDate !== undefined) data.birthDate = dto.birthDate?.trim() ?? null;
-    if (dto.gender    !== undefined) data.gender    = dto.gender            ?? null;
-    if (dto.status    !== undefined) data.status    = dto.status;
+    if (dto.phone             !== undefined) data.phone             = dto.phone?.trim()            ?? null;
+    if (dto.country           !== undefined) data.country           = dto.country?.trim()          ?? null;
+    if (dto.bio               !== undefined) data.bio               = dto.bio?.trim()              ?? null;
+    if (dto.birthDate         !== undefined) data.birthDate         = dto.birthDate?.trim()        ?? null;
+    if (dto.gender            !== undefined) data.gender            = dto.gender                   ?? null;
+    if (dto.status            !== undefined) data.status            = dto.status;
+    if (dto.ministerialTitle  !== undefined) data.ministerialTitle  = dto.ministerialTitle         ?? null;
     if (dto.campusId  !== undefined) {
       data.campusId = dto.campusId;
       if (dto.campusId) {

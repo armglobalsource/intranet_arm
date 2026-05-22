@@ -2,6 +2,12 @@
 
 import { useAuthStore } from '@/lib/store/auth.store';
 
+const MINISTERIAL_PREFIX_MAP: Record<string, string> = {
+  pastor_principal: 'Ps. Ppal.',
+  pastor:           'Ps.',
+  ministro:         'Min.',
+};
+
 export function Topbar() {
   const user = useAuthStore((s) => s.user);
 
@@ -9,7 +15,8 @@ export function Topbar() {
     ? (user.firstName[0] + user.lastName[0]).toUpperCase()
     : '?';
 
-  const fullName = user ? `${user.firstName} ${user.lastName}` : '';
+  const prefix   = user?.ministerialTitle ? MINISTERIAL_PREFIX_MAP[user.ministerialTitle] + ' ' : '';
+  const fullName = user ? `${prefix}${user.firstName} ${user.lastName}` : '';
 
   return (
     <header className="h-13 bg-white border-b border-gray-100 flex items-center px-6 gap-4 shrink-0">

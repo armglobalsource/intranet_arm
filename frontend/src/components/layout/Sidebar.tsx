@@ -157,7 +157,7 @@ const NAV: NavGroup[] = [
       { href: '/dashboard/produccion-general/noticias', label: 'Noticias',        icon: NoticiasIcon },
     ],
   },
-  { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon   },
+  { href: '/dashboard/orgchart',                        label: 'Organigramas',  icon: OrgIcon   },
   { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon },
 ];
 
@@ -184,7 +184,9 @@ export function Sidebar() {
   const initials = user
     ? ((user.firstName?.[0] ?? '') + (user.lastName?.[0] ?? '')).toUpperCase() || '??'
     : '??';
-  const fullName = user ? `${user.firstName} ${user.lastName}` : '';
+  const MINISTERIAL_PREFIX_MAP: Record<string, string> = { pastor_principal: 'Ps. Ppal.', pastor: 'Ps.', ministro: 'Min.' };
+  const prefix   = user?.ministerialTitle ? MINISTERIAL_PREFIX_MAP[user.ministerialTitle] + ' ' : '';
+  const fullName = user ? `${prefix}${user.firstName} ${user.lastName}` : '';
   const role     = user?.role?.name ?? '';
 
   async function handleLogout() {

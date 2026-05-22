@@ -81,7 +81,7 @@ function CompleteProfileInner() {
       if (res.data.user) updateUser(res.data.user);
       clearProfileCompletion();
       if (res.data.accessToken) setTokens(res.data.accessToken, res.data.refreshToken);
-      router.replace('/dashboard/orgchart');
+      router.replace('/dashboard');
     } catch (err: any) {
       setError('root', { message: apiErrorMessage(err, 'Error al guardar el perfil') });
     }
@@ -89,7 +89,7 @@ function CompleteProfileInner() {
 
   const handleSkip = () => {
     clearProfileCompletion();
-    router.replace('/dashboard/orgchart');
+    router.replace('/dashboard');
   };
 
   if (!hasHydrated || loading) return <Spinner />;
