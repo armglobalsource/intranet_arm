@@ -98,6 +98,7 @@ export class UsersService {
       phone:             dto.phone?.trim()            ?? null,
       country:           dto.country?.trim()          ?? null,
       bio:               dto.bio?.trim()              ?? null,
+      birthDate:         dto.birthDate?.trim()        ?? null,
       ministerialTitle:  dto.ministerialTitle         ?? null,
       avatarUrl:    null,
       status:       'active',

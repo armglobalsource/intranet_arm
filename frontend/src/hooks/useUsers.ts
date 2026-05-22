@@ -19,6 +19,7 @@ export interface CreateUserDto {
   phone?:             string;
   country?:           string;
   bio?:               string;
+  birthDate?:         string;
   ministerialTitle?:  'pastor_principal' | 'pastor' | 'ministro' | null;
 }
 

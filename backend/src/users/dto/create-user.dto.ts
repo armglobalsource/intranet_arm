@@ -19,6 +19,7 @@ export class CreateUserDto {
   @ApiProperty() @IsOptional() @IsString()                   phone?:              string;
   @ApiProperty() @IsOptional() @IsString()                   country?:            string;
   @ApiProperty() @IsOptional() @IsString()                   bio?:                string;
+  @ApiProperty() @IsOptional() @IsString()                   birthDate?:          string;
   @ApiProperty() @IsOptional() @IsEnum(['pastor_principal', 'pastor', 'ministro']) ministerialTitle?: MinisterialTitle | null;
 }
 
