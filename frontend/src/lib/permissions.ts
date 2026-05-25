@@ -97,15 +97,6 @@ export const PERMISSION_CATALOG = {
       admin:   'Administrar configuración de fichas',
     },
   },
-  fichas: {
-    label: 'Fichas técnicas',
-    description: 'Planificación y seguimiento de servicios y eventos',
-    actions: {
-      admin:  'Crear y eliminar fichas',
-      create: 'Crear nuevas fichas',
-      view:   'Ver fichas y sus secciones',
-    },
-  },
   events: {
     label: 'Eventos',
     description: 'Calendario de eventos de la organización',
