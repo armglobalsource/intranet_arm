@@ -32,6 +32,8 @@ async function bootstrap() {
       'http://localhost:3002',
       'https://intranet-arm.web.app',
       'https://intranet-arm-dev.web.app',
+      'https://ecosistema-arm.web.app',
+      'https://ecosistema-arm-dev.web.app',
     ]);
   app.enableCors({
     origin: (origin, callback) => {
