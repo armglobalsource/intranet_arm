@@ -481,7 +481,7 @@ export function FichasTecnicasClient() {
 
   const campusNames = Object.keys(grouped).sort((a, b) => grouped[b].length - grouped[a].length);
   const canCreate = isAdmin || can('fichas:create') || can('fichas:admin');
-  const canDelete = isAdmin || can('fichas:admin');
+  const canDelete = isAdmin || can('fichas:delete') || can('fichas:admin');
 
   // ── Stats rápidos ──────────────────────────────────────────────────────────
   const stats = useMemo(() => {

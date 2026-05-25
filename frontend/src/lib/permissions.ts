@@ -13,7 +13,7 @@ export const PERMISSION_CATALOG = {
     description: 'Cuentas de acceso de los colaboradores',
     actions: {
       view:   'Ver la lista de personas',
-      create: 'Invitar nuevas personas',
+      create: 'Crear nuevas personas',
       edit:   'Modificar datos de una persona',
       delete: 'Dar de baja una persona',
     },
@@ -53,12 +53,56 @@ export const PERMISSION_CATALOG = {
       manage: 'Administrar cursos y contenido del campus',
     },
   },
-  directory: {
-    label: 'Directorio',
-    description: 'Cargos y estructura organizacional',
+  areas: {
+    label: 'Áreas',
+    description: 'Ministerios y departamentos del organigrama',
     actions: {
-      view:   'Ver el directorio de la empresa',
-      manage: 'Administrar cargos y la estructura del directorio',
+      view:   'Ver las áreas',
+      create: 'Crear nuevas áreas',
+      edit:   'Modificar áreas existentes',
+      delete: 'Eliminar áreas',
+    },
+  },
+  equipos: {
+    label: 'Equipos',
+    description: 'Grupos de trabajo dentro de cada área',
+    actions: {
+      view:   'Ver los equipos',
+      create: 'Crear nuevos equipos',
+      edit:   'Modificar equipos existentes',
+      delete: 'Eliminar equipos',
+    },
+  },
+  campus: {
+    label: 'Campus',
+    description: 'Sedes y campus de la iglesia',
+    actions: {
+      view:   'Ver los campus',
+      create: 'Crear nuevos campus',
+      edit:   'Modificar campus existentes',
+      delete: 'Eliminar campus',
+    },
+  },
+  cargos: {
+    label: 'Cargos',
+    description: 'Catálogo de puestos del ministerio',
+    actions: {
+      view:   'Ver los cargos',
+      create: 'Crear nuevos cargos',
+      edit:   'Modificar cargos existentes',
+      delete: 'Eliminar cargos',
+    },
+  },
+  fichas: {
+    label: 'Fichas Técnicas',
+    description: 'Fichas técnicas de producción musical',
+    actions: {
+      view:    'Ver fichas propias',
+      viewAll: 'Ver fichas de todos los usuarios',
+      create:  'Crear nuevas fichas',
+      edit:    'Editar fichas existentes',
+      delete:  'Eliminar fichas',
+      admin:   'Administrar configuración de fichas',
     },
   },
 } as const;

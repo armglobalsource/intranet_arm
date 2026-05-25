@@ -119,6 +119,7 @@ export class RolesService implements OnModuleInit {
       description: dto.description?.trim() ?? null,
       isSystem:    false,
       isActive:    true,
+      permissions: [],
       createdAt:   this.fb.now(),
       updatedAt:   this.fb.now(),
     };
