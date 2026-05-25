@@ -45,14 +45,6 @@ export const PERMISSION_CATALOG = {
       delete: 'Eliminar documentos',
     },
   },
-  campus: {
-    label: 'Campus',
-    description: 'Cursos y material de capacitación',
-    actions: {
-      view:   'Acceder al campus',
-      manage: 'Administrar cursos y contenido del campus',
-    },
-  },
   areas: {
     label: 'Áreas',
     description: 'Ministerios y departamentos del organigrama',
