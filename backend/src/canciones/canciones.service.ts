@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { UpsertCancionDto } from './dto/cancion.dto';
 
@@ -26,7 +26,7 @@ export class CancionesService {
    */
   async upsert(dto: UpsertCancionDto) {
     const tituloNorm = dto.titulo.trim();
-    if (!tituloNorm) return null;
+    if (!tituloNorm) throw new InternalServerErrorException('El título de la canción no puede estar vacío');
 
     const snap = await this.fb.db
       .collection(COL)

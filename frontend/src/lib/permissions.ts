@@ -61,6 +61,31 @@ export const PERMISSION_CATALOG = {
       manage: 'Administrar cargos y la estructura del directorio',
     },
   },
+  fichas: {
+    label: 'Fichas técnicas',
+    description: 'Planificación y seguimiento de servicios y eventos',
+    actions: {
+      admin:  'Crear y eliminar fichas',
+      create: 'Crear nuevas fichas',
+      view:   'Ver fichas y sus secciones',
+    },
+  },
+  events: {
+    label: 'Eventos',
+    description: 'Calendario de eventos de la organización',
+    actions: {
+      view:   'Ver el calendario de eventos',
+      manage: 'Crear, editar y eliminar eventos',
+    },
+  },
+  canciones: {
+    label: 'Catálogo de canciones',
+    description: 'Biblioteca de canciones para los servicios',
+    actions: {
+      view:   'Buscar canciones',
+      manage: 'Agregar y modificar canciones',
+    },
+  },
 } as const;
 
 export function hasPermission(userPermissions: string[], required: string): boolean {

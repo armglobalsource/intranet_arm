@@ -17,6 +17,8 @@ export class CreateFichaDto {
   @IsString() date: string;  // ISO string
   @IsArray() @ValidateNested({ each: true }) @Type(() => EncuentroDto)
   encuentros: EncuentroDto[];
+  @IsOptional() @IsString() descripcion?: string;
+  @IsOptional() @IsString() ubicacion?: string;
 }
 
 export class UpdateFichaDto {

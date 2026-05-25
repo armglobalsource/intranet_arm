@@ -72,7 +72,7 @@ interface CustomEncuentro { label: string; time: string; }
 
 function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }) {
   const { data: rawCampuses = [], isLoading: loadingCampus } = useAllCampuses();
-  const { mutate: createFicha, isPending } = useCreateFicha();
+  const { mutate: createFicha, isPending, isError, error } = useCreateFicha();
 
   // Solo campus activos
   const campuses = rawCampuses.filter((c) => c.isActive);
@@ -85,8 +85,10 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
 
   // Estado para evento especial
   const [customName,       setCustomName]       = useState('');
-  const [customEncuentros, setCustomEncuentros] = useState<CustomEncuentro[]>([{ label: '', time: '' }]);
+  const [customEncuentros, setCustomEncuentros] = useState<CustomEncuentro[]>([{ label: '', time: '08:00' }]);
   const [customMulti,      setCustomMulti]      = useState(false);
+  const [descripcion,      setDescripcion]      = useState('');
+  const [ubicacion,        setUbicacion]        = useState('');
 
   const isCustom = diaIdx === -1;
 
@@ -134,7 +136,7 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
 
   // ── Custom encuentros ────────────────────────────────────────────────────
   function addCustomEncuentro() {
-    setCustomEncuentros((prev) => [...prev, { label: '', time: '' }]);
+    setCustomEncuentros((prev) => [...prev, { label: '', time: '08:00' }]);
   }
   function removeCustomEncuentro(i: number) {
     setCustomEncuentros((prev) => prev.filter((_, idx) => idx !== i));
@@ -155,14 +157,34 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
       ? (customMulti && encuentros.length > 1 ? 'multi' : 'unico')
       : type;
 
-    // Siempre usar el nombre exacto del mantenedor como campusName
-    createFicha(
-      { campusId: String(campus.id), campusName: campus.name, type: finalType, title, date, encuentros },
-      { onSuccess: (data) => onCreated(data.fichaId ?? data.id ?? '') },
-    );
+    const payload: import('@/types/ficha').CreateFichaPayload = {
+      campusId:   String(campus.id),
+      campusName: campus.name,
+      type:       finalType,
+      title,
+      date,
+      encuentros,
+      ...(isCustom && descripcion.trim() ? { descripcion: descripcion.trim() } : {}),
+      ...(isCustom && ubicacion.trim()   ? { ubicacion:   ubicacion.trim() }   : {}),
+    };
+
+    createFicha(payload, {
+      onSuccess: (data) => onCreated(data.fichaId ?? data.id ?? ''),
+    });
   }
 
   const canSubmit = campusId && title && date && (!isCustom || encuentros.length > 0);
+
+  // Validation hint shown above the submit button
+  const validationHint = !campusId
+    ? 'Selecciona un campus'
+    : !title
+    ? 'Agrega un título'
+    : !date
+    ? 'Elige la fecha del evento'
+    : isCustom && encuentros.length === 0
+    ? 'El evento necesita al menos un horario'
+    : null;
 
   return (
     <form onSubmit={handleSubmit} className="card p-6 space-y-5">
@@ -246,6 +268,34 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
             />
           </div>
 
+          {/* Descripción */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Descripción <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <textarea
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Breve descripción del evento…"
+              rows={2}
+              className="input text-sm resize-none"
+            />
+          </div>
+
+          {/* Ubicación */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Ubicación <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <input
+              type="text"
+              value={ubicacion}
+              onChange={(e) => setUbicacion(e.target.value)}
+              placeholder="ej: Auditorio Principal, Online, Sala B…"
+              className="input text-sm"
+            />
+          </div>
+
           {/* Tipo: único o multi */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">
@@ -258,7 +308,7 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
                   type="button"
                   onClick={() => {
                     setCustomMulti(isMulti);
-                    if (!isMulti) setCustomEncuentros(prev => [prev[0] ?? { label: '', time: '' }]);
+                    if (!isMulti) setCustomEncuentros(prev => [prev[0] ?? { label: '', time: '08:00' }]);
                   }}
                   className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-all ${
                     customMulti === isMulti
@@ -373,10 +423,34 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
         </div>
       )}
 
+      {/* Validation hint */}
+      {validationHint && (
+        <p className="text-xs text-amber-600 flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          {validationHint}
+        </p>
+      )}
+
+      {/* API error */}
+      {isError && (
+        <p className="text-xs text-red-600 flex items-center gap-1.5 bg-red-50 px-3 py-2 rounded-lg">
+          <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+          {(error as any)?.response?.data?.message ?? 'Error al crear la ficha. Intenta de nuevo.'}
+        </p>
+      )}
+
       <button
         type="submit"
         disabled={isPending || !canSubmit}
-        className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+        className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isPending ? (
           <>

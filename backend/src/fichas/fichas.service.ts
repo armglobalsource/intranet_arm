@@ -278,6 +278,8 @@ export class FichasService {
       title:            dto.title,
       date:             this.fb.ts(new Date(dto.date)),
       encuentros:       encuentrosPlain,
+      ...(dto.descripcion ? { descripcion: dto.descripcion } : {}),
+      ...(dto.ubicacion   ? { ubicacion:   dto.ubicacion }   : {}),
       sections:         buildDefaultSections(dto.type),
       completionStatus: buildDefaultCompletion(dto.type),
       status:           'draft',

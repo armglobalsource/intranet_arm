@@ -4,7 +4,7 @@
   "description": "Intranet Corporativa — Backend API (NestJS)",
   "private": true,
   "scripts": {
-    "build": "nest build",
+    "build": "rm -rf dist && npx tsc -p tsconfig.build.json",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -57,6 +57,7 @@
     "eslint": "^8.57.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.3",
-    "vitest": "^1.4.0"
+    "vitest": "^1.4.0",
+    "xlsx": "^0.18.5"
   }
 }

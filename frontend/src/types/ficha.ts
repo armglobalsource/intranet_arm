@@ -87,12 +87,14 @@ export interface FichaListItem {
 }
 
 export type CreateFichaPayload = {
-  campusId:   string;
-  campusName: string;
-  type:       FichaType;
-  title:      string;
-  date:       string;
-  encuentros: Encuentro[];
+  campusId:    string;
+  campusName:  string;
+  type:        FichaType;
+  title:       string;
+  date:        string;
+  encuentros:  Encuentro[];
+  descripcion?: string;
+  ubicacion?:   string;
 };
 
 // ── Canción ───────────────────────────────────────────────────────────────────

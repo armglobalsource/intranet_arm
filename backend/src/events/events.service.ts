@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -32,11 +32,7 @@ export class EventsService {
     return this.fb.toObj(snap);
   }
 
-  async create(dto: CreateEventDto, userId: number, userRole: string) {
-    if (userRole !== 'admin') {
-      throw new ForbiddenException('Solo administradores pueden crear eventos');
-    }
-
+  async create(dto: CreateEventDto, userId: number) {
     const ref  = this.fb.db.collection(COL).doc();
     const data = {
       id:          ref.id,
@@ -57,11 +53,7 @@ export class EventsService {
     return data;
   }
 
-  async update(id: string, dto: UpdateEventDto, userRole: string) {
-    if (userRole !== 'admin') {
-      throw new ForbiddenException('Solo administradores pueden editar eventos');
-    }
-
+  async update(id: string, dto: UpdateEventDto) {
     await this.findOne(id);
     await this.fb.db
       .collection(COL)
@@ -71,11 +63,7 @@ export class EventsService {
     return this.findOne(id);
   }
 
-  async remove(id: string, userRole: string) {
-    if (userRole !== 'admin') {
-      throw new ForbiddenException('Solo administradores pueden eliminar eventos');
-    }
-
+  async remove(id: string) {
     await this.findOne(id);
     await this.fb.db.collection(COL).doc(id).delete();
     return { id };
