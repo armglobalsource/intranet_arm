@@ -1,7 +1,7 @@
 {
   "hosting": [
     {
-      "site": "intranet-arm",
+      "site": "ecosistema-arm",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [
         {
@@ -25,7 +25,7 @@
       ]
     },
     {
-      "site": "intranet-arm-dev",
+      "site": "ecosistema-arm-dev",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [
         {
