@@ -5,10 +5,9 @@ import { useMiFichas } from '@/hooks/useFichas';
 import { useNoticiasGlobal, useNoticiasCampus } from '@/hooks/useNoticias';
 import type { Noticia } from '@/hooks/useNoticias';
 import { useAuthStore } from '@/lib/store/auth.store';
-import { usePermissions } from '@/hooks/usePermissions';
-import { CanDo } from '@/components/shared/CanDo';
-import { displayName } from '@/types/user';
 import { CalendarioAnual } from './CalendarioAnual';
+import { useOrgUserProfile } from '@/hooks/useOrgChart';
+import { membershipArea } from '@/types/orgchart';
 
 // ── Helper fecha ──────────────────────────────────────────────────────────────
 
@@ -135,7 +134,18 @@ export function DashboardClient() {
   const { data: noticiasGlobal, isLoading: loadingGlobal } = useNoticiasGlobal();
   const { data: noticiasCampus, isLoading: loadingCampus } = useNoticiasCampus();
   const { user } = useAuthStore();
-  const { can } = usePermissions();
+
+  // Mis equipos y ministerios
+  const { data: orgProfile, isLoading: orgLoading } = useOrgUserProfile(user?.id ?? null);
+  const myMemberships = orgProfile?.orgMemberships ?? [];
+  const myUniqueAreas = Array.from(
+    new Map(
+      myMemberships
+        .map((m) => membershipArea(m))
+        .filter(Boolean)
+        .map((a) => [a!.id, a!])
+    ).values()
+  );
 
   const firstName        = user?.firstName ?? '';
   const miFichasCount    = fichas?.length ?? 0;
@@ -172,7 +182,7 @@ export function DashboardClient() {
           )}
           <div className="min-w-0">
             <p className="text-sm font-bold text-gray-900 truncate leading-tight">
-              {user ? displayName(user) : '—'}
+              {user ? `${user.firstName} ${user.lastName}` : '—'}
             </p>
             <p className="text-xs text-gray-400 truncate mt-0.5">{user?.role?.name ?? 'Sin rol'}</p>
             {user?.campus?.name && (
@@ -185,42 +195,87 @@ export function DashboardClient() {
         </Link>
 
         {/* Mis fichas */}
-        <CanDo permission="fichas:view">
-          <Link href="/dashboard/mis-fichas"
-            className="card p-5 flex items-center gap-4 hover:shadow-md hover:border-gray-300 transition-all group">
-            <div className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center bg-gray-900 group-hover:bg-black transition-all">
-              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl font-bold text-gray-900 leading-none">
-                {fichasLoading ? '…' : String(miFichasCount)}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">Mis fichas técnicas</p>
-              {!fichasLoading && fichasCompletadas > 0 && (
-                <p className="text-[10px] text-emerald-600 font-medium mt-1">
-                  {fichasCompletadas} completa{fichasCompletadas !== 1 ? 's' : ''}
-                </p>
-              )}
-              <p className="text-[10px] text-gray-400 font-medium mt-1 group-hover:text-gray-600 transition-colors">
-                Ver fichas →
-              </p>
-            </div>
-          </Link>
-        </CanDo>
-
-        {/* Voluntarios */}
-        <div className="card p-5 flex items-center gap-4">
-          <span className="text-3xl">👥</span>
-          <div>
-            <p className="text-2xl font-bold text-gray-900">—</p>
-            <p className="text-xs text-gray-500">Voluntarios activos</p>
+        <Link href="/dashboard/mis-fichas"
+          className="card p-5 flex items-center gap-4 hover:shadow-md hover:border-gray-300 transition-all group">
+          <div className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center bg-gray-900 group-hover:bg-black transition-all">
+            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
           </div>
-        </div>
+          <div className="min-w-0">
+            <p className="text-2xl font-bold text-gray-900 leading-none">
+              {fichasLoading ? '…' : String(miFichasCount)}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">Mis fichas técnicas</p>
+            {!fichasLoading && fichasCompletadas > 0 && (
+              <p className="text-[10px] text-emerald-600 font-medium mt-1">
+                {fichasCompletadas} completa{fichasCompletadas !== 1 ? 's' : ''}
+              </p>
+            )}
+            <p className="text-[10px] text-gray-400 font-medium mt-1 group-hover:text-gray-600 transition-colors">
+              Ver fichas →
+            </p>
+          </div>
+        </Link>
+
+        {/* Mis equipos */}
+        <Link href="/dashboard/orgchart"
+          className="card p-5 flex items-start gap-4 hover:shadow-md hover:border-gray-300 transition-all group">
+          <div className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center bg-emerald-50 group-hover:bg-emerald-100 transition-all">
+            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="#16A34A"
+              strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            {orgLoading ? (
+              <div className="space-y-1.5">
+                <div className="h-6 w-8 bg-gray-100 rounded animate-pulse" />
+                <div className="h-3 w-32 bg-gray-100 rounded animate-pulse" />
+              </div>
+            ) : myMemberships.length === 0 ? (
+              <>
+                <p className="text-2xl font-bold text-gray-300 leading-none">—</p>
+                <p className="text-xs text-gray-400 mt-0.5">Sin equipos asignados</p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-bold text-gray-900 leading-none">{myMemberships.length}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {myMemberships.length === 1 ? 'Equipo o ministerio' : 'Equipos y ministerios'}
+                </p>
+                {myUniqueAreas.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {myUniqueAreas.slice(0, 2).map((a) => (
+                      <span
+                        key={a.id}
+                        className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full max-w-[110px]"
+                        style={{ background: `${a.color}18`, color: a.color }}
+                      >
+                        <span>{a.icon}</span>
+                        <span className="truncate">{a.name}</span>
+                      </span>
+                    ))}
+                    {myUniqueAreas.length > 2 && (
+                      <span className="text-[10px] text-gray-400 self-center font-medium">
+                        +{myUniqueAreas.length - 2}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            <p className="text-[10px] text-gray-400 font-medium mt-1.5 group-hover:text-gray-600 transition-colors">
+              Ver organigrama →
+            </p>
+          </div>
+        </Link>
 
         {/* Notificaciones */}
         <div className="card p-5 flex items-center gap-4">
@@ -233,40 +288,38 @@ export function DashboardClient() {
       </div>
 
       {/* Hubs de noticias */}
-      <CanDo permission="content:view">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <HubNoticias
-            title="Noticias Global"
-            subtitle="Comunicados para toda la red ARM"
-            accentColor="#6366F1"
-            icon={
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none"
-                stroke="#6366F1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="2" y1="12" x2="22" y2="12" />
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-              </svg>
-            }
-            noticias={noticiasGlobal}
-            isLoading={loadingGlobal}
-          />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <HubNoticias
+          title="Noticias Global"
+          subtitle="Comunicados para toda la red ARM"
+          accentColor="#6366F1"
+          icon={
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none"
+              stroke="#6366F1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="2" y1="12" x2="22" y2="12" />
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+            </svg>
+          }
+          noticias={noticiasGlobal}
+          isLoading={loadingGlobal}
+        />
 
-          <HubNoticias
-            title="Noticias Campus"
-            subtitle={user?.campus?.name ? `Noticias de ${user.campus.name}` : 'Noticias de tu campus local'}
-            accentColor="#10B981"
-            icon={
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none"
-                stroke="#10B981" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
-                <polyline points="9 21 9 13 15 13 15 21" />
-              </svg>
-            }
-            noticias={noticiasCampus}
-            isLoading={loadingCampus}
-          />
-        </div>
-      </CanDo>
+        <HubNoticias
+          title="Noticias Campus"
+          subtitle={user?.campus?.name ? `Noticias de ${user.campus.name}` : 'Noticias de tu campus local'}
+          accentColor="#10B981"
+          icon={
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none"
+              stroke="#10B981" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+              <polyline points="9 21 9 13 15 13 15 21" />
+            </svg>
+          }
+          noticias={noticiasCampus}
+          isLoading={loadingCampus}
+        />
+      </div>
 
       <CalendarioAnual />
     </div>

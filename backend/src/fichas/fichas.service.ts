@@ -101,7 +101,7 @@ function defaultRows(section: SectionName): any[] {
     // ── Info Encuentro ─────────────────────────────────────────────────────
     case 'anuncios':
       return [
-        { id: 'an1', label: 'Info Bienvenida',  type: 'text', shared: true, values: { shared: 'VIDA PANORAMICA | @vidapanoramica' }, order: 0, required: false },
+        { id: 'an1', label: 'Info Bienvenida',  type: 'text', shared: true, values: {}, order: 0, required: false },
         { id: 'an2', label: 'Info Despedida 1', type: 'text', shared: true, values: {}, order: 1, required: false },
         { id: 'an3', label: 'Info Despedida 2', type: 'text', shared: true, values: {}, order: 2, required: false },
         { id: 'an4', label: 'Info Despedida 3', type: 'text', shared: true, values: {}, order: 3, required: false },
