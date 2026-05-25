@@ -40,6 +40,12 @@ echo "[3/5] Build y push del frontend..."
 docker build \
   --platform linux/amd64 \
   --build-arg NEXT_PUBLIC_API_URL="https://${GCP_PROJECT}.web.app/api/v1" \
+  --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="AIzaSyDEKvQ-XzSPA1JMhQMq_phXKxqvXqPcEVM" \
+  --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="intranet-arm-dev-70a30.firebaseapp.com" \
+  --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="intranet-arm-dev-70a30" \
+  --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="intranet-arm-dev-70a30.firebasestorage.app" \
+  --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="1065052048117" \
+  --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="1:1065052048117:web:c9dfa55f1949126fa7d3bc" \
   -t "${REGISTRY}/frontend:latest" \
   ./frontend
 

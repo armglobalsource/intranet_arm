@@ -4,8 +4,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
+// useEffect es usado por el menú de usuario
 import { useAuthStore } from '@/lib/store/auth.store';
-import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/api';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -39,6 +39,17 @@ function OrgIcon({ active }: { active: boolean }) {
       <rect x="9" y="16" width="6" height="4" rx="1" />
       <rect x="17" y="16" width="6" height="4" rx="1" />
       <path d="M4 16v-4h16v4" /><path d="M12 6v6" />
+    </svg>
+  );
+}
+
+function ConfigIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
+  return (
+    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   );
 }
@@ -120,30 +131,21 @@ function NoticiasIcon({ active }: { active: boolean }) {
 
 // ── Estructura de navegación ──────────────────────────────────────────────────
 
-interface NavChild {
-  href:        string;
-  label:       string;
-  icon:        (p: { active: boolean }) => React.JSX.Element;
-  permission?: string;
-}
-
 interface NavGroup {
-  href:        string;
-  label:       string;
-  icon:        (p: { active: boolean }) => React.JSX.Element;
-  permission?: string;
-  alwaysShow?: boolean;
-  children?:   NavChild[];
+  href:      string;
+  label:     string;
+  icon:      (p: { active: boolean }) => React.JSX.Element;
+  children?: { href: string; label: string; icon: (p: { active: boolean }) => React.JSX.Element }[];
 }
 
 const NAV: NavGroup[] = [
   {
-    href:       '/dashboard',
-    label:      'Inicio',
-    icon:       HomeIcon,
-    alwaysShow: true,
+    href:  '/dashboard',
+    label: 'Inicio',
+    icon:  HomeIcon,
     children: [
-      { href: '/dashboard/mis-fichas', label: 'Mis Fichas', icon: MiFichaIcon, permission: 'fichas:view' },
+      { href: '/dashboard/perfil',     label: 'Mi Perfil',  icon: PerfilIcon  },
+      { href: '/dashboard/mis-fichas', label: 'Mis Fichas', icon: MiFichaIcon },
     ],
   },
   {
@@ -151,12 +153,12 @@ const NAV: NavGroup[] = [
     label: 'Producción General',
     icon:  ProduccionIcon,
     children: [
-      { href: '/dashboard/fichas-tecnicas',             label: 'Fichas Técnicas', icon: FichaIcon,    permission: 'fichas:viewAll'  },
-      { href: '/dashboard/produccion-general/noticias', label: 'Noticias',        icon: NoticiasIcon, permission: 'content:create'  },
+      { href: '/dashboard/fichas-tecnicas',             label: 'Fichas Técnicas', icon: FichaIcon    },
+      { href: '/dashboard/produccion-general/noticias', label: 'Noticias',        icon: NoticiasIcon },
     ],
   },
-  { href: '/dashboard/orgchart',                        label: 'Organigramas', icon: OrgIcon,   permission: 'orgchart:view'  },
-  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas', icon: StatsIcon, permission: 'content:view'   },
+  { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon   },
+  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon },
 ];
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -165,10 +167,23 @@ export function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
   const { logout, refreshToken, user } = useAuthStore();
-  const { can } = usePermissions();
 
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen,   setMenuOpen]   = useState(false);
+  const [collapsed,  setCollapsed]  = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Leer preferencia guardada
+  useEffect(() => {
+    if (localStorage.getItem('sidebar-collapsed') === 'true') setCollapsed(true);
+  }, []);
+
+  function toggleSidebar() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('sidebar-collapsed', String(next));
+      return next;
+    });
+  }
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -183,9 +198,7 @@ export function Sidebar() {
   const initials = user
     ? ((user.firstName?.[0] ?? '') + (user.lastName?.[0] ?? '')).toUpperCase() || '??'
     : '??';
-  const MINISTERIAL_PREFIX_MAP: Record<string, string> = { pastor_principal: 'Ps. Ppal.', pastor: 'Ps.', ministro: 'Min.' };
-  const prefix   = user?.ministerialTitle ? MINISTERIAL_PREFIX_MAP[user.ministerialTitle] + ' ' : '';
-  const fullName = user ? `${prefix}${user.firstName} ${user.lastName}` : '';
+  const fullName = user ? `${user.firstName} ${user.lastName}` : '';
   const role     = user?.role?.name ?? '';
 
   async function handleLogout() {
@@ -198,24 +211,49 @@ export function Sidebar() {
   }
 
   return (
+    <>
+      {/* Botón flotante para reabrir cuando está colapsado */}
+      {collapsed && (
+        <button
+          onClick={toggleSidebar}
+          title="Abrir menú"
+          className="fixed left-0 top-1/2 -translate-y-1/2 z-50 flex items-center justify-center w-5 h-10 rounded-r-md transition-all hover:w-6"
+          style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderLeft: 'none' }}
+        >
+          <svg className="w-3 h-3 text-white/40 hover:text-white/70" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      )}
+
     <aside
       style={{ background: '#0d0d0d', borderRight: '1px solid #1f1f1f' }}
-      className="w-56 flex flex-col shrink-0 print:hidden"
+      className={`flex flex-col shrink-0 print:hidden overflow-hidden transition-all duration-300 ease-in-out ${
+        collapsed ? 'w-0' : 'w-56'
+      }`}
     >
-      {/* Logo */}
+      {/* Logo + botón colapsar */}
       <div style={{ borderBottom: '1px solid #1f1f1f' }}
-        className="px-4 pt-4 pb-2 flex items-center justify-center">
+        className="px-4 pt-4 pb-2 flex items-center justify-between gap-2 min-w-[224px]">
         <Image src="/logo.png" alt="Logo" width={100} height={28}
           className="object-contain" priority />
+        <button
+          onClick={toggleSidebar}
+          title="Ocultar menú"
+          className="flex items-center justify-center w-6 h-6 rounded-md transition-all hover:bg-white/10 flex-shrink-0"
+        >
+          <svg className="w-3.5 h-3.5 text-white/30 hover:text-white/60" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 pt-4 space-y-0.5">
-        {NAV.map(({ href, label, icon: Icon, permission, alwaysShow, children }) => {
-          if (permission && !can(permission)) return null;
-
-          const visibleChildren = children?.filter((c) => !c.permission || can(c.permission));
-          const childActive     = visibleChildren?.some((c) => pathname.startsWith(c.href)) ?? false;
+      <nav className="flex-1 p-3 pt-4 space-y-0.5 min-w-[224px]">
+        {NAV.map(({ href, label, icon: Icon, children }) => {
+          const childActive = children?.some((c) => pathname.startsWith(c.href)) ?? false;
 
           const active =
             href === '/dashboard'
@@ -225,9 +263,6 @@ export function Sidebar() {
                   || pathname.startsWith('/dashboard/fichas-tecnicas')
                   || childActive
                 : pathname.startsWith(href);
-
-          // Hide parent group when all children are hidden (unless alwaysShow)
-          if (children && visibleChildren?.length === 0 && !alwaysShow) return null;
 
           return (
             <div key={href}>
@@ -243,7 +278,7 @@ export function Sidebar() {
               </Link>
 
               {/* Sub-ítems */}
-              {visibleChildren && visibleChildren.map(({ href: chref, label: clabel, icon: CIcon }) => {
+              {children && children.map(({ href: chref, label: clabel, icon: CIcon }) => {
                 const cActive = pathname.startsWith(chref);
                 return (
                   <Link
@@ -269,9 +304,29 @@ export function Sidebar() {
         })}
       </nav>
 
+      {/* Configuración */}
+      <div className="px-3 pb-1 min-w-[224px]">
+        {(() => {
+          const href   = '/dashboard/directorio';
+          const active = pathname.startsWith(href);
+          return (
+            <Link
+              href={href}
+              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+              }`}
+            >
+              <ConfigIcon active={active} />
+              Configuración
+            </Link>
+          );
+        })()}
+      </div>
+
       {/* Usuario con menú */}
       <div ref={menuRef} style={{ borderTop: '1px solid #1f1f1f' }}
-        className="relative px-3 py-3">
+        className="relative px-3 py-3 min-w-[224px]">
         {menuOpen && (
           <div
             className="absolute bottom-full left-3 right-3 mb-1 rounded-lg overflow-hidden shadow-lg"
@@ -289,22 +344,6 @@ export function Sidebar() {
               </svg>
               Mi perfil
             </Link>
-            {(can('users:view') || can('users:create') || can('users:edit') ||
-              can('roles:view') || can('roles:manage') ||
-              can('areas:view') || can('equipos:view') || can('campus:view') || can('cargos:view')) && (
-              <Link
-                href="/dashboard/directorio"
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-2.5 text-[12px] text-white/60 hover:text-white hover:bg-white/5 transition-all"
-              >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-                Configuración
-              </Link>
-            )}
             <button
               onClick={handleLogout}
               className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[12px] text-white/40 hover:text-white/60 hover:bg-white/5 transition-all"
@@ -350,5 +389,6 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   );
 }
