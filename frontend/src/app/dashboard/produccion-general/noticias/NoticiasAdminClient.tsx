@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
+import { CanDo } from '@/components/shared/CanDo';
 import { useActiveCampuses } from '@/hooks/useCampus';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -146,6 +147,10 @@ function NoticiaCard({
   onToggleStatus: (n: Noticia) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const { can, isAdmin } = usePermissions();
+  const canEdit    = isAdmin || can('content:create');
+  const canPublish = isAdmin || can('content:publish');
+  const canDelete  = isAdmin || can('content:delete');
   const cc = campusName ? campusColor(campusName) : '#6366F1';
 
   return (
@@ -241,27 +246,33 @@ function NoticiaCard({
         </div>
       ) : (
         <div className="px-4 pb-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onToggleStatus(noticia)}
-            className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors ${
-              noticia.status === 'published'
-                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
-                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-            }`}>
-            {noticia.status === 'published' ? 'Despublicar' : 'Publicar'}
-          </button>
-          <button onClick={() => onEdit(noticia)}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-            Editar
-          </button>
-          <button onClick={() => setConfirming(true)}
-            className="px-2.5 py-1.5 rounded-lg text-xs bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors border border-gray-200">
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <path d="M10 11v6M14 11v6" />
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-            </svg>
-          </button>
+          <CanDo permission="content:publish">
+            <button onClick={() => onToggleStatus(noticia)}
+              className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors ${
+                noticia.status === 'published'
+                  ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+              }`}>
+              {noticia.status === 'published' ? 'Despublicar' : 'Publicar'}
+            </button>
+          </CanDo>
+          {canEdit && (
+            <button onClick={() => onEdit(noticia)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+              Editar
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={() => setConfirming(true)}
+              className="px-2.5 py-1.5 rounded-lg text-xs bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors border border-gray-200">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -515,7 +526,8 @@ function NoticiaPanel({
 
 export function NoticiasAdminClient() {
   const router = useRouter();
-  const { isAdmin } = usePermissions();
+  const { isAdmin, can } = usePermissions();
+  const canCreate = isAdmin || can('content:create');
   const { data: campuses = [] } = useActiveCampuses();
 
   const [panel,        setPanel]       = useState<Noticia | null | 'new'>(null);
@@ -569,10 +581,10 @@ export function NoticiasAdminClient() {
     global:    noticias.filter((n) => !n.campusId).length,
   }), [noticias]);
 
-  if (!isAdmin) {
+  if (!canCreate) {
     return (
       <div className="card p-16 text-center">
-        <p className="text-sm text-gray-500 font-medium">Solo administradores pueden acceder al publicador</p>
+        <p className="text-sm text-gray-500 font-medium">No tienes permiso para acceder al publicador</p>
       </div>
     );
   }
@@ -594,15 +606,17 @@ export function NoticiasAdminClient() {
           </div>
           <p className="text-gray-500 text-sm">Gestiona y publica noticias globales y por campus</p>
         </div>
-        <button
-          onClick={() => setPanel('new')}
-          className="btn-primary flex items-center gap-2 text-sm flex-shrink-0"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Nueva noticia
-        </button>
+        <CanDo permission="content:create">
+          <button
+            onClick={() => setPanel('new')}
+            className="btn-primary flex items-center gap-2 text-sm flex-shrink-0"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Nueva noticia
+          </button>
+        </CanDo>
       </div>
 
       {/* Stats */}

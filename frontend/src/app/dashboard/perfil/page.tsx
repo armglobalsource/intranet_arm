@@ -265,17 +265,14 @@ export default function PerfilPage() {
 
       {/* ── Header / Hero ── */}
       <div className="relative">
-        {/* Banner */}
-        <div className="h-28 w-full" style={{ background: 'linear-gradient(135deg, #1a1030 0%, #0f1a2e 50%, #0a1a15 100%)' }} />
-
-        <div className="px-8 pb-6">
-          {/* Breadcrumb */}
-          <div className="flex items-center justify-between mb-2 pt-3">
+        {/* Banner con breadcrumb y estado */}
+        <div className="relative h-28 w-full" style={{ background: 'linear-gradient(135deg, #1a1030 0%, #0f1a2e 50%, #0a1a15 100%)' }}>
+          <div className="absolute inset-x-0 top-0 px-8 pt-4 flex items-center justify-between">
             <Link href="/dashboard"
               className="inline-flex items-center gap-1.5 text-[12px] transition-colors"
-              style={{ color: 'rgba(255,255,255,0.3)' }}
-              onMouseOver={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.65)')}
-              onMouseOut={(e)  => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
+              style={{ color: 'rgba(255,255,255,0.35)' }}
+              onMouseOver={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}
+              onMouseOut={(e)  => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
@@ -284,9 +281,11 @@ export default function PerfilPage() {
             </Link>
             <Badge label={STATUS_LABELS[user.status ?? ''] ?? user.status ?? '—'} color={statusColor} />
           </div>
+        </div>
 
+        <div className="px-8 pb-6">
           {/* Avatar flotando sobre el banner */}
-          <div className="flex items-end gap-5 -mt-14">
+          <div className="flex items-end gap-5 -mt-11">
             <div className="relative group flex-shrink-0">
               <Avatar avatarUrl={user.avatarUrl} initials={initials} size={22} />
               <button

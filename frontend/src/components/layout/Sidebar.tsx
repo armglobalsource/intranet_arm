@@ -4,8 +4,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
-// useEffect es usado por el menú de usuario
 import { useAuthStore } from '@/lib/store/auth.store';
+import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/api';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -39,17 +39,6 @@ function OrgIcon({ active }: { active: boolean }) {
       <rect x="9" y="16" width="6" height="4" rx="1" />
       <rect x="17" y="16" width="6" height="4" rx="1" />
       <path d="M4 16v-4h16v4" /><path d="M12 6v6" />
-    </svg>
-  );
-}
-
-function ConfigIcon({ active }: { active: boolean }) {
-  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
-  return (
-    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   );
 }
@@ -131,21 +120,30 @@ function NoticiasIcon({ active }: { active: boolean }) {
 
 // ── Estructura de navegación ──────────────────────────────────────────────────
 
+interface NavChild {
+  href:        string;
+  label:       string;
+  icon:        (p: { active: boolean }) => React.JSX.Element;
+  permission?: string;
+}
+
 interface NavGroup {
-  href:      string;
-  label:     string;
-  icon:      (p: { active: boolean }) => React.JSX.Element;
-  children?: { href: string; label: string; icon: (p: { active: boolean }) => React.JSX.Element }[];
+  href:        string;
+  label:       string;
+  icon:        (p: { active: boolean }) => React.JSX.Element;
+  permission?: string;
+  alwaysShow?: boolean;
+  children?:   NavChild[];
 }
 
 const NAV: NavGroup[] = [
   {
-    href:  '/dashboard',
-    label: 'Inicio',
-    icon:  HomeIcon,
+    href:       '/dashboard',
+    label:      'Inicio',
+    icon:       HomeIcon,
+    alwaysShow: true,
     children: [
-      { href: '/dashboard/perfil',     label: 'Mi Perfil',  icon: PerfilIcon  },
-      { href: '/dashboard/mis-fichas', label: 'Mis Fichas', icon: MiFichaIcon },
+      { href: '/dashboard/mis-fichas', label: 'Mis Fichas', icon: MiFichaIcon, permission: 'fichas:view' },
     ],
   },
   {
@@ -153,12 +151,12 @@ const NAV: NavGroup[] = [
     label: 'Producción General',
     icon:  ProduccionIcon,
     children: [
-      { href: '/dashboard/fichas-tecnicas',             label: 'Fichas Técnicas', icon: FichaIcon    },
-      { href: '/dashboard/produccion-general/noticias', label: 'Noticias',        icon: NoticiasIcon },
+      { href: '/dashboard/fichas-tecnicas',             label: 'Fichas Técnicas', icon: FichaIcon,    permission: 'fichas:viewAll'  },
+      { href: '/dashboard/produccion-general/noticias', label: 'Noticias',        icon: NoticiasIcon, permission: 'content:create'  },
     ],
   },
-  { href: '/dashboard/orgchart',                        label: 'Organigramas',  icon: OrgIcon   },
-  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon },
+  { href: '/dashboard/orgchart',                        label: 'Organigramas', icon: OrgIcon,   permission: 'orgchart:view'  },
+  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas', icon: StatsIcon, permission: 'content:view'   },
 ];
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -167,6 +165,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
   const { logout, refreshToken, user } = useAuthStore();
+  const { can } = usePermissions();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -212,8 +211,11 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 p-3 pt-4 space-y-0.5">
-        {NAV.map(({ href, label, icon: Icon, children }) => {
-          const childActive = children?.some((c) => pathname.startsWith(c.href)) ?? false;
+        {NAV.map(({ href, label, icon: Icon, permission, alwaysShow, children }) => {
+          if (permission && !can(permission)) return null;
+
+          const visibleChildren = children?.filter((c) => !c.permission || can(c.permission));
+          const childActive     = visibleChildren?.some((c) => pathname.startsWith(c.href)) ?? false;
 
           const active =
             href === '/dashboard'
@@ -223,6 +225,9 @@ export function Sidebar() {
                   || pathname.startsWith('/dashboard/fichas-tecnicas')
                   || childActive
                 : pathname.startsWith(href);
+
+          // Hide parent group when all children are hidden (unless alwaysShow)
+          if (children && visibleChildren?.length === 0 && !alwaysShow) return null;
 
           return (
             <div key={href}>
@@ -238,7 +243,7 @@ export function Sidebar() {
               </Link>
 
               {/* Sub-ítems */}
-              {children && children.map(({ href: chref, label: clabel, icon: CIcon }) => {
+              {visibleChildren && visibleChildren.map(({ href: chref, label: clabel, icon: CIcon }) => {
                 const cActive = pathname.startsWith(chref);
                 return (
                   <Link
@@ -264,26 +269,6 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Configuración */}
-      <div className="px-3 pb-1">
-        {(() => {
-          const href   = '/dashboard/directorio';
-          const active = pathname.startsWith(href);
-          return (
-            <Link
-              href={href}
-              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
-              }`}
-            >
-              <ConfigIcon active={active} />
-              Configuración
-            </Link>
-          );
-        })()}
-      </div>
-
       {/* Usuario con menú */}
       <div ref={menuRef} style={{ borderTop: '1px solid #1f1f1f' }}
         className="relative px-3 py-3">
@@ -304,6 +289,22 @@ export function Sidebar() {
               </svg>
               Mi perfil
             </Link>
+            {(can('users:view') || can('users:create') || can('users:edit') ||
+              can('roles:view') || can('roles:manage') ||
+              can('areas:view') || can('equipos:view') || can('campus:view') || can('cargos:view')) && (
+              <Link
+                href="/dashboard/directorio"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2.5 px-3 py-2.5 text-[12px] text-white/60 hover:text-white hover:bg-white/5 transition-all"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                Configuración
+              </Link>
+            )}
             <button
               onClick={handleLogout}
               className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[12px] text-white/40 hover:text-white/60 hover:bg-white/5 transition-all"

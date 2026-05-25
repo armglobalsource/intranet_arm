@@ -105,14 +105,12 @@ export function DirectorioClient() {
           Panel de administración central de personas, estructura y acceso del sistema.
         </p>
         <div className="flex gap-2 flex-wrap justify-center mt-2">
-          <StatPill count={persons?.length}   label="personas" loading={loadingPersons} />
-          <StatPill count={cargos?.length}    label="cargos"   loading={loadingCargos} />
-          <StatPill count={areas?.length}     label="áreas"    loading={loadingAreas} />
-          <StatPill count={teams?.length}     label="equipos"  loading={loadingTeams} />
-          <StatPill count={campuses?.length}  label="campus"   loading={loadingCampuses} />
-          {can('roles:view') && (
-            <StatPill count={roles?.length}   label="roles"    loading={loadingRoles} />
-          )}
+          {can('users:view')   && <StatPill count={persons?.length}  label="personas" loading={loadingPersons} />}
+          {can('cargos:view')  && <StatPill count={cargos?.length}   label="cargos"   loading={loadingCargos} />}
+          {can('areas:view')   && <StatPill count={areas?.length}    label="áreas"    loading={loadingAreas} />}
+          {can('equipos:view') && <StatPill count={teams?.length}    label="equipos"  loading={loadingTeams} />}
+          {can('campus:view')  && <StatPill count={campuses?.length} label="campus"   loading={loadingCampuses} />}
+          {can('roles:view')   && <StatPill count={roles?.length}    label="roles"    loading={loadingRoles} />}
         </div>
       </div>
 
@@ -123,60 +121,70 @@ export function DirectorioClient() {
 
       {/* Compact list */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden divide-y divide-slate-100">
-        <HubRow
-          href="/dashboard/directorio/personas"
-          icon="👥"
-          title="Personas"
-          description="Usuarios del sistema: crea, edita y gestiona el acceso de cada persona."
-          accentColor="#2563EB"
-          count={persons?.length}
-          countLabel="registradas"
-          loading={loadingPersons}
-        />
+        {can('users:view') && (
+          <HubRow
+            href="/dashboard/directorio/personas"
+            icon="👥"
+            title="Personas"
+            description="Usuarios del sistema: crea, edita y gestiona el acceso de cada persona."
+            accentColor="#2563EB"
+            count={persons?.length}
+            countLabel="registradas"
+            loading={loadingPersons}
+          />
+        )}
 
-        <HubRow
-          href="/dashboard/directorio/cargos"
-          icon="💼"
-          title="Cargos"
-          description="Catálogo de puestos y roles que se asignan a las personas del ministerio."
-          accentColor="#D97706"
-          count={cargos?.length}
-          countLabel="cargos"
-          loading={loadingCargos}
-        />
+        {can('cargos:view') && (
+          <HubRow
+            href="/dashboard/directorio/cargos"
+            icon="💼"
+            title="Cargos"
+            description="Catálogo de puestos y roles que se asignan a las personas del ministerio."
+            accentColor="#D97706"
+            count={cargos?.length}
+            countLabel="cargos"
+            loading={loadingCargos}
+          />
+        )}
 
-        <HubRow
-          href="/dashboard/directorio/areas"
-          icon="🗂️"
-          title="Áreas"
-          description="Ministerios o departamentos que agrupan equipos en el organigrama."
-          accentColor="#7C3AED"
-          count={areas?.length}
-          countLabel="áreas"
-          loading={loadingAreas}
-        />
+        {can('areas:view') && (
+          <HubRow
+            href="/dashboard/directorio/areas"
+            icon="🗂️"
+            title="Áreas"
+            description="Ministerios o departamentos que agrupan equipos en el organigrama."
+            accentColor="#7C3AED"
+            count={areas?.length}
+            countLabel="áreas"
+            loading={loadingAreas}
+          />
+        )}
 
-        <HubRow
-          href="/dashboard/directorio/equipos"
-          icon="🏷️"
-          title="Equipos"
-          description="Grupos de trabajo dentro de cada área: configura nombre, ícono y columna."
-          accentColor="#0D9488"
-          count={teams?.length}
-          countLabel="equipos"
-          loading={loadingTeams}
-        />
+        {can('equipos:view') && (
+          <HubRow
+            href="/dashboard/directorio/equipos"
+            icon="🏷️"
+            title="Equipos"
+            description="Grupos de trabajo dentro de cada área: configura nombre, ícono y columna."
+            accentColor="#0D9488"
+            count={teams?.length}
+            countLabel="equipos"
+            loading={loadingTeams}
+          />
+        )}
 
-        <HubRow
-          href="/dashboard/directorio/campus"
-          icon="🏛️"
-          title="Campus"
-          description="Registra cada campus con sus pastores, horarios, contacto y dirección."
-          accentColor="#0891B2"
-          count={campuses?.length}
-          countLabel="campus"
-          loading={loadingCampuses}
-        />
+        {can('campus:view') && (
+          <HubRow
+            href="/dashboard/directorio/campus"
+            icon="🏛️"
+            title="Campus"
+            description="Registra cada campus con sus pastores, horarios, contacto y dirección."
+            accentColor="#0891B2"
+            count={campuses?.length}
+            countLabel="campus"
+            loading={loadingCampuses}
+          />
+        )}
 
         {can('roles:view') && (
           <HubRow
