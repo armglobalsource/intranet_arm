@@ -206,14 +206,40 @@ export function Sidebar() {
   const router   = useRouter();
   const { logout, refreshToken, user } = useAuthStore();
 
-  const [menuOpen,   setMenuOpen]   = useState(false);
-  const [collapsed,  setCollapsed]  = useState(false);
+  const [menuOpen,        setMenuOpen]        = useState(false);
+  const [collapsed,       setCollapsed]       = useState(false);
+  const [expandedGroups,  setExpandedGroups]  = useState<Set<string>>(new Set());
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Leer preferencia guardada
   useEffect(() => {
     if (localStorage.getItem('sidebar-collapsed') === 'true') setCollapsed(true);
   }, []);
+
+  // Auto-expandir el grupo cuyo hijo esté activo al cambiar de ruta
+  useEffect(() => {
+    NAV.forEach(({ href, children }) => {
+      if (children?.some((c) => pathname.startsWith(c.href))) {
+        setExpandedGroups((prev) => {
+          if (prev.has(href)) return prev;
+          const next = new Set(prev);
+          next.add(href);
+          return next;
+        });
+      }
+    });
+  }, [pathname]);
+
+  function toggleGroup(href: string, e: React.MouseEvent) {
+    // Permitir que el Link navegue pero también alternar el grupo
+    e.preventDefault();
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(href) ? next.delete(href) : next.add(href);
+      return next;
+    });
+    router.push(href);
+  }
 
   function toggleSidebar() {
     setCollapsed((prev) => {
@@ -291,7 +317,8 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 p-3 pt-4 space-y-0.5 min-w-[224px]">
         {NAV.map(({ href, label, icon: Icon, children }) => {
-          const childActive = children?.some((c) => pathname.startsWith(c.href)) ?? false;
+          const childActive  = children?.some((c) => pathname.startsWith(c.href)) ?? false;
+          const isExpanded   = expandedGroups.has(href);
 
           const active =
             href === '/dashboard'
@@ -304,39 +331,56 @@ export function Sidebar() {
 
           return (
             <div key={href}>
+              {/* Ítem principal */}
               <Link
                 href={href}
+                onClick={children ? (e) => toggleGroup(href, e) : undefined}
                 style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
                 }`}
               >
                 <Icon active={active} />
-                {label}
+                <span className="flex-1">{label}</span>
+                {/* Chevron para ítems con hijos */}
+                {children && (
+                  <svg
+                    className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${
+                      isExpanded ? 'rotate-180' : ''
+                    } ${active ? 'text-white/50' : 'text-white/20'}`}
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                )}
               </Link>
 
-              {/* Sub-ítems */}
-              {children && children.map(({ href: chref, label: clabel, icon: CIcon }) => {
-                const cActive = pathname.startsWith(chref);
-                return (
-                  <Link
-                    key={chref}
-                    href={chref}
-                    style={cActive ? { background: 'rgba(255,255,255,0.06)' } : {}}
-                    className={`flex items-center gap-2.5 pl-8 pr-3 py-2 mt-0.5 rounded-lg text-xs font-medium transition-all ${
-                      cActive ? 'text-white/90' : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                    }`}
-                  >
-                    {/* línea vertical conectora */}
-                    <span
-                      className="flex-shrink-0 w-px h-3 rounded-full"
-                      style={{ background: cActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)' }}
-                    />
-                    <CIcon active={cActive} />
-                    {clabel}
-                  </Link>
-                );
-              })}
+              {/* Sub-ítems colapsables */}
+              {children && isExpanded && (
+                <div className="mt-0.5 space-y-0.5">
+                  {children.map(({ href: chref, label: clabel, icon: CIcon }) => {
+                    const cActive = pathname.startsWith(chref);
+                    return (
+                      <Link
+                        key={chref}
+                        href={chref}
+                        style={cActive ? { background: 'rgba(255,255,255,0.06)' } : {}}
+                        className={`flex items-center gap-2.5 pl-8 pr-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                          cActive ? 'text-white/90' : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                        }`}
+                      >
+                        <span
+                          className="flex-shrink-0 w-px h-3 rounded-full"
+                          style={{ background: cActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)' }}
+                        />
+                        <CIcon active={cActive} />
+                        {clabel}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
