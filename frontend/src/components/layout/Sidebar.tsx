@@ -142,6 +142,16 @@ function NoticiasIcon({ active }: { active: boolean }) {
   );
 }
 
+// Ícono genérico para subítems de ministerios (punto + línea)
+function MinisterioSubIcon({ active }: { active: boolean }) {
+  return (
+    <span
+      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+      style={{ background: active ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.2)' }}
+    />
+  );
+}
+
 // ── Estructura de navegación ──────────────────────────────────────────────────
 
 interface NavGroup {
@@ -172,7 +182,21 @@ const NAV: NavGroup[] = [
   },
   { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon          },
   { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon        },
-  { href: '/dashboard/ministerios',                     label: 'Ministerios',   icon: MinisteriosIcon  },
+  {
+    href:  '/dashboard/ministerios',
+    label: 'Ministerios',
+    icon:  MinisteriosIcon,
+    children: [
+      { href: '/dashboard/ministerios/ar-kids',    label: 'AR Kids',    icon: MinisterioSubIcon },
+      { href: '/dashboard/ministerios/ar-tweens',  label: 'AR Tweens',  icon: MinisterioSubIcon },
+      { href: '/dashboard/ministerios/ar-teens',   label: 'AR Teens',   icon: MinisterioSubIcon },
+      { href: '/dashboard/ministerios/ar-jovenes', label: 'AR Jóvenes', icon: MinisterioSubIcon },
+      { href: '/dashboard/ministerios/ar-worship', label: 'AR Worship', icon: MinisterioSubIcon },
+      { href: '/dashboard/ministerios/ar-hombres', label: 'AR Hombres', icon: MinisterioSubIcon },
+      { href: '/dashboard/ministerios/ar-mujeres', label: 'AR Mujeres', icon: MinisterioSubIcon },
+      { href: '/dashboard/ministerios/ar-gold',    label: 'AR Gold',    icon: MinisterioSubIcon },
+    ],
+  },
 ];
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
