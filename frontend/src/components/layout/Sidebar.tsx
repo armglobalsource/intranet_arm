@@ -117,6 +117,19 @@ function StatsIcon({ active }: { active: boolean }) {
   );
 }
 
+function MinisteriosIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
+  return (
+    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
 function NoticiasIcon({ active }: { active: boolean }) {
   const c = active ? '#fff' : 'rgba(255,255,255,0.35)';
   return (
@@ -157,8 +170,9 @@ const NAV: NavGroup[] = [
       { href: '/dashboard/produccion-general/noticias', label: 'Noticias',        icon: NoticiasIcon },
     ],
   },
-  { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon   },
-  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon },
+  { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon          },
+  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon        },
+  { href: '/dashboard/ministerios',                     label: 'Ministerios',   icon: MinisteriosIcon  },
 ];
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
