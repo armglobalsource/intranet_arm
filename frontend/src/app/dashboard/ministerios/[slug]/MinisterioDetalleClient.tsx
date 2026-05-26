@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { useOrgAreaTree } from '@/hooks/useOrgChart';
 import type { OrgAreaTree, OrgMembership } from '@/types/orgchart';
 import { orgUserJobTitle } from '@/types/orgchart';
-import type { MINISTERIOS_CONFIG } from './page';
+import type { MinistrioConfig } from '../ministerios.config';
 
-type Config = (typeof MINISTERIOS_CONFIG)[string];
+type Config = MinistrioConfig;
 
 // ── UserCard ──────────────────────────────────────────────────────────────────
 
