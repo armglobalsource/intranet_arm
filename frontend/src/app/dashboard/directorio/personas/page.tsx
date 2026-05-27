@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { CanDo } from '@/components/shared/CanDo';
 import Link from 'next/link';
 import {
   useUsers,
@@ -13,10 +14,13 @@ import {
 import { useAllJobTitles, useCreateJobTitle } from '@/hooks/useJobTitles';
 import type { JobTitle }                      from '@/hooks/useJobTitles';
 import { useActiveCampuses }                  from '@/hooks/useCampus';
-import type { User, UpdateUserDto } from '@/types/user';
+import type { User, UpdateUserDto, MinisterialTitle } from '@/types/user';
+import { MINISTERIAL_LABEL, MINISTERIAL_PREFIX, displayName } from '@/types/user';
 import type { CreateUserDto }                 from '@/hooks/useUsers';
 import { userJobTitleNames } from '@/types/user';
 import { useOrgAllTeams, useCreateOrgMembership, useDeleteOrgMembership, useOrgUserProfile } from '@/hooks/useOrgChart';
+import { api } from '@/lib/api';
+import CountryPicker from '@/components/CountryPicker';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -162,29 +166,68 @@ function CampusSelect({ value, onChange }: CampusSelectProps) {
   );
 }
 
-// ── TeamSelect ────────────────────────────────────────────────────────────────
+// ── TeamSelect (autocomplete) ─────────────────────────────────────────────────
 
 interface TeamSelectProps {
-  value:       number | null;
-  onChange:    (id: number | null) => void;
-  excludeIds?: Set<number>;
+  value:        number | null;
+  onChange:     (id: number | null) => void;
+  excludeIds?:  Set<number>;
   placeholder?: string;
 }
 
-function TeamSelect({ value, onChange, excludeIds, placeholder = 'Sin equipo asignado' }: TeamSelectProps) {
+function TeamSelect({ value, onChange, excludeIds, placeholder = 'Buscar equipo…' }: TeamSelectProps) {
   const { data: teams = [] } = useOrgAllTeams();
-  const activeTeams = teams.filter((t) => t.isActive && (!excludeIds || !excludeIds.has(t.id)));
+  const [input, setInput]   = useState('');
+  const [open,  setOpen]    = useState(false);
+
+  const activeTeams  = teams.filter((t) => t.isActive && (!excludeIds || !excludeIds.has(t.id)));
+  const selectedTeam = activeTeams.find((t) => t.id === value) ?? null;
+
+  const teamLabel = (t: typeof activeTeams[0]) => `${t.icon ? `${t.icon} ` : ''}${t.name}`;
+
+  const filtered = activeTeams
+    .filter((t) => teamLabel(t).toLowerCase().includes(input.toLowerCase()))
+    .slice(0, 8);
+
+  const showDrop = open && filtered.length > 0;
+
   return (
-    <select
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition bg-white"
-    >
-      <option value="">{placeholder}</option>
-      {activeTeams.map((t) => (
-        <option key={t.id} value={t.id}>{t.icon ? `${t.icon} ` : ''}{t.name}</option>
-      ))}
-    </select>
+    <div className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={selectedTeam ? teamLabel(selectedTeam) : input}
+          onChange={(e) => { setInput(e.target.value); onChange(null); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={placeholder}
+          autoComplete="off"
+          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition pr-7"
+        />
+        {value && (
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); onChange(null); setInput(''); }}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-base leading-none"
+          >×</button>
+        )}
+      </div>
+
+      {showDrop && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+          {filtered.map((team) => (
+            <button
+              key={team.id}
+              type="button"
+              onMouseDown={() => { onChange(team.id); setInput(''); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
+            >
+              {teamLabel(team)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -206,19 +249,20 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
 
   const currentJobTitleIds = user.jobTitles.map((jt) => jt.jobTitle.id);
 
-  const [firstName,   setFirstName]   = useState(user.firstName);
-  const [lastName,    setLastName]    = useState(user.lastName);
-  const [email,       setEmail]       = useState(user.email);
+  const [firstName,   setFirstName]   = useState(user.firstName ?? '');
+  const [lastName,    setLastName]    = useState(user.lastName  ?? '');
+  const [email,       setEmail]       = useState(user.email     ?? '');
   const [password,    setPassword]    = useState('');
   const [showPass,    setShowPass]    = useState(false);
   const [roleId,      setRoleId]      = useState(user.role?.id ?? 0);
-  const [phone,       setPhone]       = useState(user.phone ?? '');
-  const [country,     setCountry]     = useState(user.country ?? '');
-  const [bio,         setBio]         = useState(user.bio ?? '');
-  const [campusId,    setCampusId]    = useState<number | null>(user.campusId ?? null);
-  const [jobTitleIds, setJobTitleIds] = useState<number[]>(currentJobTitleIds);
-  const [saveState,   setSaveState]   = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [errorMsg,    setErrorMsg]    = useState('');
+  const [phone,             setPhone]             = useState(user.phone ?? '');
+  const [country,           setCountry]           = useState(user.country ?? '');
+  const [bio,               setBio]               = useState(user.bio ?? '');
+  const [campusId,          setCampusId]          = useState<number | null>(user.campusId ?? null);
+  const [jobTitleIds,       setJobTitleIds]       = useState<number[]>(currentJobTitleIds);
+  const [ministerialTitle,  setMinisterialTitle]  = useState<MinisterialTitle | null>(user.ministerialTitle ?? null);
+  const [saveState,         setSaveState]         = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [errorMsg,          setErrorMsg]          = useState('');
 
   const [addTeamId,  setAddTeamId]  = useState<number | null>(null);
   const [addingTeam, setAddingTeam] = useState(false);
@@ -230,16 +274,17 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
     setSaveState('saving');
     setErrorMsg('');
     const payload: UpdateUserDto = {
-      firstName:   firstName.trim()        || undefined,
-      lastName:    lastName.trim()         || undefined,
-      email:       email.trim()            || undefined,
-      password:    password.length >= 6 ? password : undefined,
-      roleId:      roleId > 0 ? roleId     : undefined,
-      phone:       phone.trim()            || undefined,
-      country:     country.trim()          || undefined,
-      bio:         bio.trim()              || undefined,
+      firstName:        firstName.trim()        || undefined,
+      lastName:         lastName.trim()         || undefined,
+      email:            email.trim()            || undefined,
+      password:         password.length >= 6 ? password : undefined,
+      roleId:           roleId > 0 ? roleId     : undefined,
+      phone:            phone.trim()            || undefined,
+      country:          country.trim()          || undefined,
+      bio:              bio.trim()              || undefined,
       campusId,
       jobTitleIds,
+      ministerialTitle: ministerialTitle ?? null,
     };
     updateUser.mutate({ id: user.id, data: payload }, {
       onSuccess: () => { setSaveState('saved'); setTimeout(onClose, 800); },
@@ -282,7 +327,7 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
             : <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-[13px]" style={{ background: bg, color: text }}>{userInitials(user)}</div>
           }
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-slate-900 text-[14px] truncate">{user.firstName} {user.lastName}</p>
+            <p className="font-semibold text-slate-900 text-[14px] truncate">{displayName(user)}</p>
             <p className="text-[11px] text-slate-400 mt-0.5">Editar información completa</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 text-sm">✕</button>
@@ -341,6 +386,20 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
             </select>
           </div>
 
+          <div>
+            <label className={labelCls}>Nombramiento ministerial <span className="text-slate-300 font-normal">— opcional</span></label>
+            <select
+              value={ministerialTitle ?? ''}
+              onChange={(e) => setMinisterialTitle((e.target.value as MinisterialTitle) || null)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white"
+            >
+              <option value="">Sin nombramiento</option>
+              {(Object.entries(MINISTERIAL_LABEL) as [MinisterialTitle, string][]).map(([val, label]) => (
+                <option key={val} value={val}>{label} ({MINISTERIAL_PREFIX[val]})</option>
+              ))}
+            </select>
+          </div>
+
           <div className="border-t border-slate-100" />
 
           <p className={sectionCls}>Perfil</p>
@@ -367,7 +426,7 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
             </div>
             <div>
               <label className={labelCls}>País</label>
-              <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className={inputCls} placeholder="Colombia, Chile..." />
+              <CountryPicker value={country} onChange={setCountry} placeholder="Chile, Colombia…" />
             </div>
           </div>
 
@@ -471,32 +530,42 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
   const [password,    setPassword]    = useState('');
   const [firstName,   setFirstName]   = useState('');
   const [lastName,    setLastName]    = useState('');
-  const [roleId,      setRoleId]      = useState(0);
-  const [campusId,    setCampusId]    = useState<number | null>(null);
-  const [teamId,      setTeamId]      = useState<number | null>(null);
-  const [jobTitleIds, setJobTitleIds] = useState<number[]>([]);
-  const [phone,       setPhone]       = useState('');
-  const [country,     setCountry]     = useState('');
-  const [bio,         setBio]         = useState('');
-  const [showPass,    setShowPass]    = useState(false);
-  const [saveState,   setSaveState]   = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [errorMsg,    setErrorMsg]    = useState('');
+  const [roleId,            setRoleId]            = useState(0);
+  const [campusId,          setCampusId]          = useState<number | null>(null);
+  const [teamId,            setTeamId]            = useState<number | null>(null);
+  const [jobTitleIds,       setJobTitleIds]       = useState<number[]>([]);
+  const [phone,             setPhone]             = useState('');
+  const [country,           setCountry]           = useState('');
+  const [bio,               setBio]               = useState('');
+  const [ministerialTitle,  setMinisterialTitle]  = useState<MinisterialTitle | null>(null);
+  const [showPass,          setShowPass]          = useState(false);
+  const [saveState,         setSaveState]         = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [errorMsg,          setErrorMsg]          = useState('');
 
-  const canSubmit = email.trim() && password.length >= 6 && firstName.trim() && lastName.trim() && roleId > 0;
+  // Auto-select "usuario" role when roles load
+  useEffect(() => {
+    if (roles.length > 0 && roleId === 0) {
+      const userRole = roles.find((r) => ['user', 'usuario'].includes(r.name.toLowerCase()));
+      if (userRole) setRoleId(userRole.id);
+    }
+  }, [roles, roleId]);
+
+  const canSubmit = email.trim() && firstName.trim() && lastName.trim() && roleId > 0;
 
   function handleSubmit() {
     if (!canSubmit) return;
     setSaveState('saving');
     setErrorMsg('');
     const payload: CreateUserDto = {
-      email: email.trim(), password,
+      email: email.trim(), password: password || undefined,
       firstName: firstName.trim(), lastName: lastName.trim(),
       roleId,
-      campusId:    campusId    ?? undefined,
-      jobTitleIds: jobTitleIds.length ? jobTitleIds : undefined,
-      phone:   phone.trim()   || undefined,
-      country: country.trim() || undefined,
-      bio:     bio.trim()     || undefined,
+      campusId:         campusId    ?? undefined,
+      jobTitleIds:      jobTitleIds.length ? jobTitleIds : undefined,
+      phone:            phone.trim()   || undefined,
+      country:          country.trim() || undefined,
+      bio:              bio.trim()     || undefined,
+      ministerialTitle: ministerialTitle ?? undefined,
     };
     createUser.mutate(payload, {
       onSuccess: (newUser) => {
@@ -558,7 +627,7 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Contraseña <span className="text-red-400">*</span> <span className="text-slate-300 font-normal">— mín. 6 caracteres</span></label>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">Contraseña <span className="text-slate-400 font-normal">(opcional) — mín. 6 caracteres</span></label>
             <div className="relative">
               <input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 pr-10 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition" placeholder="••••••••" />
@@ -578,6 +647,22 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
               <option value="">Seleccionar rol...</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>{ROLE_LABELS[r.name] ?? r.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Nombramiento ministerial <span className="text-slate-300 font-normal">— opcional</span>
+            </label>
+            <select
+              value={ministerialTitle ?? ''}
+              onChange={(e) => setMinisterialTitle((e.target.value as MinisterialTitle) || null)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition bg-white"
+            >
+              <option value="">Sin nombramiento</option>
+              {(Object.entries(MINISTERIAL_LABEL) as [MinisterialTitle, string][]).map(([val, label]) => (
+                <option key={val} value={val}>{label} ({MINISTERIAL_PREFIX[val]})</option>
               ))}
             </select>
           </div>
@@ -618,8 +703,7 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
             </div>
             <div>
               <label className="block text-[11px] font-medium text-slate-500 mb-1">País</label>
-              <input type="text" value={country} onChange={(e) => setCountry(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition" placeholder="Colombia, Chile..." />
+              <CountryPicker value={country} onChange={setCountry} placeholder="Chile, Colombia…" />
             </div>
           </div>
 
@@ -691,7 +775,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isPending }: DeleteConf
             <p className="text-[15px] font-bold text-slate-900">¿Eliminar persona?</p>
             <p className="text-[12.5px] text-slate-500 mt-1.5 leading-relaxed">
               Estás a punto de eliminar a{' '}
-              <span className="font-semibold text-slate-700">{user.firstName} {user.lastName}</span>.
+              <span className="font-semibold text-slate-700">{displayName(user)}</span>.
               Esta acción no se puede deshacer.
             </p>
           </div>
@@ -703,7 +787,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isPending }: DeleteConf
               : <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-semibold" style={{ background: bg, color: text }}>{userInitials(user)}</div>
             }
             <div className="min-w-0 text-left">
-              <p className="text-[12px] font-semibold text-slate-800 truncate">{user.firstName} {user.lastName}</p>
+              <p className="text-[12px] font-semibold text-slate-800 truncate">{displayName(user)}</p>
               <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
             </div>
           </div>
@@ -806,6 +890,395 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
   );
 }
 
+// ── Excel helpers ─────────────────────────────────────────────────────────────
+
+const TEMPLATE_HEADERS = [
+  'Nombre *', 'Apellido *', 'Email *', 'Contraseña', 'Rol * (admin / user)',
+  'Teléfono', 'País', 'Campus', 'Cargos (separados por coma)', 'Biografía',
+];
+
+async function downloadTemplate() {
+  const XLSX = await import('xlsx');
+  const wb   = XLSX.utils.book_new();
+  const ws   = XLSX.utils.aoa_to_sheet([
+    TEMPLATE_HEADERS,
+    ['Juan', 'Pérez', 'juan@iglesia.com', '', 'user', '+56 9 1234 5678', 'Chile', 'Campus Santiago', 'Diseño, Producción', 'Breve bio de ejemplo'],
+  ]);
+  ws['!cols'] = TEMPLATE_HEADERS.map((h) => ({ wch: Math.max(h.length + 2, 20) }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Personas');
+  XLSX.writeFile(wb, 'formato_importacion_personas.xlsx');
+}
+
+// ── ImportarExcelModal ────────────────────────────────────────────────────────
+
+interface ParsedRow {
+  index:      number;
+  firstName:  string;
+  lastName:   string;
+  email:      string;
+  password?:  string;
+  roleName:   string;
+  phone?:     string;
+  country?:   string;
+  campusName?: string;
+  jobTitlesRaw?: string;
+  bio?:       string;
+  errors:     string[];
+}
+
+interface ImportResult {
+  index:   number;
+  email:   string;
+  status:  'success' | 'error';
+  message?: string;
+}
+
+interface ImportarExcelModalProps {
+  roles:        { id: number; name: string }[];
+  campuses:     { id: number; name: string; siglas?: string | null }[];
+  allJobTitles: JobTitle[];
+  onClose:      () => void;
+  onDone:       () => void;
+}
+
+function ImportarExcelModal({ roles, campuses, allJobTitles, onClose, onDone }: ImportarExcelModalProps) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [rows,     setRows]     = useState<ParsedRow[]>([]);
+  const [fileName, setFileName] = useState('');
+  const [phase,    setPhase]    = useState<'idle' | 'preview' | 'importing' | 'done'>('idle');
+  const [results,  setResults]  = useState<ImportResult[]>([]);
+  const [current,  setCurrent]  = useState(0);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && phase !== 'importing') onClose(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [onClose, phase]);
+
+  function validateRows(raw: Record<string, string>[]): ParsedRow[] {
+    return raw.map((r, i) => {
+      const firstName  = (r['Nombre *'] ?? r['Nombre'] ?? '').trim();
+      const lastName   = (r['Apellido *'] ?? r['Apellido'] ?? '').trim();
+      const email      = (r['Email *'] ?? r['Email'] ?? '').trim().toLowerCase();
+      const password   = (r['Contraseña'] ?? '').trim() || undefined;
+      const roleName   = (r['Rol * (admin / user)'] ?? r['Rol'] ?? '').trim().toLowerCase();
+      const phone      = (r['Teléfono'] ?? '').trim() || undefined;
+      const country    = (r['País'] ?? '').trim() || undefined;
+      const campusName = (r['Campus'] ?? '').trim() || undefined;
+      const jobTitlesRaw = (r['Cargos (separados por coma)'] ?? r['Cargos'] ?? '').trim() || undefined;
+      const bio        = (r['Biografía'] ?? r['Biografia'] ?? '').trim() || undefined;
+
+      const errors: string[] = [];
+      if (!firstName)              errors.push('Nombre requerido');
+      if (!lastName)               errors.push('Apellido requerido');
+      if (!email)                  errors.push('Email requerido');
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push('Email inválido');
+      if (!roleName)               errors.push('Rol requerido');
+      else if (!['admin', 'user'].includes(roleName)) errors.push(`Rol inválido "${roleName}" — debe ser admin o user`);
+      if (password && password.length < 6) errors.push('Contraseña debe tener mín. 6 caracteres');
+
+      return { index: i + 2, firstName, lastName, email, password, roleName, phone, country, campusName, jobTitlesRaw, bio, errors };
+    });
+  }
+
+  async function handleFile(file: File) {
+    setFileName(file.name);
+    const XLSX  = await import('xlsx');
+    const buf   = await file.arrayBuffer();
+    const wb    = XLSX.read(buf, { type: 'array' });
+    const ws    = wb.Sheets[wb.SheetNames[0]];
+    const data  = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
+    setRows(validateRows(data));
+    setPhase('preview');
+  }
+
+  async function handleImport() {
+    setPhase('importing');
+    setCurrent(0);
+    const res: ImportResult[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].errors.length > 0) {
+        res.push({ index: rows[i].index, email: rows[i].email, status: 'error', message: rows[i].errors.join(', ') });
+        continue;
+      }
+      setCurrent(i + 1);
+      const row = rows[i];
+
+      const role = roles.find((r) => r.name === row.roleName);
+      if (!role) {
+        res.push({ index: row.index, email: row.email, status: 'error', message: `Rol "${row.roleName}" no encontrado` });
+        continue;
+      }
+
+      const campus = row.campusName
+        ? campuses.find((c) => c.name.toLowerCase() === row.campusName!.toLowerCase() || c.siglas?.toLowerCase() === row.campusName!.toLowerCase())
+        : undefined;
+
+      // Resolve job title IDs — create if missing
+      let jobTitleIds: number[] | undefined;
+      if (row.jobTitlesRaw) {
+        const names = row.jobTitlesRaw.split(',').map((s) => s.trim()).filter(Boolean);
+        jobTitleIds = [];
+        for (const name of names) {
+          const existing = allJobTitles.find((jt) => jt.name.toLowerCase() === name.toLowerCase());
+          if (existing) {
+            jobTitleIds.push(existing.id);
+          } else {
+            try {
+              const created = await api.post<JobTitle>('/job-titles', { name }).then((r) => r.data);
+              jobTitleIds.push(created.id);
+              allJobTitles.push(created);
+            } catch { /* ignore create errors for job titles */ }
+          }
+        }
+      }
+
+      const payload: CreateUserDto = {
+        firstName:   row.firstName,
+        lastName:    row.lastName,
+        email:       row.email,
+        roleId:      role.id,
+        ...(row.password    && { password: row.password }),
+        ...(campus          && { campusId: campus.id }),
+        ...(jobTitleIds?.length && { jobTitleIds }),
+        ...(row.phone       && { phone: row.phone }),
+        ...(row.country     && { country: row.country }),
+        ...(row.bio         && { bio: row.bio }),
+      };
+
+      try {
+        await api.post('/users', payload);
+        res.push({ index: row.index, email: row.email, status: 'success' });
+      } catch (err: any) {
+        const msg = err?.response?.data?.message ?? 'Error desconocido';
+        res.push({ index: row.index, email: row.email, status: 'error', message: Array.isArray(msg) ? msg.join(', ') : msg });
+      }
+    }
+
+    setResults(res);
+    setPhase('done');
+    onDone();
+  }
+
+  const validRows   = rows.filter((r) => r.errors.length === 0);
+  const invalidRows = rows.filter((r) => r.errors.length > 0);
+  const successCount = results.filter((r) => r.status === 'success').length;
+  const errorCount   = results.filter((r) => r.status === 'error').length;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={phase !== 'importing' ? onClose : undefined}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[600px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50">
+          <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4.5 h-4.5 text-emerald-600 w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-slate-900 text-[14px]">Importar personas desde Excel</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Carga masiva de usuarios desde archivo .xlsx o .xls</p>
+          </div>
+          {phase !== 'importing' && (
+            <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100 text-sm">✕</button>
+          )}
+        </div>
+
+        <div className="p-5 flex flex-col gap-4 max-h-[75vh] overflow-y-auto">
+
+          {/* IDLE — drop zone */}
+          {phase === 'idle' && (
+            <>
+              <div
+                onClick={() => fileRef.current?.click()}
+                className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center gap-3 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/40 transition-all"
+              >
+                <svg className="w-10 h-10 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <div className="text-center">
+                  <p className="text-[13px] font-semibold text-slate-700">Haz clic para seleccionar un archivo</p>
+                  <p className="text-[11.5px] text-slate-400 mt-0.5">Formatos soportados: .xlsx, .xls</p>
+                </div>
+              </div>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+
+              <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                <svg className="w-4 h-4 text-blue-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <p className="text-[11.5px] text-blue-700">
+                  Descarga el formato de Excel para ver las columnas requeridas y un ejemplo de datos.
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* PREVIEW */}
+          {phase === 'preview' && (
+            <>
+              <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <svg className="w-4 h-4 text-slate-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                </svg>
+                <span className="text-[12px] text-slate-600 font-medium truncate">{fileName}</span>
+                <span className="ml-auto text-[11.5px] text-slate-400 flex-shrink-0">{rows.length} fila{rows.length !== 1 ? 's' : ''} leída{rows.length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {rows.length === 0 ? (
+                <p className="text-[13px] text-slate-400 text-center py-6">El archivo está vacío o no tiene el formato esperado.</p>
+              ) : (
+                <>
+                  <div className="flex gap-3">
+                    {validRows.length > 0 && (
+                      <div className="flex-1 flex items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                        <span className="text-lg font-bold text-emerald-600">{validRows.length}</span>
+                        <span className="text-[12px] text-emerald-700">lista{validRows.length !== 1 ? 's' : ''} para importar</span>
+                      </div>
+                    )}
+                    {invalidRows.length > 0 && (
+                      <div className="flex-1 flex items-center gap-2 p-3 bg-red-50 rounded-xl border border-red-200">
+                        <span className="text-lg font-bold text-red-500">{invalidRows.length}</span>
+                        <span className="text-[12px] text-red-700">con error{invalidRows.length !== 1 ? 'es' : ''}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                      <table className="w-full text-[11.5px]">
+                        <thead className="bg-slate-50 sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Fila</th>
+                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Nombre</th>
+                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Email</th>
+                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Rol</th>
+                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row) => (
+                            <tr key={row.index} className={`border-t border-slate-100 ${row.errors.length > 0 ? 'bg-red-50/60' : ''}`}>
+                              <td className="px-3 py-2 text-slate-400">{row.index}</td>
+                              <td className="px-3 py-2 text-slate-700 font-medium">{row.firstName} {row.lastName}</td>
+                              <td className="px-3 py-2 text-slate-500">{row.email}</td>
+                              <td className="px-3 py-2 text-slate-500">{row.roleName}</td>
+                              <td className="px-3 py-2">
+                                {row.errors.length === 0
+                                  ? <span className="text-emerald-600 font-medium">✓ OK</span>
+                                  : <span className="text-red-600 text-[10.5px]" title={row.errors.join('\n')}>✕ {row.errors[0]}{row.errors.length > 1 ? ` (+${row.errors.length - 1})` : ''}</span>
+                                }
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {invalidRows.length > 0 && validRows.length === 0 && (
+                    <p className="text-[12px] text-red-600 text-center">Corrige los errores en el archivo y vuelve a intentarlo.</p>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* IMPORTING */}
+          {phase === 'importing' && (
+            <div className="flex flex-col items-center gap-4 py-6">
+              <div className="w-12 h-12 border-4 border-slate-200 border-t-emerald-500 rounded-full animate-spin" />
+              <div className="text-center">
+                <p className="text-[14px] font-semibold text-slate-800">Importando personas...</p>
+                <p className="text-[12px] text-slate-400 mt-1">{current} de {rows.length}</p>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div className="bg-emerald-500 h-2 rounded-full transition-all duration-300" style={{ width: `${(current / rows.length) * 100}%` }} />
+              </div>
+            </div>
+          )}
+
+          {/* DONE */}
+          {phase === 'done' && (
+            <>
+              <div className="flex flex-col items-center gap-3 py-4">
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${errorCount === 0 ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+                  <span className="text-2xl">{errorCount === 0 ? '✓' : '⚠'}</span>
+                </div>
+                <div className="text-center">
+                  <p className="text-[15px] font-bold text-slate-900">Importación completada</p>
+                  <p className="text-[12.5px] text-slate-500 mt-1">
+                    {successCount} importada{successCount !== 1 ? 's' : ''} correctamente
+                    {errorCount > 0 ? ` · ${errorCount} con error` : ''}
+                  </p>
+                </div>
+              </div>
+
+              {errorCount > 0 && (
+                <div className="border border-red-200 rounded-xl overflow-hidden">
+                  <div className="max-h-48 overflow-y-auto">
+                    <table className="w-full text-[11.5px]">
+                      <thead className="bg-red-50 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-red-400">Email</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-red-400">Error</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.filter((r) => r.status === 'error').map((r) => (
+                          <tr key={r.index} className="border-t border-red-100">
+                            <td className="px-3 py-2 text-slate-600">{r.email}</td>
+                            <td className="px-3 py-2 text-red-600">{r.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Footer buttons */}
+          <div className="flex items-center gap-2 pt-1">
+            {phase === 'idle' && (
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[13px] font-medium text-slate-500 hover:bg-slate-50 transition-colors">
+                Cancelar
+              </button>
+            )}
+
+            {phase === 'preview' && (
+              <>
+                <button onClick={() => { setRows([]); setFileName(''); setPhase('idle'); if (fileRef.current) fileRef.current.value = ''; }}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-500 hover:bg-slate-50 transition-colors">
+                  ← Atrás
+                </button>
+                <button
+                  onClick={handleImport}
+                  disabled={validRows.length === 0}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-[13px] font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Importar {validRows.length} persona{validRows.length !== 1 ? 's' : ''}
+                </button>
+              </>
+            )}
+
+            {phase === 'done' && (
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-slate-900 text-[13px] font-semibold text-white hover:bg-slate-700 transition-colors">
+                Cerrar
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── PersonasPage ──────────────────────────────────────────────────────────────
 
 export default function PersonasPage() {
@@ -828,6 +1301,7 @@ export default function PersonasPage() {
   const { data: users = [], isLoading } = useUsers(debounced || undefined);
   const { data: allJobTitles = [] }     = useAllJobTitles();
   const { data: campuses = [] }         = useActiveCampuses();
+  const { data: roles = [] }            = useRoles();
   const createJobTitle                  = useCreateJobTitle();
 
   async function handleCreateJobTitle(name: string): Promise<JobTitle> {
@@ -839,6 +1313,7 @@ export default function PersonasPage() {
 
   const [editing,        setEditing]        = useState<User | null>(null);
   const [creating,       setCreating]       = useState(false);
+  const [importing,      setImporting]      = useState(false);
   const [confirmDelete,  setConfirmDelete]  = useState<User | null>(null);
   const [togglingId,     setTogglingId]     = useState<number | null>(null);
 
@@ -884,11 +1359,11 @@ export default function PersonasPage() {
         <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6" />
         </svg>
-        Directorio
+        Configuración
       </Link>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Personas</h1>
           <p className="text-sm text-slate-400 mt-0.5">
@@ -898,13 +1373,36 @@ export default function PersonasPage() {
             }
           </p>
         </div>
-        <button onClick={() => setCreating(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all bg-violet-600 hover:bg-violet-700">
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Nueva persona
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={downloadTemplate}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12.5px] font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all"
+            title="Descargar formato Excel de importación"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Formato Excel
+          </button>
+          <button
+            onClick={() => setImporting(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12.5px] font-semibold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-all"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Importar Excel
+          </button>
+          <CanDo permission="users:create">
+            <button onClick={() => setCreating(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12.5px] font-semibold text-white transition-all bg-violet-600 hover:bg-violet-700">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Nueva persona
+            </button>
+          </CanDo>
+        </div>
       </div>
 
       {/* Search + Filters */}
@@ -983,7 +1481,7 @@ export default function PersonasPage() {
                             : <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-[12px] font-semibold" style={{ background: bg, color: text }}>{userInitials(u)}</div>
                           }
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-900 truncate">{u.firstName} {u.lastName}</p>
+                            <p className="text-sm font-semibold text-slate-900 truncate">{displayName(u)}</p>
                             <p className="text-[11px] text-slate-400 truncate">{u.email}</p>
                           </div>
                         </div>
@@ -1008,31 +1506,37 @@ export default function PersonasPage() {
                       <td className="px-4 py-3"><StatusBadge status={u.status} /></td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <button onClick={() => setEditing(u)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors" title="Editar">
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                          </button>
-                          <button onClick={() => handleToggle(u)} disabled={togglingId === u.id}
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50 ${u.status === 'active' ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
-                            title={u.status === 'active' ? 'Desactivar' : 'Activar'}>
-                            {togglingId === u.id
-                              ? <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
-                              : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" />
-                                </svg>
-                            }
-                          </button>
-                          <button
-                            onClick={() => setConfirmDelete(u)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Eliminar">
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
-                            </svg>
-                          </button>
+                          <CanDo permission="users:edit">
+                            <button onClick={() => setEditing(u)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors" title="Editar">
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                              </svg>
+                            </button>
+                          </CanDo>
+                          <CanDo permission="users:edit">
+                            <button onClick={() => handleToggle(u)} disabled={togglingId === u.id}
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50 ${u.status === 'active' ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
+                              title={u.status === 'active' ? 'Desactivar' : 'Activar'}>
+                              {togglingId === u.id
+                                ? <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                                : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" />
+                                  </svg>
+                              }
+                            </button>
+                          </CanDo>
+                          <CanDo permission="users:delete">
+                            <button
+                              onClick={() => setConfirmDelete(u)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              title="Eliminar">
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
+                              </svg>
+                            </button>
+                          </CanDo>
                         </div>
                       </td>
                     </tr>
@@ -1087,6 +1591,15 @@ export default function PersonasPage() {
           allJobTitles={allJobTitles}
           onCreateJobTitle={handleCreateJobTitle}
           onClose={() => setCreating(false)}
+        />
+      )}
+      {importing && (
+        <ImportarExcelModal
+          roles={roles}
+          campuses={campuses}
+          allJobTitles={allJobTitles}
+          onClose={() => setImporting(false)}
+          onDone={() => {}}
         />
       )}
       {confirmDelete && (

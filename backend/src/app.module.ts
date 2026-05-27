@@ -16,6 +16,12 @@ import { StorageModule } from './common/storage/storage.module';
 import { JobTitlesModule } from './job-titles/job-titles.module';
 import { CampusModule } from './campus/campus.module';
 import { RolesModule } from './roles/roles.module';
+import { FichasModule } from './fichas/fichas.module';
+import { CancionesModule } from './canciones/canciones.module';
+import { EventsModule } from './events/events.module';
+import { DisponibilidadModule } from './disponibilidad/disponibilidad.module';
+import { FeedbackModule } from './feedback/feedback.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 
 const envSchema = Joi.object({
   NODE_ENV:             Joi.string().valid('development', 'production', 'test').default('development'),
@@ -61,6 +67,12 @@ const envSchema = Joi.object({
     JobTitlesModule,
     CampusModule,
     RolesModule,
+    FichasModule,
+    CancionesModule,
+    EventsModule,
+    DisponibilidadModule,
+    FeedbackModule,
+    OnboardingModule,
   ],
 })
 export class AppModule {}

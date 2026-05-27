@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  experimental: {
+    staleTimes: {
+      dynamic: 0,   // no client-side cache for dynamic pages
+      static: 180,
+    },
+  },
   images: {
     remotePatterns: [
       // Backend local — logos de equipo/área en desarrollo

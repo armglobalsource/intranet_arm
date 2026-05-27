@@ -122,7 +122,7 @@ export function useDeleteOrgTeam() {
 export function useCreateOrgMembership() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { userId: number; areaId?: number; teamId?: number; role: string; sortOrder?: number }) =>
+    mutationFn: (data: { userId: number; areaId?: number; teamId?: number; role: string; customTitle?: string | null; sortOrder?: number }) =>
       api.post('/orgchart/memberships', data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['orgchart'] }),
   });

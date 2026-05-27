@@ -78,12 +78,15 @@ export class OrgChartService {
     ]);
     const usersMap = await this.loadUsersMap(Array.from(userIds));
 
-    const formattedLeaders = leaders.map((m) => ({
-      ...m,
-      area: { id: area.id, name: area.name, color: area.color, slug: area.slug, icon: area.icon },
-      team: null,
-      user: fmtUser(usersMap[m.userId]),
-    }));
+    const formattedLeaders = leaders
+      .map((m) => ({
+        ...m,
+        area: { id: area.id, name: area.name, color: area.color, slug: area.slug, icon: area.icon },
+        team: null,
+        user: fmtUser(usersMap[m.userId]),
+      }))
+      // Ignorar membresías cuyo usuario fue eliminado
+      .filter((m) => m.user !== null);
 
     const teamsWithMembers = teams.map((team) => ({
       ...team,
@@ -95,7 +98,9 @@ export class OrgChartService {
           area: null,
           team: { id: team.id, name: team.name, area: { id: area.id, name: area.name, color: area.color, slug: area.slug, icon: area.icon } },
           user: fmtUser(usersMap[m.userId]),
-        })),
+        }))
+        // Ignorar membresías cuyo usuario fue eliminado
+        .filter((m) => m.user !== null),
     }));
 
     return { ...area, leaders: formattedLeaders, teams: teamsWithMembers };
@@ -236,13 +241,14 @@ export class OrgChartService {
     const membSnap = await this.fb.db.collection(MEMBERSHIPS).where('userId', '==', userId).get();
     const memberships = this.fb.toDocs(membSnap).sort((a, b) => a.sortOrder - b.sortOrder);
 
-    const areaIds = [...new Set(memberships.map((m) => m.areaId).filter(Boolean))];
+    const directAreaIds = memberships.map((m) => m.areaId).filter(Boolean);
     const teamIds = [...new Set(memberships.map((m) => m.teamId).filter(Boolean))];
 
-    const [areasMap, teamsMap] = await Promise.all([
-      this.loadMap(AREAS, areaIds),
-      this.loadMap(TEAMS, teamIds),
-    ]);
+    // Load teams first so we can collect their areaIds too
+    const teamsMap = await this.loadMap(TEAMS, teamIds);
+    const teamAreaIds = Object.values(teamsMap).map((t: any) => t.areaId).filter(Boolean);
+    const allAreaIds = [...new Set([...directAreaIds, ...teamAreaIds])];
+    const areasMap = await this.loadMap(AREAS, allAreaIds);
 
     const orgMemberships = memberships.map((m) => {
       const team = m.teamId ? teamsMap[m.teamId] : null;
@@ -278,12 +284,14 @@ export class OrgChartService {
     if (!matched.length) return [];
 
     const memberships = this.fb.toDocs(membSnap);
-    const areaIds = [...new Set(memberships.map((m) => m.areaId).filter(Boolean))];
+    const directAreaIds = memberships.map((m) => m.areaId).filter(Boolean);
     const teamIds = [...new Set(memberships.map((m) => m.teamId).filter(Boolean))];
-    const [areasMap, teamsMap] = await Promise.all([
-      this.loadMap(AREAS, areaIds),
-      this.loadMap(TEAMS, teamIds),
-    ]);
+
+    // Load teams first so we can also load their areas
+    const teamsMap = await this.loadMap(TEAMS, teamIds);
+    const teamAreaIds = Object.values(teamsMap).map((t: any) => t.areaId).filter(Boolean);
+    const allAreaIds = [...new Set([...directAreaIds, ...teamAreaIds])];
+    const areasMap = await this.loadMap(AREAS, allAreaIds);
 
     return matched.map((u) => ({
       ...fmtUser(u),

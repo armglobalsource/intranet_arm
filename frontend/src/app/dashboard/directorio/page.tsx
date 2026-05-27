@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { DirectorioClient } from './DirectorioClient';
 
-export const metadata: Metadata = { title: 'Directorio' };
+export const metadata: Metadata = { title: 'Configuración' };
 
 export default function DirectorioPage() {
   return <DirectorioClient />;

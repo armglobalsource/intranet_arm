@@ -15,11 +15,11 @@ export class CampusService {
   }
 
   async findActive() {
-    const snap = await this.fb.db.collection(COL)
-      .where('isActive', '==', true)
-      .orderBy('name')
-      .get();
-    return this.fb.toDocs(snap).map(({ id, name, address }) => ({ id, name, address }));
+    const snap = await this.fb.db.collection(COL).get();
+    return this.fb.toDocs(snap)
+      .filter((c) => c.isActive)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(({ id, name, siglas, address, country, phone }) => ({ id, name, siglas, address, country, phone }));
   }
 
   async findOne(id: number) {
@@ -30,7 +30,6 @@ export class CampusService {
 
   async create(dto: CreateCampusDto) {
     const name = dto.name.trim();
-    // Verificar duplicado (case-insensitive)
     const snap = await this.fb.db.collection(COL)
       .where('nameLower', '==', name.toLowerCase())
       .limit(1).get();
@@ -38,12 +37,23 @@ export class CampusService {
 
     const id = await this.fb.nextId(COL);
     const doc = {
-      id, name,
-      nameLower: name.toLowerCase(),
-      address:   dto.address?.trim() ?? null,
-      isActive:  true,
-      createdAt: this.fb.now(),
-      updatedAt: this.fb.now(),
+      id,
+      name,
+      nameLower:    name.toLowerCase(),
+      siglas:       dto.siglas?.trim()      ?? null,
+      address:      dto.address?.trim()     ?? null,
+      city:         dto.city?.trim()        ?? null,
+      country:      dto.country?.trim()     ?? null,
+      phone:        dto.phone?.trim()       ?? null,
+      email:        dto.email?.trim()       ?? null,
+      website:      dto.website?.trim()     ?? null,
+      description:  dto.description?.trim() ?? null,
+      pastorIds:    dto.pastorIds           ?? [],
+      adminIds:     dto.adminIds            ?? [],
+      schedules:    dto.schedules           ?? [],
+      isActive:     true,
+      createdAt:    this.fb.now(),
+      updatedAt:    this.fb.now(),
     };
     await this.fb.db.collection(COL).doc(String(id)).set(doc);
     return this.fb.toObj(await this.fb.db.collection(COL).doc(String(id)).get());
@@ -61,9 +71,19 @@ export class CampusService {
       }
     }
     const data: any = { updatedAt: this.fb.now() };
-    if (dto.name    !== undefined) { data.name = dto.name.trim(); data.nameLower = dto.name.trim().toLowerCase(); }
-    if (dto.address !== undefined) data.address = dto.address?.trim() ?? null;
-    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.name        !== undefined) { data.name = dto.name.trim(); data.nameLower = dto.name.trim().toLowerCase(); }
+    if (dto.siglas      !== undefined) data.siglas      = dto.siglas?.trim()      ?? null;
+    if (dto.address     !== undefined) data.address     = dto.address?.trim()     ?? null;
+    if (dto.city        !== undefined) data.city        = dto.city?.trim()        ?? null;
+    if (dto.country     !== undefined) data.country     = dto.country?.trim()     ?? null;
+    if (dto.phone       !== undefined) data.phone       = dto.phone?.trim()       ?? null;
+    if (dto.email       !== undefined) data.email       = dto.email?.trim()       ?? null;
+    if (dto.website     !== undefined) data.website     = dto.website?.trim()     ?? null;
+    if (dto.description !== undefined) data.description = dto.description?.trim() ?? null;
+    if (dto.isActive    !== undefined) data.isActive    = dto.isActive;
+    if (dto.pastorIds !== undefined) data.pastorIds = dto.pastorIds;
+    if (dto.adminIds  !== undefined) data.adminIds  = dto.adminIds;
+    if (dto.schedules !== undefined) data.schedules = dto.schedules;
 
     await this.fb.db.collection(COL).doc(String(id)).update(data);
     return this.findOne(id);

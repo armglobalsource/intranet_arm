@@ -21,6 +21,35 @@ export interface UserJobTitle {
 
 export type UserGender = 'male' | 'female' | 'other' | 'prefer_not_to_say';
 
+// ── Nombramiento ministerial ──────────────────────────────────────────────────
+
+export type MinisterialTitle = 'pastor_principal' | 'pastor' | 'ministro';
+
+export const MINISTERIAL_LABEL: Record<MinisterialTitle, string> = {
+  pastor_principal: 'Pastor Principal',
+  pastor:           'Pastor',
+  ministro:         'Ministro',
+};
+
+export const MINISTERIAL_PREFIX: Record<MinisterialTitle, string> = {
+  pastor_principal: 'Ps. Ppal.',
+  pastor:           'Ps.',
+  ministro:         'Min.',
+};
+
+/** Devuelve el prefijo abreviado del nombramiento, o cadena vacía */
+export function ministerialPrefix(u: { ministerialTitle?: string | null }): string {
+  const t = u.ministerialTitle as MinisterialTitle | null | undefined;
+  return t ? (MINISTERIAL_PREFIX[t] ?? '') : '';
+}
+
+/** Nombre completo con prefijo ministerial antepuesto si aplica */
+export function displayName(u: { firstName: string; lastName?: string | null; ministerialTitle?: string | null }): string {
+  const prefix = ministerialPrefix(u);
+  const name   = [u.firstName, u.lastName].filter(Boolean).join(' ');
+  return prefix ? `${prefix} ${name}` : name;
+}
+
 export interface User {
   id: number;
   email: string;
@@ -32,6 +61,7 @@ export interface User {
   bio?: string | null;
   birthDate?: string | null;
   gender?: UserGender | null;
+  ministerialTitle?: MinisterialTitle | null;
   status: 'active' | 'inactive' | 'suspended';
   departmentId?: number | null;
   campusId?: number | null;
@@ -55,8 +85,9 @@ export interface UpdateUserDto {
   country?:     string;
   bio?:         string;
   birthDate?:   string | null;
-  gender?:      UserGender | null;
-  status?:      'active' | 'inactive' | 'suspended';
+  gender?:            UserGender | null;
+  ministerialTitle?:  MinisterialTitle | null;
+  status?:            'active' | 'inactive' | 'suspended';
 }
 
 /** Extrae los nombres de cargos de un usuario */

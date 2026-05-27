@@ -1,17 +1,26 @@
 export type OrgRole = 'area_leader' | 'team_leader' | 'member';
 
+export type MinisterialTitle = 'pastor_principal' | 'pastor' | 'ministro';
+
+export const MINISTERIAL_PREFIX: Record<MinisterialTitle, string> = {
+  pastor_principal: 'Ps. Ppal.',
+  pastor:           'Ps.',
+  ministro:         'Min.',
+};
+
 export interface OrgUser {
   id: number;
   firstName: string;
   lastName: string;
   email: string;
   avatarUrl?: string | null;
-  jobTitles: { jobTitle: { name: string } }[];
+  jobTitles: { jobTitle: { id: number; name: string } }[];
   phone?: string | null;
   country?: string | null;
   bio?: string | null;
   campus?: { id: number; name: string } | null;
   status?: 'active' | 'inactive' | 'suspended';
+  ministerialTitle?: MinisterialTitle | null;
 }
 
 /** Primer cargo del usuario o null */
@@ -51,6 +60,7 @@ export interface OrgArea {
   icon: string;
   iconUrl?: string | null;
   desc?: string | null;
+  leaderDesc?: string | null;
   sortOrder: number;
   isActive?: boolean;
 }

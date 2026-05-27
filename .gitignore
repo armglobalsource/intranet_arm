@@ -43,9 +43,15 @@ Thumbs.db
 
 # ── Testing ───────────────────────────────────────────────────
 coverage/
+frontend/test-results/
+frontend/playwright-report/
 
 # ── Database dumps (excluye migraciones de Prisma) ────────────
 prod_data.sql
 /prod_data.sql
 
-package-lock.json
+# package-lock.json se commitea para que npm ci funcione en CI/CD
+
+# ── Playwright MCP / build cache ──────────────────────────────
+.playwright-mcp/
+frontend/tsconfig.tsbuildinfo

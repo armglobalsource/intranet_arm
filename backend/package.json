@@ -4,7 +4,7 @@
   "description": "Intranet Corporativa — Backend API (NestJS)",
   "private": true,
   "scripts": {
-    "build": "nest build",
+    "build": "rm -rf dist && npx tsc -p tsconfig.build.json",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -26,6 +26,7 @@
     "@nestjs/platform-express": "^10.3.0",
     "@nestjs/swagger": "^7.3.0",
     "@nestjs/throttler": "^5.1.2",
+    "@types/passport-google-oauth20": "^2.0.17",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
@@ -34,6 +35,7 @@
     "joi": "^18.2.1",
     "nodemailer": "^6.9.13",
     "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "reflect-metadata": "^0.2.1",
@@ -55,6 +57,7 @@
     "eslint": "^8.57.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.3",
-    "vitest": "^1.4.0"
+    "vitest": "^1.4.0",
+    "xlsx": "^0.18.5"
   }
 }

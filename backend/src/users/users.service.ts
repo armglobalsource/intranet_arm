@@ -82,7 +82,7 @@ export class UsersService {
     // Cargar jobTitles para denormalizar
     const jobTitles = await this.resolveJobTitles(dto.jobTitleIds ?? []);
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const passwordHash = dto.password ? await bcrypt.hash(dto.password, 12) : null;
     const id           = await this.fb.nextId(COL);
 
     const doc = {
@@ -95,9 +95,11 @@ export class UsersService {
       campusId:     dto.campusId ?? null,
       campus,
       jobTitles,
-      phone:        dto.phone?.trim()   ?? null,
-      country:      dto.country?.trim() ?? null,
-      bio:          dto.bio?.trim()     ?? null,
+      phone:             dto.phone?.trim()            ?? null,
+      country:           dto.country?.trim()          ?? null,
+      bio:               dto.bio?.trim()              ?? null,
+      birthDate:         dto.birthDate?.trim()        ?? null,
+      ministerialTitle:  dto.ministerialTitle         ?? null,
       avatarUrl:    null,
       status:       'active',
       departmentId: null,
@@ -133,12 +135,13 @@ export class UsersService {
       data.lastName  = dto.lastName.trim();
       data.nameLower = `${dto.firstName ?? current.data()!.firstName} ${dto.lastName}`.toLowerCase();
     }
-    if (dto.phone     !== undefined) data.phone     = dto.phone?.trim()     ?? null;
-    if (dto.country   !== undefined) data.country   = dto.country?.trim()   ?? null;
-    if (dto.bio       !== undefined) data.bio       = dto.bio?.trim()       ?? null;
-    if (dto.birthDate !== undefined) data.birthDate = dto.birthDate?.trim() ?? null;
-    if (dto.gender    !== undefined) data.gender    = dto.gender            ?? null;
-    if (dto.status    !== undefined) data.status    = dto.status;
+    if (dto.phone             !== undefined) data.phone             = dto.phone?.trim()            ?? null;
+    if (dto.country           !== undefined) data.country           = dto.country?.trim()          ?? null;
+    if (dto.bio               !== undefined) data.bio               = dto.bio?.trim()              ?? null;
+    if (dto.birthDate         !== undefined) data.birthDate         = dto.birthDate?.trim()        ?? null;
+    if (dto.gender            !== undefined) data.gender            = dto.gender                   ?? null;
+    if (dto.status            !== undefined) data.status            = dto.status;
+    if (dto.ministerialTitle  !== undefined) data.ministerialTitle  = dto.ministerialTitle         ?? null;
     if (dto.campusId  !== undefined) {
       data.campusId = dto.campusId;
       if (dto.campusId) {
@@ -172,6 +175,78 @@ export class UsersService {
 
   async updateLastLogin(id: number) {
     await this.fb.db.collection(COL).doc(String(id)).update({ lastLoginAt: this.fb.now() });
+  }
+
+  async patchGoogleFields(id: number, patch: Record<string, string>) {
+    const data: Record<string, any> = { ...patch, updatedAt: this.fb.now() };
+    if (patch.firstName || patch.lastName) {
+      const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+      const current = snap.data()!;
+      data.nameLower = `${patch.firstName ?? current.firstName} ${patch.lastName ?? current.lastName}`.toLowerCase();
+    }
+    await this.fb.db.collection(COL).doc(String(id)).update(data);
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    return this.fb.toObj(snap);
+  }
+
+  async claimAccount(id: number, data: { firstName: string; lastName: string }) {
+    await this.fb.db.collection(COL).doc(String(id)).update({
+      firstName: data.firstName.trim(),
+      lastName:  data.lastName.trim(),
+      nameLower: `${data.firstName} ${data.lastName}`.toLowerCase(),
+      updatedAt: this.fb.now(),
+    });
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    return this.fb.toObj(snap);
+  }
+
+  async selfRegister(data: {
+    email: string;
+    password?: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  }) {
+    const email = data.email.trim().toLowerCase();
+    const existing = await this.findByEmail(email);
+    if (existing) throw new ConflictException('Ya existe un usuario con ese email');
+
+    const roleSnap = await this.fb.db.collection('roles').doc('2').get();
+    const role = roleSnap.exists
+      ? { id: 2, name: roleSnap.data()!.name }
+      : { id: 2, name: 'employee' };
+
+    const passwordHash = data.password ? await bcrypt.hash(data.password, 12) : null;
+    const id = await this.fb.nextId(COL);
+
+    const doc = {
+      id, email, passwordHash,
+      firstName:    data.firstName.trim(),
+      lastName:     data.lastName.trim(),
+      nameLower:    `${data.firstName} ${data.lastName}`.toLowerCase(),
+      roleId:       2,
+      role,
+      campusId:     null,
+      campus:       null,
+      jobTitles:    [],
+      phone:             null,
+      country:           null,
+      bio:               null,
+      birthDate:         null,
+      gender:            null,
+      ministerialTitle:  null,
+      avatarUrl:         data.avatarUrl ?? null,
+      status:            'active',
+      departmentId: null,
+      lastLoginAt:  null,
+      createdAt:    this.fb.now(),
+      updatedAt:    this.fb.now(),
+    };
+
+    await this.fb.db.collection(COL).doc(String(id)).set(doc);
+    // Retorna raw (con passwordHash) igual que findByEmail, para que AuthService lo procese
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    return this.fb.toObj(snap);
   }
 
   async uploadAvatar(id: number, file: Express.Multer.File) {
@@ -219,8 +294,10 @@ export class UsersService {
     const snaps = await Promise.all(
       ids.map((jid) => this.fb.db.collection('job_titles').doc(String(jid)).get()),
     );
+    // Mantener el índice original ANTES de filtrar para que jobTitleId corresponda
+    // al id correcto (filter() reindexaría y asignaría ids erróneos)
     return snaps
-      .filter((s) => s.exists)
-      .map((s, i) => ({ jobTitleId: ids[i], name: s.data()!.name, sortOrder: i }));
+      .map((s, i) => s.exists ? { jobTitleId: ids[i], name: s.data()!.name, sortOrder: i } : null)
+      .filter((item): item is NonNullable<typeof item> => item !== null);
   }
 }

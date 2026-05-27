@@ -20,7 +20,7 @@ export function useSystemRoles() {
   return useQuery<SystemRole[]>({
     queryKey: roleKeys.all,
     queryFn:  () => api.get('/roles').then((r) => r.data),
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

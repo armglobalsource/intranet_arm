@@ -49,13 +49,13 @@ export class FirebaseService implements OnModuleInit {
   toObj(snap: admin.firestore.DocumentSnapshot): any {
     if (!snap.exists) return null;
     const data = snap.data()!;
-    // Convertir Timestamps a Date
-    return this.convertTimestamps(data);
+    // fichaId siempre viene del ID real del documento (nunca del campo almacenado)
+    return { ...this.convertTimestamps(data), fichaId: snap.id };
   }
 
   /** Convierte QueryDocumentSnapshot[] → array de objetos */
   toDocs(snaps: admin.firestore.QuerySnapshot): any[] {
-    return snaps.docs.map((d) => this.convertTimestamps(d.data()));
+    return snaps.docs.map((d) => ({ ...this.convertTimestamps(d.data()), fichaId: d.id }));
   }
 
   private convertTimestamps(obj: any): any {

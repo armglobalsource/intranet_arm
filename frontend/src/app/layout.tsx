@@ -2,11 +2,14 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+// ecosistema-arm
+
+export const dynamic = 'force-dynamic';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: { default: 'Intranet Corporativa', template: '%s | Intranet' },
+  title: { default: 'Ecosistema ARM', template: '%s | Ecosistema' },
   description: 'Portal interno corporativo',
   robots: { index: false },
 };
@@ -14,6 +17,22 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
+      <head>
+        {/* Recarga automática cuando un chunk JS no se encuentra tras un nuevo deploy */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          window.addEventListener('error', function(e) {
+            if (e.target && e.target.tagName === 'SCRIPT' && e.target.src && e.target.src.includes('/_next/static/')) {
+              window.location.reload();
+            }
+          }, true);
+          window.addEventListener('unhandledrejection', function(e) {
+            var msg = e.reason && (e.reason.message || String(e.reason));
+            if (msg && (msg.includes('Loading chunk') || msg.includes('ChunkLoadError'))) {
+              window.location.reload();
+            }
+          });
+        `}} />
+      </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>

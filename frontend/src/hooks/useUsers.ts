@@ -9,16 +9,18 @@ export interface Role {
 }
 
 export interface CreateUserDto {
-  email:          string;
-  password:       string;
-  firstName:      string;
-  lastName:       string;
-  roleId:         number;
-  campusId?:      number;
-  jobTitleIds?:   number[];
-  phone?:         string;
-  country?:       string;
-  bio?:           string;
+  email:              string;
+  password?:          string;
+  firstName:          string;
+  lastName:           string;
+  roleId:             number;
+  campusId?:          number;
+  jobTitleIds?:       number[];
+  phone?:             string;
+  country?:           string;
+  bio?:               string;
+  birthDate?:         string;
+  ministerialTitle?:  'pastor_principal' | 'pastor' | 'ministro' | null;
 }
 
 export interface PaginatedUsers {

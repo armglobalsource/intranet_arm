@@ -65,6 +65,17 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
     });
   }
 
+  function toggleResource(resource: string, actions: string[]) {
+    setSelected((prev) => {
+      const next      = new Set(prev);
+      const allChecked = actions.every((a) => next.has(`${resource}:${a}`));
+      actions.forEach((a) => {
+        allChecked ? next.delete(`${resource}:${a}`) : next.add(`${resource}:${a}`);
+      });
+      return next;
+    });
+  }
+
   function toggleWildcard() { setWildcard((w) => !w); setSelected(new Set()); }
 
   function handleSave() {
@@ -115,10 +126,34 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
 
         <div className={`overflow-y-auto flex-1 px-5 py-4 ${wildcard ? 'opacity-40 pointer-events-none' : ''}`}>
           <div className="flex flex-col gap-4">
-            {Object.entries(PERMISSION_CATALOG).map(([resource, cfg]) => (
+            {Object.entries(PERMISSION_CATALOG).map(([resource, cfg]) => {
+              const actions    = Object.keys(cfg.actions);
+              const allChecked = actions.every((a) => selected.has(`${resource}:${a}`));
+              const someChecked = !allChecked && actions.some((a) => selected.has(`${resource}:${a}`));
+              return (
               <div key={resource}>
                 <div className="mb-2">
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleResource(resource, actions)}
+                      className="flex-shrink-0 w-4 h-4 rounded flex items-center justify-center transition-colors"
+                      style={{
+                        background:  allChecked ? '#4F46E5' : someChecked ? '#C7D2FE' : 'transparent',
+                        border:      allChecked || someChecked ? 'none' : '2px solid #CBD5E1',
+                      }}
+                      title={allChecked ? 'Desmarcar todo' : 'Marcar todo'}
+                    >
+                      {allChecked && (
+                        <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      )}
+                      {someChecked && (
+                        <svg className="w-2.5 h-2.5 text-indigo-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                      )}
+                    </button>
                     <p className="text-[11.5px] font-bold text-slate-700 uppercase tracking-wider">{cfg.label}</p>
                     <div className="flex-1 h-px bg-slate-100"/>
                   </div>
@@ -144,7 +179,7 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
                   })}
                 </div>
               </div>
-            ))}
+            );})}
           </div>
         </div>
 
@@ -480,7 +515,7 @@ export default function RolesPage() {
         <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6"/>
         </svg>
-        Directorio
+        Configuración
       </Link>
 
       {/* Header */}

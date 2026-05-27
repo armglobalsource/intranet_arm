@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
-import { api } from '@/lib/api';
+import { api, apiErrorMessage } from '@/lib/api';
 
 const schema = z.object({
   email:    z.string().email('Email inválido'),
@@ -25,7 +26,7 @@ export default function LoginPage() {
   // If already logged in, skip the login page
   useEffect(() => {
     if (hasHydrated && isAuthenticated) {
-      router.replace('/dashboard/orgchart');
+      router.replace('/dashboard');
     }
   }, [hasHydrated, isAuthenticated, router]);
 
@@ -40,10 +41,10 @@ export default function LoginPage() {
     try {
       const res = await api.post('/auth/login', data);
       setSession(res.data.user, res.data.accessToken, res.data.refreshToken);
-      router.replace('/dashboard/orgchart');
+      router.replace('/dashboard');
     } catch (err: any) {
       setError('root', {
-        message: err.response?.data?.message || 'Email o contraseña incorrectos',
+        message: apiErrorMessage(err, 'Email o contraseña incorrectos'),
       });
     }
   };
@@ -179,6 +180,17 @@ export default function LoginPage() {
             </button>
 
           </form>
+
+          <Link
+            href="/auth/register"
+            style={{ background: 'transparent', border: '1px solid #2a2a2a' }}
+            className="w-full mt-3 py-2.5 rounded-lg text-sm font-semibold text-white/60
+              flex items-center justify-center hover:border-white/20 hover:text-white
+              transition-all active:scale-[0.98]"
+          >
+            Registrarme
+          </Link>
+
         </div>
       </div>
 

@@ -12,10 +12,14 @@ interface User {
   bio?: string | null;
   birthDate?: string | null;
   gender?: string | null;
+  ministerialTitle?: string | null;
   campusId?: number | null;
   campus?: { id: number; name: string; address?: string | null } | null;
   role: { name: string };
   permissions: string[];
+  status?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 interface AuthState {
@@ -23,13 +27,22 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  needsProfileCompletion: boolean;
   /** true once Zustand has rehydrated from localStorage */
   _hasHydrated: boolean;
+
+  /** Impersonation state — persisted so reload keeps the simulated session */
+  impersonation: { roleId: number; roleName: string } | null;
+  originalSession: { accessToken: string; refreshToken: string; user: User } | null;
+
   setHasHydrated: (val: boolean) => void;
-  setSession: (user: User, accessToken: string, refreshToken: string) => void;
+  setSession: (user: User, accessToken: string, refreshToken: string, needsProfileCompletion?: boolean) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   updateUser: (patch: Partial<User>) => void;
+  clearProfileCompletion: () => void;
   logout: () => void;
+  startImpersonation: (accessToken: string, roleId: number, roleName: string, permissions: string[]) => void;
+  exitImpersonation: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -39,12 +52,15 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      needsProfileCompletion: false,
       _hasHydrated: false,
+      impersonation: null,
+      originalSession: null,
 
       setHasHydrated: (val) => set({ _hasHydrated: val }),
 
-      setSession: (user, accessToken, refreshToken) =>
-        set({ user, accessToken, refreshToken, isAuthenticated: true }),
+      setSession: (user, accessToken, refreshToken, needsProfileCompletion = false) =>
+        set({ user, accessToken, refreshToken, isAuthenticated: true, needsProfileCompletion }),
 
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken }),
@@ -52,21 +68,49 @@ export const useAuthStore = create<AuthState>()(
       updateUser: (patch) =>
         set((s) => ({ user: s.user ? { ...s.user, ...patch } : s.user })),
 
+      clearProfileCompletion: () => set({ needsProfileCompletion: false }),
+
       logout: () =>
-        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false }),
+        set({
+          user: null, accessToken: null, refreshToken: null,
+          isAuthenticated: false, needsProfileCompletion: false,
+          impersonation: null, originalSession: null,
+        }),
+
+      startImpersonation: (accessToken, roleId, roleName, permissions) =>
+        set((s) => ({
+          originalSession: s.originalSession ?? {
+            accessToken: s.accessToken!,
+            refreshToken: s.refreshToken!,
+            user: s.user!,
+          },
+          accessToken,
+          impersonation: { roleId, roleName },
+          user: s.user ? { ...s.user, role: { name: roleName }, permissions } : s.user,
+        })),
+
+      exitImpersonation: () =>
+        set((s) => ({
+          accessToken:    s.originalSession?.accessToken  ?? s.accessToken,
+          refreshToken:   s.originalSession?.refreshToken ?? s.refreshToken,
+          user:           s.originalSession?.user         ?? s.user,
+          impersonation:  null,
+          originalSession: null,
+        })),
     }),
     {
       name: 'auth-storage',
-      // Called when Zustand finishes reading localStorage
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },
-      // _hasHydrated is runtime-only — never persist it
       partialize: (state) => ({
-        user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
+        user:                   state.user,
+        accessToken:            state.accessToken,
+        refreshToken:           state.refreshToken,
+        isAuthenticated:        state.isAuthenticated,
+        needsProfileCompletion: state.needsProfileCompletion,
+        impersonation:          state.impersonation,
+        originalSession:        state.originalSession,
       }),
     },
   ),
