@@ -6,6 +6,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 // useEffect es usado por el menú de usuario
 import { useAuthStore } from '@/lib/store/auth.store';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useSystemRoles } from '@/hooks/useRoles';
+import { useImpersonation } from '@/hooks/useImpersonation';
 import { api } from '@/lib/api';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -205,6 +208,10 @@ export function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
   const { logout, refreshToken, user } = useAuthStore();
+  const { isAdmin } = usePermissions();
+  const { data: allRoles } = useSystemRoles();
+  const impersonation = useAuthStore((s) => s.impersonation);
+  const { start: startImpersonation, exit: exitImpersonation } = useImpersonation();
 
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [collapsed,       setCollapsed]       = useState(false);
@@ -426,9 +433,56 @@ export function Sidebar() {
               </svg>
               Mi perfil
             </Link>
+            {/* Simular rol (admin-only, o salir si ya está simulando) */}
+            {(isAdmin || impersonation) && (
+              <div style={{ borderTop: '1px solid #2a2a2a' }}>
+                {impersonation ? (
+                  <button
+                    onClick={() => { setMenuOpen(false); exitImpersonation(); }}
+                    className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[12px] transition-all"
+                    style={{ color: '#f59e0b' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.1)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
+                  >
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                    Salir de simulación
+                  </button>
+                ) : (
+                  <>
+                    <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest"
+                      style={{ color: 'rgba(255,255,255,0.2)' }}>
+                      Simular rol
+                    </p>
+                    {(allRoles ?? [])
+                      .filter((r: any) => r.name !== 'admin' && r.isActive)
+                      .map((role: any) => (
+                        <button
+                          key={role.id}
+                          onClick={() => { setMenuOpen(false); startImpersonation(role.id); }}
+                          className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
+                        >
+                          <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                          </svg>
+                          {role.name}
+                        </button>
+                      ))}
+                  </>
+                )}
+              </div>
+            )}
+
             <button
               onClick={handleLogout}
               className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[12px] text-white/40 hover:text-white/60 hover:bg-white/5 transition-all"
+              style={{ borderTop: '1px solid #2a2a2a' }}
             >
               <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -459,7 +513,13 @@ export function Sidebar() {
           )}
           <div className="flex-1 min-w-0">
             <p className="text-white/75 text-[12px] font-medium truncate leading-none">{fullName}</p>
-            {role && <p className="text-white/30 text-[10px] mt-0.5 truncate">{role}</p>}
+            {impersonation ? (
+              <p className="text-[10px] mt-0.5 truncate font-semibold" style={{ color: '#f59e0b' }}>
+                ⟳ {impersonation.roleName}
+              </p>
+            ) : (
+              role && <p className="text-white/30 text-[10px] mt-0.5 truncate">{role}</p>
+            )}
           </div>
           <svg
             className={`w-3 h-3 flex-shrink-0 text-white/20 transition-transform ${menuOpen ? 'rotate-180' : ''}`}

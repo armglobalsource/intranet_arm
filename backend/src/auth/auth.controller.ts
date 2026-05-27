@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Body, Req, Res, HttpCode, HttpStatus, Get, UseGuards,
+  Controller, Post, Body, Req, Res, HttpCode, HttpStatus, Get, UseGuards, ForbiddenException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -103,6 +103,15 @@ export class AuthController {
   @ApiOperation({ summary: 'Renovar access token con refresh token' })
   refresh(@Body() dto: RefreshDto) {
     return this.authService.refresh(dto.refreshToken);
+  }
+
+  @Post('impersonate')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin: obtener token con permisos de otro rol para pruebas' })
+  impersonate(@Body() body: { roleId: number }, @CurrentUser() user: any) {
+    if (user.role !== 'admin') throw new ForbiddenException('Solo administradores pueden simular roles');
+    return this.authService.impersonateRole(user.sub, user.email, body.roleId);
   }
 
   @Post('logout')

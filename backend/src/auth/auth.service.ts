@@ -1,5 +1,5 @@
 import {
-  Injectable, UnauthorizedException, ConflictException, Logger,
+  Injectable, UnauthorizedException, ConflictException, ForbiddenException, Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -209,6 +209,39 @@ export class AuthService {
 
     const user = await this.users.update(userId, update);
     return { user };
+  }
+
+  async impersonateRole(adminUserId: number, adminEmail: string, roleId: number) {
+    const roleSnap = await this.fb.db.collection('roles').doc(String(roleId)).get();
+    if (!roleSnap.exists) throw new ForbiddenException('Rol no encontrado');
+
+    const roleData = roleSnap.data()!;
+    if (roleData.name === 'admin' || (roleData.permissions ?? []).includes('*')) {
+      throw new ForbiddenException('No puedes simular el rol admin');
+    }
+    if (roleData.isActive === false) {
+      throw new ForbiddenException('El rol seleccionado no está activo');
+    }
+
+    const permissions: string[] = roleData.permissions ?? [];
+    const roleName: string      = roleData.name;
+
+    const userSnap = await this.fb.db.collection('users').doc(String(adminUserId)).get();
+    const userData = userSnap.exists ? userSnap.data()! : {};
+
+    const jti     = randomUUID();
+    const payload = {
+      sub: adminUserId, email: adminEmail,
+      role: roleName, roleId,
+      permissions, jti,
+      campusId:      userData.campusId  ?? null,
+      firstName:     userData.firstName ?? null,
+      lastName:      userData.lastName  ?? null,
+      impersonating: true,
+    };
+
+    const accessToken = this.jwt.sign(payload, { expiresIn: '4h' });
+    return { accessToken, roleName, permissions };
   }
 
   async isTokenRevoked(jti: string): Promise<boolean> {

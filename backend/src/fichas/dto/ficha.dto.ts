@@ -25,6 +25,7 @@ export class UpdateFichaDto {
   @IsOptional() @IsString() title?: string;
   @IsOptional() @IsString() date?: string;
   @IsOptional() @IsIn(['draft', 'in_progress', 'complete']) status?: string;
+  @IsOptional() @IsArray() hiddenSections?: string[];
 }
 
 export class CloneFichaDto {

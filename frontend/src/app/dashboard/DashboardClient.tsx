@@ -186,7 +186,7 @@ function DisponibilidadWidget({ campusId }: { campusId: number | null }) {
 
 export function DashboardClient() {
   const { can, isAdmin } = usePermissions();
-  const canDisponibilidad = isAdmin || can('disponibilidad:submit');
+  const canDisponibilidad = true; // todos los usuarios ven la card; el backend valida al enviar
 
   const { data: fichas, isLoading: fichasLoading } = useMiFichas();
   const { data: noticiasGlobal, isLoading: loadingGlobal } = useNoticiasGlobal();
