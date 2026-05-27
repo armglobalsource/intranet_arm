@@ -9,6 +9,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useSystemRoles } from '@/hooks/useRoles';
 import { useImpersonation } from '@/hooks/useImpersonation';
+import { useNotifications } from '@/hooks/useNotifications';
 import { api } from '@/lib/api';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -213,10 +214,14 @@ export function Sidebar() {
   const impersonation = useAuthStore((s) => s.impersonation);
   const { start: startImpersonation, exit: exitImpersonation } = useImpersonation();
 
+  const { notifications, unreadCount, markRead } = useNotifications();
+
   const [menuOpen,        setMenuOpen]        = useState(false);
+  const [bellOpen,        setBellOpen]        = useState(false);
   const [collapsed,       setCollapsed]       = useState(false);
   const [expandedGroups,  setExpandedGroups]  = useState<Set<string>>(new Set());
   const menuRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLDivElement>(null);
 
   // Leer preferencia guardada
   useEffect(() => {
@@ -260,6 +265,9 @@ export function Sidebar() {
     function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
+      }
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+        setBellOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -411,6 +419,78 @@ export function Sidebar() {
             </Link>
           );
         })()}
+      </div>
+
+      {/* Notificaciones */}
+      <div ref={bellRef} style={{ borderTop: '1px solid #1f1f1f' }}
+        className="relative px-3 py-2 min-w-[224px]">
+        {bellOpen && (
+          <div
+            className="absolute bottom-full left-3 right-3 mb-1 rounded-lg overflow-hidden shadow-lg"
+            style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', maxHeight: 320 }}
+          >
+            <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest"
+              style={{ color: 'rgba(255,255,255,0.25)' }}>
+              Notificaciones
+            </p>
+            {notifications.length === 0 ? (
+              <p className="px-3 py-3 text-[12px] text-white/30">Sin notificaciones</p>
+            ) : (
+              <div className="overflow-y-auto" style={{ maxHeight: 260 }}>
+                {notifications.slice(0, 10).map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => {
+                      if (!n.read) markRead(n.id);
+                      setBellOpen(false);
+                      if (n.link) router.push(n.link);
+                    }}
+                    className="w-full text-left px-3 py-2.5 flex gap-2.5 items-start transition-all hover:bg-white/5"
+                    style={{ borderTop: '1px solid #242424' }}
+                  >
+                    <span
+                      className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full"
+                      style={{ background: n.read ? 'transparent' : '#3b82f6' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[12px] leading-snug ${n.read ? 'text-white/40' : 'text-white/80 font-medium'}`}>
+                        {n.title}
+                      </p>
+                      {n.body && (
+                        <p className="text-[11px] text-white/25 mt-0.5 truncate">{n.body}</p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          onClick={() => { setBellOpen((o) => !o); setMenuOpen(false); }}
+          className="flex items-center gap-2.5 w-full rounded-lg px-2 py-1.5 hover:bg-white/5 transition-all text-left"
+        >
+          <div className="relative flex-shrink-0">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none"
+              stroke="rgba(255,255,255,0.35)" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {unreadCount > 0 && (
+              <span
+                className="absolute -top-1 -right-1 flex items-center justify-center rounded-full text-white font-bold leading-none"
+                style={{ background: '#ef4444', fontSize: 8, minWidth: 13, height: 13, padding: '0 2px' }}
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[12px] text-white/35">
+            {unreadCount > 0 ? `${unreadCount} nueva${unreadCount > 1 ? 's' : ''}` : 'Notificaciones'}
+          </span>
+        </button>
       </div>
 
       {/* Usuario con menú */}

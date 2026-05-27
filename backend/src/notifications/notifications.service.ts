@@ -53,6 +53,16 @@ export class NotificationsService {
     return this.findOne(id);
   }
 
+  async markRead(id: number) {
+    await this.findOne(id);
+    await this.fb.db.collection('notifications').doc(String(id)).update({
+      read: true,
+      readAt: this.fb.now(),
+      updatedAt: this.fb.now(),
+    });
+    return this.findOne(id);
+  }
+
   async remove(id: number) {
     await this.findOne(id);
     await this.fb.db.collection('notifications').doc(String(id)).delete();

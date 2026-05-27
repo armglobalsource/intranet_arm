@@ -11,6 +11,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { UpdateUserDto } from '../users/dto/create-user.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as admin from 'firebase-admin';
 
 export interface JwtPayload {
@@ -35,6 +36,7 @@ export class AuthService {
     private users: UsersService,
     private jwt: JwtService,
     private config: ConfigService,
+    private notifications: NotificationsService,
   ) {}
 
   async login(dto: LoginDto, ipAddress?: string, userAgent?: string) {
@@ -115,6 +117,13 @@ export class AuthService {
         firstName: dto.firstName,
         lastName:  dto.lastName,
       });
+      this.notifications.create({
+        userId:  0,
+        title:   `Nuevo usuario registrado: ${dto.firstName} ${dto.lastName}`,
+        body:    `${dto.email} se registró y necesita que le asignes un rol.`,
+        link:    '/dashboard/directorio/usuarios',
+        channel: 'in_app',
+      }, 0).catch((e) => this.logger.warn('No se pudo crear notificación de registro', e));
     }
 
     if (user.status !== 'active') {
@@ -169,6 +178,13 @@ export class AuthService {
         lastName:  googleUser.lastName,
         avatarUrl: googleUser.avatarUrl,
       });
+      this.notifications.create({
+        userId:  0,
+        title:   `Nuevo usuario registrado: ${googleUser.firstName} ${googleUser.lastName}`,
+        body:    `${googleUser.email} se registró con Google y necesita que le asignes un rol.`,
+        link:    '/dashboard/directorio/usuarios',
+        channel: 'in_app',
+      }, 0).catch((e) => this.logger.warn('No se pudo crear notificación de registro Google', e));
     } else {
       // Sincronizar datos de Google: foto siempre, nombre solo si estaba vacío
       const patch: Record<string, string> = {};

@@ -36,6 +36,12 @@ export class NotificationsController {
     return this.service.update(id, dto);
   }
 
+  @Patch(':id/read')
+  @ApiOperation({ summary: 'Marcar notificación como leída' })
+  markRead(@Param('id', ParseIntPipe) id: number) {
+    return this.service.markRead(id);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar un registro' })
   remove(@Param('id', ParseIntPipe) id: number) {
