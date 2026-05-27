@@ -327,8 +327,14 @@ export function Sidebar() {
       {/* Logo + botón colapsar */}
       <div style={{ borderBottom: '1px solid #1f1f1f' }}
         className="px-4 pt-4 pb-2 flex items-center justify-between gap-2 min-w-[224px]">
-        <Image src="/logo.png" alt="Logo" width={100} height={28}
-          className="object-contain" priority />
+        <div className="relative overflow-hidden group">
+          <Image src="/logo.png" alt="Logo" width={100} height={28}
+            className="object-contain" priority />
+          <div
+            className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out pointer-events-none"
+            style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%)' }}
+          />
+        </div>
         <button
           onClick={toggleSidebar}
           title="Ocultar menú"
