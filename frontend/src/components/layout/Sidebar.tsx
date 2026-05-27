@@ -328,21 +328,12 @@ export function Sidebar() {
       <div style={{ borderBottom: '1px solid #1f1f1f' }}
         className="px-4 pt-4 pb-2 flex items-center justify-between gap-2 min-w-[224px]">
         <div className="relative overflow-hidden group" style={{ width: 100, height: 28 }}>
-          {/* Logo: se atenúa al hover */}
           <Image src="/logo.png" alt="Logo" width={100} height={28}
-            className="object-contain transition-opacity duration-300 group-hover:opacity-20" priority />
-          {/* Shimmer */}
+            className="object-contain" priority />
           <div
             className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out pointer-events-none"
             style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%)' }}
           />
-          {/* Tagline superpuesto sobre el logo atenuado */}
-          <div className="absolute inset-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-150 pointer-events-none">
-            <span className="text-[8px] font-light italic whitespace-nowrap leading-none"
-              style={{ color: 'rgba(255,255,255,0.9)', letterSpacing: '0.03em' }}>
-              La iglesia es mucho más
-            </span>
-          </div>
         </div>
         <button
           onClick={toggleSidebar}
