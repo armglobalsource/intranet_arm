@@ -1,6 +1,7 @@
 import { Sidebar } from '@/components/layout/Sidebar';
 import { AuthGuard } from '@/components/AuthGuard';
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner';
+import { FeedbackWidget } from '@/components/layout/FeedbackWidget';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </main>
         </div>
       </div>
+      <FeedbackWidget />
     </AuthGuard>
   );
 }

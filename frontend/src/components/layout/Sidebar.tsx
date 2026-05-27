@@ -156,6 +156,18 @@ function MinisterioSubIcon({ active }: { active: boolean }) {
   );
 }
 
+function SoporteIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
+  return (
+    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      <line x1="9" y1="9" x2="15" y2="9" />
+      <line x1="9" y1="13" x2="12" y2="13" />
+    </svg>
+  );
+}
+
 // ── Estructura de navegación ──────────────────────────────────────────────────
 
 interface NavGroup {
@@ -401,8 +413,8 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Configuración */}
-      <div className="px-3 pb-1 min-w-[224px]">
+      {/* Configuración + Soporte (admin-only) */}
+      <div className="px-3 pb-1 min-w-[224px] space-y-0.5">
         {(() => {
           const href   = '/dashboard/directorio';
           const active = pathname.startsWith(href);
@@ -416,6 +428,22 @@ export function Sidebar() {
             >
               <ConfigIcon active={active} />
               Configuración
+            </Link>
+          );
+        })()}
+        {isAdmin && (() => {
+          const href   = '/dashboard/soporte';
+          const active = pathname.startsWith(href);
+          return (
+            <Link
+              href={href}
+              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+              }`}
+            >
+              <SoporteIcon active={active} />
+              Soporte
             </Link>
           );
         })()}
