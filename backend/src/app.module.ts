@@ -21,6 +21,7 @@ import { CancionesModule } from './canciones/canciones.module';
 import { EventsModule } from './events/events.module';
 import { DisponibilidadModule } from './disponibilidad/disponibilidad.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 
 const envSchema = Joi.object({
   NODE_ENV:             Joi.string().valid('development', 'production', 'test').default('development'),
@@ -71,6 +72,7 @@ const envSchema = Joi.object({
     EventsModule,
     DisponibilidadModule,
     FeedbackModule,
+    OnboardingModule,
   ],
 })
 export class AppModule {}

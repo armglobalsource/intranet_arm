@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFeedbackList, useUpdateFeedbackStatus, useDeleteFeedback, FeedbackItem } from '@/hooks/useFeedback';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -233,10 +233,11 @@ export function SoporteClient() {
   const [filter,   setFilter]   = useState<Filter>('all');
   const [selected, setSelected] = useState<FeedbackItem | null>(null);
 
-  if (!isAdmin) {
-    router.replace('/dashboard');
-    return null;
-  }
+  useEffect(() => {
+    if (!isAdmin) router.replace('/dashboard');
+  }, [isAdmin, router]);
+
+  if (!isAdmin) return null;
 
   const filtered = items.filter((item) => {
     if (filter === 'all')         return true;

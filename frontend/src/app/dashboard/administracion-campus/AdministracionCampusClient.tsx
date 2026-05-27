@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAllCampuses, Campus } from '@/hooks/useCampus';
@@ -94,11 +95,13 @@ export function AdministracionCampusClient() {
   const router = useRouter();
   const { isAdmin, can } = usePermissions();
   const { data: campuses = [], isLoading } = useAllCampuses();
+  const hasAccess = isAdmin || can('campus:manage');
 
-  if (!isAdmin && !can('campus:manage')) {
-    router.replace('/dashboard');
-    return null;
-  }
+  useEffect(() => {
+    if (!hasAccess) router.replace('/dashboard');
+  }, [hasAccess, router]);
+
+  if (!hasAccess) return null;
 
   const active   = campuses.filter((c) => c.isActive);
   const inactive = campuses.filter((c) => !c.isActive);
