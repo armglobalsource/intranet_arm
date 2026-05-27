@@ -82,8 +82,8 @@ function WeekSelector({
       </button>
 
       <div className="flex flex-col items-center px-2">
-        <span className="text-sm font-semibold text-slate-700">{formatWeekLabel(weekLabel)}</span>
-        <span className="text-[10px] text-slate-400">{weekLabel}</span>
+        <span className="text-sm font-semibold text-slate-800">{formatWeekLabel(weekLabel)}</span>
+        <span className="text-[10px] text-slate-500">{weekLabel}</span>
       </div>
 
       <button
@@ -178,39 +178,33 @@ function VolunteerView({ campusId, weekLabel }: { campusId: number; weekLabel: s
         return (
           <div
             key={enc.scheduleKey}
-            className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-all ${
-              isAvail === true
-                ? 'border-green-200'
+            className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all"
+            style={{
+              borderLeft: isAvail === true
+                ? '3px solid #16a34a'
                 : isAvail === false
-                ? 'border-red-200'
-                : 'border-slate-200/80'
-            }`}
+                ? '3px solid #ef4444'
+                : '3px solid #e2e8f0',
+            }}
           >
-            {/* Accent lateral */}
-            <div
-              className={`h-1 w-full ${
-                isAvail === true ? 'bg-green-400' : isAvail === false ? 'bg-red-300' : 'bg-slate-100'
-              }`}
-            />
-
             <div className="px-5 py-4">
               {/* Header encuentro */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-2.5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
                   {enc.bloque && (
-                    <span className="flex-shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
+                    <span className="flex-shrink-0 w-9 h-9 rounded-xl text-[11px] font-bold flex items-center justify-center bg-slate-100 text-slate-600">
                       {enc.bloque}
                     </span>
                   )}
                   <div>
-                    <p className="text-sm font-semibold text-slate-800 capitalize">
+                    <p className="text-sm font-semibold text-slate-800 capitalize leading-snug">
                       {formatEncounterDate(enc.encounterDate)}
                     </p>
-                    <p className="text-xs text-slate-400 mt-0.5">{enc.hora} hrs</p>
+                    <p className="text-xs font-medium text-slate-500 mt-0.5">{enc.hora} hrs</p>
                   </div>
                 </div>
                 {isSaved && (
-                  <span className="flex-shrink-0 text-[10px] bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full font-semibold">
+                  <span className="flex-shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
                     Guardado
                   </span>
                 )}
@@ -220,20 +214,20 @@ function VolunteerView({ campusId, weekLabel }: { campusId: number; weekLabel: s
               <div className="flex gap-2 mb-3">
                 <button
                   onClick={() => toggle(enc.scheduleKey, true)}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
                     isAvail === true
-                      ? 'bg-green-500 text-white border-green-500 shadow-sm'
-                      : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-green-300 hover:text-green-600 hover:bg-green-50'
+                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50'
                   }`}
                 >
                   ✓ Disponible
                 </button>
                 <button
                   onClick={() => toggle(enc.scheduleKey, false)}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
                     isAvail === false
                       ? 'bg-red-500 text-white border-red-500 shadow-sm'
-                      : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-red-300 hover:text-red-500 hover:bg-red-50'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-red-300 hover:text-red-600 hover:bg-red-50'
                   }`}
                 >
                   ✕ No disponible
@@ -247,7 +241,7 @@ function VolunteerView({ campusId, weekLabel }: { campusId: number; weekLabel: s
                 value={nota}
                 onChange={(e) => setNota(enc.scheduleKey, e.target.value)}
                 maxLength={300}
-                className="input resize-none text-xs bg-slate-50 border-slate-200 placeholder:text-slate-300"
+                className="w-full resize-none text-xs px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-slate-300 focus:bg-white transition-all"
               />
             </div>
           </div>
@@ -255,20 +249,20 @@ function VolunteerView({ campusId, weekLabel }: { campusId: number; weekLabel: s
       })}
 
       {/* Guardar */}
-      <div className="pt-2">
+      <div className="pt-1">
         <button
           onClick={handleSave}
           disabled={bulkSubmit.isPending}
-          className="w-full py-3 rounded-xl text-sm font-bold transition-all bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-50 shadow-sm"
+          className="w-full py-3 rounded-xl text-sm font-semibold transition-all bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
         >
           {bulkSubmit.isPending ? 'Guardando...' : allResponded ? 'Actualizar disponibilidad' : 'Guardar disponibilidad'}
         </button>
 
         {bulkSubmit.isSuccess && (
-          <p className="text-center text-xs text-green-600 font-medium mt-2">✓ Disponibilidad guardada correctamente</p>
+          <p className="text-center text-xs text-emerald-600 font-medium mt-2.5">✓ Disponibilidad guardada correctamente</p>
         )}
         {bulkSubmit.isError && (
-          <p className="text-center text-xs text-red-500 mt-2">Error al guardar. Intenta nuevamente.</p>
+          <p className="text-center text-xs text-red-500 mt-2.5">Error al guardar. Intenta nuevamente.</p>
         )}
       </div>
     </div>
@@ -444,8 +438,8 @@ export function DisponibilidadClient() {
                 </svg>
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-green-600">AR Worship</p>
-                <h1 className="text-lg font-bold text-slate-900 leading-tight">Disponibilidad</h1>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">AR Worship</p>
+                <h1 className="text-xl font-bold text-slate-900 leading-tight">Disponibilidad</h1>
               </div>
             </div>
 
