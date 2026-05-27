@@ -6,10 +6,9 @@ import { CreateNotificationDto } from './dto/create-notification.dto';
 export class NotificationsService {
   constructor(private fb: FirebaseService) {}
 
-  async findAll(userId: number, roleId: number) {
-    // Return notifications for this user (or all for admins, role=1)
+  async findAll(userId: number, isAdmin: boolean) {
     const col = this.fb.db.collection('notifications');
-    const snap = roleId === 1
+    const snap = isAdmin
       ? await col.limit(200).get()
       : await col.where('userId', '==', userId).limit(100).get();
     return this.fb.toDocs(snap).sort((a, b) => {

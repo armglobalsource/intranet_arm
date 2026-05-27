@@ -64,7 +64,9 @@ export class AuthController {
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: 'Callback de Google OAuth' })
   async googleCallback(@Req() req: any, @Res() res: Response) {
-    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
+    // FRONTEND_URL puede ser CSV ("https://a.com,https://b.com") — usar solo la primera
+    const frontendUrl = (this.config.get<string>('FRONTEND_URL', 'http://localhost:3000'))
+      .split(',')[0].trim();
     try {
       const result = await this.authService.googleAuth(
         req.user,

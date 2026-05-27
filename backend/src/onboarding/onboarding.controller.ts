@@ -16,8 +16,8 @@ export class OnboardingController {
   @Get()
   @ApiOperation({ summary: 'Listar onboardings visibles para el usuario' })
   findAll(@CurrentUser() user: any) {
-    const isAdmin  = user.role === 'admin';
-    const roleName = user.roleName ?? user.role ?? '';
+    const isAdmin  = (user.permissions ?? []).includes('*');
+    const roleName = user.role ?? '';
     if (isAdmin) return this.service.findAllAdmin();
     return this.service.findAll(roleName, false);
   }
@@ -31,7 +31,7 @@ export class OnboardingController {
   @Post()
   @ApiOperation({ summary: 'Crear onboarding (admin)' })
   create(@Body() dto: CreateOnboardingDto, @CurrentUser() user: any) {
-    if (user.role !== 'admin') throw new ForbiddenException();
+    if (!(user.permissions ?? []).includes('*')) throw new ForbiddenException();
     return this.service.create(dto);
   }
 
@@ -42,14 +42,14 @@ export class OnboardingController {
     @Body() dto: UpdateOnboardingDto,
     @CurrentUser() user: any,
   ) {
-    if (user.role !== 'admin') throw new ForbiddenException();
+    if (!(user.permissions ?? []).includes('*')) throw new ForbiddenException();
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar onboarding (admin)' })
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    if (user.role !== 'admin') throw new ForbiddenException();
+    if (!(user.permissions ?? []).includes('*')) throw new ForbiddenException();
     return this.service.remove(id);
   }
 }

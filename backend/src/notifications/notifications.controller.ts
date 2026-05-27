@@ -15,7 +15,8 @@ export class NotificationsController {
   @Get()
   @ApiOperation({ summary: 'Listar todos los registros' })
   findAll(@CurrentUser() user: any) {
-    return this.service.findAll(user.sub, user.roleId);
+    const isAdmin = (user.permissions ?? []).includes('*');
+    return this.service.findAll(user.sub, isAdmin);
   }
 
   @Get(':id')

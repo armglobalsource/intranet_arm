@@ -229,13 +229,14 @@ export class UsersService {
       campusId:     null,
       campus:       null,
       jobTitles:    [],
-      phone:        null,
-      country:      null,
-      bio:          null,
-      birthDate:    null,
-      gender:       null,
-      avatarUrl:    data.avatarUrl ?? null,
-      status:       'active',
+      phone:             null,
+      country:           null,
+      bio:               null,
+      birthDate:         null,
+      gender:            null,
+      ministerialTitle:  null,
+      avatarUrl:         data.avatarUrl ?? null,
+      status:            'active',
       departmentId: null,
       lastLoginAt:  null,
       createdAt:    this.fb.now(),
@@ -293,8 +294,10 @@ export class UsersService {
     const snaps = await Promise.all(
       ids.map((jid) => this.fb.db.collection('job_titles').doc(String(jid)).get()),
     );
+    // Mantener el índice original ANTES de filtrar para que jobTitleId corresponda
+    // al id correcto (filter() reindexaría y asignaría ids erróneos)
     return snaps
-      .filter((s) => s.exists)
-      .map((s, i) => ({ jobTitleId: ids[i], name: s.data()!.name, sortOrder: i }));
+      .map((s, i) => s.exists ? { jobTitleId: ids[i], name: s.data()!.name, sortOrder: i } : null)
+      .filter((item): item is NonNullable<typeof item> => item !== null);
   }
 }
