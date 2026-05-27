@@ -18,6 +18,11 @@ export class FirebaseService implements OnModuleInit {
       const keyFilePath = keyFileEnv ? path.resolve(keyFileEnv) : '';
       const hasKeyFile  = keyFilePath && fs.existsSync(keyFilePath);
 
+      this.logger.log(
+        `Firebase init — projectId=${projectId} ` +
+        `keyFile=${hasKeyFile ? keyFilePath : 'N/A (ADC)'}`
+      );
+
       // Cloud Run / GCP → usa Application Default Credentials automáticamente
       // Local dev       → usa el service-account.json
       const credential = hasKeyFile

@@ -40,6 +40,21 @@ export class RolesService implements OnModuleInit {
   constructor(private fb: FirebaseService) {}
 
   async onModuleInit() {
+    // Timeout de 20s para no bloquear el startup de Cloud Run si Firestore
+    // no responde en el primer arranque (e.g. ADC lento, primera conexión).
+    const TIMEOUT_MS = 20_000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Firestore seed timeout (${TIMEOUT_MS}ms)`)), TIMEOUT_MS),
+    );
+
+    try {
+      await Promise.race([this.seedRoles(), timeoutPromise]);
+    } catch (err) {
+      this.logger.warn(`onModuleInit (roles): ${(err as Error).message} — continuando sin seed`);
+    }
+  }
+
+  private async seedRoles() {
     const snap = await this.fb.db.collection(COL).get();
 
     if (snap.empty) {
