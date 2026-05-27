@@ -156,6 +156,17 @@ function MinisterioSubIcon({ active }: { active: boolean }) {
   );
 }
 
+function AdminCampusIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
+  return (
+    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+      <polyline points="9 21 9 13 15 13 15 21" />
+    </svg>
+  );
+}
+
 function SoporteIcon({ active }: { active: boolean }) {
   const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
   return (
@@ -221,7 +232,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
   const { logout, refreshToken, user } = useAuthStore();
-  const { isAdmin } = usePermissions();
+  const { isAdmin, can } = usePermissions();
   const { data: allRoles } = useSystemRoles();
   const impersonation = useAuthStore((s) => s.impersonation);
   const { start: startImpersonation, exit: exitImpersonation } = useImpersonation();
@@ -434,6 +445,22 @@ export function Sidebar() {
             >
               <ConfigIcon active={active} />
               Configuración
+            </Link>
+          );
+        })()}
+        {(isAdmin || can('campus:manage')) && (() => {
+          const href   = '/dashboard/administracion-campus';
+          const active = pathname.startsWith(href);
+          return (
+            <Link
+              href={href}
+              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+              }`}
+            >
+              <AdminCampusIcon active={active} />
+              Adm. Campus
             </Link>
           );
         })()}
