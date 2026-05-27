@@ -302,13 +302,33 @@ export class FichasService {
   }
 
   async update(fichaId: string, dto: UpdateFichaDto, userId: number, userName?: string) {
-    await this.findOne(fichaId);
+    const ficha = await this.findOne(fichaId);
     const data: any = { lastModifiedBy: userId, lastModifiedAt: this.fb.now() };
     if (userName !== undefined) data.lastModifiedByName = userName;
     if (dto.title          !== undefined) data.title          = dto.title;
     if (dto.status         !== undefined) data.status         = dto.status;
     if (dto.date           !== undefined) data.date           = this.fb.ts(new Date(dto.date));
-    if (dto.hiddenSections !== undefined) data.hiddenSections = dto.hiddenSections;
+    if (dto.hiddenSections !== undefined) {
+      data.hiddenSections = dto.hiddenSections;
+
+      // Si alguna sección fue habilitada (ya no está en hiddenSections) y no existe
+      // en el documento de Firestore, inicializarla con sus filas por defecto.
+      const previousHidden: string[] = ficha.hiddenSections ?? [];
+      const newlyEnabled = previousHidden.filter(s => !dto.hiddenSections!.includes(s));
+      for (const sectionName of newlyEnabled) {
+        if (!ficha.sections?.[sectionName]) {
+          data[`sections.${sectionName}`] = {
+            assignedTo:   null,
+            assignedName: null,
+            isCompleted:  false,
+            completedBy:  null,
+            completedAt:  null,
+            rows:         defaultRows(sectionName as SectionName),
+          };
+          data[`completionStatus.${sectionName}`] = false;
+        }
+      }
+    }
     await this.fb.db.collection(COL).doc(fichaId).update(data);
     return this.findOne(fichaId);
   }

@@ -240,6 +240,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
           <FichaDocumentView
             ficha={ficha}
             editable={editable}
+            forceShowAll={canEdit}
             onEdit={canEdit ? () => setIsEditing(true) : undefined}
             onSave={handleSaveAll}
             onArchive={canEdit ? () => archiveFicha(fichaId) : undefined}

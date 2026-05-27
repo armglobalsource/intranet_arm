@@ -283,6 +283,7 @@ function SectionFooter({ sectionName, editable, isCompleted, onAddRow, onComplet
 
 interface EditProps {
   editable?: boolean;
+  forceShowAll?: boolean;   // Siempre mostrar la card aunque las filas estén vacías
   colId: string;
   onCellChange?: (rowId: string, colId: string, value: string) => void;
   onDeleteRow?: (rowId: string) => void;
@@ -295,10 +296,10 @@ interface EditProps {
 
 function RoleCard({
   title, rows, colId,
-  editable, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { title: string; rows: Row[] } & EditProps) {
-  const displayed = editable ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!editable && !displayed.length) return null;
+  const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
+  if (!displayed.length) return null;
 
   return (
     <div className="ficha-card" style={S.card}>
@@ -317,7 +318,7 @@ function RoleCard({
                 style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
               />
             ) : (
-              <span style={S.roleValue}>{val(row, colId)}</span>
+              <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
             )}
             {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
           </div>
@@ -332,14 +333,14 @@ function RoleCard({
 
 function StreamingCard({
   rows, colId,
-  editable, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
-  const displayed = editable ? allRows(rows) : rowsWithVal(rows, colId);
+  const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   const director  = displayed.filter((r) => /director|wirecast/i.test(r.label));
   const cameras   = displayed.filter((r) => /^cam\s?\d/i.test(r.label));
   const others    = displayed.filter((r) => !director.includes(r) && !cameras.includes(r));
 
-  if (!editable && !displayed.length) return null;
+  if (!displayed.length) return null;
 
   return (
     <div className="ficha-card" style={S.card}>
@@ -358,7 +359,7 @@ function StreamingCard({
                 style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
               />
             ) : (
-              <span style={S.roleValue}>{val(row, colId)}</span>
+              <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
             )}
             {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
           </div>
@@ -381,8 +382,8 @@ function StreamingCard({
                   style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, marginTop: 2 }}
                 />
               ) : (
-                <div style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, marginTop: 2 }}>
-                  {val(row, colId)}
+                <div style={{ fontSize: 12, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted, marginTop: 2 }}>
+                  {val(row, colId) || '—'}
                 </div>
               )}
             </div>
@@ -398,14 +399,14 @@ function StreamingCard({
 
 function EscenaCard({
   rows, colId,
-  editable, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
-  const displayed  = editable ? allRows(rows) : rowsWithVal(rows, colId);
+  const displayed  = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   const vio        = displayed.find((r) => r.label === 'VIO');
   const positions  = displayed.filter((r) => /posición|posicion/i.test(r.label));
   const musicians  = displayed.filter((r) => r !== vio && !positions.includes(r));
 
-  if (!editable && !displayed.length) return null;
+  if (!displayed.length) return null;
 
   const half = Math.ceil(musicians.length / 2);
   const col1 = musicians.slice(0, half);
@@ -483,7 +484,7 @@ function EscenaCard({
                         style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, textAlign: 'right' }}
                       />
                     ) : (
-                      <span style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary }}>{val(row, colId)}</span>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
                     )}
                     {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                   </div>
@@ -503,10 +504,10 @@ function EscenaCard({
 
 function SetListCard({
   rows, colId, encuentro,
-  editable, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { rows: Row[]; encuentro: Encuentro | null } & EditProps) {
-  const displayed = editable ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!editable && !displayed.length) return null;
+  const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
+  if (!displayed.length) return null;
 
   return (
     <div className="ficha-card" style={S.card}>
@@ -533,8 +534,8 @@ function SetListCard({
               {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
             </>
           ) : (
-            <span style={{ fontSize: 13, fontWeight: 500, color: D.textPrimary, flex: 1 }}>
-              {val(row, colId)}
+            <span style={{ fontSize: 13, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted, flex: 1 }}>
+              {val(row, colId) || '—'}
             </span>
           )}
         </div>
@@ -548,10 +549,10 @@ function SetListCard({
 
 function HorariosCard({
   rows, colId,
-  editable, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
-  const displayed = editable ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!editable && !displayed.length) return null;
+  const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
+  if (!displayed.length) return null;
 
   return (
     <div className="ficha-card" style={S.card}>
@@ -577,9 +578,9 @@ function HorariosCard({
               <span style={{
                 fontSize: 11, width: 38, textAlign: 'right', flexShrink: 0,
                 fontVariantNumeric: 'tabular-nums', fontWeight: isBold ? 600 : 400,
-                color: isBold ? D.textPrimary : D.textSecond,
+                color: val(row, colId) ? (isBold ? D.textPrimary : D.textSecond) : D.textMuted,
               }}>
-                {val(row, colId)}
+                {val(row, colId) || '—'}
               </span>
             )}
             <div style={{ width: 3, height: 14, flexShrink: 0, borderRadius: 2, background: color, opacity }} />
@@ -599,10 +600,10 @@ function HorariosCard({
 
 function AnunciosCard({
   rows, colId,
-  editable, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
-  const displayed = editable ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!editable && !displayed.length) return null;
+  const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
+  if (!displayed.length) return null;
 
   return (
     <div className="ficha-card" style={{ ...S.card, marginBottom: 0 }}>
@@ -625,7 +626,7 @@ function AnunciosCard({
                   {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                 </div>
               ) : (
-                <span style={{ color: D.textPrimary }}>{val(row, colId)}</span>
+                <span style={{ color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
               )}
             </div>
           </div>
@@ -640,10 +641,10 @@ function AnunciosCard({
 
 function VoluntariosCard({
   rows, colId,
-  editable, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
-  const displayed = editable ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!editable && !displayed.length) return null;
+  const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
+  if (!displayed.length) return null;
 
   return (
     <div className="ficha-card" style={{ ...S.card, marginBottom: 14 }}>
@@ -663,7 +664,7 @@ function VoluntariosCard({
                   style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
                 />
               ) : (
-                <span style={S.roleValue}>{val(row, colId)}</span>
+                <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
               )}
               {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
             </div>
@@ -716,6 +717,8 @@ export interface FichaDocumentViewProps {
   canPublish?: boolean;
   isPublishing?: boolean;
   editable?: boolean;
+  /** Cuando true, muestra todos los módulos habilitados aunque sus filas estén vacías (contexto editor) */
+  forceShowAll?: boolean;
   localSections?: Partial<Record<SectionName, Row[]>>;
   onCellChange?: (section: SectionName, rowId: string, colId: string, value: string) => void;
   onAddRow?: (section: SectionName, label: string, type: Row['type'], shared: boolean) => void;
@@ -730,7 +733,7 @@ export interface FichaDocumentViewProps {
 export function FichaDocumentView({
   ficha, onEdit, onSave, onArchive, onUnarchive, canArchive,
   onPublish, onUnpublish, canPublish, isPublishing,
-  editable, localSections, onCellChange, onAddRow, onDeleteRow, onSectionComplete,
+  editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onSectionComplete,
   sectionStatus, saveState, hiddenSections, onToggleModule,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
@@ -748,6 +751,7 @@ export function FichaDocumentView({
 
   const editProps = (name: SectionName): EditProps => ({
     editable,
+    forceShowAll,
     colId,
     onCellChange: onCellChange ? (rowId, cId, value) => onCellChange(name, rowId, cId, value) : undefined,
     onDeleteRow:  onDeleteRow  ? (rowId) => onDeleteRow(name, rowId)                           : undefined,
