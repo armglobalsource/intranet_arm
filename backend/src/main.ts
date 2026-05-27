@@ -94,5 +94,8 @@ async function bootstrap() {
   });
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('❌ BOOTSTRAP ERROR — el servidor no pudo iniciar:', err);
+  process.exit(1);
+});
 
