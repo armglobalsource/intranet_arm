@@ -5,6 +5,7 @@ import { useFichas } from '@/hooks/useFichas';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { Noticia } from '@/hooks/useNoticias';
+import { usePermissions } from '@/hooks/usePermissions';
 
 // ── HubCard ───────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,9 @@ function HubCard({ href, icon, title, description, accentColor, stat, loading }:
 // ── ProduccionGeneralClient ───────────────────────────────────────────────────
 
 export function ProduccionGeneralClient() {
+  const { can, isAdmin } = usePermissions();
+  const canDisponibilidad = isAdmin || can('disponibilidad:submit') || can('disponibilidad:view');
+
   const { data: fichas, isLoading } = useFichas();
   const { data: noticias, isLoading: loadingNoticias } = useQuery<Noticia[]>({
     queryKey: ['noticias-admin'],
@@ -178,6 +182,25 @@ export function ProduccionGeneralClient() {
           stat={statNoticias}
           loading={loadingNoticias}
         />
+
+        {canDisponibilidad && (
+          <HubCard
+            href="/dashboard/worship/disponibilidad"
+            icon={
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
+                stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <polyline points="9 16 11 18 15 14" />
+              </svg>
+            }
+            title="Disponibilidad Worship"
+            description="Disponibilidad semanal de músicos y cantantes para los encuentros de cada campus."
+            accentColor="#16a34a"
+          />
+        )}
 
         <ComingSoonCard icon="🎛️" title="Inventario Técnico"  accentColor="#f59e0b" />
         <ComingSoonCard icon="📅" title="Fechas Clave"        accentColor="#10b981" />
