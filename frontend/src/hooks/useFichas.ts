@@ -81,7 +81,7 @@ export function useCreateFicha() {
 export function useUpdateFicha() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ fichaId, ...dto }: { fichaId: string; title?: string; date?: string; status?: string }) =>
+    mutationFn: ({ fichaId, ...dto }: { fichaId: string; title?: string; date?: string; status?: string; hiddenSections?: string[] }) =>
       api.patch(`/fichas/${fichaId}`, dto).then(r => r.data),
     onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: KEYS.list() }),
   });
@@ -123,6 +123,22 @@ export function useUnarchiveFicha() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (fichaId: string) => api.patch(`/fichas/${fichaId}/unarchive`).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+  });
+}
+
+export function usePublishFicha() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fichaId: string) => api.patch(`/fichas/${fichaId}/publish`).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+  });
+}
+
+export function useUnpublishFicha() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fichaId: string) => api.patch(`/fichas/${fichaId}/unpublish`).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
   });
 }

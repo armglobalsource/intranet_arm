@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useFichas, useDeleteFicha, useArchiveFicha } from '@/hooks/useFichas';
+import { useFichas, useDeleteFicha, useArchiveFicha, usePublishFicha, useUnpublishFicha } from '@/hooks/useFichas';
 import { CloneModal } from '@/components/fichas/CloneModal';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -71,8 +71,8 @@ const SECTION_COLORS: Record<SectionName, string> = {
 
 // ── ProgressBar ───────────────────────────────────────────────────────────────
 
-function ProgressBar({ completionStatus }: { completionStatus: Record<string, boolean> }) {
-  const pct = completionPercent(completionStatus as any);
+function ProgressBar({ completionStatus, hiddenSections }: { completionStatus: Record<string, boolean>; hiddenSections?: SectionName[] }) {
+  const pct = completionPercent(completionStatus as any, hiddenSections ?? []);
   const sections = Object.keys(completionStatus) as SectionName[];
 
   return (
@@ -120,13 +120,17 @@ function ProgressBar({ completionStatus }: { completionStatus: Record<string, bo
 
 // ── FichaCard ─────────────────────────────────────────────────────────────────
 
-function FichaCard({ ficha, canDelete, canArchive, onClone }: { ficha: FichaListItem; canDelete: boolean; canArchive?: boolean; onClone?: () => void }) {
+function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { ficha: FichaListItem; canDelete: boolean; canArchive?: boolean; canPublish?: boolean; onClone?: () => void }) {
   const [confirming,         setConfirming]         = useState(false);
   const [confirmingArchive,  setConfirmingArchive]  = useState(false);
+  const [confirmingPublish,  setConfirmingPublish]  = useState(false);
   const [copied,             setCopied]             = useState(false);
-  const { mutate: deleteFicha,  isPending: deleting  } = useDeleteFicha();
-  const { mutate: archiveFicha, isPending: archiving } = useArchiveFicha();
+  const { mutate: deleteFicha,    isPending: deleting    } = useDeleteFicha();
+  const { mutate: archiveFicha,   isPending: archiving   } = useArchiveFicha();
+  const { mutate: publishFicha,   isPending: publishing  } = usePublishFicha();
+  const { mutate: unpublishFicha, isPending: unpublishing } = useUnpublishFicha();
   const isComplete = ficha.status === 'complete';
+  const isPublished = ficha.published ?? false;
 
   function handleDelete() {
     deleteFicha(ficha.fichaId, { onSuccess: () => setConfirming(false) });
@@ -134,6 +138,14 @@ function FichaCard({ ficha, canDelete, canArchive, onClone }: { ficha: FichaList
 
   function handleArchive() {
     archiveFicha(ficha.fichaId, { onSuccess: () => setConfirmingArchive(false) });
+  }
+
+  function handlePublish() {
+    publishFicha(ficha.fichaId, { onSuccess: () => setConfirmingPublish(false) });
+  }
+
+  function handleUnpublish() {
+    unpublishFicha(ficha.fichaId, { onSuccess: () => setConfirmingPublish(false) });
   }
 
   function handleShare() {
@@ -172,16 +184,61 @@ function FichaCard({ ficha, canDelete, canArchive, onClone }: { ficha: FichaList
         </div>
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
           <StatusBadge status={ficha.status} />
-          <span
-            className="text-[9px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded"
-            style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.4)' }}
-          >
-            {ficha.type === 'oracion' ? '🙏 Oración' : ficha.type === 'unico' ? 'Único' : 'Multi'}
-          </span>
+          <div className="flex items-center gap-1">
+            {isPublished && (
+              <span
+                className="text-[9px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(29,158,117,0.15)', color: '#1D9E75' }}
+              >
+                Publicada
+              </span>
+            )}
+            <span
+              className="text-[9px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded"
+              style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.4)' }}
+            >
+              {ficha.type === 'oracion' ? '🙏 Oración' : ficha.type === 'unico' ? 'Único' : 'Multi'}
+            </span>
+          </div>
         </div>
       </div>
 
-      <ProgressBar completionStatus={ficha.completionStatus} />
+      <ProgressBar completionStatus={ficha.completionStatus} hiddenSections={ficha.hiddenSections} />
+
+      {/* Confirmación de publicar/despublicar */}
+      {confirmingPublish && (
+        <div className="rounded-lg p-3 flex flex-col gap-2"
+          style={{
+            background: isPublished ? 'rgba(29,158,117,0.08)' : 'rgba(239,68,68,0.08)',
+            border: `1px solid ${isPublished ? 'rgba(29,158,117,0.25)' : 'rgba(239,68,68,0.25)'}`,
+          }}>
+          <p className="text-xs font-medium" style={{ color: isPublished ? '#34D399' : '#FCA5A5' }}>
+            {isPublished
+              ? '¿Despublicar esta ficha? Dejará de ser visible para los asignados.'
+              : '¿Publicar esta ficha? Será visible para los usuarios asignados y via link.'}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={isPublished ? handleUnpublish : handlePublish}
+              disabled={publishing || unpublishing}
+              className="flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              style={{
+                background: isPublished ? 'rgba(29,158,117,0.2)' : 'rgba(239,68,68,0.2)',
+                color: isPublished ? '#1D9E75' : '#F87171',
+                border: `1px solid ${isPublished ? 'rgba(29,158,117,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              }}>
+              {(publishing || unpublishing)
+                ? (isPublished ? 'Despublicando…' : 'Publicando…')
+                : (isPublished ? 'Sí, despublicar' : 'Sí, publicar')}
+            </button>
+            <button onClick={() => setConfirmingPublish(false)}
+              className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors"
+              style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Confirmación de archivo */}
       {confirmingArchive && (
@@ -243,6 +300,27 @@ function FichaCard({ ficha, canDelete, canArchive, onClone }: { ficha: FichaList
           </Link>
         )}
 
+        {/* Publicar / Despublicar */}
+        {canPublish && (
+          <button
+            onClick={() => { setConfirming(false); setConfirmingArchive(false); setConfirmingPublish((v) => !v); }}
+            title={isPublished ? 'Despublicar ficha' : 'Publicar ficha'}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style={{
+              background: isPublished
+                ? (confirmingPublish ? 'rgba(29,158,117,0.2)' : 'rgba(29,158,117,0.15)')
+                : (confirmingPublish ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.12)'),
+              color: isPublished ? '#1D9E75' : '#F87171',
+              border: `1px solid ${isPublished ? 'rgba(29,158,117,0.35)' : 'rgba(239,68,68,0.35)'}`,
+            }}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        )}
+
         {/* Duplicar */}
         {onClone && (
           <button
@@ -285,7 +363,7 @@ function FichaCard({ ficha, canDelete, canArchive, onClone }: { ficha: FichaList
         {/* Archivar */}
         {canArchive && (
           <button
-            onClick={() => { setConfirming(false); setConfirmingArchive((v) => !v); }}
+            onClick={() => { setConfirming(false); setConfirmingPublish(false); setConfirmingArchive((v) => !v); }}
             title="Archivar ficha"
             className="px-2.5 py-1.5 rounded-lg transition-colors"
             style={{
@@ -305,7 +383,7 @@ function FichaCard({ ficha, canDelete, canArchive, onClone }: { ficha: FichaList
 
         {canDelete && (
           <button
-            onClick={() => { setConfirmingArchive(false); setConfirming((v) => !v); }}
+            onClick={() => { setConfirmingArchive(false); setConfirmingPublish(false); setConfirming((v) => !v); }}
             className="px-2.5 py-1.5 rounded-lg transition-colors"
             title="Eliminar ficha"
             style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.1)' }}
@@ -331,17 +409,21 @@ function CampusGroup({
   fichas,
   canDelete,
   canArchive,
+  canPublish,
+  currentUserId,
   onClone,
 }: {
   campusName: string;
   fichas: FichaListItem[];
   canDelete: boolean;
   canArchive?: boolean;
+  canPublish?: boolean;
+  currentUserId?: number;
   onClone?: (ficha: FichaListItem) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const totalPct = fichas.length
-    ? Math.round(fichas.reduce((a, f) => a + completionPercent(f.completionStatus), 0) / fichas.length)
+    ? Math.round(fichas.reduce((a, f) => a + completionPercent(f.completionStatus, f.hiddenSections ?? []), 0) / fichas.length)
     : 0;
   const completas = fichas.filter((f) => f.status === 'complete').length;
 
@@ -395,7 +477,14 @@ function CampusGroup({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
               {fichas.map((f) => (
-                <FichaCard key={f.fichaId} ficha={f} canDelete={canDelete} canArchive={canArchive} onClone={onClone ? () => onClone(f) : undefined} />
+                <FichaCard
+                  key={f.fichaId}
+                  ficha={f}
+                  canDelete={canDelete}
+                  canArchive={canArchive}
+                  canPublish={canPublish && (f.createdBy === currentUserId || canDelete)}
+                  onClone={onClone ? () => onClone(f) : undefined}
+                />
               ))}
             </div>
           )}
@@ -481,7 +570,7 @@ export function FichasTecnicasClient() {
 
   const campusNames = Object.keys(grouped).sort((a, b) => grouped[b].length - grouped[a].length);
   const canCreate = isAdmin || can('fichas:create') || can('fichas:admin');
-  const canDelete = isAdmin || can('fichas:delete') || can('fichas:admin');
+  const canDelete = isAdmin || can('fichas:admin');
 
   // ── Stats rápidos ──────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -649,6 +738,8 @@ export function FichasTecnicasClient() {
               fichas={grouped[name]}
               canDelete={canDelete}
               canArchive={canDelete}
+              canPublish={isAdmin || can('fichas:create') || can('fichas:admin')}
+              currentUserId={user?.id}
               onClone={canClone ? (f) => setCloneTarget(f) : undefined}
             />
           ))}

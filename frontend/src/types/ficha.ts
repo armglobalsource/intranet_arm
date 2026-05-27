@@ -72,6 +72,11 @@ export interface Ficha {
   archivedBy?:        number | null;
   archivedByName?:    string | null;
   archivedAt?:        any | null;
+  published?:         boolean;
+  publishedBy?:       number | null;
+  publishedByName?:   string | null;
+  publishedAt?:       any | null;
+  hiddenSections?:    SectionName[];
 }
 
 export interface FichaListItem {
@@ -83,7 +88,10 @@ export interface FichaListItem {
   date:             any;
   status:           FichaStatus;
   completionStatus: CompletionStatus;
-  archived?:        boolean;
+  archived?:          boolean;
+  published?:         boolean;
+  createdBy?:         number;
+  hiddenSections?:    SectionName[];
 }
 
 export type CreateFichaPayload = {
@@ -109,8 +117,8 @@ export interface Cancion {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-export function completionPercent(status: CompletionStatus): number {
-  const keys = Object.keys(status) as SectionName[];
+export function completionPercent(status: CompletionStatus, hidden: SectionName[] = []): number {
+  const keys = (Object.keys(status) as SectionName[]).filter(k => !hidden.includes(k));
   if (!keys.length) return 0;
   const done = keys.filter(k => status[k]).length;
   return Math.round((done / keys.length) * 100);

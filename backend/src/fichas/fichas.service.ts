@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto } from './dto/ficha.dto';
 
@@ -252,9 +252,10 @@ export class FichasService {
     if (isAdmin) return all;
 
     return all.filter((ficha: any) => {
-      // creador de la ficha
+      // el creador siempre ve sus propias fichas (publicadas o no)
       if (ficha.createdBy === userId) return true;
-      // asignado como responsable de alguna sección
+      // otros usuarios solo ven fichas publicadas donde están asignados
+      if (!ficha.published) return false;
       const sections = ficha.sections ?? {};
       return Object.values(sections).some((sec: any) => sec?.assignedTo === userId);
     });
@@ -264,6 +265,12 @@ export class FichasService {
     const snap = await this.fb.db.collection(COL).doc(fichaId).get();
     if (!snap.exists) throw new NotFoundException(`Ficha ${fichaId} no encontrada`);
     return this.fb.toObj(snap);
+  }
+
+  async findPublic(fichaId: string) {
+    const ficha = await this.findOne(fichaId);
+    if (!ficha.published) throw new ForbiddenException('Esta ficha no está publicada');
+    return ficha;
   }
 
   async create(dto: CreateFichaDto, userId: number, userName: string) {
@@ -283,6 +290,7 @@ export class FichasService {
       sections:         buildDefaultSections(dto.type),
       completionStatus: buildDefaultCompletion(dto.type),
       status:           'draft',
+      published:        false,
       createdBy:        userId,
       createdByName:    userName,
       createdAt:        this.fb.now(),
@@ -297,9 +305,10 @@ export class FichasService {
     await this.findOne(fichaId);
     const data: any = { lastModifiedBy: userId, lastModifiedAt: this.fb.now() };
     if (userName !== undefined) data.lastModifiedByName = userName;
-    if (dto.title  !== undefined) data.title  = dto.title;
-    if (dto.status !== undefined) data.status = dto.status;
-    if (dto.date   !== undefined) data.date   = this.fb.ts(new Date(dto.date));
+    if (dto.title          !== undefined) data.title          = dto.title;
+    if (dto.status         !== undefined) data.status         = dto.status;
+    if (dto.date           !== undefined) data.date           = this.fb.ts(new Date(dto.date));
+    if (dto.hiddenSections !== undefined) data.hiddenSections = dto.hiddenSections;
     await this.fb.db.collection(COL).doc(fichaId).update(data);
     return this.findOne(fichaId);
   }
@@ -348,6 +357,10 @@ export class FichasService {
       sections,
       completionStatus: buildDefaultCompletion(original.type ?? 'multi'),
       status:           'draft',
+      published:        false,
+      publishedBy:      null,
+      publishedByName:  null,
+      publishedAt:      null,
       createdBy:        userId,
       createdByName:    userName,
       createdAt:        this.fb.now(),
@@ -411,7 +424,8 @@ export class FichasService {
       lastModifiedByName: userName,
       lastModifiedAt:     this.fb.now(),
     };
-    const allDone = SECTIONS.every(s =>
+    const visibleSections = SECTIONS.filter(s => !(ficha.hiddenSections ?? []).includes(s));
+    const allDone = visibleSections.every(s =>
       s === sectionName ? true : ficha.completionStatus?.[s] === true,
     );
     if (allDone)                        update.status = 'complete';
@@ -442,6 +456,34 @@ export class FichasService {
       archivedBy:         null,
       archivedByName:     null,
       archivedAt:         null,
+      lastModifiedBy:     userId,
+      lastModifiedByName: userName,
+      lastModifiedAt:     this.fb.now(),
+    });
+    return this.findOne(fichaId);
+  }
+
+  async publish(fichaId: string, userId: number, userName: string) {
+    await this.findOne(fichaId);
+    await this.fb.db.collection(COL).doc(fichaId).update({
+      published:        true,
+      publishedBy:      userId,
+      publishedByName:  userName,
+      publishedAt:      this.fb.now(),
+      lastModifiedBy:     userId,
+      lastModifiedByName: userName,
+      lastModifiedAt:     this.fb.now(),
+    });
+    return this.findOne(fichaId);
+  }
+
+  async unpublish(fichaId: string, userId: number, userName: string) {
+    await this.findOne(fichaId);
+    await this.fb.db.collection(COL).doc(fichaId).update({
+      published:        false,
+      publishedBy:      null,
+      publishedByName:  null,
+      publishedAt:      null,
       lastModifiedBy:     userId,
       lastModifiedByName: userName,
       lastModifiedAt:     this.fb.now(),

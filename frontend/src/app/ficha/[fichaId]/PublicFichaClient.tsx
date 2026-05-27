@@ -20,6 +20,7 @@ export function PublicFichaClient({ fichaId }: { fichaId: string }) {
     fetch(`${API_BASE}/fichas/public/${fichaId}`)
       .then(async (r) => {
         if (!r.ok) {
+          if (r.status === 403) throw new Error('not_published');
           const body = await r.json().catch(() => ({}));
           throw new Error(body?.message ?? `Error ${r.status}`);
         }
@@ -46,12 +47,37 @@ export function PublicFichaClient({ fichaId }: { fichaId: string }) {
   }
 
   if (error || !ficha) {
+    const isNotPublished = error === 'not_published';
     return (
       <div style={{
         minHeight: '100vh', background: '#0d0d0d',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12,
       }}>
-        <p style={{ color: '#888', fontSize: 14 }}>{error ?? 'Ficha no encontrada'}</p>
+        <div style={{
+          width: 48, height: 48, borderRadius: 14,
+          background: 'rgba(127,119,221,0.12)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7F77DD" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            {isNotPublished ? (
+              <>
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </>
+            ) : (
+              <>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </>
+            )}
+          </svg>
+        </div>
+        <p style={{ color: '#888', fontSize: 14, textAlign: 'center', maxWidth: 280 }}>
+          {isNotPublished
+            ? 'Esta ficha aún no ha sido publicada y no está disponible públicamente.'
+            : (error ?? 'Ficha no encontrada')}
+        </p>
       </div>
     );
   }
@@ -84,7 +110,7 @@ export function PublicFichaClient({ fichaId }: { fichaId: string }) {
       </div>
 
       {/* Ficha (read-only, sin botón editar) */}
-      <FichaDocumentView ficha={ficha} />
+      <FichaDocumentView ficha={ficha} hiddenSections={ficha.hiddenSections ?? []} />
     </div>
   );
 }

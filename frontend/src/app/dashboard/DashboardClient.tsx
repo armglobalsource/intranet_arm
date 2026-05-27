@@ -5,9 +5,12 @@ import { useMiFichas } from '@/hooks/useFichas';
 import { useNoticiasGlobal, useNoticiasCampus } from '@/hooks/useNoticias';
 import type { Noticia } from '@/hooks/useNoticias';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { usePermissions } from '@/hooks/usePermissions';
 import { CalendarioAnual } from './CalendarioAnual';
 import { useOrgUserProfile } from '@/hooks/useOrgChart';
 import { membershipArea } from '@/types/orgchart';
+import { useMyDisponibilidad } from '@/hooks/useDisponibilidad';
+import { toWeekLabel, formatWeekLabel } from '@/types/disponibilidad';
 
 // ── Helper fecha ──────────────────────────────────────────────────────────────
 
@@ -127,9 +130,64 @@ function HubNoticias({
   );
 }
 
+// ── DisponibilidadWidget ──────────────────────────────────────────────────────
+
+function DisponibilidadWidget({ campusId }: { campusId: number | null }) {
+  const weekLabel = toWeekLabel(new Date());
+  const { data: saved = [], isLoading } = useMyDisponibilidad(campusId, weekLabel);
+  const responded = saved.length > 0;
+
+  return (
+    <Link
+      href="/dashboard/worship/disponibilidad"
+      className="p-5 flex items-start gap-4 rounded-2xl transition-all group"
+      style={{ background: '#E5E7EB', border: '1px solid #D1D5DB' }}
+      onMouseEnter={e => (e.currentTarget.style.background = '#D1D5DB')}
+      onMouseLeave={e => (e.currentTarget.style.background = '#E5E7EB')}
+    >
+      <div className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center"
+        style={{ background: 'rgba(0,0,0,0.07)' }}>
+        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none"
+          stroke="#374151" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+          <polyline points="9 16 11 18 15 14" />
+        </svg>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold leading-tight text-gray-900">Mi disponibilidad</p>
+        <p className="text-xs mt-0.5 text-gray-500">{formatWeekLabel(weekLabel)}</p>
+        <div className="mt-1.5">
+          {isLoading ? (
+            <div className="h-4 w-20 rounded-full animate-pulse bg-gray-300" />
+          ) : !campusId ? (
+            <span className="text-[10px] font-semibold text-yellow-600">Sin campus asignado</span>
+          ) : responded ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-green-700 bg-green-100 border border-green-200">
+              ✓ Enviada
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-100 border border-amber-200">
+              Pendiente
+            </span>
+          )}
+        </div>
+        <p className="text-[10px] font-medium mt-1.5 text-gray-500">
+          {responded ? 'Actualizar mi disponibilidad →' : 'Enviar mi disponibilidad →'}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
 // ── DashboardClient ───────────────────────────────────────────────────────────
 
 export function DashboardClient() {
+  const { can, isAdmin } = usePermissions();
+  const canDisponibilidad = isAdmin || can('disponibilidad:submit');
+
   const { data: fichas, isLoading: fichasLoading } = useMiFichas();
   const { data: noticiasGlobal, isLoading: loadingGlobal } = useNoticiasGlobal();
   const { data: noticiasCampus, isLoading: loadingCampus } = useNoticiasCampus();
@@ -277,14 +335,18 @@ export function DashboardClient() {
           </div>
         </Link>
 
-        {/* Notificaciones */}
-        <div className="card p-5 flex items-center gap-4">
-          <span className="text-3xl">🔔</span>
-          <div>
-            <p className="text-2xl font-bold text-gray-900">—</p>
-            <p className="text-xs text-gray-500">Notificaciones nuevas</p>
+        {/* Disponibilidad / Notificaciones */}
+        {canDisponibilidad ? (
+          <DisponibilidadWidget campusId={user?.campusId ?? null} />
+        ) : (
+          <div className="card p-5 flex items-center gap-4">
+            <span className="text-3xl">🔔</span>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">—</p>
+              <p className="text-xs text-gray-500">Notificaciones nuevas</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Hubs de noticias */}

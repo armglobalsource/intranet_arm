@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useFichaRealtime, useUpdateSection, useCompleteSection, useArchiveFicha, useUnarchiveFicha } from '@/hooks/useFichas';
+import { useFichaRealtime, useUpdateSection, useCompleteSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, usePublishFicha, useUnpublishFicha } from '@/hooks/useFichas';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAuthStore } from '@/lib/store/auth.store';
 import { FichaDocumentView } from './FichaDocumentView';
+import { DisponibilidadSideCard } from '@/components/fichas/DisponibilidadSideCard';
 import type { Row, SectionName, Section } from '@/types/ficha';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -17,6 +19,7 @@ function uid() {
 
 export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { can, isAdmin } = usePermissions();
+  const { user } = useAuthStore();
   const { ficha, loading, error } = useFichaRealtime(fichaId);
   const [saveState, setSaveState]       = useState<SaveState>('idle');
   const [localSections, setLocalSections] =
@@ -26,12 +29,24 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const debounceRefs =
     useRef<Partial<Record<SectionName, ReturnType<typeof setTimeout>>>>({});
 
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(true);
 
   const { mutate: updateSection } = useUpdateSection();
   const { mutate: completeSection } = useCompleteSection();
   const { mutate: archiveFicha } = useArchiveFicha();
   const { mutate: unarchiveFicha } = useUnarchiveFicha();
+  const { mutate: updateFicha } = useUpdateFicha();
+  const { mutate: publishFicha,   isPending: isPublishing  } = usePublishFicha();
+  const { mutate: unpublishFicha, isPending: isUnpublishing } = useUnpublishFicha();
+
+  function handleToggleModule(name: SectionName) {
+    if (!ficha) return;
+    const current = ficha.hiddenSections ?? [];
+    const next = current.includes(name)
+      ? current.filter((s) => s !== name)
+      : [...current, name];
+    updateFicha({ fichaId: ficha.fichaId, hiddenSections: next });
+  }
 
   // ── Sincronizar filas desde Firestore ──────────────────────────────────────
   // Solo sincronizamos secciones que NO tienen una edición pendiente
@@ -48,7 +63,8 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     });
   }, [ficha?.sections]);
 
-  const canEdit = isAdmin || can('fichas:edit') || can('fichas:admin');
+  const canEdit    = isAdmin || can('fichas:edit') || can('fichas:admin');
+  const canPublish = ficha ? (isAdmin || can('fichas:admin') || ficha.createdBy === user?.id) : false;
   const editable = canEdit && isEditing;
 
   // ── Status de secciones ────────────────────────────────────────────────────
@@ -199,6 +215,9 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     );
   }
 
+  const canViewDisponibilidad = isAdmin || can('disponibilidad:view');
+  const showSidePanel = editable && canViewDisponibilidad;
+
   return (
     <div className="space-y-4">
       {/* Breadcrumb */}
@@ -215,23 +234,39 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         </Link>
       </div>
 
-      {/* Vista documento (editable o read-only) */}
-      <FichaDocumentView
-        ficha={ficha}
-        editable={editable}
-        onEdit={canEdit ? () => setIsEditing(true) : undefined}
-        onSave={handleSaveAll}
-        onArchive={canEdit ? () => archiveFicha(fichaId) : undefined}
-        onUnarchive={canEdit ? () => unarchiveFicha(fichaId) : undefined}
-        canArchive={canEdit}
-        localSections={localSections}
-        onCellChange={handleCellChange}
-        onAddRow={handleAddRow}
-        onDeleteRow={handleDeleteRow}
-        onSectionComplete={handleSectionComplete}
-        sectionStatus={sectionStatus}
-        saveState={saveState}
-      />
+      {/* Layout: ficha + panel lateral cuando está en edición */}
+      <div className={showSidePanel ? 'flex gap-5 items-start' : ''}>
+        <div className={showSidePanel ? 'flex-1 min-w-0' : ''}>
+          <FichaDocumentView
+            ficha={ficha}
+            editable={editable}
+            onEdit={canEdit ? () => setIsEditing(true) : undefined}
+            onSave={handleSaveAll}
+            onArchive={canEdit ? () => archiveFicha(fichaId) : undefined}
+            onUnarchive={canEdit ? () => unarchiveFicha(fichaId) : undefined}
+            canArchive={canEdit}
+            onPublish={canPublish ? () => publishFicha(fichaId) : undefined}
+            onUnpublish={canPublish ? () => unpublishFicha(fichaId) : undefined}
+            canPublish={canPublish}
+            isPublishing={isPublishing || isUnpublishing}
+            localSections={localSections}
+            onCellChange={handleCellChange}
+            onAddRow={handleAddRow}
+            onDeleteRow={handleDeleteRow}
+            onSectionComplete={handleSectionComplete}
+            sectionStatus={sectionStatus}
+            saveState={saveState}
+            hiddenSections={ficha.hiddenSections ?? []}
+            onToggleModule={canEdit ? handleToggleModule : undefined}
+          />
+        </div>
+
+        {showSidePanel && (
+          <div className="w-56 flex-shrink-0 sticky top-4">
+            <DisponibilidadSideCard fichaDate={ficha.date} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import type { Ficha, Row, SectionName, Encuentro } from '@/types/ficha';
+import { SECTION_LABELS } from '@/types/ficha';
 import { useUpdateFicha } from '@/hooks/useFichas';
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
@@ -710,6 +711,10 @@ export interface FichaDocumentViewProps {
   onArchive?: () => void;
   onUnarchive?: () => void;
   canArchive?: boolean;
+  onPublish?: () => void;
+  onUnpublish?: () => void;
+  canPublish?: boolean;
+  isPublishing?: boolean;
   editable?: boolean;
   localSections?: Partial<Record<SectionName, Row[]>>;
   onCellChange?: (section: SectionName, rowId: string, colId: string, value: string) => void;
@@ -718,12 +723,15 @@ export interface FichaDocumentViewProps {
   onSectionComplete?: (section: SectionName) => void;
   sectionStatus?: Partial<Record<SectionName, boolean>>;
   saveState?: 'idle' | 'saving' | 'saved' | 'error';
+  hiddenSections?: SectionName[];
+  onToggleModule?: (name: SectionName) => void;
 }
 
 export function FichaDocumentView({
   ficha, onEdit, onSave, onArchive, onUnarchive, canArchive,
+  onPublish, onUnpublish, canPublish, isPublishing,
   editable, localSections, onCellChange, onAddRow, onDeleteRow, onSectionComplete,
-  sectionStatus, saveState,
+  sectionStatus, saveState, hiddenSections, onToggleModule,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
 
@@ -748,7 +756,23 @@ export function FichaDocumentView({
     onComplete:   onSectionComplete ? () => onSectionComplete(name) : undefined,
   });
 
-  const [copied, setCopied] = useState(false);
+  const [copied,           setCopied]           = useState(false);
+  const [modulesOpen,      setModulesOpen]      = useState(false);
+  const [confirmingPublish, setConfirmingPublish] = useState(false);
+  const isPublished = ficha.published ?? false;
+  const modulesRef = useRef<HTMLDivElement>(null);
+
+  const hidden = (n: SectionName) => (hiddenSections ?? []).includes(n);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (modulesRef.current && !modulesRef.current.contains(e.target as Node)) {
+        setModulesOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // ── Edición inline del título ─────────────────────────────────────────────
   const { mutate: updateFicha } = useUpdateFicha();
@@ -1136,6 +1160,79 @@ export function FichaDocumentView({
                 </button>
               )}
 
+              {/* Módulos (solo modo edición) */}
+              {editable && onToggleModule && (
+                <div ref={modulesRef} style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setModulesOpen((o) => !o)}
+                    title="Gestionar módulos"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      background: modulesOpen ? 'rgba(127,119,221,0.15)' : 'rgba(255,255,255,0.06)',
+                      color: modulesOpen ? C.purple : D.textSecond,
+                      border: `0.5px solid ${modulesOpen ? 'rgba(127,119,221,0.35)' : D.cardBorder}`,
+                      cursor: 'pointer', transition: 'all 0.2s',
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                      <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+                    </svg>
+                    Módulos
+                  </button>
+                  {modulesOpen && (
+                    <div
+                      style={{
+                        position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
+                        background: '#1a1a1a', border: '0.5px solid rgba(255,255,255,0.12)',
+                        borderRadius: 10, padding: '6px 0', minWidth: 220,
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                      }}
+                    >
+                      <p style={{ padding: '4px 12px 8px', fontSize: 10, fontWeight: 700,
+                        textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.25)' }}>
+                        Módulos activos
+                      </p>
+                      {(Object.keys(SECTION_LABELS) as SectionName[]).map((name) => {
+                        const isHidden = hidden(name);
+                        return (
+                          <button
+                            key={name}
+                            onClick={() => onToggleModule(name)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              width: '100%', padding: '8px 12px', fontSize: 12,
+                              color: isHidden ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)',
+                              background: 'transparent', border: 'none', cursor: 'pointer',
+                              textAlign: 'left', transition: 'background 0.15s',
+                            }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                          >
+                            <span style={{
+                              flexShrink: 0, width: 16, height: 16, borderRadius: 4,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: isHidden ? 'rgba(255,255,255,0.06)' : 'rgba(29,158,117,0.2)',
+                              border: `1px solid ${isHidden ? 'rgba(255,255,255,0.1)' : 'rgba(29,158,117,0.4)'}`,
+                            }}>
+                              {!isHidden && (
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none"
+                                  stroke={C.green} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              )}
+                            </span>
+                            {SECTION_LABELS[name]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Imprimir */}
               <button
                 onClick={() => window.print()}
@@ -1154,6 +1251,30 @@ export function FichaDocumentView({
                 </svg>
                 Imprimir
               </button>
+
+              {/* Publicar / Despublicar */}
+              {canPublish && (
+                <button
+                  onClick={() => setConfirmingPublish((v) => !v)}
+                  title={isPublished ? 'Despublicar ficha' : 'Publicar ficha'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    background: isPublished
+                      ? (confirmingPublish ? 'rgba(29,158,117,0.2)' : 'rgba(29,158,117,0.12)')
+                      : (confirmingPublish ? 'rgba(239,68,68,0.2)'  : 'rgba(239,68,68,0.1)'),
+                    color: isPublished ? C.green : '#F87171',
+                    border: `0.5px solid ${isPublished ? 'rgba(29,158,117,0.35)' : 'rgba(239,68,68,0.35)'}`,
+                    cursor: 'pointer', transition: 'all 0.2s',
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  {isPublished ? 'Publicada' : 'Publicar'}
+                </button>
+              )}
 
               {/* Archivar / Desarchivar */}
               {canArchive && (
@@ -1228,23 +1349,69 @@ export function FichaDocumentView({
           </div>{/* fin fila 2 */}
         </div>{/* fin header */}
 
+        {/* ── Banner confirmación publicar/despublicar ── */}
+        {confirmingPublish && canPublish && (
+          <div className="ficha-no-print" style={{
+            margin: '0 1.5rem',
+            padding: '10px 14px',
+            borderRadius: 10,
+            background: isPublished ? 'rgba(29,158,117,0.08)' : 'rgba(239,68,68,0.08)',
+            border: `0.5px solid ${isPublished ? 'rgba(29,158,117,0.25)' : 'rgba(239,68,68,0.25)'}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}>
+            <p style={{ fontSize: 12, color: isPublished ? '#34D399' : '#FCA5A5', margin: 0 }}>
+              {isPublished
+                ? '¿Despublicar esta ficha? Dejará de ser visible para los usuarios asignados.'
+                : '¿Publicar esta ficha? Será visible para todos los asignados y compartible por link.'}
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <button
+                onClick={() => { (isPublished ? onUnpublish : onPublish)?.(); setConfirmingPublish(false); }}
+                disabled={isPublishing}
+                style={{
+                  padding: '5px 14px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+                  background: isPublished ? 'rgba(29,158,117,0.2)' : 'rgba(239,68,68,0.2)',
+                  color: isPublished ? C.green : '#F87171',
+                  border: `0.5px solid ${isPublished ? 'rgba(29,158,117,0.4)' : 'rgba(239,68,68,0.4)'}`,
+                  cursor: isPublishing ? 'default' : 'pointer',
+                  opacity: isPublishing ? 0.6 : 1,
+                }}
+              >
+                {isPublishing
+                  ? (isPublished ? 'Despublicando…' : 'Publicando…')
+                  : (isPublished ? 'Sí, despublicar' : 'Sí, publicar')}
+              </button>
+              <button
+                onClick={() => setConfirmingPublish(false)}
+                style={{
+                  padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 500,
+                  background: 'rgba(255,255,255,0.06)', color: D.textSecond,
+                  border: `0.5px solid ${D.cardBorder}`, cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Cuerpo ── */}
         <div className="ficha-body" style={{ padding: '1.5rem 2rem' }}>
           <div className="ficha-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
-              <RoleCard title="Equipo Pastoral" rows={sec('pastoral')}   {...editProps('pastoral')} />
-              <RoleCard title="Producción"       rows={sec('produccion')} {...editProps('produccion')} />
-              <StreamingCard                     rows={sec('streaming')}  {...editProps('streaming')} />
+              {!hidden('pastoral')   && <RoleCard title="Equipo Pastoral" rows={sec('pastoral')}   {...editProps('pastoral')} />}
+              {!hidden('produccion') && <RoleCard title="Producción"       rows={sec('produccion')} {...editProps('produccion')} />}
+              {!hidden('streaming')  && <StreamingCard                     rows={sec('streaming')}  {...editProps('streaming')} />}
             </div>
             <div>
-              <EscenaCard   rows={sec('escena')}   {...editProps('escena')} />
-              <SetListCard  rows={sec('setList')}  {...editProps('setList')} encuentro={selectedEncuentro} />
-              <HorariosCard rows={sec('horarios')} {...editProps('horarios')} />
+              {!hidden('escena')   && <EscenaCard   rows={sec('escena')}   {...editProps('escena')} />}
+              {!hidden('setList')  && <SetListCard  rows={sec('setList')}  {...editProps('setList')} encuentro={selectedEncuentro} />}
+              {!hidden('horarios') && <HorariosCard rows={sec('horarios')} {...editProps('horarios')} />}
             </div>
           </div>
 
-          <VoluntariosCard rows={sec('voluntarios')} {...editProps('voluntarios')} />
-          <AnunciosCard    rows={sec('anuncios')}    {...editProps('anuncios')} />
+          {!hidden('voluntarios') && <VoluntariosCard rows={sec('voluntarios')} {...editProps('voluntarios')} />}
+          {!hidden('anuncios')    && <AnunciosCard    rows={sec('anuncios')}    {...editProps('anuncios')} />}
         </div>
 
         {/* ── Footer de auditoría ── */}
