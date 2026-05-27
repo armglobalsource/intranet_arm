@@ -428,6 +428,24 @@ export function Sidebar() {
             </div>
           );
         })}
+
+        {/* Administración de Campus — debajo de Ministerios, independiente */}
+        {(isAdmin || can('campus:manage')) && (() => {
+          const href   = '/dashboard/administracion-campus';
+          const active = pathname.startsWith(href);
+          return (
+            <Link
+              href={href}
+              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+              }`}
+            >
+              <AdminCampusIcon active={active} />
+              Adm. Campus
+            </Link>
+          );
+        })()}
       </nav>
 
       {/* Configuración + Soporte (admin-only) */}
@@ -445,22 +463,6 @@ export function Sidebar() {
             >
               <ConfigIcon active={active} />
               Configuración
-            </Link>
-          );
-        })()}
-        {(isAdmin || can('campus:manage')) && (() => {
-          const href   = '/dashboard/administracion-campus';
-          const active = pathname.startsWith(href);
-          return (
-            <Link
-              href={href}
-              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
-              }`}
-            >
-              <AdminCampusIcon active={active} />
-              Adm. Campus
             </Link>
           );
         })()}
