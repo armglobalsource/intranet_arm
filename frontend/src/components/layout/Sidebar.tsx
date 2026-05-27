@@ -338,8 +338,8 @@ export function Sidebar() {
             />
           </div>
           <p
-            className="absolute top-full left-0 mt-0.5 text-[9px] font-light italic tracking-wider whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-200 pointer-events-none"
-            style={{ color: 'rgba(255,255,255,0.35)' }}
+            className="absolute top-full left-0 mt-0.5 text-[9px] font-light italic tracking-wider whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-200 pointer-events-none z-10"
+            style={{ color: 'rgba(255,255,255,0.7)', background: '#0d0d0d', paddingBottom: 2 }}
           >
             La iglesia es mucho más
           </p>
