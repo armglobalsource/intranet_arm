@@ -166,23 +166,6 @@ export function ProduccionGeneralClient() {
           loading={isLoading}
         />
 
-        <HubCard
-          href="/dashboard/produccion-general/noticias"
-          icon={
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
-              stroke="#4F46E5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l6 6v8a2 2 0 0 1-2 2z" />
-              <polyline points="17 20 17 13 7 13 7 20" />
-              <polyline points="7 4 7 8 15 8" />
-            </svg>
-          }
-          title="Noticias"
-          description="Publica y gestiona noticias globales y por campus. Comparte imágenes, videos e Instagram."
-          accentColor="#4F46E5"
-          stat={statNoticias}
-          loading={loadingNoticias}
-        />
-
         {canDisponibilidad && (
           <HubCard
             href="/dashboard/worship/disponibilidad"
@@ -201,6 +184,23 @@ export function ProduccionGeneralClient() {
             accentColor="#16a34a"
           />
         )}
+
+        <HubCard
+          href="/dashboard/produccion-general/noticias"
+          icon={
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
+              stroke="#4F46E5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l6 6v8a2 2 0 0 1-2 2z" />
+              <polyline points="17 20 17 13 7 13 7 20" />
+              <polyline points="7 4 7 8 15 8" />
+            </svg>
+          }
+          title="Noticias"
+          description="Publica y gestiona noticias globales y por campus. Comparte imágenes, videos e Instagram."
+          accentColor="#4F46E5"
+          stat={statNoticias}
+          loading={loadingNoticias}
+        />
 
         <ComingSoonCard icon="🎛️" title="Inventario Técnico"  accentColor="#f59e0b" />
         <ComingSoonCard icon="📅" title="Fechas Clave"        accentColor="#10b981" />
