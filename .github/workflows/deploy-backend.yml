@@ -82,6 +82,7 @@ jobs:
             GCS_BUCKET_AVATARS=intranet-arm-dev-70a30.firebasestorage.app
             BACKEND_URL=${{ secrets.BACKEND_URL }}
             GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
 
       - name: Verify deployment
         run: |
