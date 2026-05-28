@@ -3,9 +3,15 @@ const nextConfig = {
   output: 'standalone',
   experimental: {
     staleTimes: {
-      dynamic: 0,   // no client-side cache for dynamic pages
+      dynamic: 0,
       static: 180,
     },
+  },
+  async redirects() {
+    return [
+      { source: '/login',    destination: '/auth/login',    permanent: true },
+      { source: '/register', destination: '/auth/register', permanent: true },
+    ];
   },
   images: {
     remotePatterns: [
