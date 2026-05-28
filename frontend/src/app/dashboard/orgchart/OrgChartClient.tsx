@@ -6,7 +6,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/api';
 import {
   useOrgAreas, useOrgAreaTree, useOrgSearch, useOrgUserProfile,
-  useUpdateOrgArea, useUpdateOrgTeam, useCreateOrgTeam, useDeleteOrgTeam,
+  useCreateOrgArea, useUpdateOrgArea, useUpdateOrgTeam, useCreateOrgTeam, useDeleteOrgTeam,
   useCreateOrgMembership, useUpdateOrgMembership, useDeleteOrgMembership,
   useUploadTeamLogo, useUploadAreaLogo,
 } from '@/hooks/useOrgChart';
@@ -194,13 +194,14 @@ interface TeamCardProps {
   color:        string;
   canEdit:      boolean;
   forceOpen:    boolean | null;
+  depth?:       number;
   isDragging?:  boolean;
   dragHandle?:  React.ReactNode;
   onSelect:     (m: OrgMembership) => void;
   onSelectTeam: (t: OrgTeam) => void;
 }
 
-function TeamCard({ team, color, canEdit, forceOpen, isDragging, dragHandle, onSelect, onSelectTeam }: TeamCardProps) {
+function TeamCard({ team, color, canEdit, forceOpen, depth = 0, isDragging, dragHandle, onSelect, onSelectTeam }: TeamCardProps) {
   const [open,            setOpen]            = useState(false);
   const [descOpen,        setDescOpen]        = useState(false);
   const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
@@ -213,7 +214,12 @@ function TeamCard({ team, color, canEdit, forceOpen, isDragging, dragHandle, onS
     }
   }, [forceOpen]);
 
-  const total = team.memberships.length;
+  const total    = team.memberships.length;
+  const children = team.children ?? [];
+  const hasContent = total > 0 || children.length > 0;
+
+  // Tono ligeramente más claro para sub-equipos anidados
+  const bgStyle = depth === 0 ? { background: '#d1d0cc' } : { background: '#e4e3df' };
 
   function handleRemove(id: number) {
     setConfirmRemoveId(id);
@@ -224,16 +230,24 @@ function TeamCard({ team, color, canEdit, forceOpen, isDragging, dragHandle, onS
       {/* Header del equipo */}
       <div
         className="flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 shadow-sm cursor-pointer transition-shadow hover:shadow-md"
-        style={{ background: '#d1d0cc' }}
+        style={bgStyle}
         onClick={() => onSelectTeam(team)}
       >
-        {/* Drag handle — solo en modo edición */}
+        {/* Drag handle — solo en modo edición (nivel raíz) */}
         {dragHandle}
+
+        {/* Indicador de nivel para sub-equipos */}
+        {depth > 0 && (
+          <svg className="w-3 h-3 flex-shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        )}
 
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-slate-800 leading-snug truncate">{team.name}</div>
           <div className="text-[10.5px] text-slate-500 mt-0.5 uppercase tracking-wide">
             {total} persona{total !== 1 ? 's' : ''}
+            {children.length > 0 && <span className="ml-1.5 opacity-60">· {children.length} sub-equipo{children.length !== 1 ? 's' : ''}</span>}
           </div>
         </div>
 
@@ -250,17 +264,19 @@ function TeamCard({ team, color, canEdit, forceOpen, isDragging, dragHandle, onS
           </button>
         )}
 
-        <button
-          onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-          className={`w-7 h-7 rounded-[7px] flex-shrink-0 border flex items-center justify-center transition-all ${
-            open ? 'text-white border-transparent' : 'border-slate-400/40 text-slate-500 hover:bg-slate-300/30'
-          }`}
-          style={open ? { background: color, borderColor: color } : {}}
-        >
-          <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
+        {hasContent && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+            className={`w-7 h-7 rounded-[7px] flex-shrink-0 border flex items-center justify-center transition-all ${
+              open ? 'text-white border-transparent' : 'border-slate-400/40 text-slate-500 hover:bg-slate-300/30'
+            }`}
+            style={open ? { background: color, borderColor: color } : {}}
+          >
+            <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Descripción */}
@@ -270,14 +286,33 @@ function TeamCard({ team, color, canEdit, forceOpen, isDragging, dragHandle, onS
         </div>
       )}
 
-      {/* Miembros */}
+      {/* Contenido expandido: miembros + sub-equipos */}
       {open && (
-        <div className="ml-[18px] pl-[26px] mt-1.5 flex flex-col gap-1.5 border-l-2" style={{ borderColor: `${color}2a` }}>
+        <div className="ml-[18px] pl-[14px] mt-1.5 flex flex-col gap-1.5 border-l-2" style={{ borderColor: `${color}2a` }}>
+          {/* Miembros directos */}
           {team.memberships.map((m) => (
             <MemberCard key={m.id} membership={m} color={color} canEdit={canEdit} onSelect={onSelect} onRemove={handleRemove} />
           ))}
-          {team.memberships.length === 0 && (
+          {team.memberships.length === 0 && children.length === 0 && (
             <p className="text-xs text-slate-400 italic px-2 py-1">Sin miembros asignados</p>
+          )}
+
+          {/* Sub-equipos anidados */}
+          {children.length > 0 && (
+            <div className="flex flex-col gap-2 mt-0.5">
+              {children.map((child) => (
+                <TeamCard
+                  key={child.id}
+                  team={child}
+                  color={color}
+                  canEdit={canEdit}
+                  forceOpen={forceOpen}
+                  depth={depth + 1}
+                  onSelect={onSelect}
+                  onSelectTeam={onSelectTeam}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -1399,6 +1434,15 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
   const [desc,        setDesc]        = useState(team.desc ?? '');
   const [saveStatus,  setSaveStatus]  = useState<'idle' | 'saving' | 'saved'>('idle');
 
+  // Sub-equipo
+  const [addingSubteam,      setAddingSubteam]      = useState(false);
+  const [subteamName,        setSubteamName]        = useState('');
+  const [subteamDesc,        setSubteamDesc]        = useState('');
+  const [subteamSaving,      setSubteamSaving]      = useState(false);
+  const [confirmDelSubteam,  setConfirmDelSubteam]  = useState<{ id: number; name: string } | null>(null);
+  const createTeam = useCreateOrgTeam();
+  const deleteTeam = useDeleteOrgTeam();
+
   // Estado local de miembros — no toca la BD ni el organigrama hasta guardar
   const [localMembers, setLocalMembers] = useState<OrgMembership[]>(team.memberships);
   const [toRemove,     setToRemove]     = useState<number[]>([]);
@@ -1429,6 +1473,27 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
   const createUser       = useCreateUser();
   const { data: roles }   = useRoles();
   const { data: campuses } = useActiveCampuses();
+
+  async function handleCreateSubteam() {
+    if (!subteamName.trim()) return;
+    setSubteamSaving(true);
+    try {
+      await createTeam.mutateAsync({
+        areaId:       team.areaId,
+        parentTeamId: team.id,
+        name:         subteamName.trim(),
+        desc:         subteamDesc.trim() || undefined,
+      });
+      setSubteamName('');
+      setSubteamDesc('');
+      setAddingSubteam(false);
+      setTeamToast({ msg: 'Sub-equipo creado correctamente.', kind: 'success' });
+    } catch {
+      setTeamToast({ msg: 'No se pudo crear el sub-equipo.', kind: 'error' });
+    } finally {
+      setSubteamSaving(false);
+    }
+  }
 
   const isEditing = canEdit && editingTeam;
 
@@ -1804,7 +1869,115 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
               )}
             </div>
           )}
-        </div>
+
+          {/* Sub-equipos */}
+          {((team.children && team.children.length > 0) || canEdit) && (
+            <div className="flex flex-col gap-1.5">
+
+              {/* Separador + label */}
+              <div className="flex items-center gap-2 pt-1">
+                <div className="h-px flex-1 bg-slate-100" />
+                <span className="text-[9.5px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1">
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                  </svg>
+                  Sub-equipos
+                  {(team.children?.length ?? 0) > 0 && (
+                    <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-bold">
+                      {team.children!.length}
+                    </span>
+                  )}
+                </span>
+                <div className="h-px flex-1 bg-slate-100" />
+              </div>
+
+              {/* Lista de sub-equipos existentes */}
+              <div className="ml-3 mr-1 pl-3 flex flex-col gap-1.5 border-l-2" style={{ borderColor: `${color}30` }}>
+                {(team.children ?? []).map((child) => (
+                  <div
+                    key={child.id}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] bg-white border border-slate-200 shadow-sm group hover:border-slate-300 hover:shadow transition-all"
+                  >
+                    {/* Dot conector */}
+                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-semibold text-slate-800 truncate leading-snug">{child.name}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {child.memberships.length} persona{child.memberships.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    {canEdit && (
+                      <button
+                        onClick={() => setConfirmDelSubteam({ id: child.id, name: child.name })}
+                        className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded-md flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0 text-sm leading-none"
+                        title="Eliminar sub-equipo"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Botón agregar sub-equipo */}
+              {canEdit && !addingSubteam && (
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setAddingSubteam(true)}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold py-1.5 px-3.5 rounded-full border transition-all"
+                    style={{ borderColor: `${color}50`, color, background: `${color}0d` }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = `${color}20`; e.currentTarget.style.borderColor = color; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = `${color}0d`; e.currentTarget.style.borderColor = `${color}50`; }}
+                  >
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Agregar sub-equipo
+                  </button>
+                </div>
+              )}
+
+              {canEdit && addingSubteam && (
+                <div className="flex flex-col gap-2.5 p-3.5 rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderTop: `2px solid ${color}` }}>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color }}>Nuevo sub-equipo</p>
+                    <button onClick={() => { setAddingSubteam(false); setSubteamName(''); setSubteamDesc(''); }} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Nombre *</label>
+                    <input
+                      value={subteamName}
+                      onChange={(e) => setSubteamName(e.target.value)}
+                      placeholder="Nombre del sub-equipo"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded-lg text-[12px] focus:outline-none focus:border-blue-300 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Descripción</label>
+                    <input
+                      value={subteamDesc}
+                      onChange={(e) => setSubteamDesc(e.target.value)}
+                      placeholder="Descripción opcional"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded-lg text-[12px] focus:outline-none focus:border-blue-300 transition-colors"
+                    />
+                  </div>
+                  <button
+                    onClick={handleCreateSubteam}
+                    disabled={subteamSaving || !subteamName.trim()}
+                    className="w-full py-2 rounded-xl text-[12px] font-semibold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ background: color }}
+                  >
+                    {subteamSaving
+                      ? <><div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />Creando...</>
+                      : 'Crear sub-equipo'
+                    }
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>{/* fin scroll area */}
 
         {/* Footer */}
         {canEdit && (
@@ -1843,6 +2016,23 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
       </div>
 
       {teamToast && <OrgToast msg={teamToast.msg} kind={teamToast.kind} onDismiss={() => setTeamToast(null)} />}
+
+      {confirmDelSubteam && (
+        <ConfirmModal
+          title="¿Eliminar sub-equipo?"
+          message={`"${confirmDelSubteam.name}" quedará desactivado. Esta acción se puede revertir contactando al administrador.`}
+          confirmLabel="Eliminar"
+          danger
+          onConfirm={() => {
+            deleteTeam.mutate(confirmDelSubteam.id, {
+              onSuccess: () => setTeamToast({ msg: 'Sub-equipo eliminado.', kind: 'success' }),
+              onError:   () => setTeamToast({ msg: 'No se pudo eliminar el sub-equipo.', kind: 'error' }),
+            });
+            setConfirmDelSubteam(null);
+          }}
+          onCancel={() => setConfirmDelSubteam(null)}
+        />
+      )}
     </>
   );
 }
@@ -2096,6 +2286,275 @@ function SearchBar({ areas, onSelectUser }: { areas: OrgArea[]; onSelectUser: (u
   );
 }
 
+// ── NewAreaModal ───────────────────────────────────────────────────────────────
+
+function NewAreaModal({ onClose }: { onClose: () => void }) {
+  const [name,       setName]       = useState('');
+  const [slug,       setSlug]       = useState('');
+  const [color,      setColor]      = useState('#0D9488');
+  const [icon,       setIcon]       = useState('🏛️');
+  const [desc,       setDesc]       = useState('');
+  const [slugEdited, setSlugEdited] = useState(false);
+  const [imageFile,  setImageFile]  = useState<File | null>(null);
+  const [preview,    setPreview]    = useState<string | null>(null);
+  const [uploading,  setUploading]  = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const create     = useCreateOrgArea();
+  const uploadLogo = useUploadAreaLogo();
+
+  const isPending = create.isPending || uploading;
+
+  function toSlug(v: string) {
+    return v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+
+  function handleNameChange(v: string) {
+    setName(v);
+    if (!slugEdited) setSlug(toSlug(v));
+  }
+
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.files?.[0];
+    if (!raw) return;
+    const resized = await resizeImage(raw);
+    setImageFile(resized);
+    setPreview(URL.createObjectURL(resized));
+  }
+
+  function removeImage() {
+    setImageFile(null);
+    setPreview(null);
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
+  async function handleSubmit() {
+    if (!name.trim() || !slug.trim()) return;
+    create.mutate(
+      { name: name.trim(), slug: slug.trim(), color, icon: icon.trim() || '📁', desc: desc.trim() || undefined },
+      {
+        onSuccess: async (created) => {
+          if (imageFile && created?.id) {
+            setUploading(true);
+            try {
+              await uploadLogo.mutateAsync({ id: created.id, file: imageFile });
+            } finally {
+              setUploading(false);
+            }
+          }
+          onClose();
+        },
+      },
+    );
+  }
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[440px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0 overflow-hidden" style={{ background: `${color}20` }}>
+            {preview
+              ? <img src={preview} alt="" className="w-full h-full object-cover" />
+              : (icon || '📁')}
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-slate-900 text-[14px]">Nueva área</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Agrega un área al organigrama</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100 text-sm">✕</button>
+        </div>
+
+        <div className="p-5 flex flex-col gap-3.5">
+
+          {/* Imagen + emoji — fila visual */}
+          <div className="flex gap-3 items-start">
+            {/* Preview / uploader de imagen */}
+            <div className="flex flex-col items-center gap-1.5">
+              <div
+                className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden cursor-pointer hover:border-teal-400 transition-colors relative group"
+                style={preview ? {} : { background: `${color}12` }}
+                onClick={() => fileRef.current?.click()}
+              >
+                {preview ? (
+                  <img src={preview} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-3xl select-none">{icon || '📁'}</span>
+                )}
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-[10px]">
+                  <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                </div>
+              </div>
+              {preview ? (
+                <button onClick={removeImage} className="text-[10px] text-red-400 hover:text-red-600 transition-colors">Quitar</button>
+              ) : (
+                <span className="text-[10px] text-slate-400">Imagen</span>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+            </div>
+
+            {/* Emoji + Color */}
+            <div className="flex-1 flex flex-col gap-2.5">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                  Ícono (emoji) <span className="text-[10px] text-slate-400 font-normal">— si no se sube imagen</span>
+                </label>
+                <input
+                  type="text" value={icon} onChange={(e) => setIcon(e.target.value)}
+                  maxLength={4} placeholder="🏛️"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[18px] text-center focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">Color <span className="text-red-400">*</span></label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color" value={color} onChange={(e) => setColor(e.target.value)}
+                    className="w-9 h-9 rounded-lg border border-slate-200 cursor-pointer p-0.5"
+                  />
+                  <span className="text-[12px] font-mono text-slate-500">{color}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Nombre */}
+          <div>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">Nombre <span className="text-red-400">*</span></label>
+            <input
+              autoFocus type="text" value={name} onChange={(e) => handleNameChange(e.target.value)}
+              placeholder="Ej: Área de Música"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition"
+            />
+          </div>
+
+          {/* Slug */}
+          <div>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Identificador (slug) <span className="text-red-400">*</span>
+              <span className="ml-1 text-[10px] text-slate-400 font-normal">— se usa en la URL</span>
+            </label>
+            <input
+              type="text" value={slug}
+              onChange={(e) => { setSlug(toSlug(e.target.value)); setSlugEdited(true); }}
+              placeholder="area-musica"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-[13px] font-mono focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition"
+            />
+          </div>
+
+          {/* Descripción */}
+          <div>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">Descripción</label>
+            <textarea
+              value={desc} onChange={(e) => setDesc(e.target.value)} rows={2}
+              placeholder="Describe brevemente esta área…"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-teal-400 resize-none transition"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={handleSubmit} disabled={!name.trim() || !slug.trim() || isPending}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all disabled:opacity-40"
+              style={{ background: color }}
+            >
+              {isPending
+                ? <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />{uploading ? 'Subiendo imagen…' : 'Creando…'}</>
+                : 'Crear área'
+              }
+            </button>
+            <button onClick={onClose} disabled={isPending} className="px-4 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-500 hover:bg-slate-50 disabled:opacity-40">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── NewTeamModal ───────────────────────────────────────────────────────────────
+
+function NewTeamModal({ areaId, areaColor, onClose }: { areaId: number; areaColor: string; onClose: () => void }) {
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const create = useCreateOrgTeam();
+
+  function handleSubmit() {
+    if (!name.trim()) return;
+    create.mutate(
+      { areaId, name: name.trim(), desc: desc.trim() || undefined },
+      { onSuccess: onClose },
+    );
+  }
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: areaColor }}>
+            {name.trim() ? name.trim()[0].toUpperCase() : '+'}
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-slate-900 text-[14px]">Nuevo equipo</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Agrega un equipo a esta área</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100 text-sm">✕</button>
+        </div>
+
+        <div className="p-5 flex flex-col gap-3.5">
+          <div>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">Nombre <span className="text-red-400">*</span></label>
+            <input
+              autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+              placeholder="Ej: Equipo de Sonido"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">Descripción</label>
+            <textarea
+              value={desc} onChange={(e) => setDesc(e.target.value)} rows={2}
+              placeholder="Describe el rol de este equipo…"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-teal-400 resize-none transition"
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={handleSubmit} disabled={!name.trim() || create.isPending}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all disabled:opacity-40"
+              style={{ background: areaColor }}
+            >
+              {create.isPending
+                ? <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Creando...</>
+                : 'Crear equipo'
+              }
+            </button>
+            <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-500 hover:bg-slate-50">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── OverviewCard ───────────────────────────────────────────────────────────────
 
 function OverviewCard({ area, onClick }: { area: OrgArea; onClick: () => void }) {
@@ -2156,12 +2615,13 @@ function AreaPage({ slug, canEdit, onSelectUser, onSelectTeam, editingArea, onTo
   const areaDescRef  = useRef<HTMLParagraphElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  const [forceOpen,    setForceOpen]    = useState<boolean | null>(null);
-  const [allOpen,      setAllOpen]      = useState(false);
-  const [logoPreview,  setLogoPreview]  = useState<string | null>(null);
-  const [editColor,    setEditColor]    = useState<string>('');
-  const [saving,       setSaving]       = useState(false);
-  const [pageToast,    setPageToast]    = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
+  const [forceOpen,      setForceOpen]      = useState<boolean | null>(null);
+  const [allOpen,        setAllOpen]        = useState(false);
+  const [logoPreview,    setLogoPreview]    = useState<string | null>(null);
+  const [editColor,      setEditColor]      = useState<string>('');
+  const [saving,         setSaving]         = useState(false);
+  const [pageToast,      setPageToast]      = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
+  const [showNewTeam,    setShowNewTeam]    = useState(false);
 
   const isEditing  = canEdit && editingArea;
   const liveColor  = isEditing && editColor ? editColor : (data?.color ?? '#64748b');
@@ -2358,17 +2818,29 @@ function AreaPage({ slug, canEdit, onSelectUser, onSelectTeam, editingArea, onTo
             {canEdit && (
               <div className="ml-auto flex items-center gap-2">
                 {!isEditing ? (
-                  <button
-                    onClick={onToggleEdit}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-all hover:opacity-90"
-                    style={{ background: liveColor }}
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                    Editar organigrama
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowNewTeam(true)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-semibold border transition-all hover:bg-white/10"
+                      style={{ borderColor: `${liveColor}60`, color: liveColor }}
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      Nuevo equipo
+                    </button>
+                    <button
+                      onClick={onToggleEdit}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-all hover:opacity-90"
+                      style={{ background: liveColor }}
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                      Editar organigrama
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <button
@@ -2402,6 +2874,14 @@ function AreaPage({ slug, canEdit, onSelectUser, onSelectTeam, editingArea, onTo
       </div>
 
       {pageToast && <OrgToast msg={pageToast.msg} kind={pageToast.kind} onDismiss={() => setPageToast(null)} />}
+
+      {showNewTeam && data && (
+        <NewTeamModal
+          areaId={data.id}
+          areaColor={liveColor}
+          onClose={() => setShowNewTeam(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2423,6 +2903,7 @@ export function OrgChartClient() {
   const [searchSelected,  setSearchSelected]  = useState<OrgSearchUser | null>(null);
   const [editingArea,     setEditingArea]     = useState(false);
   const [showAreaPanel,   setShowAreaPanel]   = useState(false);
+  const [showNewArea,     setShowNewArea]     = useState(false);
   const areaSaveFnRef = useRef<(() => void) | null>(null);
 
   function getColor(areaId?: number) {
@@ -2488,6 +2969,19 @@ export function OrgChartClient() {
               {areas?.map((area) => (
                 <OverviewCard key={area.slug} area={area} onClick={() => setActiveSlug(area.slug)} />
               ))}
+              {canEdit && (
+                <button
+                  onClick={() => setShowNewArea(true)}
+                  className="bg-white rounded-2xl p-5 flex-1 min-w-[160px] shadow-sm border-2 border-dashed border-slate-200 hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 transition-all text-left flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-slate-600"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </div>
+                  <span className="text-[12px] font-semibold text-center">Nueva área</span>
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -2538,6 +3032,9 @@ export function OrgChartClient() {
           canEdit={canEdit}
           onClose={() => setShowAreaPanel(false)}
         />
+      )}
+      {showNewArea && (
+        <NewAreaModal onClose={() => setShowNewArea(false)} />
       )}
     </div>
   );

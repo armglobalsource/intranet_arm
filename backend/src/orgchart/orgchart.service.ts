@@ -99,11 +99,18 @@ export class OrgChartService {
           team: { id: team.id, name: team.name, area: { id: area.id, name: area.name, color: area.color, slug: area.slug, icon: area.icon } },
           user: fmtUser(usersMap[m.userId]),
         }))
-        // Ignorar membresías cuyo usuario fue eliminado
         .filter((m) => m.user !== null),
     }));
 
-    return { ...area, leaders: formattedLeaders, teams: teamsWithMembers };
+    // Construir árbol recursivo: los equipos raíz son los que no tienen parentTeamId
+    const buildTeamTree = (parentId: number | null): typeof teamsWithMembers =>
+      teamsWithMembers
+        .filter((t) => (t.parentTeamId ?? null) === parentId)
+        .map((t) => ({ ...t, children: buildTeamTree(t.id) }));
+
+    const teamTree = buildTeamTree(null);
+
+    return { ...area, leaders: formattedLeaders, teams: teamTree };
   }
 
   async createArea(dto: CreateOrgAreaDto) {
@@ -121,12 +128,36 @@ export class OrgChartService {
 
   async deleteArea(id: number) {
     await this.findAreaOrFail(id);
-    const batch = this.fb.db.batch();
-    const teamsSnap = await this.fb.db.collection(TEAMS).where('areaId', '==', id).get();
-    teamsSnap.docs.forEach((d) => batch.update(d.ref, { isActive: false }));
-    batch.update(this.fb.db.collection(AREAS).doc(String(id)), { isActive: false, updatedAt: this.fb.now() });
-    await batch.commit();
-    return this.fb.toObj(await this.fb.db.collection(AREAS).doc(String(id)).get());
+
+    const [teamsSnap, areaMembSnap] = await Promise.all([
+      this.fb.db.collection(TEAMS).where('areaId', '==', id).get(),
+      this.fb.db.collection(MEMBERSHIPS).where('areaId', '==', id).get(),
+    ]);
+
+    const teamIds = teamsSnap.docs.map((d) => d.data().id as number);
+
+    // Membresías de los equipos del área
+    const teamMembSnaps = teamIds.length
+      ? await Promise.all(teamIds.map((tid) => this.fb.db.collection(MEMBERSHIPS).where('teamId', '==', tid).get()))
+      : [];
+    const teamMembDocs = teamMembSnaps.flatMap((s) => s.docs);
+
+    // Eliminar en lotes de 500 (límite de Firestore)
+    const allDocs = [
+      ...areaMembSnap.docs,
+      ...teamMembDocs,
+      ...teamsSnap.docs,
+      this.fb.db.collection(AREAS).doc(String(id)),
+    ];
+
+    const BATCH_LIMIT = 500;
+    for (let i = 0; i < allDocs.length; i += BATCH_LIMIT) {
+      const batch = this.fb.db.batch();
+      allDocs.slice(i, i + BATCH_LIMIT).forEach((d) => batch.delete('ref' in d ? (d as any).ref : d));
+      await batch.commit();
+    }
+
+    return { id, deleted: true };
   }
 
   async uploadAreaLogo(id: number, file: Express.Multer.File) {
@@ -152,23 +183,40 @@ export class OrgChartService {
   }
 
   async getAllTeams() {
-    const [teamsSnap, areasSnap] = await Promise.all([
+    const [teamsSnap, areasSnap, membSnap] = await Promise.all([
       this.fb.db.collection(TEAMS).get(),
       this.fb.db.collection(AREAS).get(),
+      this.fb.db.collection(MEMBERSHIPS).get(),
     ]);
     const areasMap = Object.fromEntries(this.fb.toDocs(areasSnap).map((a) => [a.id, a]));
+
+    // Contar miembros por equipo
+    const memberCountMap: Record<number, number> = {};
+    this.fb.toDocs(membSnap).forEach((m) => {
+      if (m.teamId) memberCountMap[m.teamId] = (memberCountMap[m.teamId] ?? 0) + 1;
+    });
+
     return this.fb.toDocs(teamsSnap)
       .sort((a, b) => {
         if (a.isActive !== b.isActive) return b.isActive ? 1 : -1;
         return a.areaId - b.areaId || a.sortOrder - b.sortOrder;
       })
-      .map((t) => ({ ...t, area: areasMap[t.areaId] ?? null }));
+      .map((t) => ({ ...t, area: areasMap[t.areaId] ?? null, memberCount: memberCountMap[t.id] ?? 0 }));
   }
 
   async createTeam(dto: CreateOrgTeamDto) {
     await this.findAreaOrFail(dto.areaId);
+    if (dto.parentTeamId) await this.findTeamOrFail(dto.parentTeamId);
     const id  = await this.fb.nextId(TEAMS);
-    const doc = { id, ...dto, isActive: true, iconUrl: null, createdAt: this.fb.now(), updatedAt: this.fb.now() };
+    const doc = {
+      id,
+      ...dto,
+      parentTeamId: dto.parentTeamId ?? null,
+      isActive: true,
+      iconUrl: null,
+      createdAt: this.fb.now(),
+      updatedAt: this.fb.now(),
+    };
     await this.fb.db.collection(TEAMS).doc(String(id)).set(doc);
     return this.fb.toObj(await this.fb.db.collection(TEAMS).doc(String(id)).get());
   }

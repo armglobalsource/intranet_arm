@@ -19,23 +19,35 @@ type TeamWithArea = OrgTeam & { area: OrgArea };
 // ── TeamModal ─────────────────────────────────────────────────────────────────
 
 interface TeamModalProps {
-  team?:   TeamWithArea;
-  areas:   OrgArea[];
-  onClose: () => void;
+  team?:    TeamWithArea;
+  areas:    OrgArea[];
+  allTeams: TeamWithArea[];
+  onClose:  () => void;
 }
 
-function TeamModal({ team, areas, onClose }: TeamModalProps) {
+function TeamModal({ team, areas, allTeams, onClose }: TeamModalProps) {
   const isEdit = !!team;
-  const [name,   setName]   = useState(team?.name ?? '');
-  const [desc,   setDesc]   = useState(team?.desc ?? '');
-  const [areaId, setAreaId] = useState<number>(team?.areaId ?? (areas[0]?.id ?? 0));
+  const [name,         setName]         = useState(team?.name ?? '');
+  const [desc,         setDesc]         = useState(team?.desc ?? '');
+  const [areaId,       setAreaId]       = useState<number>(team?.areaId ?? (areas[0]?.id ?? 0));
+  const [parentTeamId, setParentTeamId] = useState<number | null>(team?.parentTeamId ?? null);
 
-  const create = useCreateOrgTeam();
-  const update = useUpdateOrgTeam();
+  const create    = useCreateOrgTeam();
+  const update    = useUpdateOrgTeam();
   const isPending = create.isPending || update.isPending;
 
   const selectedArea = areas.find((a) => a.id === areaId);
 
+  // Equipos del área seleccionada que pueden ser padres (excluye el equipo actual)
+  const parentCandidates = allTeams.filter(
+    (t) => t.areaId === areaId && t.isActive && t.id !== team?.id,
+  );
+
+  // Resetear equipo padre si cambia el área
+  function handleAreaChange(id: number) {
+    setAreaId(id);
+    setParentTeamId(null);
+  }
 
   function handleSubmit() {
     if (!name.trim()) return;
@@ -46,7 +58,12 @@ function TeamModal({ team, areas, onClose }: TeamModalProps) {
       );
     } else {
       create.mutate(
-        { areaId, name: name.trim(), desc: desc.trim() || undefined },
+        {
+          areaId,
+          name: name.trim(),
+          desc: desc.trim() || undefined,
+          ...(parentTeamId ? { parentTeamId } : {}),
+        },
         { onSuccess: onClose },
       );
     }
@@ -81,13 +98,35 @@ function TeamModal({ team, areas, onClose }: TeamModalProps) {
               <label className="block text-[11px] font-medium text-slate-500 mb-1">Área <span className="text-red-400">*</span></label>
               <select
                 value={areaId}
-                onChange={(e) => setAreaId(Number(e.target.value))}
+                onChange={(e) => handleAreaChange(Number(e.target.value))}
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition bg-white"
               >
                 {areas.map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {!isEdit && (
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                Equipo padre
+                <span className="ml-1.5 text-[10px] text-slate-400 font-normal">(opcional)</span>
+              </label>
+              <select
+                value={parentTeamId ?? ''}
+                onChange={(e) => setParentTeamId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition bg-white text-slate-700"
+              >
+                <option value="">— Sin equipo padre —</option>
+                {parentCandidates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              {parentCandidates.length === 0 && (
+                <p className="text-[10.5px] text-slate-400 mt-1">No hay equipos disponibles en esta área.</p>
+              )}
             </div>
           )}
 
@@ -307,6 +346,12 @@ export default function EquiposPage() {
     [teams, areaMap],
   );
 
+  // Mapa id → equipo para lookup de equipo padre
+  const teamMap = useMemo(
+    () => Object.fromEntries(teamsWithArea.map((t) => [t.id, t])),
+    [teamsWithArea],
+  );
+
   const filtered = useMemo(() => {
     let list = teamsWithArea;
     if (areaFilter) list = list.filter((t) => String(t.areaId) === areaFilter);
@@ -429,7 +474,17 @@ export default function EquiposPage() {
                           </div>
                           <div className="min-w-0">
                             <p className="text-[13.5px] font-semibold text-slate-900">{t.name}</p>
-                            {t.desc && <p className="text-[11px] text-slate-400 truncate max-w-[180px]">{t.desc}</p>}
+                            {t.parentTeamId && teamMap[t.parentTeamId] && (
+                              <span className="inline-flex items-center gap-1 text-[10.5px] text-slate-400 mt-0.5">
+                                <svg className="w-2.5 h-2.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                                {teamMap[t.parentTeamId].name}
+                              </span>
+                            )}
+                            {!t.parentTeamId && t.desc && (
+                              <p className="text-[11px] text-slate-400 truncate max-w-[180px]">{t.desc}</p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -450,7 +505,12 @@ export default function EquiposPage() {
 
                       {/* Miembros */}
                       <td className="px-4 py-3">
-                        <span className="text-[12.5px] text-slate-500">{t.memberships?.length ?? 0}</span>
+                        <span className="inline-flex items-center gap-1 text-[12.5px] text-slate-600 font-medium">
+                          {t.memberCount ?? t.memberships?.length ?? 0}
+                          <svg className="w-3 h-3 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                          </svg>
+                        </span>
                       </td>
 
                       {/* Estado */}
@@ -540,6 +600,7 @@ export default function EquiposPage() {
         <TeamModal
           team={modal !== 'create' ? (modal as TeamWithArea) : undefined}
           areas={areas}
+          allTeams={teamsWithArea}
           onClose={() => setModal(null)}
         />
       )}
