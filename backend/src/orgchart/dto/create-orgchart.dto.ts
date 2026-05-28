@@ -22,6 +22,7 @@ export class UpdateOrgAreaDto {
 
 export class CreateOrgTeamDto {
   @ApiProperty() @IsInt() areaId: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() parentTeamId?: number;
   @ApiProperty() @IsString() @MinLength(2) @MaxLength(150) name: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(10) icon?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() desc?: string;

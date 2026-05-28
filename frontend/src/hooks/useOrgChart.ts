@@ -103,7 +103,7 @@ export function useUpdateOrgTeam() {
 export function useCreateOrgTeam() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { areaId: number; name: string; icon?: string; desc?: string; colPosition?: number; sortOrder?: number }) =>
+    mutationFn: (data: { areaId: number; parentTeamId?: number; name: string; icon?: string; desc?: string; colPosition?: number; sortOrder?: number }) =>
       api.post('/orgchart/teams', data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['orgchart'] }),
   });

@@ -42,6 +42,7 @@ export interface OrgMembership {
 export interface OrgTeam {
   id: number;
   areaId: number;
+  parentTeamId?: number | null;
   name: string;
   icon?: string | null;
   iconUrl?: string | null;
@@ -50,6 +51,8 @@ export interface OrgTeam {
   sortOrder: number;
   isActive: boolean;
   memberships: OrgMembership[];
+  children?: OrgTeam[];
+  memberCount?: number;
 }
 
 export interface OrgArea {
