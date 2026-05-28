@@ -151,6 +151,22 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     [scheduleSave],
   );
 
+  // ── Reordenar fila (drag & drop) ───────────────────────────────────────────
+  const handleReorderRow = useCallback(
+    (sectionName: SectionName, fromIndex: number, toIndex: number) => {
+      setLocalSections((prev) => {
+        const sorted = [...(prev[sectionName] ?? [])].sort((a, b) => a.order - b.order);
+        const [moved] = sorted.splice(fromIndex, 1);
+        sorted.splice(toIndex, 0, moved);
+        // Reasignar campo order para reflejar el nuevo orden
+        const updated = sorted.map((r, i) => ({ ...r, order: i }));
+        scheduleSave(sectionName, updated, true);
+        return { ...prev, [sectionName]: updated };
+      });
+    },
+    [scheduleSave],
+  );
+
   // ── Guardar todo de inmediato ──────────────────────────────────────────────
   const handleSaveAll = useCallback(() => {
     let hasPending = false;
@@ -254,6 +270,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             onCellChange={handleCellChange}
             onAddRow={handleAddRow}
             onDeleteRow={handleDeleteRow}
+            onReorderRow={handleReorderRow}
             onSectionComplete={handleSectionComplete}
             sectionStatus={sectionStatus}
             saveState={saveState}
