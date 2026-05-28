@@ -4,6 +4,22 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { Ficha, Row, SectionName, Encuentro } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
 import { useUpdateFicha } from '@/hooks/useFichas';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
 
@@ -168,6 +184,114 @@ function DeleteBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
+// ── Drag & Drop ───────────────────────────────────────────────────────────────
+
+function GripIcon() {
+  return (
+    <svg width="9" height="13" viewBox="0 0 9 13" fill="currentColor" aria-hidden="true">
+      <circle cx="2.5" cy="2"   r="1.3" />
+      <circle cx="6.5" cy="2"   r="1.3" />
+      <circle cx="2.5" cy="6.5" r="1.3" />
+      <circle cx="6.5" cy="6.5" r="1.3" />
+      <circle cx="2.5" cy="11"  r="1.3" />
+      <circle cx="6.5" cy="11"  r="1.3" />
+    </svg>
+  );
+}
+
+/** Wrapper DnD para una lista sortable. Cuando `onReorder` es undefined, renderiza sin contexto DnD. */
+function SortableSection({
+  items,
+  onReorder,
+  children,
+}: {
+  items: { id: string }[];
+  onReorder?: (fromIndex: number, toIndex: number) => void;
+  children: React.ReactNode;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !onReorder) return;
+    const fromIndex = items.findIndex((r) => r.id === String(active.id));
+    const toIndex   = items.findIndex((r) => r.id === String(over.id));
+    if (fromIndex !== -1 && toIndex !== -1) onReorder(fromIndex, toIndex);
+  }
+
+  if (!onReorder) return <>{children}</>;
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={items.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+        {children}
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+/**
+ * Wrapper para una fila individual sortable.
+ * `children` es un render-prop que recibe el elemento handle para insertarlo donde corresponda.
+ */
+function SortableRow({
+  id,
+  editable,
+  children,
+}: {
+  id: string;
+  editable?: boolean;
+  children: (handle: React.ReactNode) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: !editable,
+  });
+
+  const handle = editable ? (
+    <button
+      {...attributes}
+      {...listeners}
+      className="ficha-no-print"
+      title="Arrastrar para reordenar"
+      style={{
+        flexShrink: 0,
+        cursor: isDragging ? 'grabbing' : 'grab',
+        color: 'rgba(255,255,255,0.18)',
+        background: 'none',
+        border: 'none',
+        padding: '0 5px 0 0',
+        display: 'flex',
+        alignItems: 'center',
+        touchAction: 'none',
+        transition: 'color 0.15s',
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.18)'; }}
+    >
+      <GripIcon />
+    </button>
+  ) : null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        position: 'relative',
+        zIndex: isDragging ? 10 : undefined,
+      }}
+    >
+      {children(handle)}
+    </div>
+  );
+}
+
 // ── AddRowInline ──────────────────────────────────────────────────────────────
 
 function AddRowInline({ sectionName, onAdd }: {
@@ -288,6 +412,8 @@ interface EditProps {
   onCellChange?: (rowId: string, colId: string, value: string) => void;
   onDeleteRow?: (rowId: string) => void;
   onAddRow?: (label: string, type: Row['type'], shared: boolean) => void;
+  /** Reordena filas: fromIndex y toIndex son posiciones en el array ordenado (allRows) */
+  onReorderRow?: (fromIndex: number, toIndex: number) => void;
   isCompleted?: boolean;
   onComplete?: () => void;
 }
@@ -296,7 +422,7 @@ interface EditProps {
 
 function RoleCard({
   title, rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
 }: { title: string; rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   if (!displayed.length && !editable) return null;
@@ -304,26 +430,33 @@ function RoleCard({
   return (
     <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>{title}</div>
-      {displayed.map((row, i) => (
-        <div key={row.id} style={{
-          ...S.roleRow,
-          ...(i === displayed.length - 1 ? { borderBottom: 'none', paddingBottom: 0 } : {}),
-        }}>
-          <span style={S.roleLabel}>{row.label}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-            {editable ? (
-              <CellInput
-                value={rawVal(row, colId)}
-                onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
-              />
-            ) : (
-              <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
+      <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
+        {displayed.map((row, i) => (
+          <SortableRow key={row.id} id={row.id} editable={editable}>
+            {(handle) => (
+              <div style={{
+                ...S.roleRow,
+                ...(i === displayed.length - 1 ? { borderBottom: 'none', paddingBottom: 0 } : {}),
+              }}>
+                {handle}
+                <span style={S.roleLabel}>{row.label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
+                  {editable ? (
+                    <CellInput
+                      value={rawVal(row, colId)}
+                      onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                      style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
+                    />
+                  ) : (
+                    <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
+                  )}
+                  {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                </div>
+              </div>
             )}
-            {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-          </div>
-        </div>
-      ))}
+          </SortableRow>
+        ))}
+      </SortableSection>
       <SectionFooter sectionName={title} editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
     </div>
   );
@@ -333,63 +466,78 @@ function RoleCard({
 
 function StreamingCard({
   rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   const director  = displayed.filter((r) => /director|wirecast/i.test(r.label));
   const cameras   = displayed.filter((r) => /^cam\s?\d/i.test(r.label));
   const others    = displayed.filter((r) => !director.includes(r) && !cameras.includes(r));
+  const roleRows  = [...director, ...others];
 
   if (!displayed.length && !editable) return null;
 
   return (
     <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>Streaming</div>
-      {[...director, ...others].map((row, i, arr) => (
-        <div key={row.id} style={{
-          ...S.roleRow,
-          ...(!cameras.length && i === arr.length - 1 ? { borderBottom: 'none' } : {}),
-        }}>
-          <span style={S.roleLabel}>{row.label}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-            {editable ? (
-              <CellInput
-                value={rawVal(row, colId)}
-                onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
-              />
-            ) : (
-              <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
-            )}
-            {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-          </div>
-        </div>
-      ))}
-      {cameras.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 10 }}>
-          {cameras.map((row) => (
-            <div key={row.id} style={{ background: D.badgeBg, borderRadius: 8, padding: '8px 10px', border: `0.5px solid ${D.cardBorder}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  {row.label}
+      <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
+        {roleRows.map((row, i) => (
+          <SortableRow key={row.id} id={row.id} editable={editable}>
+            {(handle) => (
+              <div style={{
+                ...S.roleRow,
+                ...(!cameras.length && i === roleRows.length - 1 ? { borderBottom: 'none' } : {}),
+              }}>
+                {handle}
+                <span style={S.roleLabel}>{row.label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
+                  {editable ? (
+                    <CellInput
+                      value={rawVal(row, colId)}
+                      onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                      style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
+                    />
+                  ) : (
+                    <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
+                  )}
+                  {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                 </div>
-                {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
               </div>
-              {editable ? (
-                <CellInput
-                  value={rawVal(row, colId)}
-                  onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                  style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, marginTop: 2 }}
-                />
-              ) : (
-                <div style={{ fontSize: 12, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted, marginTop: 2 }}>
-                  {val(row, colId) || '—'}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+            )}
+          </SortableRow>
+        ))}
+        {cameras.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 10 }}>
+            {cameras.map((row) => (
+              <SortableRow key={row.id} id={row.id} editable={editable}>
+                {(handle) => (
+                  <div style={{ background: D.badgeBg, borderRadius: 8, padding: '8px 10px', border: `0.5px solid ${D.cardBorder}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {handle}
+                        <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                          {row.label}
+                        </div>
+                      </div>
+                      {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                    </div>
+                    {editable ? (
+                      <CellInput
+                        value={rawVal(row, colId)}
+                        onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                        style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, marginTop: 2 }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: 12, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted, marginTop: 2 }}>
+                        {val(row, colId) || '—'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </SortableRow>
+            ))}
+          </div>
+        )}
+      </SortableSection>
       <SectionFooter sectionName="streaming" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
     </div>
   );
@@ -399,7 +547,7 @@ function StreamingCard({
 
 function EscenaCard({
   rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed  = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   const vio        = displayed.find((r) => r.label === 'VIO');
@@ -408,92 +556,103 @@ function EscenaCard({
 
   if (!displayed.length && !editable) return null;
 
-  const half = Math.ceil(musicians.length / 2);
-  const col1 = musicians.slice(0, half);
-  const col2 = musicians.slice(half);
-
   return (
     <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>
         AR Worship / Banda{(!editable && vio) ? ` — VIO: ${val(vio, colId)}` : ''}
       </div>
 
-      {editable && vio && (
-        <div style={{ ...S.roleRow, marginBottom: 8 }}>
-          <span style={S.roleLabel}>VIO</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-            <CellInput
-              value={rawVal(vio, colId)}
-              onChange={(v) => onCellChange?.(vio.id, effectiveColId(vio, colId), v)}
-              style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
-            />
-            {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(vio.id)} />}
-          </div>
-        </div>
-      )}
-
-      {positions.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          {positions.map((row) => {
-            const posLabel = row.label.replace(/posición\s*/i, '');
-            return (
-              <div key={row.id} style={{
-                flex: 1, textAlign: 'center',
-                background: D.badgeBg, borderRadius: 8, padding: '9px 4px',
-                border: `0.5px solid ${D.cardBorder}`,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 2 }}>
-                  <div style={{ flex: 1, fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: 'center' }}>
-                    {posLabel}
-                  </div>
-                  {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-                </div>
-                {editable ? (
+      <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
+        {editable && vio && (
+          <SortableRow id={vio.id} editable={editable}>
+            {(handle) => (
+              <div style={{ ...S.roleRow, marginBottom: 8 }}>
+                {handle}
+                <span style={S.roleLabel}>VIO</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                   <CellInput
-                    value={rawVal(row, colId)}
-                    onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                    style={{ fontSize: 12, fontWeight: 600, color: D.textPrimary, textAlign: 'center', marginTop: 2 }}
+                    value={rawVal(vio, colId)}
+                    onChange={(v) => onCellChange?.(vio.id, effectiveColId(vio, colId), v)}
+                    style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
                   />
-                ) : (
-                  <div style={{ fontSize: 12, fontWeight: 600, color: D.textPrimary, marginTop: 3 }}>
-                    {val(row, colId)}
+                  {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(vio.id)} />}
+                </div>
+              </div>
+            )}
+          </SortableRow>
+        )}
+
+        {positions.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {positions.map((row) => {
+              const posLabel = row.label.replace(/posición\s*/i, '');
+              return (
+                <SortableRow key={row.id} id={row.id} editable={editable}>
+                  {(handle) => (
+                    <div style={{
+                      flex: 1, textAlign: 'center',
+                      background: D.badgeBg, borderRadius: 8, padding: '9px 4px',
+                      border: `0.5px solid ${D.cardBorder}`,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 2 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, justifyContent: 'center' }}>
+                          {handle}
+                          <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                            {posLabel}
+                          </div>
+                        </div>
+                        {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                      </div>
+                      {editable ? (
+                        <CellInput
+                          value={rawVal(row, colId)}
+                          onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                          style={{ fontSize: 12, fontWeight: 600, color: D.textPrimary, textAlign: 'center', marginTop: 2 }}
+                        />
+                      ) : (
+                        <div style={{ fontSize: 12, fontWeight: 600, color: D.textPrimary, marginTop: 3 }}>
+                          {val(row, colId)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </SortableRow>
+              );
+            })}
+          </div>
+        )}
+
+        {musicians.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
+            {musicians.map((row) => (
+              <SortableRow key={row.id} id={row.id} editable={editable}>
+                {(handle) => (
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '5px 0', gap: 4,
+                    borderBottom: `0.5px solid ${D.divider}`,
+                  }}>
+                    {handle}
+                    <span style={{ fontSize: 11, color: D.textSecond, flexShrink: 0 }}>{row.label}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
+                      {editable ? (
+                        <CellInput
+                          value={rawVal(row, colId)}
+                          onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                          style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, textAlign: 'right' }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: 12, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
+                      )}
+                      {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                    </div>
                   </div>
                 )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {musicians.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
-          {[col1, col2].map((col, ci) => (
-            <div key={ci}>
-              {col.map((row, i) => (
-                <div key={row.id} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '5px 0', gap: 4,
-                  borderBottom: i === col.length - 1 ? 'none' : `0.5px solid ${D.divider}`,
-                }}>
-                  <span style={{ fontSize: 11, color: D.textSecond, flexShrink: 0 }}>{row.label}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-                    {editable ? (
-                      <CellInput
-                        value={rawVal(row, colId)}
-                        onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                        style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, textAlign: 'right' }}
-                      />
-                    ) : (
-                      <span style={{ fontSize: 12, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
-                    )}
-                    {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
+              </SortableRow>
+            ))}
+          </div>
+        )}
+      </SortableSection>
 
       <SectionFooter sectionName="escena" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
     </div>
@@ -504,7 +663,7 @@ function EscenaCard({
 
 function SetListCard({
   rows, colId, encuentro,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[]; encuentro: Encuentro | null } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   if (!displayed.length && !editable) return null;
@@ -512,34 +671,41 @@ function SetListCard({
   return (
     <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>Set List</div>
-      {displayed.map((row, i) => (
-        <div key={row.id} style={{
-          display: 'flex', alignItems: 'center', gap: 9,
-          padding: '7px 0',
-          borderBottom: i === displayed.length - 1 ? 'none' : `0.5px solid ${D.divider}`,
-        }}>
-          <div style={{
-            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-            background: SONG_DOT_COLORS[i % SONG_DOT_COLORS.length],
-            opacity: 0.85,
-          }} />
-          {editable ? (
-            <>
-              <CellInput
-                value={rawVal(row, colId)}
-                onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                placeholder="Nombre de la canción…"
-                style={{ fontSize: 13, fontWeight: 500, color: D.textPrimary, flex: 1 }}
-              />
-              {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-            </>
-          ) : (
-            <span style={{ fontSize: 13, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted, flex: 1 }}>
-              {val(row, colId) || '—'}
-            </span>
-          )}
-        </div>
-      ))}
+      <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
+        {displayed.map((row, i) => (
+          <SortableRow key={row.id} id={row.id} editable={editable}>
+            {(handle) => (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 9,
+                padding: '7px 0',
+                borderBottom: i === displayed.length - 1 ? 'none' : `0.5px solid ${D.divider}`,
+              }}>
+                {handle}
+                <div style={{
+                  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                  background: SONG_DOT_COLORS[i % SONG_DOT_COLORS.length],
+                  opacity: 0.85,
+                }} />
+                {editable ? (
+                  <>
+                    <CellInput
+                      value={rawVal(row, colId)}
+                      onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                      placeholder="Nombre de la canción…"
+                      style={{ fontSize: 13, fontWeight: 500, color: D.textPrimary, flex: 1 }}
+                    />
+                    {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                  </>
+                ) : (
+                  <span style={{ fontSize: 13, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted, flex: 1 }}>
+                    {val(row, colId) || '—'}
+                  </span>
+                )}
+              </div>
+            )}
+          </SortableRow>
+        ))}
+      </SortableSection>
       <SectionFooter sectionName="setList" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
     </div>
   );
@@ -549,7 +715,7 @@ function SetListCard({
 
 function HorariosCard({
   rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   if (!displayed.length && !editable) return null;
@@ -557,40 +723,47 @@ function HorariosCard({
   return (
     <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>Horarios</div>
-      {displayed.map((row) => {
-        const { color, opacity } = timelineColor(row.label);
-        const isBold = /worship|vio|predicación|inicio/i.test(row.label);
-        return (
-          <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
-            {editable ? (
-              <CellInput
-                value={rawVal(row, colId)}
-                onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                placeholder="Hora…"
-                style={{
-                  fontSize: 11, width: 48, textAlign: 'right', flexShrink: 0,
-                  fontVariantNumeric: 'tabular-nums',
-                  fontWeight: isBold ? 600 : 400,
-                  color: isBold ? D.textPrimary : D.textSecond,
-                }}
-              />
-            ) : (
-              <span style={{
-                fontSize: 11, width: 38, textAlign: 'right', flexShrink: 0,
-                fontVariantNumeric: 'tabular-nums', fontWeight: isBold ? 600 : 400,
-                color: val(row, colId) ? (isBold ? D.textPrimary : D.textSecond) : D.textMuted,
-              }}>
-                {val(row, colId) || '—'}
-              </span>
-            )}
-            <div style={{ width: 3, height: 14, flexShrink: 0, borderRadius: 2, background: color, opacity }} />
-            <span style={{ fontSize: 12, color: D.textPrimary, flex: 1, fontWeight: isBold ? 600 : 400 }}>
-              {row.label}
-            </span>
-            {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-          </div>
-        );
-      })}
+      <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
+        {displayed.map((row) => {
+          const { color, opacity } = timelineColor(row.label);
+          const isBold = /worship|vio|predicación|inicio/i.test(row.label);
+          return (
+            <SortableRow key={row.id} id={row.id} editable={editable}>
+              {(handle) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+                  {handle}
+                  {editable ? (
+                    <CellInput
+                      value={rawVal(row, colId)}
+                      onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                      placeholder="Hora…"
+                      style={{
+                        fontSize: 11, width: 48, textAlign: 'right', flexShrink: 0,
+                        fontVariantNumeric: 'tabular-nums',
+                        fontWeight: isBold ? 600 : 400,
+                        color: isBold ? D.textPrimary : D.textSecond,
+                      }}
+                    />
+                  ) : (
+                    <span style={{
+                      fontSize: 11, width: 38, textAlign: 'right', flexShrink: 0,
+                      fontVariantNumeric: 'tabular-nums', fontWeight: isBold ? 600 : 400,
+                      color: val(row, colId) ? (isBold ? D.textPrimary : D.textSecond) : D.textMuted,
+                    }}>
+                      {val(row, colId) || '—'}
+                    </span>
+                  )}
+                  <div style={{ width: 3, height: 14, flexShrink: 0, borderRadius: 2, background: color, opacity }} />
+                  <span style={{ fontSize: 12, color: D.textPrimary, flex: 1, fontWeight: isBold ? 600 : 400 }}>
+                    {row.label}
+                  </span>
+                  {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                </div>
+              )}
+            </SortableRow>
+          );
+        })}
+      </SortableSection>
       <SectionFooter sectionName="horarios" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
     </div>
   );
@@ -600,7 +773,7 @@ function HorariosCard({
 
 function AnunciosCard({
   rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   if (!displayed.length && !editable) return null;
@@ -608,30 +781,37 @@ function AnunciosCard({
   return (
     <div className="ficha-card" style={{ ...S.card, marginBottom: 0 }}>
       <div style={S.cardTitle}>Info Encuentro</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px' }}>
-        {displayed.map((row, i) => (
-          <div key={row.id} style={{
-            padding: '5px 0',
-            borderBottom: i < displayed.length - 1 ? `0.5px solid ${D.divider}` : 'none',
-          }}>
-            <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
-              <strong style={{ color: D.textSecond, fontWeight: 600, flexShrink: 0 }}>{row.label}:</strong>
-              {editable ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, minWidth: 0 }}>
-                  <CellInput
-                    value={rawVal(row, colId)}
-                    onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                    style={{ fontSize: 12, color: D.textPrimary, flex: 1 }}
-                  />
-                  {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+      <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px' }}>
+          {displayed.map((row, i) => (
+            <SortableRow key={row.id} id={row.id} editable={editable}>
+              {(handle) => (
+                <div style={{
+                  padding: '5px 0',
+                  borderBottom: i < displayed.length - 1 ? `0.5px solid ${D.divider}` : 'none',
+                }}>
+                  <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+                    {handle}
+                    <strong style={{ color: D.textSecond, fontWeight: 600, flexShrink: 0 }}>{row.label}:</strong>
+                    {editable ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, minWidth: 0 }}>
+                        <CellInput
+                          value={rawVal(row, colId)}
+                          onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                          style={{ fontSize: 12, color: D.textPrimary, flex: 1 }}
+                        />
+                        {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                      </div>
+                    ) : (
+                      <span style={{ color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <span style={{ color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
               )}
-            </div>
-          </div>
-        ))}
-      </div>
+            </SortableRow>
+          ))}
+        </div>
+      </SortableSection>
       <SectionFooter sectionName="anuncios" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
     </div>
   );
@@ -641,7 +821,7 @@ function AnunciosCard({
 
 function VoluntariosCard({
   rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   if (!displayed.length && !editable) return null;
@@ -649,28 +829,35 @@ function VoluntariosCard({
   return (
     <div className="ficha-card" style={{ ...S.card, marginBottom: 14 }}>
       <div style={S.cardTitle}>Voluntarios de Servicio</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 24px' }}>
-        {displayed.map((row, i) => (
-          <div key={row.id} style={{
-            ...S.roleRow,
-            ...(i >= displayed.length - 2 ? { borderBottom: 'none' } : {}),
-          }}>
-            <span style={S.roleLabel}>{row.label}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-              {editable ? (
-                <CellInput
-                  value={rawVal(row, colId)}
-                  onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                  style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
-                />
-              ) : (
-                <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
+      <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 24px' }}>
+          {displayed.map((row, i) => (
+            <SortableRow key={row.id} id={row.id} editable={editable}>
+              {(handle) => (
+                <div style={{
+                  ...S.roleRow,
+                  ...(i >= displayed.length - 2 ? { borderBottom: 'none' } : {}),
+                }}>
+                  {handle}
+                  <span style={S.roleLabel}>{row.label}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
+                    {editable ? (
+                      <CellInput
+                        value={rawVal(row, colId)}
+                        onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                        style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
+                      />
+                    ) : (
+                      <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
+                    )}
+                    {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                  </div>
+                </div>
               )}
-              {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-            </div>
-          </div>
-        ))}
-      </div>
+            </SortableRow>
+          ))}
+        </div>
+      </SortableSection>
       <SectionFooter sectionName="voluntarios" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
     </div>
   );
@@ -723,6 +910,7 @@ export interface FichaDocumentViewProps {
   onCellChange?: (section: SectionName, rowId: string, colId: string, value: string) => void;
   onAddRow?: (section: SectionName, label: string, type: Row['type'], shared: boolean) => void;
   onDeleteRow?: (section: SectionName, rowId: string) => void;
+  onReorderRow?: (section: SectionName, fromIndex: number, toIndex: number) => void;
   onSectionComplete?: (section: SectionName) => void;
   sectionStatus?: Partial<Record<SectionName, boolean>>;
   saveState?: 'idle' | 'saving' | 'saved' | 'error';
@@ -733,7 +921,7 @@ export interface FichaDocumentViewProps {
 export function FichaDocumentView({
   ficha, onEdit, onSave, onArchive, onUnarchive, canArchive,
   onPublish, onUnpublish, canPublish, isPublishing,
-  editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onSectionComplete,
+  editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onReorderRow, onSectionComplete,
   sectionStatus, saveState, hiddenSections, onToggleModule,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
@@ -753,11 +941,12 @@ export function FichaDocumentView({
     editable,
     forceShowAll,
     colId,
-    onCellChange: onCellChange ? (rowId, cId, value) => onCellChange(name, rowId, cId, value) : undefined,
-    onDeleteRow:  onDeleteRow  ? (rowId) => onDeleteRow(name, rowId)                           : undefined,
-    onAddRow:     onAddRow     ? (label, type, shared) => onAddRow(name, label, type, shared)  : undefined,
-    isCompleted:  sectionStatus?.[name] ?? sections?.[name]?.isCompleted,
-    onComplete:   onSectionComplete ? () => onSectionComplete(name) : undefined,
+    onCellChange:  onCellChange  ? (rowId, cId, value) => onCellChange(name, rowId, cId, value)      : undefined,
+    onDeleteRow:   onDeleteRow   ? (rowId) => onDeleteRow(name, rowId)                                : undefined,
+    onAddRow:      onAddRow      ? (label, type, shared) => onAddRow(name, label, type, shared)       : undefined,
+    onReorderRow:  onReorderRow  ? (from, to) => onReorderRow(name, from, to)                        : undefined,
+    isCompleted:   sectionStatus?.[name] ?? sections?.[name]?.isCompleted,
+    onComplete:    onSectionComplete ? () => onSectionComplete(name)                                  : undefined,
   });
 
   const [copied,           setCopied]           = useState(false);
