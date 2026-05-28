@@ -312,14 +312,16 @@ export class FichasService {
       data.hiddenSections = dto.hiddenSections;
 
       // Si alguna sección fue habilitada (ya no está en hiddenSections) y no existe
-      // en el documento de Firestore, inicializarla con sus filas por defecto.
+      // o tiene rows vacíos, inicializarla con sus filas por defecto.
       const previousHidden: string[] = ficha.hiddenSections ?? [];
       const newlyEnabled = previousHidden.filter(s => !dto.hiddenSections!.includes(s));
       for (const sectionName of newlyEnabled) {
-        if (!ficha.sections?.[sectionName]) {
+        const existing = ficha.sections?.[sectionName];
+        const needsInit = !existing || !existing.rows?.length;
+        if (needsInit) {
           data[`sections.${sectionName}`] = {
-            assignedTo:   null,
-            assignedName: null,
+            assignedTo:   existing?.assignedTo   ?? null,
+            assignedName: existing?.assignedName ?? null,
             isCompleted:  false,
             completedBy:  null,
             completedAt:  null,
