@@ -299,7 +299,7 @@ function RoleCard({
   editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { title: string; rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!displayed.length) return null;
+  if (!displayed.length && !editable) return null;
 
   return (
     <div className="ficha-card" style={S.card}>
@@ -340,7 +340,7 @@ function StreamingCard({
   const cameras   = displayed.filter((r) => /^cam\s?\d/i.test(r.label));
   const others    = displayed.filter((r) => !director.includes(r) && !cameras.includes(r));
 
-  if (!displayed.length) return null;
+  if (!displayed.length && !editable) return null;
 
   return (
     <div className="ficha-card" style={S.card}>
@@ -406,7 +406,7 @@ function EscenaCard({
   const positions  = displayed.filter((r) => /posición|posicion/i.test(r.label));
   const musicians  = displayed.filter((r) => r !== vio && !positions.includes(r));
 
-  if (!displayed.length) return null;
+  if (!displayed.length && !editable) return null;
 
   const half = Math.ceil(musicians.length / 2);
   const col1 = musicians.slice(0, half);
@@ -507,7 +507,7 @@ function SetListCard({
   editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { rows: Row[]; encuentro: Encuentro | null } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!displayed.length) return null;
+  if (!displayed.length && !editable) return null;
 
   return (
     <div className="ficha-card" style={S.card}>
@@ -552,7 +552,7 @@ function HorariosCard({
   editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!displayed.length) return null;
+  if (!displayed.length && !editable) return null;
 
   return (
     <div className="ficha-card" style={S.card}>
@@ -603,7 +603,7 @@ function AnunciosCard({
   editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!displayed.length) return null;
+  if (!displayed.length && !editable) return null;
 
   return (
     <div className="ficha-card" style={{ ...S.card, marginBottom: 0 }}>
@@ -644,7 +644,7 @@ function VoluntariosCard({
   editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!displayed.length) return null;
+  if (!displayed.length && !editable) return null;
 
   return (
     <div className="ficha-card" style={{ ...S.card, marginBottom: 14 }}>
