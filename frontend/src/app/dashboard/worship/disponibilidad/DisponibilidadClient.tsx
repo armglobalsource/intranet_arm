@@ -109,7 +109,7 @@ function WeekSelector({
 // ── VolunteerView ─────────────────────────────────────────────────────────────
 
 function VolunteerView({ campusId, weekLabel }: { campusId: number; weekLabel: string }) {
-  const { data: encounters = [], isLoading: loadingEnc } = useEncounters(campusId, weekLabel);
+  const { data: encounters = [], isLoading: loadingEnc, isError: encError } = useEncounters(campusId, weekLabel);
   const { data: saved       = []                        } = useMyDisponibilidad(campusId, weekLabel);
   const bulkSubmit = useBulkSubmit();
 
@@ -143,6 +143,14 @@ function VolunteerView({ campusId, weekLabel }: { campusId: number; weekLabel: s
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-28 rounded-2xl bg-slate-100 animate-pulse" />
         ))}
+      </div>
+    );
+  }
+
+  if (encError) {
+    return (
+      <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">
+        No se pudieron cargar los encuentros. Intenta recargar la página.
       </div>
     );
   }

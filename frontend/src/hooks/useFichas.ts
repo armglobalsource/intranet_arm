@@ -81,7 +81,7 @@ export function useCreateFicha() {
 export function useUpdateFicha() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ fichaId, ...dto }: { fichaId: string; title?: string; date?: string; status?: string; hiddenSections?: string[] }) =>
+    mutationFn: ({ fichaId, ...dto }: { fichaId: string; title?: string; date?: string; status?: string; hiddenSections?: string[]; sectionLayout?: { left: string[]; right: string[] } }) =>
       api.patch(`/fichas/${fichaId}`, dto).then(r => r.data),
     onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: KEYS.list() }),
   });
