@@ -45,6 +45,7 @@ const SECTION_COLORS: Record<SectionName, string> = {
   horarios:    '#34D399',
   anuncios:    '#F87171',
   voluntarios: '#A3E635',
+  outfit:      '#C084FC',
 };
 
 // ── ProgressBar ───────────────────────────────────────────────────────────────

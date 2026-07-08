@@ -7,6 +7,8 @@ import type { Cancion } from '@/types/ficha';
 interface SongInputProps {
   value: string;
   onChange: (value: string) => void;
+  /** Llamado cuando el usuario selecciona una canción del catálogo (con todos sus datos) */
+  onSongSelect?: (cancion: Cancion | null) => void;
   readOnly?: boolean;
   placeholder?: string;
 }
@@ -17,7 +19,7 @@ interface SongInputProps {
  * - Al confirmar (Enter / seleccionar / blur con texto), hace upsert en /canciones.
  * - Muestra la tonalidad de las canciones existentes como referencia.
  */
-export function SongInput({ value, onChange, readOnly = false, placeholder = 'Canción…' }: SongInputProps) {
+export function SongInput({ value, onChange, onSongSelect, readOnly = false, placeholder = 'Canción…' }: SongInputProps) {
   const [query, setQuery]       = useState(value);
   const [open, setOpen]         = useState(false);
   const [focused, setFocused]   = useState(false);
@@ -40,11 +42,12 @@ export function SongInput({ value, onChange, readOnly = false, placeholder = 'Ca
 
   // ── Confirmar un valor (select o blur) ───────────────────────────────────
   const confirm = useCallback(
-    (text: string) => {
+    (text: string, cancion?: Cancion) => {
       const titulo = text.trim();
       onChange(titulo);
       setQuery(titulo);
       setOpen(false);
+      onSongSelect?.(cancion ?? null);
       if (titulo && !confirmedRef.current) {
         confirmedRef.current = true;
         upsert({ titulo }, {
@@ -52,7 +55,7 @@ export function SongInput({ value, onChange, readOnly = false, placeholder = 'Ca
         });
       }
     },
-    [onChange, upsert],
+    [onChange, onSongSelect, upsert],
   );
 
   // ── Cerrar dropdown si se hace click fuera ───────────────────────────────
@@ -133,14 +136,26 @@ export function SongInput({ value, onChange, readOnly = false, placeholder = 'Ca
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault(); // evita blur antes de confirmar
-                confirm(cancion.titulo);
+                confirm(cancion.titulo, cancion);
               }}
               className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-50 transition-colors"
             >
               <span className="text-xs font-medium text-gray-800 truncate">
                 {cancion.titulo}
               </span>
-              <span className="flex items-center gap-2 flex-shrink-0 ml-2">
+              <span className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                {cancion.tipo && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style={{
+                      background: cancion.tipo.startsWith('Rápid') ? 'rgba(249,115,22,0.1)' : 'rgba(99,102,241,0.1)',
+                      color:      cancion.tipo.startsWith('Rápid') ? '#f97316' : '#6366f1',
+                    }}>
+                    {cancion.tipo.startsWith('Rápid') ? '⚡' : '✨'}
+                  </span>
+                )}
+                {cancion.bpm && (
+                  <span className="text-[10px] text-gray-400 font-medium">{cancion.bpm} BPM</span>
+                )}
                 {cancion.tonalidad && (
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
                     style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1' }}>

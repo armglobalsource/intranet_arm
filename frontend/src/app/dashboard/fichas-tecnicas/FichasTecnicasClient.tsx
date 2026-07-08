@@ -67,6 +67,7 @@ const SECTION_COLORS: Record<SectionName, string> = {
   horarios:    '#34D399', // verde esmeralda
   anuncios:    '#F87171', // coral
   voluntarios: '#A3E635', // lima
+  outfit:      '#C084FC', // lila
 };
 
 // ── ProgressBar ───────────────────────────────────────────────────────────────

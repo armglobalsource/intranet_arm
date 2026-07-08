@@ -3,7 +3,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Ficha, Row, SectionName, Encuentro } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
+import { SongInput } from '@/components/fichas/SongInput';
+
+// Secciones disponibles por tipo de ficha (para el panel de módulos)
+const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
+  unico:   ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'],
+  multi:   ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'],
+  oracion: ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'outfit'],
+};
 import { useUpdateFicha } from '@/hooks/useFichas';
+import { usePaletas, useCreatePaleta, type Paleta, type PaletaColor } from '@/hooks/usePaletas';
 import {
   DndContext,
   closestCenter,
@@ -11,13 +20,17 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
+  DragOverlay,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
+  arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -91,6 +104,39 @@ function effectiveColId(row: Row, colId: string): string {
 
 function rowsWithVal(rows: Row[], colId: string): Row[] {
   return [...rows].sort((a, b) => a.order - b.order).filter((r) => val(r, colId));
+}
+
+// ── Datos enriquecidos de canción ─────────────────────────────────────────────
+
+interface SongData {
+  titulo:    string;
+  tonalidad: string;
+  cantante:  string;
+  tipo?:     string;
+  bpm?:      number;
+}
+
+function parseSongData(raw: string): SongData {
+  if (!raw) return { titulo: '', tonalidad: '', cantante: '' };
+  try {
+    const p = JSON.parse(raw);
+    if (p && typeof p === 'object' && 'titulo' in p) {
+      return { titulo: p.titulo || '', tonalidad: p.tonalidad || '', cantante: p.cantante || '', tipo: p.tipo, bpm: p.bpm };
+    }
+  } catch {}
+  // Retrocompatibilidad: el valor era solo el título (texto plano)
+  return { titulo: raw, tonalidad: '', cantante: '' };
+}
+
+function encodeSongData(data: SongData): string {
+  if (!data.titulo && !data.tonalidad && !data.cantante) return '';
+  return JSON.stringify({
+    titulo:    data.titulo,
+    tonalidad: data.tonalidad,
+    cantante:  data.cantante,
+    ...(data.tipo ? { tipo: data.tipo } : {}),
+    ...(data.bpm  ? { bpm:  data.bpm  } : {}),
+  });
 }
 
 function allRows(rows: Row[]): Row[] {
@@ -659,12 +705,140 @@ function EscenaCard({
   );
 }
 
+// ── SongRowCell ───────────────────────────────────────────────────────────────
+
+function SongRowCell({
+  row, colId, editable, onCellChange, singers = [],
+}: {
+  row: Row;
+  colId: string;
+  editable?: boolean;
+  onCellChange?: (rowId: string, colId: string, value: string) => void;
+  singers?: string[];
+}) {
+  const raw    = rawVal(row, colId);
+  const data   = parseSongData(raw);
+  const eColId = effectiveColId(row, colId);
+
+  const [editingKey, setEditingKey] = useState(false);
+  const [keyDraft,   setKeyDraft]   = useState(data.tonalidad);
+
+  useEffect(() => { setKeyDraft(data.tonalidad); }, [data.tonalidad]);
+
+  function update(patch: Partial<SongData>) {
+    onCellChange?.(row.id, eColId, encodeSongData({ ...data, ...patch }));
+  }
+
+  const isRapida = data.tipo?.toLowerCase().includes('pida') ?? false;
+
+  if (!editable) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: data.titulo ? D.textPrimary : D.textMuted }}>
+          {data.titulo || '—'}
+        </span>
+        {(data.tipo || data.bpm) && (
+          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600, flexShrink: 0,
+            background: isRapida ? 'rgba(249,115,22,0.12)' : 'rgba(99,102,241,0.12)',
+            color:      isRapida ? '#f97316' : '#6366f1' }}>
+            {isRapida ? '⚡' : '✨'}{data.bpm ? ` ${data.bpm} BPM` : ''}
+          </span>
+        )}
+        {data.tonalidad && (
+          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 700,
+            background: 'rgba(99,102,241,0.1)', color: '#6366f1', flexShrink: 0 }}>
+            {data.tonalidad}
+          </span>
+        )}
+        {data.cantante && (
+          <span style={{ fontSize: 11, color: D.textSecond, flexShrink: 0 }}>{data.cantante}</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {/* Fila principal: título + tipo/bpm + tonalidad */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <SongInput
+            value={data.titulo}
+            onChange={(titulo) => update({ titulo })}
+            onSongSelect={(c) => { if (c) update({ titulo: c.titulo, tipo: c.tipo, bpm: c.bpm }); }}
+            placeholder="Nombre de la canción…"
+          />
+        </div>
+
+        {/* Tipo + BPM (auto desde catálogo, no editable) */}
+        {(data.tipo || data.bpm) && (
+          <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, fontWeight: 600, flexShrink: 0,
+            background: isRapida ? 'rgba(249,115,22,0.12)' : 'rgba(99,102,241,0.12)',
+            color:      isRapida ? '#f97316' : '#6366f1' }}>
+            {isRapida ? '⚡' : '✨'}{data.bpm ? ` ${data.bpm}` : ''}
+          </span>
+        )}
+
+        {/* Tonalidad — badge clickeable para editar */}
+        {editingKey ? (
+          <input
+            autoFocus
+            value={keyDraft}
+            onChange={(e) => setKeyDraft(e.target.value.toUpperCase())}
+            onBlur={() => { update({ tonalidad: keyDraft }); setEditingKey(false); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter')  { update({ tonalidad: keyDraft }); setEditingKey(false); }
+              if (e.key === 'Escape') { setKeyDraft(data.tonalidad); setEditingKey(false); }
+            }}
+            placeholder="Dm"
+            style={{
+              width: 40, fontSize: 11, fontWeight: 700, textAlign: 'center',
+              background: 'rgba(99,102,241,0.1)', border: '1.5px solid rgba(99,102,241,0.5)',
+              borderRadius: 5, color: '#6366f1', padding: '2px 4px', outline: 'none', flexShrink: 0,
+            }}
+          />
+        ) : (
+          <button
+            onClick={() => { setKeyDraft(data.tonalidad); setEditingKey(true); }}
+            title="Editar tonalidad"
+            style={{
+              fontSize: 10, padding: '2px 6px', borderRadius: 5, fontWeight: 700, flexShrink: 0,
+              background: data.tonalidad ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.04)',
+              color:  data.tonalidad ? '#6366f1' : D.textMuted,
+              border: `1px dashed ${data.tonalidad ? 'rgba(99,102,241,0.4)' : D.cardBorder}`,
+              cursor: 'pointer',
+            }}>
+            {data.tonalidad || 'Key'}
+          </button>
+        )}
+      </div>
+
+      {/* Selector de cantante */}
+      {singers.length > 0 && (
+        <select
+          value={data.cantante}
+          onChange={(e) => update({ cantante: e.target.value })}
+          style={{
+            fontSize: 11, width: '100%',
+            background: 'rgba(255,255,255,0.04)', border: `0.5px solid ${D.cardBorder}`,
+            borderRadius: 5, color: data.cantante ? D.textSecond : D.textMuted,
+            padding: '3px 7px', outline: 'none', cursor: 'pointer',
+          }}>
+          <option value="">— Sin cantante asignado —</option>
+          {singers.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      )}
+    </div>
+  );
+}
+
 // ── SetListCard ───────────────────────────────────────────────────────────────
 
 function SetListCard({
   rows, colId, encuentro,
   editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
-}: { rows: Row[]; encuentro: Encuentro | null } & EditProps) {
+  singers = [],
+}: { rows: Row[]; encuentro: Encuentro | null; singers?: string[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   if (!displayed.length && !editable) return null;
 
@@ -676,37 +850,794 @@ function SetListCard({
           <SortableRow key={row.id} id={row.id} editable={editable}>
             {(handle) => (
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 9,
+                display: 'flex', alignItems: 'flex-start', gap: 9,
                 padding: '7px 0',
                 borderBottom: i === displayed.length - 1 ? 'none' : `0.5px solid ${D.divider}`,
               }}>
                 {handle}
-                <div style={{
-                  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                  background: SONG_DOT_COLORS[i % SONG_DOT_COLORS.length],
-                  opacity: 0.85,
-                }} />
-                {editable ? (
-                  <>
-                    <CellInput
-                      value={rawVal(row, colId)}
-                      onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                      placeholder="Nombre de la canción…"
-                      style={{ fontSize: 13, fontWeight: 500, color: D.textPrimary, flex: 1 }}
-                    />
-                    {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-                  </>
-                ) : (
-                  <span style={{ fontSize: 13, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted, flex: 1 }}>
-                    {val(row, colId) || '—'}
-                  </span>
-                )}
+                <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 6,
+                  background: SONG_DOT_COLORS[i % SONG_DOT_COLORS.length], opacity: 0.85 }} />
+                <SongRowCell
+                  row={row} colId={colId} editable={editable}
+                  onCellChange={onCellChange} singers={singers}
+                />
+                {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
               </div>
             )}
           </SortableRow>
         ))}
       </SortableSection>
       <SectionFooter sectionName="setList" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
+    </div>
+  );
+}
+
+// ── CreatePaletteForm ─────────────────────────────────────────────────────────
+
+const BLANK_COLORS: PaletaColor[] = Array.from({ length: 5 }, () => ({ name: '', hex: '#888888' }));
+
+function CreatePaletteForm({ onCreated, onCancel }: { onCreated: (p: Paleta) => void; onCancel: () => void }) {
+  const { mutate, isPending } = useCreatePaleta();
+  const [name,   setName]   = useState('');
+  const [colors, setColors] = useState<PaletaColor[]>(BLANK_COLORS);
+
+  function setColor(i: number, field: keyof PaletaColor, value: string) {
+    setColors((prev) => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
+  }
+
+  function submit() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    mutate({ name: trimmed, colors }, {
+      onSuccess: (p) => onCreated(p),
+    });
+  }
+
+  const inputBase: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.05)', border: `1px solid ${D.cardBorder}`,
+    borderRadius: 6, padding: '4px 8px', fontSize: 11, outline: 'none',
+    color: D.textPrimary, width: '100%', boxSizing: 'border-box',
+  };
+
+  return (
+    <div style={{
+      marginTop: 8, padding: '12px', borderRadius: 10,
+      background: 'rgba(255,255,255,0.03)', border: `1px solid ${D.cardBorder}`,
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: D.textMuted, marginBottom: 10 }}>
+        Nueva paleta
+      </div>
+
+      {/* Nombre */}
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onCancel(); }}
+        placeholder="Nombre de la paleta…"
+        style={{ ...inputBase, marginBottom: 10, fontSize: 12 }}
+      />
+
+      {/* Colores */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 }}>
+        {colors.map((c, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            {/* Color picker */}
+            <label style={{ position: 'relative', flexShrink: 0, cursor: 'pointer' }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 6, background: c.hex,
+                border: `1px solid rgba(255,255,255,0.18)`,
+                boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.3)',
+              }} />
+              <input
+                type="color"
+                value={c.hex}
+                onChange={(e) => setColor(i, 'hex', e.target.value)}
+                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+              />
+            </label>
+            {/* Hex */}
+            <input
+              value={c.hex}
+              onChange={(e) => setColor(i, 'hex', e.target.value)}
+              placeholder="#000000"
+              style={{ ...inputBase, width: 82, fontFamily: 'monospace', fontSize: 11 }}
+            />
+            {/* Nombre del color */}
+            <input
+              value={c.name}
+              onChange={(e) => setColor(i, 'name', e.target.value)}
+              placeholder={`Color ${i + 1}`}
+              style={{ ...inputBase, flex: 1 }}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Acciones */}
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <button
+          onClick={onCancel}
+          style={{
+            fontSize: 11, fontWeight: 500, color: D.textSecond, background: 'none',
+            border: `1px solid ${D.cardBorder}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+          }}
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={submit}
+          disabled={isPending || !name.trim()}
+          style={{
+            fontSize: 11, fontWeight: 600, color: '#fff',
+            background: name.trim() ? C.purple : 'rgba(127,119,221,0.3)',
+            border: 'none', borderRadius: 6, padding: '4px 12px',
+            cursor: name.trim() ? 'pointer' : 'default',
+            opacity: isPending ? 0.6 : 1,
+          }}
+        >
+          {isPending ? 'Guardando…' : 'Guardar paleta'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── OutfitPaletteSelector ─────────────────────────────────────────────────────
+
+function OutfitPaletteSelector({
+  selectedId, paletas, editable, onSelect, loading,
+}: {
+  selectedId: string;
+  paletas:    Paleta[];
+  editable?:  boolean;
+  onSelect:   (id: string) => void;
+  loading?:   boolean;
+}) {
+  // Estado local optimista: se actualiza inmediatamente al hacer click,
+  // sin esperar a que el prop externo (que viene del backend) se propague.
+  const [localId,     setLocalId]     = useState(selectedId);
+  const [expanded,    setExpanded]    = useState(!selectedId);
+  const [showCreate,  setShowCreate]  = useState(false);
+
+  // Sincronizar si llega un cambio externo (ej: otro usuario edita)
+  useEffect(() => {
+    setLocalId(selectedId);
+    if (!selectedId) setExpanded(true);
+  }, [selectedId]);
+
+  const selectedPaleta = paletas.find((p) => p.id === localId) ?? null;
+
+  function pickPalette(id: string) {
+    setLocalId(id);
+    setExpanded(false);
+    setShowCreate(false);
+    onSelect(id);
+  }
+
+  function clearPalette() {
+    setLocalId('');
+    setExpanded(true);
+    onSelect('');
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} style={{ flex: 1, height: 28, borderRadius: 6, background: 'rgba(255,255,255,0.06)' }} />
+        ))}
+      </div>
+    );
+  }
+
+  /* ── Modo vista ── */
+  if (!editable) {
+    if (!selectedPaleta) return null;
+    return (
+      <div>
+        <div style={{ fontSize: 11, color: D.textSecond, marginBottom: 8, fontWeight: 500 }}>
+          {selectedPaleta.name}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {selectedPaleta.colors.map((c) => (
+            <div key={c.name} style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ height: 36, borderRadius: 8, background: c.hex, border: '0.5px solid rgba(255,255,255,0.1)', marginBottom: 4 }} />
+              <div style={{ fontSize: 9, color: D.textSecond, textAlign: 'center', lineHeight: 1.3, wordBreak: 'break-word' }}>
+                {c.name}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Modo edición: paleta seleccionada (colapsado) ── */
+  if (selectedPaleta && !expanded) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Swatches de la paleta seleccionada */}
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          {selectedPaleta.colors.map((c) => (
+            <div key={c.name} title={c.name} style={{
+              width: 22, height: 22, borderRadius: 5, background: c.hex,
+              border: '0.5px solid rgba(255,255,255,0.15)', flexShrink: 0,
+            }} />
+          ))}
+        </div>
+        {/* Nombre */}
+        <span style={{ fontSize: 12, fontWeight: 600, color: D.textPrimary, flex: 1 }}>
+          {selectedPaleta.name}
+        </span>
+        {/* Cambiar */}
+        <button
+          onClick={() => setExpanded(true)}
+          style={{
+            fontSize: 11, fontWeight: 500, color: C.purple,
+            background: 'rgba(127,119,221,0.08)', border: `1px solid rgba(127,119,221,0.2)`,
+            borderRadius: 6, padding: '3px 8px', cursor: 'pointer',
+          }}
+        >
+          Cambiar
+        </button>
+        {/* Quitar selección */}
+        <button
+          onClick={clearPalette}
+          title="Quitar selección"
+          style={{ fontSize: 13, color: D.textMuted, background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = D.textMuted; }}
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  /* ── Modo edición: selector expandido ── */
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {paletas.map((p) => {
+        const isSel = p.id === localId;
+        return (
+          <button
+            key={p.id}
+            onClick={() => pickPalette(p.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: '7px 10px', borderRadius: 8, cursor: 'pointer',
+              background: isSel ? 'rgba(127,119,221,0.08)' : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${isSel ? C.purple : D.cardBorder}`,
+              transition: 'all 0.15s', textAlign: 'left',
+            }}
+            onMouseEnter={(e) => { if (!isSel) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
+            onMouseLeave={(e) => { if (!isSel) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+          >
+            <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+              {p.colors.map((c) => (
+                <div key={c.name} title={c.name} style={{
+                  width: 18, height: 18, borderRadius: 4, background: c.hex,
+                  border: '0.5px solid rgba(255,255,255,0.12)', flexShrink: 0,
+                }} />
+              ))}
+            </div>
+            <span style={{ fontSize: 12, fontWeight: isSel ? 600 : 400, color: isSel ? D.textPrimary : D.textSecond, flex: 1 }}>
+              {p.name}
+            </span>
+            {isSel && (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </button>
+        );
+      })}
+
+      {/* Botón cancelar (si hay paleta seleccionada) */}
+      {selectedPaleta && !showCreate && (
+        <button
+          onClick={() => setExpanded(false)}
+          style={{
+            marginTop: 2, fontSize: 11, color: D.textMuted, background: 'none', border: 'none',
+            cursor: 'pointer', textAlign: 'left', padding: '2px 0',
+          }}
+        >
+          ← Cancelar
+        </button>
+      )}
+
+      {/* Crear nueva paleta */}
+      {!showCreate ? (
+        <button
+          onClick={() => setShowCreate(true)}
+          style={{
+            marginTop: 4, fontSize: 11, color: D.textMuted, background: 'none', border: 'none',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0',
+            transition: 'color 0.15s',
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = C.purple; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = D.textMuted; }}
+        >
+          <span style={{ fontSize: 15, lineHeight: 1 }}>+</span> Crear nueva paleta
+        </button>
+      ) : (
+        <CreatePaletteForm
+          onCreated={(p) => { pickPalette(p.id); setShowCreate(false); }}
+          onCancel={() => setShowCreate(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── AddPositionBtn ────────────────────────────────────────────────────────────
+
+function AddPositionBtn({ onAdd }: { onAdd: (name: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
+
+  const submit = () => {
+    const n = name.trim();
+    if (n) onAdd(n);
+    setName('');
+    setOpen(false);
+  };
+
+  if (!open) return (
+    <button
+      onClick={() => setOpen(true)}
+      title="Agregar posición"
+      style={{
+        alignSelf: 'center', minWidth: 36, height: 36, borderRadius: 8,
+        border: `1px dashed ${D.cardBorder}`, background: 'transparent',
+        color: D.textMuted, fontSize: 20, cursor: 'pointer', lineHeight: 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'all 0.15s', flexShrink: 0,
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.borderColor = C.purple;
+        (e.currentTarget as HTMLButtonElement).style.color = C.purple;
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.borderColor = D.cardBorder;
+        (e.currentTarget as HTMLButtonElement).style.color = D.textMuted;
+      }}
+    >
+      +
+    </button>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+      <input
+        ref={inputRef}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') submit();
+          if (e.key === 'Escape') { setOpen(false); setName(''); }
+        }}
+        placeholder="Nombre…"
+        style={{
+          background: 'rgba(255,255,255,0.06)', border: `1px solid ${D.cardBorder}`,
+          borderRadius: 6, padding: '4px 8px', fontSize: 11, outline: 'none',
+          color: D.textPrimary, width: 90,
+        }}
+      />
+      <div style={{ display: 'flex', gap: 3 }}>
+        <button onClick={submit} style={{
+          flex: 1, background: C.purple, color: '#fff', border: 'none',
+          borderRadius: 5, fontSize: 10, padding: '3px 0', cursor: 'pointer', fontWeight: 600,
+        }}>
+          Agregar
+        </button>
+        <button onClick={() => { setOpen(false); setName(''); }} style={{
+          background: 'none', border: 'none', color: D.textSecond, fontSize: 12,
+          cursor: 'pointer', padding: '0 3px',
+        }}>
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── OutfitCard ────────────────────────────────────────────────────────────────
+
+function OutfitCard({
+  rows, colId,
+  editable, paletas, paletasLoading,
+  onCellChange, onAddRow, isCompleted, onComplete,
+}: {
+  rows:            Row[];
+  paletas:         Paleta[];
+  paletasLoading?: boolean;
+} & Pick<EditProps, 'colId' | 'editable' | 'onCellChange' | 'onAddRow' | 'isCompleted' | 'onComplete'>) {
+  const outfitRow = rows.find((r) => r.id === 'outfit_palette' || r.label === 'Paleta');
+  const selectedId = outfitRow?.shared
+    ? (outfitRow.values?.['shared'] ?? '')
+    : (outfitRow?.values?.[colId] ?? '');
+
+  const createdRef = useRef(false);
+  const pendingRef = useRef<string | null>(null);
+
+  // Flush pending selection once the row is created
+  useEffect(() => {
+    if (outfitRow && pendingRef.current !== null) {
+      onCellChange?.(outfitRow.id, 'shared', pendingRef.current);
+      pendingRef.current = null;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outfitRow?.id]);
+
+  function handleSelect(id: string) {
+    if (outfitRow) {
+      onCellChange?.(outfitRow.id, 'shared', id);
+    } else {
+      pendingRef.current = id;
+      if (!createdRef.current && onAddRow) {
+        createdRef.current = true;
+        onAddRow('Paleta', 'text', true);
+      }
+    }
+  }
+
+  // View mode: nothing to show if no palette selected
+  if (!editable && !selectedId) return null;
+
+  return (
+    <div className="ficha-card" style={{ ...S.card, marginBottom: 14 }}>
+      <div style={S.cardTitle}>Outfit / Paleta de Colores</div>
+      <OutfitPaletteSelector
+        selectedId={selectedId}
+        paletas={paletas}
+        editable={editable}
+        onSelect={handleSelect}
+        loading={paletasLoading && paletas.length === 0}
+      />
+      {editable && (
+        <div className="ficha-no-print" style={{ marginTop: 10, borderTop: `0.5px solid ${D.divider}`, paddingTop: 8, textAlign: 'right' }}>
+          {isCompleted ? (
+            <span style={{ fontSize: 10, fontWeight: 600, color: C.green }}>✓ Sección completada</span>
+          ) : onComplete ? (
+            <button onClick={onComplete} style={{
+              fontSize: 10, fontWeight: 600, color: C.green,
+              background: 'rgba(29,158,117,0.1)', border: `1px solid rgba(29,158,117,0.25)`,
+              borderRadius: 6, padding: '3px 8px', cursor: 'pointer',
+            }}>
+              ✓ Marcar completada
+            </button>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── WorshipSetListCard ────────────────────────────────────────────────────────
+
+function WorshipSetListCard({
+  escenaRows, setListRows, outfitRows,
+  escena, setList, outfit,
+  hideEscena, hideSetList, hideOutfit,
+  paletas, paletasLoading,
+}: {
+  escenaRows:  Row[];
+  setListRows: Row[];
+  outfitRows:  Row[];
+  escena:      EditProps;
+  setList:     EditProps;
+  outfit:      EditProps;
+  hideEscena?:  boolean;
+  hideSetList?: boolean;
+  hideOutfit?:  boolean;
+  paletas?:         Paleta[];
+  paletasLoading?:  boolean;
+}) {
+  const editable     = escena.editable;
+  const forceShowAll = escena.forceShowAll;
+  const colId        = escena.colId;
+
+  const commentRow = escenaRows.find((r) => r.id === 'esc_comment' || /comentarios?\s+del\s+productor/i.test(r.label));
+  const bandaRows  = escenaRows.filter((r) => r !== commentRow);
+
+  const displayedEscena = !hideEscena
+    ? ((editable || forceShowAll) ? allRows(bandaRows) : rowsWithVal(bandaRows, colId))
+    : [];
+  const vio       = displayedEscena.find((r) => r.label === 'VIO');
+  const positions = displayedEscena.filter((r) => /posición|posicion/i.test(r.label));
+  const musicians = displayedEscena.filter((r) => r !== vio && !positions.includes(r));
+
+  const displayedSetList = !hideSetList
+    ? ((editable || forceShowAll) ? allRows(setListRows) : rowsWithVal(setListRows, colId))
+    : [];
+
+  // Cantantes disponibles: personas de escena que tienen un nombre asignado ese día
+  const singers = allRows(bandaRows)
+    .filter((r) => r.type === 'person')
+    .map((r) => val(r, colId))
+    .filter(Boolean);
+
+  const commentValue = commentRow
+    ? (commentRow.shared ? (commentRow.values?.['shared'] ?? '') : (commentRow.values?.[colId] ?? ''))
+    : '';
+
+  // ── Comment textarea (pending-value pattern for old fichas) ───────────────
+  const [localComment, setLocalComment] = useState(commentValue);
+  const commentCreatedRef = useRef(false);
+  const pendingComment    = useRef<string | null>(null);
+
+  useEffect(() => { setLocalComment(commentValue); }, [commentValue]);
+
+  useEffect(() => {
+    if (commentRow && pendingComment.current !== null) {
+      escena.onCellChange?.(commentRow.id, 'shared', pendingComment.current);
+      pendingComment.current = null;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commentRow?.id]);
+
+  function handleCommentChange(v: string) {
+    setLocalComment(v);
+    if (commentRow) {
+      escena.onCellChange?.(commentRow.id, 'shared', v);
+    } else {
+      pendingComment.current = v;
+    }
+  }
+
+  function ensureCommentRow() {
+    if (!commentRow && !commentCreatedRef.current && escena.onAddRow) {
+      commentCreatedRef.current = true;
+      escena.onAddRow('Comentarios del Productor', 'text', true);
+    }
+  }
+
+  // ── Outfit palette (pending-value pattern, data from outfit section) ───────
+  const outfitRow = outfitRows.find((r) => r.id === 'outfit_palette' || r.label === 'Paleta');
+  const outfitSelectedId = outfitRow?.shared
+    ? (outfitRow.values?.['shared'] ?? '')
+    : (outfitRow?.values?.[colId] ?? '');
+
+  const outfitCreatedRef = useRef(false);
+  const pendingOutfit    = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (outfitRow && pendingOutfit.current !== null) {
+      outfit.onCellChange?.(outfitRow.id, 'shared', pendingOutfit.current);
+      pendingOutfit.current = null;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outfitRow?.id]);
+
+  function handleSelectPalette(id: string) {
+    if (outfitRow) {
+      outfit.onCellChange?.(outfitRow.id, 'shared', id);
+    } else {
+      pendingOutfit.current = id;
+      if (!outfitCreatedRef.current && outfit.onAddRow) {
+        outfitCreatedRef.current = true;
+        outfit.onAddRow('Paleta', 'text', true);
+      }
+    }
+  }
+
+  const showOutfit = !hideOutfit && (editable || !!outfitSelectedId);
+
+  const hasContent = displayedEscena.length > 0 || displayedSetList.length > 0 || showOutfit;
+  if (!hasContent && !editable) return null;
+
+  function SubDivider({ label }: { label: string }) {
+    return (
+      <div style={{ margin: '14px 0 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1, height: '0.5px', background: D.divider }} />
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.1em', color: D.textMuted }}>
+          {label}
+        </span>
+        <div style={{ flex: 1, height: '0.5px', background: D.divider }} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="ficha-card" style={S.card}>
+      {/* Header */}
+      <div style={S.cardTitle}>
+        AR Worship / Banda{(!editable && vio) ? ` — VIO: ${val(vio, colId)}` : ''}
+      </div>
+
+      {/* ── Banda ── */}
+      {displayedEscena.length > 0 && (
+        <SortableSection items={displayedEscena} onReorder={editable ? escena.onReorderRow : undefined}>
+          {editable && vio && (
+            <SortableRow id={vio.id} editable={editable}>
+              {(handle) => (
+                <div style={{ ...S.roleRow, marginBottom: 8 }}>
+                  {handle}
+                  <span style={S.roleLabel}>VIO</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
+                    <CellInput
+                      value={rawVal(vio, colId)}
+                      onChange={(v) => escena.onCellChange?.(vio.id, effectiveColId(vio, colId), v)}
+                      style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
+                    />
+                    {escena.onDeleteRow && <DeleteBtn onClick={() => escena.onDeleteRow!(vio.id)} />}
+                  </div>
+                </div>
+              )}
+            </SortableRow>
+          )}
+          {(positions.length > 0 || editable) && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'stretch' }}>
+              {positions.map((row) => {
+                const posLabel = row.label.replace(/posición\s*/i, '');
+                return (
+                  <SortableRow key={row.id} id={row.id} editable={editable}>
+                    {(handle) => (
+                      <div style={{ flex: '1 1 0', minWidth: 0, textAlign: 'center', background: D.badgeBg, borderRadius: 8, padding: '9px 4px', border: `0.5px solid ${D.cardBorder}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, justifyContent: 'center' }}>
+                            {handle}
+                            <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{posLabel}</div>
+                          </div>
+                          {editable && escena.onDeleteRow && <DeleteBtn onClick={() => escena.onDeleteRow!(row.id)} />}
+                        </div>
+                        {editable ? (
+                          <textarea
+                            value={rawVal(row, colId)}
+                            onChange={(e) => escena.onCellChange?.(row.id, effectiveColId(row, colId), e.target.value)}
+                            placeholder="Nombre…"
+                            rows={2}
+                            style={{
+                              width: '100%', background: 'transparent', border: 'none',
+                              borderBottom: `1px dashed ${D.inputBorder}`, outline: 'none',
+                              resize: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                              color: D.textPrimary, textAlign: 'center', marginTop: 4,
+                              padding: 0, lineHeight: 1.45, caretColor: C.purple,
+                            }}
+                          />
+                        ) : (
+                          <div style={{ fontSize: 12, fontWeight: 600, color: val(row, colId) ? D.textPrimary : D.textMuted, marginTop: 3, whiteSpace: 'pre-wrap', lineHeight: 1.45, textAlign: 'center' }}>
+                            {val(row, colId) || '—'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </SortableRow>
+                );
+              })}
+              {editable && escena.onAddRow && (
+                <AddPositionBtn
+                  onAdd={(name) => escena.onAddRow!(`Posición ${name}`, 'person', true)}
+                />
+              )}
+            </div>
+          )}
+          {musicians.length > 0 && (
+            <div>
+              {musicians.map((row) => (
+                <SortableRow key={row.id} id={row.id} editable={editable}>
+                  {(handle) => (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', gap: 8, borderBottom: `0.5px solid ${D.divider}` }}>
+                      {handle}
+                      <span style={{ fontSize: 11, color: D.textSecond, flexShrink: 0, minWidth: 120 }}>{row.label}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
+                        {editable ? (
+                          <CellInput
+                            value={rawVal(row, colId)}
+                            onChange={(v) => escena.onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                            style={{ fontSize: 13, fontWeight: 500, color: D.textPrimary, textAlign: 'right' }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 13, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted, textAlign: 'right', wordBreak: 'break-word' }}>
+                            {val(row, colId) || '—'}
+                          </span>
+                        )}
+                        {editable && escena.onDeleteRow && <DeleteBtn onClick={() => escena.onDeleteRow!(row.id)} />}
+                      </div>
+                    </div>
+                  )}
+                </SortableRow>
+              ))}
+            </div>
+          )}
+        </SortableSection>
+      )}
+
+      {/* Banda mini-footer */}
+      {!hideEscena && editable && (
+        <div className="ficha-no-print" style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `0.5px solid ${D.divider}`, paddingTop: 8 }}>
+          {escena.onAddRow && <AddRowInline sectionName="escena" onAdd={escena.onAddRow} />}
+          <div>
+            {escena.isCompleted ? (
+              <span style={{ fontSize: 10, fontWeight: 600, color: C.green }}>✓ Banda completada</span>
+            ) : escena.onComplete ? (
+              <button onClick={escena.onComplete} style={{ fontSize: 10, fontWeight: 600, color: C.green, background: 'rgba(29,158,117,0.1)', border: `1px solid rgba(29,158,117,0.25)`, borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
+                ✓ Marcar banda
+              </button>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* ── Set List ── */}
+      {!hideSetList && (
+        <>
+          <SubDivider label="Set List" />
+          <SortableSection items={displayedSetList} onReorder={editable ? setList.onReorderRow : undefined}>
+            {displayedSetList.map((row, i) => (
+              <SortableRow key={row.id} id={row.id} editable={editable}>
+                {(handle) => (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '7px 0', borderBottom: i === displayedSetList.length - 1 ? 'none' : `0.5px solid ${D.divider}` }}>
+                    {handle}
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 6,
+                      background: SONG_DOT_COLORS[i % SONG_DOT_COLORS.length], opacity: 0.85 }} />
+                    <SongRowCell
+                      row={row} colId={colId} editable={editable}
+                      onCellChange={setList.onCellChange} singers={singers}
+                    />
+                    {editable && setList.onDeleteRow && <DeleteBtn onClick={() => setList.onDeleteRow!(row.id)} />}
+                  </div>
+                )}
+              </SortableRow>
+            ))}
+          </SortableSection>
+          <SectionFooter sectionName="setList" editable={editable} isCompleted={setList.isCompleted} onAddRow={setList.onAddRow} onComplete={setList.onComplete} />
+        </>
+      )}
+
+      {/* ── Outfit / Paleta ── */}
+      {showOutfit && (
+        <>
+          <SubDivider label="Outfit / Paleta" />
+          <OutfitPaletteSelector
+            selectedId={outfitSelectedId}
+            paletas={paletas ?? []}
+            editable={editable}
+            onSelect={handleSelectPalette}
+            loading={paletasLoading && (paletas ?? []).length === 0}
+          />
+        </>
+      )}
+
+      {/* ── Comentarios del Productor ── */}
+      {(editable || commentValue) && (
+        <>
+          <SubDivider label="Comentarios del Productor" />
+          {editable ? (
+            <textarea
+              value={localComment}
+              onChange={(e) => handleCommentChange(e.target.value)}
+              onFocus={ensureCommentRow}
+              placeholder="Notas o instrucciones para este encuentro…"
+              rows={3}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box' as const,
+                background: 'rgba(255,255,255,0.03)',
+                border: `0.5px solid ${D.cardBorder}`,
+                borderRadius: 8,
+                color: D.textPrimary,
+                fontSize: 12,
+                fontFamily: 'inherit',
+                padding: '8px 10px',
+                resize: 'vertical' as const,
+                outline: 'none',
+                lineHeight: '1.5',
+                colorScheme: 'dark' as any,
+              }}
+            />
+          ) : (
+            <p style={{ fontSize: 12, color: D.textPrimary, margin: 0, lineHeight: 1.6, padding: '4px 0', whiteSpace: 'pre-wrap' }}>
+              {commentValue}
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -724,39 +1655,72 @@ function HorariosCard({
     <div className="ficha-card" style={S.card}>
       <div style={S.cardTitle}>Horarios</div>
       <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
-        {displayed.map((row) => {
+        {displayed.map((row, i) => {
           const { color, opacity } = timelineColor(row.label);
-          const isBold = /worship|vio|predicación|inicio/i.test(row.label);
+          const isBold    = /worship|vio|predicaci[oó]n|inicio/i.test(row.label);
+          const timeValue = editable ? rawVal(row, colId) : val(row, colId);
+          const hasTime   = !!timeValue;
+          const isLast    = i === displayed.length - 1;
+
           return (
             <SortableRow key={row.id} id={row.id} editable={editable}>
               {(handle) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 0,
+                  padding: '0',
+                  borderBottom: isLast ? 'none' : `0.5px solid ${D.divider}`,
+                }}>
                   {handle}
-                  {editable ? (
-                    <CellInput
-                      value={rawVal(row, colId)}
-                      onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                      placeholder="Hora…"
-                      style={{
-                        fontSize: 11, width: 48, textAlign: 'right', flexShrink: 0,
+
+                  {/* Columna de tiempo */}
+                  <div style={{ width: 72, flexShrink: 0, paddingRight: 12, textAlign: 'right' }}>
+                    {editable ? (
+                      <CellInput
+                        value={rawVal(row, colId)}
+                        onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                        placeholder="00:00"
+                        style={{
+                          fontSize: 12, width: '100%', textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontWeight: isBold ? 700 : 400,
+                          color: hasTime ? (isBold ? D.textPrimary : D.textSecond) : D.textMuted,
+                        }}
+                      />
+                    ) : (
+                      <span style={{
+                        display: 'inline-block',
+                        fontSize: 12,
                         fontVariantNumeric: 'tabular-nums',
-                        fontWeight: isBold ? 600 : 400,
-                        color: isBold ? D.textPrimary : D.textSecond,
-                      }}
-                    />
-                  ) : (
-                    <span style={{
-                      fontSize: 11, width: 38, textAlign: 'right', flexShrink: 0,
-                      fontVariantNumeric: 'tabular-nums', fontWeight: isBold ? 600 : 400,
-                      color: val(row, colId) ? (isBold ? D.textPrimary : D.textSecond) : D.textMuted,
-                    }}>
-                      {val(row, colId) || '—'}
-                    </span>
-                  )}
-                  <div style={{ width: 3, height: 14, flexShrink: 0, borderRadius: 2, background: color, opacity }} />
-                  <span style={{ fontSize: 12, color: D.textPrimary, flex: 1, fontWeight: isBold ? 600 : 400 }}>
+                        fontWeight: isBold ? 700 : 500,
+                        color: hasTime ? (isBold ? D.textPrimary : D.textSecond) : D.textMuted,
+                        background: hasTime && isBold ? 'rgba(255,255,255,0.06)' : 'transparent',
+                        borderRadius: 5,
+                        padding: hasTime && isBold ? '1px 5px' : '1px 0',
+                      }}>
+                        {timeValue || '—'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Barra de color */}
+                  <div style={{
+                    width: 3, flexShrink: 0, borderRadius: 2,
+                    alignSelf: 'stretch',
+                    background: `linear-gradient(to bottom, transparent 10%, ${color} 30%, ${color} 70%, transparent 90%)`,
+                    opacity: hasTime ? opacity : 0.25,
+                    margin: '0 10px',
+                  }} />
+
+                  {/* Etiqueta */}
+                  <span style={{
+                    fontSize: 12, flex: 1, padding: '8px 0',
+                    fontWeight: isBold ? 600 : 400,
+                    color: isBold ? D.textPrimary : D.textSecond,
+                    letterSpacing: isBold ? '-0.01em' : 'normal',
+                  }}>
                     {row.label}
                   </span>
+
                   {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                 </div>
               )}
@@ -782,34 +1746,64 @@ function AnunciosCard({
     <div className="ficha-card" style={{ ...S.card, marginBottom: 0 }}>
       <div style={S.cardTitle}>Info Encuentro</div>
       <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px' }}>
-          {displayed.map((row, i) => (
-            <SortableRow key={row.id} id={row.id} editable={editable}>
-              {(handle) => (
-                <div style={{
-                  padding: '5px 0',
-                  borderBottom: i < displayed.length - 1 ? `0.5px solid ${D.divider}` : 'none',
-                }}>
-                  <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {displayed.map((row, i) => {
+            const content = val(row, colId);
+            return (
+              <SortableRow key={row.id} id={row.id} editable={editable}>
+                {(handle) => (
+                  <div style={{
+                    display: 'flex', alignItems: 'baseline', gap: 6,
+                    padding: '5px 0',
+                    borderBottom: i < displayed.length - 1 ? `0.5px solid ${D.divider}` : 'none',
+                  }}>
                     {handle}
-                    <strong style={{ color: D.textSecond, fontWeight: 600, flexShrink: 0 }}>{row.label}:</strong>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, color: D.textSecond,
+                      flexShrink: 0, whiteSpace: 'nowrap' as const,
+                    }}>
+                      {row.label}:
+                    </span>
                     {editable ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, minWidth: 0 }}>
-                        <CellInput
+                      <>
+                        <textarea
                           value={rawVal(row, colId)}
-                          onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                          style={{ fontSize: 12, color: D.textPrimary, flex: 1 }}
+                          onChange={(e) => onCellChange?.(row.id, effectiveColId(row, colId), e.target.value)}
+                          placeholder="Contenido del anuncio…"
+                          rows={1}
+                          style={{
+                            flex: 1, boxSizing: 'border-box' as const,
+                            background: 'transparent',
+                            border: 'none', borderBottom: `1px dashed ${D.inputBorder}`,
+                            outline: 'none', resize: 'none' as const,
+                            fontFamily: 'inherit', fontSize: 12,
+                            color: D.textPrimary, lineHeight: 1.45,
+                            padding: '1px 0', caretColor: C.green,
+                            overflow: 'hidden',
+                            minHeight: 22,
+                          }}
+                          onInput={(e) => {
+                            const t = e.currentTarget;
+                            t.style.height = 'auto';
+                            t.style.height = t.scrollHeight + 'px';
+                          }}
                         />
                         {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-                      </div>
+                      </>
                     ) : (
-                      <span style={{ color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
+                      <span style={{
+                        fontSize: 12, color: content ? D.textPrimary : D.textMuted,
+                        lineHeight: 1.45, whiteSpace: 'pre-wrap' as const,
+                        wordBreak: 'break-word' as const,
+                      }}>
+                        {content || '—'}
+                      </span>
                     )}
                   </div>
-                </div>
-              )}
-            </SortableRow>
-          ))}
+                )}
+              </SortableRow>
+            );
+          })}
         </div>
       </SortableSection>
       <SectionFooter sectionName="anuncios" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
@@ -836,7 +1830,7 @@ function VoluntariosCard({
               {(handle) => (
                 <div style={{
                   ...S.roleRow,
-                  ...(i >= displayed.length - 2 ? { borderBottom: 'none' } : {}),
+                  ...(i === displayed.length - 1 ? { borderBottom: 'none' } : {}),
                 }}>
                   {handle}
                   <span style={S.roleLabel}>{row.label}</span>
@@ -890,6 +1884,68 @@ function EncuentroTabs({
   );
 }
 
+// ── Layout drag-to-reorder ────────────────────────────────────────────────────
+
+type LayoutSlot = 'pastoral' | 'produccion' | 'streaming' | 'horarios' | 'worship' | 'voluntarios' | 'anuncios';
+
+const DEFAULT_LAYOUT: { left: LayoutSlot[]; right: LayoutSlot[] } = {
+  left:  ['pastoral', 'produccion', 'streaming', 'horarios'],
+  right: ['worship', 'voluntarios', 'anuncios'],
+};
+const DEFAULT_LAYOUT_ORACION: { left: LayoutSlot[]; right: LayoutSlot[] } = {
+  left:  ['pastoral', 'produccion', 'streaming', 'horarios'],
+  right: ['worship'],
+};
+
+/** Columna droppable (target para soltar desde otra columna) */
+function DroppableColumn({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id });
+  return <div ref={setNodeRef} style={{ minHeight: 40 }}>{children}</div>;
+}
+
+/** Wrapper draggable alrededor de cada card de sección */
+function DraggableSectionCard({ id, editMode, children }: { id: string; editMode?: boolean; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: !editMode,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform:  CSS.Transform.toString(transform),
+        transition,
+        opacity:    isDragging ? 0.45 : 1,
+        zIndex:     isDragging ? 100  : 'auto',
+        position:   'relative',
+      }}
+    >
+      {/* Handle de arrastre — visible solo en modo edición */}
+      {editMode && (
+        <div
+          {...attributes}
+          {...listeners}
+          className="ficha-no-print"
+          title="Arrastra para mover este módulo"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            height: 14, cursor: 'grab', opacity: 0, transition: 'opacity 0.15s',
+            marginBottom: -2, borderRadius: '6px 6px 0 0',
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0'; }}
+        >
+          <svg width="28" height="6" viewBox="0 0 28 6" fill="rgba(255,255,255,0.25)">
+            <rect y="0" width="28" height="1.5" rx="1" />
+            <rect y="4" width="28" height="1.5" rx="1" />
+          </svg>
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
 // ── FichaDocumentView — componente principal ──────────────────────────────────
 
 export interface FichaDocumentViewProps {
@@ -916,6 +1972,8 @@ export interface FichaDocumentViewProps {
   saveState?: 'idle' | 'saving' | 'saved' | 'error';
   hiddenSections?: SectionName[];
   onToggleModule?: (name: SectionName) => void;
+  sectionLayout?: { left: string[]; right: string[] };
+  onUpdateLayout?: (layout: { left: string[]; right: string[] }) => void;
 }
 
 export function FichaDocumentView({
@@ -923,6 +1981,7 @@ export function FichaDocumentView({
   onPublish, onUnpublish, canPublish, isPublishing,
   editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onReorderRow, onSectionComplete,
   sectionStatus, saveState, hiddenSections, onToggleModule,
+  sectionLayout: sectionLayoutProp, onUpdateLayout,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
 
@@ -956,6 +2015,71 @@ export function FichaDocumentView({
   const modulesRef = useRef<HTMLDivElement>(null);
 
   const hidden = (n: SectionName) => (hiddenSections ?? []).includes(n);
+
+  // ── Layout drag-to-reorder ────────────────────────────────────────────────
+  const defaultLayout = ficha.type === 'oracion' ? DEFAULT_LAYOUT_ORACION : DEFAULT_LAYOUT;
+  const resolvedLayout = (sectionLayoutProp ?? defaultLayout) as { left: LayoutSlot[]; right: LayoutSlot[] };
+
+  const [activeSlot, setActiveSlot] = useState<LayoutSlot | null>(null);
+
+  const layoutSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function handleLayoutDragStart({ active }: DragStartEvent) {
+    setActiveSlot(active.id as LayoutSlot);
+  }
+
+  function handleLayoutDragEnd({ active, over }: DragEndEvent) {
+    setActiveSlot(null);
+    if (!over || !onUpdateLayout) return;
+
+    const activeId = active.id as LayoutSlot;
+    const overId   = over.id as string;
+
+    if (activeId === overId) return;
+
+    const layout = resolvedLayout;
+    const inLeft  = (id: string) => layout.left.includes(id as LayoutSlot);
+
+    const activeIsLeft = inLeft(activeId);
+    const overIsLeft   = inLeft(overId);
+    const overIsColLeft  = overId === 'left';
+    const overIsColRight = overId === 'right';
+
+    if (activeIsLeft && (overIsLeft || overIsColLeft)) {
+      // Reordenar dentro de la columna izquierda
+      const from = layout.left.indexOf(activeId);
+      const to   = overIsColLeft ? layout.left.length - 1 : layout.left.indexOf(overId as LayoutSlot);
+      if (from !== -1 && to !== -1 && from !== to) {
+        onUpdateLayout({ ...layout, left: arrayMove(layout.left, from, to) });
+      }
+    } else if (!activeIsLeft && (!overIsLeft || overIsColRight)) {
+      // Reordenar dentro de la columna derecha
+      const from = layout.right.indexOf(activeId);
+      const to   = overIsColRight ? layout.right.length - 1 : layout.right.indexOf(overId as LayoutSlot);
+      if (from !== -1 && to !== -1 && from !== to) {
+        onUpdateLayout({ ...layout, right: arrayMove(layout.right, from, to) });
+      }
+    } else if (activeIsLeft && (!overIsLeft || overIsColRight)) {
+      // Mover izquierda → derecha
+      const newLeft  = layout.left.filter((s) => s !== activeId);
+      const insertAt = overIsColRight ? layout.right.length : Math.max(0, layout.right.indexOf(overId as LayoutSlot));
+      const newRight = [...layout.right];
+      newRight.splice(insertAt === -1 ? newRight.length : insertAt, 0, activeId);
+      onUpdateLayout({ left: newLeft, right: newRight });
+    } else {
+      // Mover derecha → izquierda
+      const newRight = layout.right.filter((s) => s !== activeId);
+      const insertAt = overIsColLeft ? layout.left.length : Math.max(0, layout.left.indexOf(overId as LayoutSlot));
+      const newLeft  = [...layout.left];
+      newLeft.splice(insertAt === -1 ? newLeft.length : insertAt, 0, activeId);
+      onUpdateLayout({ left: newLeft, right: newRight });
+    }
+  }
+
+  const { paletas, loading: paletasLoading } = usePaletas();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -1388,7 +2512,7 @@ export function FichaDocumentView({
                         textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.25)' }}>
                         Módulos activos
                       </p>
-                      {(Object.keys(SECTION_LABELS) as SectionName[]).map((name) => {
+                      {(SECTIONS_BY_TYPE[ficha.type] ?? Object.keys(SECTION_LABELS) as SectionName[]).map((name) => {
                         const isHidden = hidden(name);
                         return (
                           <button
@@ -1590,21 +2714,82 @@ export function FichaDocumentView({
 
         {/* ── Cuerpo ── */}
         <div className="ficha-body" style={{ padding: '1.5rem 2rem' }}>
-          <div className="ficha-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div>
-              {!hidden('pastoral')   && <RoleCard title="Equipo Pastoral" rows={sec('pastoral')}   {...editProps('pastoral')} />}
-              {!hidden('produccion') && <RoleCard title="Producción"       rows={sec('produccion')} {...editProps('produccion')} />}
-              {!hidden('streaming')  && <StreamingCard                     rows={sec('streaming')}  {...editProps('streaming')} />}
-            </div>
-            <div>
-              {!hidden('escena')   && <EscenaCard   rows={sec('escena')}   {...editProps('escena')} />}
-              {!hidden('setList')  && <SetListCard  rows={sec('setList')}  {...editProps('setList')} encuentro={selectedEncuentro} />}
-              {!hidden('horarios') && <HorariosCard rows={sec('horarios')} {...editProps('horarios')} />}
-            </div>
-          </div>
+          {(() => {
+            // Función que renderiza una slot de sección
+            const renderSlot = (slot: LayoutSlot) => {
+              switch (slot) {
+                case 'pastoral':
+                  return !hidden('pastoral') ? <RoleCard key="pastoral" title="Equipo Pastoral" rows={sec('pastoral')} {...editProps('pastoral')} /> : null;
+                case 'produccion':
+                  return !hidden('produccion') ? <RoleCard key="produccion" title="Producción" rows={sec('produccion')} {...editProps('produccion')} /> : null;
+                case 'streaming':
+                  return !hidden('streaming') ? <StreamingCard key="streaming" rows={sec('streaming')} {...editProps('streaming')} /> : null;
+                case 'horarios':
+                  return !hidden('horarios') ? <HorariosCard key="horarios" rows={sec('horarios')} {...editProps('horarios')} /> : null;
+                case 'worship':
+                  return (!hidden('escena') || !hidden('setList') || !hidden('outfit')) ? (
+                    <WorshipSetListCard
+                      key="worship"
+                      escenaRows={sec('escena')} setListRows={sec('setList')} outfitRows={sec('outfit')}
+                      escena={editProps('escena')} setList={editProps('setList')} outfit={editProps('outfit')}
+                      hideEscena={hidden('escena')} hideSetList={hidden('setList')} hideOutfit={hidden('outfit')}
+                      paletas={paletas} paletasLoading={paletasLoading}
+                    />
+                  ) : null;
+                case 'voluntarios':
+                  return !hidden('voluntarios') ? <VoluntariosCard key="voluntarios" rows={sec('voluntarios')} {...editProps('voluntarios')} /> : null;
+                case 'anuncios':
+                  return !hidden('anuncios') ? <AnunciosCard key="anuncios" rows={sec('anuncios')} {...editProps('anuncios')} /> : null;
+                default: return null;
+              }
+            };
 
-          {!hidden('voluntarios') && <VoluntariosCard rows={sec('voluntarios')} {...editProps('voluntarios')} />}
-          {!hidden('anuncios')    && <AnunciosCard    rows={sec('anuncios')}    {...editProps('anuncios')} />}
+            // Todos los slots de ambas columnas como IDs para los SortableContext
+            const allSlots = [...resolvedLayout.left, ...resolvedLayout.right];
+
+            return (
+              <DndContext
+                sensors={layoutSensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleLayoutDragStart}
+                onDragEnd={handleLayoutDragEnd}
+                onDragCancel={() => setActiveSlot(null)}
+              >
+                <div className="ficha-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  {/* Columna izquierda */}
+                  <SortableContext items={resolvedLayout.left} strategy={verticalListSortingStrategy}>
+                    <DroppableColumn id="left">
+                      {resolvedLayout.left.map((slot) => (
+                        <DraggableSectionCard key={slot} id={slot} editMode={editable && !!onUpdateLayout}>
+                          {renderSlot(slot)}
+                        </DraggableSectionCard>
+                      ))}
+                    </DroppableColumn>
+                  </SortableContext>
+
+                  {/* Columna derecha */}
+                  <SortableContext items={resolvedLayout.right} strategy={verticalListSortingStrategy}>
+                    <DroppableColumn id="right">
+                      {resolvedLayout.right.map((slot) => (
+                        <DraggableSectionCard key={slot} id={slot} editMode={editable && !!onUpdateLayout}>
+                          {renderSlot(slot)}
+                        </DraggableSectionCard>
+                      ))}
+                    </DroppableColumn>
+                  </SortableContext>
+                </div>
+
+                {/* Ghost overlay mientras se arrastra */}
+                <DragOverlay>
+                  {activeSlot && (
+                    <div style={{ opacity: 0.85, cursor: 'grabbing', pointerEvents: 'none' }}>
+                      {renderSlot(activeSlot)}
+                    </div>
+                  )}
+                </DragOverlay>
+              </DndContext>
+            );
+          })()}
         </div>
 
         {/* ── Footer de auditoría ── */}

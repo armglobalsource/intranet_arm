@@ -17,7 +17,8 @@ export type SectionName =
   | 'setList'
   | 'horarios'
   | 'anuncios'      // Info Encuentro
-  | 'voluntarios';
+  | 'voluntarios'
+  | 'outfit';       // Paleta de Colores / Vestimenta
 
 export const SECTION_LABELS: Record<SectionName, string> = {
   pastoral:    'Equipo Pastoral',
@@ -28,6 +29,7 @@ export const SECTION_LABELS: Record<SectionName, string> = {
   horarios:    'Horarios',
   anuncios:    'Info Encuentro',
   voluntarios: 'Voluntarios de Servicio',
+  outfit:      'Outfit / Paleta',
 };
 
 export interface Row {
@@ -77,6 +79,7 @@ export interface Ficha {
   publishedByName?:   string | null;
   publishedAt?:       any | null;
   hiddenSections?:    SectionName[];
+  sectionLayout?:     { left: string[]; right: string[] };
 }
 
 export interface FichaListItem {
@@ -111,6 +114,9 @@ export interface Cancion {
   cancionId:   string;
   titulo:      string;
   tonalidad:   string;   // G, D, C, A, B, E, F, ...
+  tipo?:       string;   // 'Rápidas' | 'Lentas'
+  bpm?:        number;
+  compas?:     string;   // '4/4' | '6/8' | '12/8'
   usageCount:  number;
   createdAt:   any;
 }

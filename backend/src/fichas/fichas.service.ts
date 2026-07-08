@@ -6,13 +6,13 @@ const COL = 'fichas';
 
 const SECTIONS = [
   'pastoral', 'escena', 'produccion', 'streaming',
-  'setList', 'horarios', 'anuncios', 'voluntarios',
+  'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit',
 ] as const;
 type SectionName = typeof SECTIONS[number];
 
 // Secciones activas según tipo de ficha
-const SECTIONS_ORACION: SectionName[] = ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios'];
-const SECTIONS_REGULAR: SectionName[] = ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios'];
+const SECTIONS_ORACION: SectionName[] = ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'outfit'];
+const SECTIONS_REGULAR: SectionName[] = ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'];
 
 // ── Filas predeterminadas — Servicios regulares ───────────────────────────────
 
@@ -40,9 +40,10 @@ function defaultRows(section: SectionName): any[] {
         { id: 'esc7',  label: 'Piano',               type: 'person', shared: true, values: {}, order: 6,  required: false },
         { id: 'esc8',  label: 'Bajo',                type: 'person', shared: true, values: {}, order: 7,  required: false },
         { id: 'esc9',  label: 'Batería',             type: 'person', shared: true, values: {}, order: 8,  required: false },
-        { id: 'esc10', label: 'Posición Izquierda',  type: 'person', shared: true, values: {}, order: 9,  required: false },
-        { id: 'esc11', label: 'Posición Centro',     type: 'person', shared: true, values: {}, order: 10, required: false },
-        { id: 'esc12', label: 'Posición Derecha',    type: 'person', shared: true, values: {}, order: 11, required: false },
+        { id: 'esc10', label: 'Posición Izquierda', type: 'person', shared: true, values: {}, order: 9,  required: false },
+        { id: 'esc11', label: 'Posición Centro',    type: 'person', shared: true, values: {}, order: 10, required: false },
+        { id: 'esc12', label: 'Posición Derecha',   type: 'person', shared: true, values: {}, order: 11, required: false },
+        { id: 'esc_comment', label: 'Comentarios del Productor', type: 'text', shared: true, values: {}, order: 12, required: false },
       ];
 
     // ── Producción ─────────────────────────────────────────────────────────
@@ -121,6 +122,12 @@ function defaultRows(section: SectionName): any[] {
         { id: 'v8',  label: 'Auditorio',         type: 'person', shared: true, values: {}, order: 7,  required: false },
         { id: 'v9',  label: 'Siembra',           type: 'person', shared: true, values: {}, order: 8,  required: false },
         { id: 'v10', label: 'Sala bebés',        type: 'person', shared: true, values: {}, order: 9,  required: false },
+      ];
+
+    // ── Outfit / Paleta de colores ─────────────────────────────────────────
+    case 'outfit':
+      return [
+        { id: 'outfit_palette', label: 'Paleta', type: 'text', shared: true, values: {}, order: 0, required: false },
       ];
   }
   return [];
@@ -203,6 +210,10 @@ function defaultRowsOracion(section: SectionName): any[] {
         { id: 'or_h11', label: '06:43-06:55 — Oración Peticiones',              type: 'person', shared: true, values: {}, order: 10, required: false },
         { id: 'or_h12', label: '07:00 — Despedida y Agradecimiento',             type: 'person', shared: true, values: {}, order: 11, required: false },
       ];
+
+    // ── Outfit / Paleta de colores (igual para oración) ────────────────────
+    case 'outfit':
+      return defaultRows('outfit');
 
     default: return [];
   }
@@ -289,6 +300,7 @@ export class FichasService {
       ...(dto.ubicacion   ? { ubicacion:   dto.ubicacion }   : {}),
       sections:         buildDefaultSections(dto.type),
       completionStatus: buildDefaultCompletion(dto.type),
+      hiddenSections:   [],
       status:           'draft',
       published:        false,
       createdBy:        userId,
@@ -325,11 +337,14 @@ export class FichasService {
             isCompleted:  false,
             completedBy:  null,
             completedAt:  null,
-            rows:         defaultRows(sectionName as SectionName),
+            rows:         (ficha.type === 'oracion' ? defaultRowsOracion : defaultRows)(sectionName as SectionName),
           };
           data[`completionStatus.${sectionName}`] = false;
         }
       }
+    }
+    if (dto.sectionLayout !== undefined) {
+      data.sectionLayout = dto.sectionLayout;
     }
     await this.fb.db.collection(COL).doc(fichaId).update(data);
     return this.findOne(fichaId);

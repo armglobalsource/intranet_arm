@@ -80,6 +80,7 @@ const SECTION_COLORS: Record<SectionName, string> = {
   horarios:    '#10B981',
   anuncios:    '#EF4444',
   voluntarios: '#84CC16',
+  outfit:      '#C084FC',
 };
 
 type StatusFilter = 'all' | FichaStatus;

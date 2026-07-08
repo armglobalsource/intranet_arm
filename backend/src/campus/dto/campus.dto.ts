@@ -8,6 +8,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class ScheduleDto {
   @ApiProperty() @IsNotEmpty() @IsString() @MaxLength(50)  dia:          string;
   @ApiProperty() @IsNotEmpty() @IsString() @MaxLength(20)  hora:         string;
+  @ApiProperty() @IsOptional() @IsString() @MaxLength(20)  bloque?:      string; // 'AM' | 'PM' | cualquier etiqueta de bloque
   @ApiProperty() @IsOptional() @IsString() @MaxLength(200) descripcion?: string;
   @ApiProperty() @IsOptional() @IsString() @MaxLength(20)  fichaType?:   string; // 'unico' | 'multi' | 'oracion'
 }

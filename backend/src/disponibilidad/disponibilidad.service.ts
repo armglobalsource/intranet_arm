@@ -80,8 +80,12 @@ export class DisponibilidadService {
 
     const slots: EncounterSlot[] = [];
     for (const [key, { schedules, dia, bloque }] of groups) {
-      const dow = DIA_TO_DOW[dia];
-      if (dow === undefined) continue;
+      const diaCapitalized = dia.charAt(0).toUpperCase() + dia.slice(1);
+      const dow = DIA_TO_DOW[diaCapitalized] ?? DIA_TO_DOW[dia];
+      if (dow === undefined) {
+        console.warn(`[DisponibilidadService] Día desconocido: "${dia}" (scheduleKey: ${key}) — schedule ignorado`);
+        continue;
+      }
 
       // Ordenar horas dentro del bloque
       schedules.sort((a, b) => (a.hora as string).localeCompare(b.hora as string));
