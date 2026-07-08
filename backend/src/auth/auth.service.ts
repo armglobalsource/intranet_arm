@@ -44,6 +44,12 @@ export class AuthService {
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
+    if (user.status === 'pending') {
+      throw new ForbiddenException('Tu cuenta aún no ha sido aprobada.');
+    }
+    if (user.status === 'rejected') {
+      throw new ForbiddenException('Tu solicitud de registro fue rechazada.');
+    }
     if (user.status !== 'active') {
       throw new UnauthorizedException('Cuenta suspendida o inactiva');
     }
@@ -105,6 +111,9 @@ export class AuthService {
       if (user.passwordHash) {
         throw new ConflictException('Este email ya tiene una cuenta. Usa "Iniciar sesión".');
       }
+      if (user.status === 'rejected') {
+        throw new ForbiddenException('Esta cuenta fue rechazada previamente. Contacta a un administrador.');
+      }
       // Actualizar nombre (si estaba vacío) y establecer contraseña
       user = await this.users.claimAccount(user.id, {
         firstName: dto.firstName || user.firstName,
@@ -120,12 +129,25 @@ export class AuthService {
       this.notifications.create({
         userId:  0,
         title:   `Nuevo usuario registrado: ${dto.firstName} ${dto.lastName}`,
-        body:    `${dto.email} se registró y necesita que le asignes un rol.`,
-        link:    '/dashboard/directorio/usuarios',
+        body:    `${dto.email} se registró y está pendiente de tu aprobación.`,
+        link:    '/dashboard/directorio/personas?status=pending',
         channel: 'in_app',
       }, 0).catch((e) => this.logger.warn('No se pudo crear notificación de registro', e));
+
+      if (user.status === 'pending') {
+        return {
+          status:  'pending',
+          message: 'Tu registro fue recibido. Un administrador debe aprobarlo antes de que puedas iniciar sesión.',
+        };
+      }
     }
 
+    if (user.status === 'pending') {
+      throw new ForbiddenException('Tu cuenta aún no ha sido aprobada.');
+    }
+    if (user.status === 'rejected') {
+      throw new ForbiddenException('Tu solicitud de registro fue rechazada.');
+    }
     if (user.status !== 'active') {
       throw new UnauthorizedException('Cuenta suspendida o inactiva');
     }
@@ -181,10 +203,14 @@ export class AuthService {
       this.notifications.create({
         userId:  0,
         title:   `Nuevo usuario registrado: ${googleUser.firstName} ${googleUser.lastName}`,
-        body:    `${googleUser.email} se registró con Google y necesita que le asignes un rol.`,
-        link:    '/dashboard/directorio/usuarios',
+        body:    `${googleUser.email} se registró con Google y está pendiente de tu aprobación.`,
+        link:    '/dashboard/directorio/personas?status=pending',
         channel: 'in_app',
       }, 0).catch((e) => this.logger.warn('No se pudo crear notificación de registro Google', e));
+
+      if (user.status === 'pending') {
+        return { status: 'pending' as const, email: user.email };
+      }
     } else {
       // Sincronizar datos de Google: foto siempre, nombre solo si estaba vacío
       const patch: Record<string, string> = {};
@@ -196,6 +222,12 @@ export class AuthService {
       }
     }
 
+    if (user.status === 'pending') {
+      throw new ForbiddenException('Tu cuenta aún no ha sido aprobada.');
+    }
+    if (user.status === 'rejected') {
+      throw new ForbiddenException('Tu solicitud de registro fue rechazada.');
+    }
     if (user.status !== 'active') {
       throw new UnauthorizedException('Cuenta suspendida o inactiva');
     }

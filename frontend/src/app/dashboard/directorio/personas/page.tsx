@@ -1,26 +1,34 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import { CanDo } from '@/components/shared/CanDo';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   useUsers,
   useUpdateUser,
   useCreateUser,
   useDeleteUser,
   useToggleUserStatus,
+  useApproveUser,
+  useRejectUser,
   useRoles,
 } from '@/hooks/useUsers';
 import { useAllJobTitles, useCreateJobTitle } from '@/hooks/useJobTitles';
 import type { JobTitle }                      from '@/hooks/useJobTitles';
-import { useActiveCampuses }                  from '@/hooks/useCampus';
+import { useActiveCampuses, useAllCampuses }  from '@/hooks/useCampus';
 import type { User, UpdateUserDto, MinisterialTitle } from '@/types/user';
 import { MINISTERIAL_LABEL, MINISTERIAL_PREFIX, displayName } from '@/types/user';
-import type { CreateUserDto }                 from '@/hooks/useUsers';
+import type { CreateUserDto, Role }           from '@/hooks/useUsers';
 import { userJobTitleNames } from '@/types/user';
 import { useOrgAllTeams, useCreateOrgMembership, useDeleteOrgMembership, useOrgUserProfile } from '@/hooks/useOrgChart';
-import { api } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api';
 import CountryPicker from '@/components/CountryPicker';
+import UserPicker, { PickableUser } from '@/components/UserPicker';
+import {
+  useMatchReconciliation, useApplyReconciliation,
+  ExcelRowInput, MatchResult, ApplyResult,
+} from '@/hooks/useReconciliation';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -742,6 +750,94 @@ function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreateP
   );
 }
 
+// ── ApprovePersonaModal ───────────────────────────────────────────────────────
+
+interface ApprovePersonaModalProps {
+  user:      User;
+  roles:     Role[];
+  onConfirm: (roleId: number) => void;
+  onCancel:  () => void;
+  isPending: boolean;
+}
+
+function ApprovePersonaModal({ user, roles, onConfirm, onCancel, isPending }: ApprovePersonaModalProps) {
+  const [roleId, setRoleId] = useState(user.role?.id ?? 0);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [onCancel]);
+
+  const { bg, text } = avatarColor(user.id);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[380px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 flex flex-col items-center gap-4 text-center">
+          <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center">
+            <svg className="w-7 h-7 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+
+          <div>
+            <p className="text-[15px] font-bold text-slate-900">
+              {user.status === 'rejected' ? 'Reconsiderar solicitud' : 'Aprobar registro'}
+            </p>
+            <p className="text-[12.5px] text-slate-500 mt-1.5 leading-relaxed">
+              {user.status === 'rejected' ? (
+                <>Esta solicitud había sido rechazada. Vas a aprobar de todos modos a{' '}
+                  <span className="font-semibold text-slate-700">{displayName(user)}</span>.
+                  Confirma el rol con el que ingresará al sistema.</>
+              ) : (
+                <>Vas a aprobar a <span className="font-semibold text-slate-700">{displayName(user)}</span>.
+                  Confirma el rol con el que ingresará al sistema.</>
+              )}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-100 w-full">
+            {user.avatarUrl
+              ? <img src={user.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+              : <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-semibold" style={{ background: bg, color: text }}>{userInitials(user)}</div>
+            }
+            <div className="min-w-0 text-left">
+              <p className="text-[12px] font-semibold text-slate-800 truncate">{displayName(user)}</p>
+              <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
+            </div>
+          </div>
+
+          <div className="w-full text-left">
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">Rol del sistema <span className="text-red-400">*</span></label>
+            <select value={roleId || ''} onChange={(e) => setRoleId(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition bg-white">
+              <option value="">Seleccionar rol...</option>
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>{ROLE_LABELS[r.name] ?? r.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex gap-2 w-full pt-1">
+            <button onClick={onCancel} disabled={isPending}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50">
+              Cancelar
+            </button>
+            <button onClick={() => onConfirm(roleId)} disabled={isPending || !roleId}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-[13px] font-semibold text-white transition-colors disabled:opacity-50">
+              {isPending
+                ? <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Aprobando...</>
+                : 'Aprobar'
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── DeleteConfirmModal ────────────────────────────────────────────────────────
 
 interface DeleteConfirmModalProps {
@@ -759,6 +855,8 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isPending }: DeleteConf
   }, [onCancel]);
 
   const { bg, text } = avatarColor(user.id);
+  const { data: orgProfile } = useOrgUserProfile(user.id);
+  const memberships = orgProfile?.orgMemberships ?? [];
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onCancel}>
@@ -792,6 +890,22 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isPending }: DeleteConf
             </div>
           </div>
 
+          {memberships.length > 0 && (
+            <div className="w-full text-left p-3 bg-amber-50 rounded-xl border border-amber-200">
+              <p className="text-[11.5px] font-semibold text-amber-800">
+                ⚠ Esta persona pertenece a {memberships.length} equipo{memberships.length !== 1 ? 's' : ''}/área{memberships.length !== 1 ? 's' : ''} del organigrama
+              </p>
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {memberships.map((m) => (
+                  <span key={m.id} className="inline-block bg-amber-100 text-amber-800 text-[10.5px] font-medium px-2 py-0.5 rounded-full">
+                    {m.team?.name ?? m.area?.name ?? '—'}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[11px] text-amber-700 mt-1.5">Al eliminarla, también se le quitará de esos equipos.</p>
+            </div>
+          )}
+
           <div className="flex gap-2 w-full pt-1">
             <button onClick={onCancel} disabled={isPending}
               className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50">
@@ -811,11 +925,30 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isPending }: DeleteConf
   );
 }
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function Toast({ msg, kind, onDismiss }: { msg: string; kind: 'success' | 'error'; onDismiss: () => void }) {
+  useEffect(() => { const t = setTimeout(onDismiss, 3500); return () => clearTimeout(t); }, [onDismiss]);
+  return (
+    <div className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium ${kind === 'error' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
+      {kind === 'error'
+        ? <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+        : <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+      <span>{msg}</span>
+      <button onClick={onDismiss} className="ml-1 opacity-70 hover:opacity-100 text-lg leading-none">×</button>
+    </div>
+  );
+}
+
 // ── StatusBadge ───────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: User['status'] }) {
   if (status === 'active')
     return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11.5px] font-medium"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Activo</span>;
+  if (status === 'pending')
+    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[11.5px] font-medium"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />Pendiente</span>;
+  if (status === 'rejected')
+    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 text-red-700 text-[11.5px] font-medium"><span className="w-1.5 h-1.5 rounded-full bg-red-500" />Rechazado</span>;
   if (status === 'suspended')
     return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 text-red-700 text-[11.5px] font-medium"><span className="w-1.5 h-1.5 rounded-full bg-red-500" />Suspendido</span>;
   return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-[11.5px] font-medium"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" />Inactivo</span>;
@@ -890,235 +1023,185 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
   );
 }
 
-// ── Excel helpers ─────────────────────────────────────────────────────────────
+// ── ReconciliarExcelModal ────────────────────────────────────────────────────
+// Importa un Excel de datos reales y hace match por nombre contra las personas
+// ya existentes (útil para reemplazar emails/datos de prueba por los reales),
+// permitiendo también crear personas nuevas cuando no hay match.
 
-const TEMPLATE_HEADERS = [
-  'Nombre *', 'Apellido *', 'Email *', 'Contraseña', 'Rol * (admin / user)',
-  'Teléfono', 'País', 'Campus', 'Cargos (separados por coma)', 'Biografía',
-];
+function ConfidenceBadge({ confidence }: { confidence: number }) {
+  if (confidence >= 0.95)
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10.5px] font-medium">Match exacto</span>;
+  if (confidence >= 0.5)
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10.5px] font-medium">Revisar sugerencia</span>;
+  return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10.5px] font-medium">Sin sugerencia clara</span>;
+}
 
-async function downloadTemplate() {
+async function parseReconciliationExcel(file: File): Promise<ExcelRowInput[]> {
   const XLSX = await import('xlsx');
-  const wb   = XLSX.utils.book_new();
-  const ws   = XLSX.utils.aoa_to_sheet([
-    TEMPLATE_HEADERS,
-    ['Juan', 'Pérez', 'juan@iglesia.com', '', 'user', '+56 9 1234 5678', 'Chile', 'Campus Santiago', 'Diseño, Producción', 'Breve bio de ejemplo'],
-  ]);
-  ws['!cols'] = TEMPLATE_HEADERS.map((h) => ({ wch: Math.max(h.length + 2, 20) }));
-  XLSX.utils.book_append_sheet(wb, ws, 'Personas');
-  XLSX.writeFile(wb, 'formato_importacion_personas.xlsx');
+  const buf  = await file.arrayBuffer();
+  const wb   = XLSX.read(buf, { type: 'array' });
+  const ws   = wb.Sheets[wb.SheetNames[0]];
+  // range: 2 salta título + fila en blanco; la fila real de encabezados es la índice 2
+  const data = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { range: 2, defval: '' });
+
+  return data
+    .filter((r) => String(r['Nombre completo'] ?? '').trim())
+    .map((r, i) => ({
+      rowKey:           `row-${i}`,
+      nombreCompleto:   String(r['Nombre completo'] ?? '').trim(),
+      area:             String(r['Área'] ?? '').trim(),
+      correo:           String(r['Correo Electronico'] ?? '').trim(),
+      fechaNacimiento:  String(r['Fecha Nacimiento'] ?? '').trim(),
+      campus:           String(r['Campus'] ?? '').trim(),
+    }));
 }
 
-// ── ImportarExcelModal ────────────────────────────────────────────────────────
+function ReconciliarExcelModal({ onClose, onApplied }: { onClose: () => void; onApplied: () => void }) {
+  const { data: allUsers = [] } = useUsers();
+  const { data: campuses = [] } = useAllCampuses();
+  const matchMutation = useMatchReconciliation();
+  const applyMutation = useApplyReconciliation();
 
-interface ParsedRow {
-  index:      number;
-  firstName:  string;
-  lastName:   string;
-  email:      string;
-  password?:  string;
-  roleName:   string;
-  phone?:     string;
-  country?:   string;
-  campusName?: string;
-  jobTitlesRaw?: string;
-  bio?:       string;
-  errors:     string[];
-}
-
-interface ImportResult {
-  index:   number;
-  email:   string;
-  status:  'success' | 'error';
-  message?: string;
-}
-
-interface ImportarExcelModalProps {
-  roles:        { id: number; name: string }[];
-  campuses:     { id: number; name: string; siglas?: string | null }[];
-  allJobTitles: JobTitle[];
-  onClose:      () => void;
-  onDone:       () => void;
-}
-
-function ImportarExcelModal({ roles, campuses, allJobTitles, onClose, onDone }: ImportarExcelModalProps) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [rows,     setRows]     = useState<ParsedRow[]>([]);
-  const [fileName, setFileName] = useState('');
-  const [phase,    setPhase]    = useState<'idle' | 'preview' | 'importing' | 'done'>('idle');
-  const [results,  setResults]  = useState<ImportResult[]>([]);
-  const [current,  setCurrent]  = useState(0);
+  const [phase,        setPhase]        = useState<'idle' | 'preview' | 'done'>('idle');
+  const [fileName,     setFileName]     = useState('');
+  const [results,      setResults]      = useState<MatchResult[]>([]);
+  const [selections,   setSelections]   = useState<Record<string, number | null>>({});
+  const [createFlags,  setCreateFlags]  = useState<Record<string, boolean>>({});
+  const [applyResults, setApplyResults] = useState<Record<string, ApplyResult>>({});
+  const [error,        setError]        = useState<string | null>(null);
+  const [activeTab,    setActiveTab]    = useState<'exact' | 'suggestions' | 'none'>('exact');
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && phase !== 'importing') onClose(); };
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', h);
     return () => document.removeEventListener('keydown', h);
-  }, [onClose, phase]);
+  }, [onClose]);
 
-  function validateRows(raw: Record<string, string>[]): ParsedRow[] {
-    return raw.map((r, i) => {
-      const firstName  = (r['Nombre *'] ?? r['Nombre'] ?? '').trim();
-      const lastName   = (r['Apellido *'] ?? r['Apellido'] ?? '').trim();
-      const email      = (r['Email *'] ?? r['Email'] ?? '').trim().toLowerCase();
-      const password   = (r['Contraseña'] ?? '').trim() || undefined;
-      const roleName   = (r['Rol * (admin / user)'] ?? r['Rol'] ?? '').trim().toLowerCase();
-      const phone      = (r['Teléfono'] ?? '').trim() || undefined;
-      const country    = (r['País'] ?? '').trim() || undefined;
-      const campusName = (r['Campus'] ?? '').trim() || undefined;
-      const jobTitlesRaw = (r['Cargos (separados por coma)'] ?? r['Cargos'] ?? '').trim() || undefined;
-      const bio        = (r['Biografía'] ?? r['Biografia'] ?? '').trim() || undefined;
-
-      const errors: string[] = [];
-      if (!firstName)              errors.push('Nombre requerido');
-      if (!lastName)               errors.push('Apellido requerido');
-      if (!email)                  errors.push('Email requerido');
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push('Email inválido');
-      if (!roleName)               errors.push('Rol requerido');
-      else if (!['admin', 'user'].includes(roleName)) errors.push(`Rol inválido "${roleName}" — debe ser admin o user`);
-      if (password && password.length < 6) errors.push('Contraseña debe tener mín. 6 caracteres');
-
-      return { index: i + 2, firstName, lastName, email, password, roleName, phone, country, campusName, jobTitlesRaw, bio, errors };
-    });
-  }
+  const pickableUsers: PickableUser[] = useMemo(
+    () => allUsers.map((u) => ({ id: u.id, name: displayName(u), email: u.email, campus: u.campus?.name ?? null })),
+    [allUsers],
+  );
+  const campusNameById = useMemo(() => new Map(campuses.map((c) => [c.id, c.name])), [campuses]);
 
   async function handleFile(file: File) {
     setFileName(file.name);
-    const XLSX  = await import('xlsx');
-    const buf   = await file.arrayBuffer();
-    const wb    = XLSX.read(buf, { type: 'array' });
-    const ws    = wb.Sheets[wb.SheetNames[0]];
-    const data  = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
-    setRows(validateRows(data));
-    setPhase('preview');
-  }
-
-  async function handleImport() {
-    setPhase('importing');
-    setCurrent(0);
-    const res: ImportResult[] = [];
-
-    for (let i = 0; i < rows.length; i++) {
-      if (rows[i].errors.length > 0) {
-        res.push({ index: rows[i].index, email: rows[i].email, status: 'error', message: rows[i].errors.join(', ') });
-        continue;
+    setError(null);
+    try {
+      const rows = await parseReconciliationExcel(file);
+      if (rows.length === 0) {
+        setError('No se encontraron filas con "Nombre completo" en el archivo.');
+        return;
       }
-      setCurrent(i + 1);
-      const row = rows[i];
-
-      const role = roles.find((r) => r.name === row.roleName);
-      if (!role) {
-        res.push({ index: row.index, email: row.email, status: 'error', message: `Rol "${row.roleName}" no encontrado` });
-        continue;
-      }
-
-      const campus = row.campusName
-        ? campuses.find((c) => c.name.toLowerCase() === row.campusName!.toLowerCase() || c.siglas?.toLowerCase() === row.campusName!.toLowerCase())
-        : undefined;
-
-      // Resolve job title IDs — create if missing
-      let jobTitleIds: number[] | undefined;
-      if (row.jobTitlesRaw) {
-        const names = row.jobTitlesRaw.split(',').map((s) => s.trim()).filter(Boolean);
-        jobTitleIds = [];
-        for (const name of names) {
-          const existing = allJobTitles.find((jt) => jt.name.toLowerCase() === name.toLowerCase());
-          if (existing) {
-            jobTitleIds.push(existing.id);
-          } else {
-            try {
-              const created = await api.post<JobTitle>('/job-titles', { name }).then((r) => r.data);
-              jobTitleIds.push(created.id);
-              allJobTitles.push(created);
-            } catch { /* ignore create errors for job titles */ }
-          }
-        }
-      }
-
-      const payload: CreateUserDto = {
-        firstName:   row.firstName,
-        lastName:    row.lastName,
-        email:       row.email,
-        roleId:      role.id,
-        ...(row.password    && { password: row.password }),
-        ...(campus          && { campusId: campus.id }),
-        ...(jobTitleIds?.length && { jobTitleIds }),
-        ...(row.phone       && { phone: row.phone }),
-        ...(row.country     && { country: row.country }),
-        ...(row.bio         && { bio: row.bio }),
-      };
-
-      try {
-        await api.post('/users', payload);
-        res.push({ index: row.index, email: row.email, status: 'success' });
-      } catch (err: any) {
-        const msg = err?.response?.data?.message ?? 'Error desconocido';
-        res.push({ index: row.index, email: row.email, status: 'error', message: Array.isArray(msg) ? msg.join(', ') : msg });
-      }
+      const matched = await matchMutation.mutateAsync(rows);
+      setResults(matched);
+      const initialSelections: Record<string, number | null> = {};
+      const initialCreateFlags: Record<string, boolean> = {};
+      matched.forEach((r) => {
+        initialSelections[r.rowKey] = r.suggestedUserId;
+        initialCreateFlags[r.rowKey] = true;
+      });
+      setSelections(initialSelections);
+      setCreateFlags(initialCreateFlags);
+      setActiveTab('exact');
+      setPhase('preview');
+    } catch (err: any) {
+      setError(apiErrorMessage(err, 'No se pudo procesar el archivo.'));
     }
-
-    setResults(res);
-    setPhase('done');
-    onDone();
   }
 
-  const validRows   = rows.filter((r) => r.errors.length === 0);
-  const invalidRows = rows.filter((r) => r.errors.length > 0);
-  const successCount = results.filter((r) => r.status === 'success').length;
-  const errorCount   = results.filter((r) => r.status === 'error').length;
+  // "Aplicar cambios" siempre opera sobre TODAS las filas (results), sin importar la pestaña activa.
+  const rowsToUpdate = results.filter((r) => selections[r.rowKey] != null);
+  const rowsToCreate = results.filter((r) => selections[r.rowKey] == null && createFlags[r.rowKey] && !!r.excelRow.correo);
+  const totalActionable = rowsToUpdate.length + rowsToCreate.length;
+
+  // Pestañas por confianza — solo afectan qué se muestra en la tabla, no qué se aplica.
+  const exactRows       = results.filter((r) => r.confidence >= 0.95);
+  const suggestionRows  = results.filter((r) => r.confidence >= 0.5 && r.confidence < 0.95);
+  const noMatchRows     = results.filter((r) => r.confidence < 0.5);
+  const visibleResults  = activeTab === 'exact' ? exactRows : activeTab === 'suggestions' ? suggestionRows : noMatchRows;
+
+  async function handleApply() {
+    const matches = [
+      ...rowsToUpdate.map((r) => ({
+        rowKey: r.rowKey, action: 'update' as const, userId: selections[r.rowKey]!,
+        nombreCompleto: r.excelRow.nombreCompleto,
+        email: r.excelRow.correo || undefined, birthDate: r.parsedBirthDate ?? undefined,
+        campusId: r.resolvedCampusId ?? undefined,
+      })),
+      ...rowsToCreate.map((r) => ({
+        rowKey: r.rowKey, action: 'create' as const, nombreCompleto: r.excelRow.nombreCompleto,
+        email: r.excelRow.correo, birthDate: r.parsedBirthDate ?? undefined,
+        campusId: r.resolvedCampusId ?? undefined,
+      })),
+    ];
+    if (matches.length === 0) return;
+
+    try {
+      const res = await applyMutation.mutateAsync(matches);
+      const byRowKey: Record<string, ApplyResult> = {};
+      res.forEach((r) => { byRowKey[r.rowKey] = r; });
+      setApplyResults(byRowKey);
+      setPhase('done');
+      onApplied();
+    } catch (err: any) {
+      setError(apiErrorMessage(err, 'No se pudo aplicar los cambios.'));
+    }
+  }
+
+  const successCount = Object.values(applyResults).filter((r) => r.status === 'success').length;
+  const skippedCount = Object.values(applyResults).filter((r) => r.status === 'skipped').length;
+  const errorCount    = Object.values(applyResults).filter((r) => r.status === 'error').length;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={phase !== 'importing' ? onClose : undefined}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[600px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1100px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50">
           <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4.5 h-4.5 text-emerald-600 w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="w-5 h-5 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
               <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
             </svg>
           </div>
           <div className="flex-1">
             <p className="font-semibold text-slate-900 text-[14px]">Importar personas desde Excel</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Carga masiva de usuarios desde archivo .xlsx o .xls</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Sube un Excel real y haz match contra las personas ya registradas, o crea las que falten</p>
           </div>
-          {phase !== 'importing' && (
-            <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100 text-sm">✕</button>
-          )}
+          <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100 text-sm">✕</button>
         </div>
 
-        <div className="p-5 flex flex-col gap-4 max-h-[75vh] overflow-y-auto">
+        <div className="p-5 flex flex-col gap-4 max-h-[80vh] overflow-y-auto">
 
           {/* IDLE — drop zone */}
           {phase === 'idle' && (
             <>
-              <div
-                onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center gap-3 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/40 transition-all"
-              >
-                <svg className="w-10 h-10 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                <div className="text-center">
-                  <p className="text-[13px] font-semibold text-slate-700">Haz clic para seleccionar un archivo</p>
-                  <p className="text-[11.5px] text-slate-400 mt-0.5">Formatos soportados: .xlsx, .xls</p>
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center gap-3">
+                <label className="flex flex-col items-center gap-3 cursor-pointer">
+                  <svg className="w-10 h-10 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <div className="text-center">
+                    <p className="text-[13px] font-semibold text-slate-700">Haz clic para seleccionar un archivo</p>
+                    <p className="text-[11.5px] text-slate-400 mt-0.5">Formatos soportados: .xlsx, .xls</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Columnas esperadas: Nombre completo, Correo Electronico, Fecha Nacimiento, Campus</p>
+                  </div>
+                  <input type="file" accept=".xlsx,.xls" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+                </label>
+              </div>
+              {matchMutation.isPending && (
+                <p className="text-center text-[12.5px] text-slate-400">Calculando coincidencias…</p>
+              )}
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 rounded-xl border border-red-100">
+                  <p className="text-[11.5px] text-red-700">{error}</p>
                 </div>
-              </div>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-
-              <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
-                <svg className="w-4 h-4 text-blue-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                <p className="text-[11.5px] text-blue-700">
-                  Descarga el formato de Excel para ver las columnas requeridas y un ejemplo de datos.
-                </p>
-              </div>
+              )}
             </>
           )}
 
-          {/* PREVIEW */}
+          {/* PREVIEW — tabla de reconciliación */}
           {phase === 'preview' && (
             <>
               <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
@@ -1126,112 +1209,153 @@ function ImportarExcelModal({ roles, campuses, allJobTitles, onClose, onDone }: 
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
                 </svg>
                 <span className="text-[12px] text-slate-600 font-medium truncate">{fileName}</span>
-                <span className="ml-auto text-[11.5px] text-slate-400 flex-shrink-0">{rows.length} fila{rows.length !== 1 ? 's' : ''} leída{rows.length !== 1 ? 's' : ''}</span>
+                <span className="ml-auto text-[11.5px] text-slate-400 flex-shrink-0">
+                  {totalActionable} de {results.length} con acción asignada (en total)
+                  <span className="text-slate-400"> · {rowsToUpdate.length} actualizar, {rowsToCreate.length} crear</span>
+                </span>
               </div>
 
-              {rows.length === 0 ? (
-                <p className="text-[13px] text-slate-400 text-center py-6">El archivo está vacío o no tiene el formato esperado.</p>
-              ) : (
-                <>
-                  <div className="flex gap-3">
-                    {validRows.length > 0 && (
-                      <div className="flex-1 flex items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                        <span className="text-lg font-bold text-emerald-600">{validRows.length}</span>
-                        <span className="text-[12px] text-emerald-700">lista{validRows.length !== 1 ? 's' : ''} para importar</span>
-                      </div>
-                    )}
-                    {invalidRows.length > 0 && (
-                      <div className="flex-1 flex items-center gap-2 p-3 bg-red-50 rounded-xl border border-red-200">
-                        <span className="text-lg font-bold text-red-500">{invalidRows.length}</span>
-                        <span className="text-[12px] text-red-700">con error{invalidRows.length !== 1 ? 'es' : ''}</span>
-                      </div>
-                    )}
-                  </div>
+              {/* Tabs por confianza */}
+              <div className="flex items-center gap-1.5">
+                {([
+                  ['exact',       `Match exacto (${exactRows.length})`],
+                  ['suggestions', `Revisar sugerencia (${suggestionRows.length})`],
+                  ['none',        `Sin coincidencia (${noMatchRows.length})`],
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveTab(key)}
+                    className={`px-3 py-1.5 rounded-lg text-[11.5px] font-medium transition-colors ${
+                      activeTab === key
+                        ? 'bg-violet-600 text-white'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
 
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="overflow-x-auto max-h-64 overflow-y-auto">
-                      <table className="w-full text-[11.5px]">
-                        <thead className="bg-slate-50 sticky top-0">
-                          <tr>
-                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Fila</th>
-                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Nombre</th>
-                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Email</th>
-                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Rol</th>
-                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Estado</th>
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto max-h-[50vh] overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-50 sticky top-0">
+                      <tr>
+                        {['Excel', 'Área (Excel)', 'Campus', 'Fecha nacimiento', 'Confianza', 'Persona en el sistema'].map((h) => (
+                          <th key={h} className="text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleResults.map((r) => {
+                        const campusName = r.resolvedCampusId != null ? campusNameById.get(r.resolvedCampusId) : null;
+                        return (
+                          <tr key={r.rowKey} className="border-t border-slate-100 align-top">
+                            <td className="px-3 py-2">
+                              <p className="text-[12px] font-semibold text-slate-900">{r.excelRow.nombreCompleto}</p>
+                              <p className="text-[10.5px] text-slate-400">{r.excelRow.correo || '—'}</p>
+                            </td>
+                            <td className="px-3 py-2 text-[11.5px] text-slate-600">
+                              {r.excelRow.area || <span className="text-slate-300 italic">sin dato</span>}
+                            </td>
+                            <td className="px-3 py-2 text-[11.5px] text-slate-600">
+                              {campusName ?? <span className="text-slate-300 italic">{r.excelRow.campus || 'sin dato'}</span>}
+                            </td>
+                            <td className="px-3 py-2 text-[11.5px] text-slate-600">
+                              {r.parsedBirthDate ?? <span className="text-amber-500 italic">fecha inválida</span>}
+                            </td>
+                            <td className="px-3 py-2"><ConfidenceBadge confidence={r.confidence} /></td>
+                            <td className="px-3 py-2 min-w-[260px]">
+                              <UserPicker
+                                users={pickableUsers}
+                                suggestions={r.topCandidates.map((c) => ({ id: c.userId, name: c.name, email: c.email, score: c.score, campus: c.campus, area: c.area }))}
+                                value={selections[r.rowKey] ?? null}
+                                onChange={(userId) => setSelections((s) => ({ ...s, [r.rowKey]: userId }))}
+                              />
+                              {selections[r.rowKey] != null && (() => {
+                                const chosen = r.topCandidates.find((c) => c.userId === selections[r.rowKey]);
+                                return (
+                                  <div className="text-[10.5px] mt-1.5 space-y-0.5">
+                                    {chosen && (chosen.campus || chosen.area) && (
+                                      <p className="text-slate-400">
+                                        cuenta actual — {chosen.campus && `campus: ${chosen.campus}`}
+                                        {chosen.campus && chosen.area && ' · '}
+                                        {chosen.area && `área: ${chosen.area}`}
+                                      </p>
+                                    )}
+                                    <p className="text-emerald-600">→ nombre: <span className="font-medium">{r.excelRow.nombreCompleto}</span></p>
+                                    <p className="text-emerald-600">→ correo: <span className="font-medium">{r.excelRow.correo || 'sin correo en el Excel'}</span></p>
+                                  </div>
+                                );
+                              })()}
+                              {selections[r.rowKey] == null && (
+                                r.excelRow.correo ? (
+                                  <label className="flex items-center gap-1.5 mt-1.5 text-[11px] text-slate-500 cursor-pointer select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={createFlags[r.rowKey] ?? true}
+                                      onChange={(e) => setCreateFlags((f) => ({ ...f, [r.rowKey]: e.target.checked }))}
+                                      className="w-3.5 h-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-400"
+                                    />
+                                    Crear persona nueva
+                                  </label>
+                                ) : (
+                                  <p className="text-[10.5px] text-amber-500 italic mt-1.5">Sin email — no se puede crear</p>
+                                )
+                              )}
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {rows.map((row) => (
-                            <tr key={row.index} className={`border-t border-slate-100 ${row.errors.length > 0 ? 'bg-red-50/60' : ''}`}>
-                              <td className="px-3 py-2 text-slate-400">{row.index}</td>
-                              <td className="px-3 py-2 text-slate-700 font-medium">{row.firstName} {row.lastName}</td>
-                              <td className="px-3 py-2 text-slate-500">{row.email}</td>
-                              <td className="px-3 py-2 text-slate-500">{row.roleName}</td>
-                              <td className="px-3 py-2">
-                                {row.errors.length === 0
-                                  ? <span className="text-emerald-600 font-medium">✓ OK</span>
-                                  : <span className="text-red-600 text-[10.5px]" title={row.errors.join('\n')}>✕ {row.errors[0]}{row.errors.length > 1 ? ` (+${row.errors.length - 1})` : ''}</span>
-                                }
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                        );
+                      })}
+                      {visibleResults.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-3 py-8 text-center text-[12px] text-slate-400">
+                            No hay filas en esta pestaña.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-                  {invalidRows.length > 0 && validRows.length === 0 && (
-                    <p className="text-[12px] text-red-600 text-center">Corrige los errores en el archivo y vuelve a intentarlo.</p>
-                  )}
-                </>
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 rounded-xl border border-red-100">
+                  <p className="text-[11.5px] text-red-700">{error}</p>
+                </div>
               )}
             </>
           )}
 
-          {/* IMPORTING */}
-          {phase === 'importing' && (
-            <div className="flex flex-col items-center gap-4 py-6">
-              <div className="w-12 h-12 border-4 border-slate-200 border-t-emerald-500 rounded-full animate-spin" />
-              <div className="text-center">
-                <p className="text-[14px] font-semibold text-slate-800">Importando personas...</p>
-                <p className="text-[12px] text-slate-400 mt-1">{current} de {rows.length}</p>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                <div className="bg-emerald-500 h-2 rounded-full transition-all duration-300" style={{ width: `${(current / rows.length) * 100}%` }} />
-              </div>
-            </div>
-          )}
-
           {/* DONE */}
           {phase === 'done' && (
-            <>
-              <div className="flex flex-col items-center gap-3 py-4">
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${errorCount === 0 ? 'bg-emerald-100' : 'bg-amber-100'}`}>
-                  <span className="text-2xl">{errorCount === 0 ? '✓' : '⚠'}</span>
-                </div>
-                <div className="text-center">
-                  <p className="text-[15px] font-bold text-slate-900">Importación completada</p>
-                  <p className="text-[12.5px] text-slate-500 mt-1">
-                    {successCount} importada{successCount !== 1 ? 's' : ''} correctamente
-                    {errorCount > 0 ? ` · ${errorCount} con error` : ''}
-                  </p>
-                </div>
+            <div className="flex flex-col items-center gap-3 py-4">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center ${errorCount === 0 ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+                <span className="text-2xl">{errorCount === 0 ? '✓' : '⚠'}</span>
               </div>
-
+              <div className="text-center">
+                <p className="text-[15px] font-bold text-slate-900">Reconciliación aplicada</p>
+                <p className="text-[12.5px] text-slate-500 mt-1">
+                  {successCount} actualizada{successCount !== 1 ? 's' : ''}/creada{successCount !== 1 ? 's' : ''}
+                  {skippedCount > 0 ? ` · ${skippedCount} sin cambios` : ''}
+                  {errorCount > 0 ? ` · ${errorCount} con error` : ''}
+                </p>
+              </div>
               {errorCount > 0 && (
-                <div className="border border-red-200 rounded-xl overflow-hidden">
+                <div className="w-full border border-red-200 rounded-xl overflow-hidden">
                   <div className="max-h-48 overflow-y-auto">
                     <table className="w-full text-[11.5px]">
                       <thead className="bg-red-50 sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-red-400">Email</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-red-400">Fila</th>
                           <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-red-400">Error</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {results.filter((r) => r.status === 'error').map((r) => (
-                          <tr key={r.index} className="border-t border-red-100">
-                            <td className="px-3 py-2 text-slate-600">{r.email}</td>
+                        {Object.values(applyResults).filter((r) => r.status === 'error').map((r) => (
+                          <tr key={r.rowKey} className="border-t border-red-100">
+                            <td className="px-3 py-2 text-slate-600">{r.rowKey}</td>
                             <td className="px-3 py-2 text-red-600">{r.message}</td>
                           </tr>
                         ))}
@@ -1240,7 +1364,7 @@ function ImportarExcelModal({ roles, campuses, allJobTitles, onClose, onDone }: 
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* Footer buttons */}
@@ -1250,23 +1374,25 @@ function ImportarExcelModal({ roles, campuses, allJobTitles, onClose, onDone }: 
                 Cancelar
               </button>
             )}
-
             {phase === 'preview' && (
               <>
-                <button onClick={() => { setRows([]); setFileName(''); setPhase('idle'); if (fileRef.current) fileRef.current.value = ''; }}
+                <button onClick={() => { setResults([]); setFileName(''); setPhase('idle'); setError(null); }}
                   className="px-4 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-500 hover:bg-slate-50 transition-colors">
                   ← Atrás
                 </button>
                 <button
-                  onClick={handleImport}
-                  disabled={validRows.length === 0}
+                  onClick={handleApply}
+                  disabled={totalActionable === 0 || applyMutation.isPending}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-[13px] font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Importar {validRows.length} persona{validRows.length !== 1 ? 's' : ''}
+                  {applyMutation.isPending ? (
+                    <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Aplicando...</>
+                  ) : (
+                    `Aplicar cambios (${totalActionable})`
+                  )}
                 </button>
               </>
             )}
-
             {phase === 'done' && (
               <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-slate-900 text-[13px] font-semibold text-white hover:bg-slate-700 transition-colors">
                 Cerrar
@@ -1282,6 +1408,15 @@ function ImportarExcelModal({ roles, campuses, allJobTitles, onClose, onDone }: 
 // ── PersonasPage ──────────────────────────────────────────────────────────────
 
 export default function PersonasPage() {
+  return (
+    <Suspense fallback={null}>
+      <PersonasPageInner />
+    </Suspense>
+  );
+}
+
+function PersonasPageInner() {
+  const searchParams = useSearchParams();
   const [search,    setSearch]    = useState('');
   const [debounced, setDebounced] = useState('');
   const debRef = useRef<ReturnType<typeof setTimeout>>();
@@ -1295,7 +1430,7 @@ export default function PersonasPage() {
   // Filters
   const [cargoFilter,  setCargoFilter]  = useState('');
   const [campusFilter, setCampusFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') ?? '');
   const [page, setPage] = useState(1);
 
   const { data: users = [], isLoading } = useUsers(debounced || undefined);
@@ -1310,12 +1445,17 @@ export default function PersonasPage() {
 
   const toggleStatus = useToggleUserStatus();
   const deleteUser   = useDeleteUser();
+  const approveUser  = useApproveUser();
+  const rejectUser   = useRejectUser();
 
   const [editing,        setEditing]        = useState<User | null>(null);
   const [creating,       setCreating]       = useState(false);
   const [importing,      setImporting]      = useState(false);
   const [confirmDelete,  setConfirmDelete]  = useState<User | null>(null);
+  const [approving,      setApproving]      = useState<User | null>(null);
   const [togglingId,     setTogglingId]     = useState<number | null>(null);
+  const [decidingId,     setDecidingId]     = useState<number | null>(null);
+  const [toast,          setToast]          = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
 
   // Reset page when filters change
   useEffect(() => setPage(1), [debounced, cargoFilter, campusFilter, statusFilter]);
@@ -1338,6 +1478,24 @@ export default function PersonasPage() {
     const next = user.status === 'active' ? 'inactive' : 'active';
     setTogglingId(user.id);
     toggleStatus.mutate({ id: user.id, status: next }, { onSettled: () => setTogglingId(null) });
+  }
+
+  function handleApproveConfirm(user: User, roleId: number) {
+    setDecidingId(user.id);
+    approveUser.mutate({ id: user.id, roleId }, {
+      onSuccess: () => { setToast({ msg: `${displayName(user)} fue aprobado y ya puede iniciar sesión.`, kind: 'success' }); setApproving(null); },
+      onError:   (err) => setToast({ msg: apiErrorMessage(err, 'No se pudo aprobar el registro.'), kind: 'error' }),
+      onSettled: () => setDecidingId(null),
+    });
+  }
+
+  function handleReject(user: User) {
+    setDecidingId(user.id);
+    rejectUser.mutate(user.id, {
+      onSuccess: () => setToast({ msg: `Se rechazó la solicitud de ${displayName(user)}.`, kind: 'success' }),
+      onError:   (err) => setToast({ msg: apiErrorMessage(err, 'No se pudo rechazar el registro.'), kind: 'error' }),
+      onSettled: () => setDecidingId(null),
+    });
   }
 
   function handleDeleteConfirm() {
@@ -1374,16 +1532,6 @@ export default function PersonasPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={downloadTemplate}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12.5px] font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all"
-            title="Descargar formato Excel de importación"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Formato Excel
-          </button>
           <button
             onClick={() => setImporting(true)}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12.5px] font-semibold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-all"
@@ -1436,9 +1584,11 @@ export default function PersonasPage() {
 
         {/* Estado filter */}
         <FilterSelect value={statusFilter} onChange={setStatusFilter} placeholder="Estado">
+          <option value="pending">Pendiente</option>
           <option value="active">Activo</option>
           <option value="inactive">Inactivo</option>
           <option value="suspended">Suspendido</option>
+          <option value="rejected">Rechazado</option>
         </FilterSelect>
 
         {/* Clear filters */}
@@ -1515,18 +1665,53 @@ export default function PersonasPage() {
                               </svg>
                             </button>
                           </CanDo>
-                          <CanDo permission="users:edit">
-                            <button onClick={() => handleToggle(u)} disabled={togglingId === u.id}
-                              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50 ${u.status === 'active' ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
-                              title={u.status === 'active' ? 'Desactivar' : 'Activar'}>
-                              {togglingId === u.id
-                                ? <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
-                                : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" />
-                                  </svg>
-                              }
-                            </button>
-                          </CanDo>
+                          {u.status === 'pending' ? (
+                            <CanDo permission="users:edit">
+                              <button onClick={() => setApproving(u)} disabled={decidingId === u.id}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                                title="Aprobar registro">
+                                {decidingId === u.id
+                                  ? <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                                  : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                }
+                              </button>
+                              <button onClick={() => handleReject(u)} disabled={decidingId === u.id}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                title="Rechazar registro">
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                              </button>
+                            </CanDo>
+                          ) : u.status === 'rejected' ? (
+                            <CanDo permission="users:edit">
+                              <button onClick={() => setApproving(u)} disabled={decidingId === u.id}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                                title="Reconsiderar y aprobar">
+                                {decidingId === u.id
+                                  ? <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                                  : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                                    </svg>
+                                }
+                              </button>
+                            </CanDo>
+                          ) : (
+                            <CanDo permission="users:edit">
+                              <button onClick={() => handleToggle(u)} disabled={togglingId === u.id}
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50 ${u.status === 'active' ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
+                                title={u.status === 'active' ? 'Desactivar' : 'Activar'}>
+                                {togglingId === u.id
+                                  ? <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                                  : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" />
+                                    </svg>
+                                }
+                              </button>
+                            </CanDo>
+                          )}
                           <CanDo permission="users:delete">
                             <button
                               onClick={() => setConfirmDelete(u)}
@@ -1594,12 +1779,9 @@ export default function PersonasPage() {
         />
       )}
       {importing && (
-        <ImportarExcelModal
-          roles={roles}
-          campuses={campuses}
-          allJobTitles={allJobTitles}
+        <ReconciliarExcelModal
           onClose={() => setImporting(false)}
-          onDone={() => {}}
+          onApplied={() => {}}
         />
       )}
       {confirmDelete && (
@@ -1610,6 +1792,16 @@ export default function PersonasPage() {
           isPending={deleteUser.isPending}
         />
       )}
+      {approving && (
+        <ApprovePersonaModal
+          user={approving}
+          roles={roles}
+          onConfirm={(roleId) => handleApproveConfirm(approving, roleId)}
+          onCancel={() => setApproving(null)}
+          isPending={approveUser.isPending}
+        />
+      )}
+      {toast && <Toast msg={toast.msg} kind={toast.kind} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

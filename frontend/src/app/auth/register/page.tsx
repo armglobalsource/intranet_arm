@@ -47,6 +47,10 @@ export default function RegisterPage() {
     try {
       const { confirmPassword: _, ...payload } = data;
       const res = await api.post('/auth/register', payload);
+      if (res.data.status === 'pending') {
+        router.replace('/auth/pending');
+        return;
+      }
       setSession(res.data.user, res.data.accessToken, res.data.refreshToken, res.data.needsProfileCompletion);
       router.replace(res.data.needsProfileCompletion ? '/auth/complete-profile' : '/dashboard/orgchart');
     } catch (err: any) {

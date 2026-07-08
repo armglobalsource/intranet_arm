@@ -3,10 +3,15 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthService, JwtPayload } from '../auth.service';
+import { UsersService } from '../../users/users.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(config: ConfigService, private authService: AuthService) {
+  constructor(
+    config: ConfigService,
+    private authService: AuthService,
+    private usersService: UsersService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -18,6 +23,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Verificar si el token fue revocado
     if (await this.authService.isTokenRevoked(payload.jti)) {
       throw new UnauthorizedException('Token revocado');
+    }
+    // Verificar status actual (no solo en login) para cortar acceso de inmediato
+    // si el usuario queda pending/suspended/inactive/rejected después de emitir el token
+    const user = await this.usersService.findOne(payload.sub);
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('Cuenta no activa');
     }
     return payload;  // se inyecta en req.user
   }

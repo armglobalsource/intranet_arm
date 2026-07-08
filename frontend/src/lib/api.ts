@@ -3,6 +3,9 @@ import { useAuthStore } from './store/auth.store';
 
 /** Extrae un mensaje de error legible de una respuesta de API */
 export function apiErrorMessage(err: unknown, fallback: string): string {
+  if ((err as any)?.response?.status === 429) {
+    return 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.';
+  }
   const msg = (err as any)?.response?.data?.message;
   if (!msg) return fallback;
   if (Array.isArray(msg)) return msg[0] ?? fallback;
@@ -36,12 +39,17 @@ function redirectToLogin() {
   }
 }
 
+// Endpoints públicos de auth: un 401 aquí es un error de credenciales del propio
+// endpoint, no una sesión expirada — no deben disparar el refresh/redirect.
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/register'];
+
 // Auto-refresh on 401
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config;
-    if (err.response?.status === 401 && !original._retry) {
+    const isAuthEndpoint = AUTH_ENDPOINTS.some((p) => original?.url?.includes(p));
+    if (err.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true;
       const refreshToken = useAuthStore.getState().refreshToken;
       if (!refreshToken) {

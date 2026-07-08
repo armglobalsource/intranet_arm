@@ -73,6 +73,10 @@ export class AuthController {
         req.ip,
         req.headers['user-agent'],
       );
+      if ('status' in result && result.status === 'pending') {
+        res.redirect(`${frontendUrl}/auth/pending?email=${encodeURIComponent(result.email)}`);
+        return;
+      }
       const params = new URLSearchParams({
         access:           result.accessToken,
         refresh:          result.refreshToken,

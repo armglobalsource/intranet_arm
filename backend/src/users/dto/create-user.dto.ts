@@ -4,7 +4,7 @@ import {
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export type UserStatus = 'active' | 'inactive' | 'suspended';
+export type UserStatus = 'pending' | 'active' | 'inactive' | 'suspended' | 'rejected';
 
 export type MinisterialTitle = 'pastor_principal' | 'pastor' | 'ministro';
 
@@ -36,6 +36,12 @@ export class UpdateUserDto {
   @ApiProperty() @IsOptional() @IsString()                   bio?:                string;
   @ApiProperty() @IsOptional() @IsString()                   birthDate?:          string | null;
   @ApiProperty() @IsOptional() @IsEnum(['male', 'female', 'other', 'prefer_not_to_say']) gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null;
-  @ApiProperty() @IsOptional() @IsEnum(['active', 'inactive', 'suspended']) status?: UserStatus;
+  @ApiProperty() @IsOptional() @IsEnum(['active', 'inactive', 'suspended', 'rejected']) status?: UserStatus;
   @ApiProperty() @IsOptional() @IsEnum(['pastor_principal', 'pastor', 'ministro']) ministerialTitle?: MinisterialTitle | null;
+}
+
+export class ApproveUserDto {
+  @ApiProperty({ required: false, description: 'Rol a asignar al aprobar (opcional, mantiene el rol actual si se omite)' })
+  @IsOptional() @IsInt()
+  roleId?: number;
 }

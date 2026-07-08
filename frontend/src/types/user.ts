@@ -62,7 +62,7 @@ export interface User {
   birthDate?: string | null;
   gender?: UserGender | null;
   ministerialTitle?: MinisterialTitle | null;
-  status: 'active' | 'inactive' | 'suspended';
+  status: 'pending' | 'active' | 'inactive' | 'suspended' | 'rejected';
   departmentId?: number | null;
   campusId?: number | null;
   department?: UserDepartment | null;
@@ -87,7 +87,7 @@ export interface UpdateUserDto {
   birthDate?:   string | null;
   gender?:            UserGender | null;
   ministerialTitle?:  MinisterialTitle | null;
-  status?:            'active' | 'inactive' | 'suspended';
+  status?:            'active' | 'inactive' | 'suspended' | 'rejected';
 }
 
 /** Extrae los nombres de cargos de un usuario */

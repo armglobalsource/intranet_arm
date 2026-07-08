@@ -7,8 +7,10 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
+import { CreateUserDto, UpdateUserDto, ApproveUserDto } from './dto/create-user.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Users')
@@ -54,6 +56,22 @@ export class UsersController {
   @ApiOperation({ summary: 'Eliminar un usuario' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
+  }
+
+  @Patch(':id/approve')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('users:edit')
+  @ApiOperation({ summary: 'Aprobar un registro pendiente (opcionalmente asignando un rol)' })
+  approve(@Param('id', ParseIntPipe) id: number, @Body() dto: ApproveUserDto) {
+    return this.service.approve(id, dto?.roleId);
+  }
+
+  @Patch(':id/reject')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('users:edit')
+  @ApiOperation({ summary: 'Rechazar un registro pendiente' })
+  reject(@Param('id', ParseIntPipe) id: number) {
+    return this.service.reject(id);
   }
 
   @Post(':id/avatar')

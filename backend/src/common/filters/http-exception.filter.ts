@@ -16,9 +16,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ? exception.getStatus()
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message = exception instanceof HttpException
-      ? exception.getResponse()
-      : (exception instanceof Error ? exception.message : 'Error interno del servidor');
+    let message: unknown;
+    if (exception instanceof HttpException) {
+      const body = exception.getResponse();
+      // Nest anida { statusCode, message, error } dentro de getResponse() cuando la
+      // excepción se construye con un string o un array (ValidationPipe) — se
+      // desenvuelve aquí para que el frontend reciba directamente el string/array.
+      message = (typeof body === 'object' && body !== null && 'message' in body)
+        ? (body as { message: unknown }).message
+        : body;
+    } else {
+      message = exception instanceof Error ? exception.message : 'Error interno del servidor';
+    }
 
     if (status >= 500) {
       this.logger.error(`${req.method} ${req.url}`, exception instanceof Error ? exception.stack : String(exception));

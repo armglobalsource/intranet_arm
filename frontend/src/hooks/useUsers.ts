@@ -40,7 +40,7 @@ export const userKeys = {
 };
 
 /** Devuelve solo el array de usuarios (compatibilidad con código existente). */
-export function useUsers(search?: string) {
+export function useUsers(search?: string, options?: { enabled?: boolean }) {
   return useQuery<User[]>({
     queryKey: userKeys.list(search),
     queryFn: () =>
@@ -48,6 +48,7 @@ export function useUsers(search?: string) {
         .get<PaginatedUsers>('/users', { params: { search: search || undefined, limit: 200 } })
         .then((r) => r.data.data),
     staleTime: 2 * 60 * 1000,
+    enabled: options?.enabled,
   });
 }
 
@@ -105,6 +106,23 @@ export function useToggleUserStatus() {
       qc.invalidateQueries({ queryKey: userKeys.all });
       qc.invalidateQueries({ queryKey: ['orgchart'] });
     },
+  });
+}
+
+export function useApproveUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, roleId }: { id: number; roleId?: number }) =>
+      api.patch(`/users/${id}/approve`, roleId ? { roleId } : {}).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
+  });
+}
+
+export function useRejectUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.patch(`/users/${id}/reject`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
   });
 }
 

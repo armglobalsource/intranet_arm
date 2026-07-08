@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { StorageService } from '../common/storage/storage.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -21,7 +22,11 @@ function formatUser(raw: any) {
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private fb: FirebaseService, private storage: StorageService) {}
+  constructor(
+    private fb: FirebaseService,
+    private storage: StorageService,
+    private notifications: NotificationsService,
+  ) {}
 
   // ── Usuarios ──────────────────────────────────────────────────────────────
 
@@ -169,7 +174,14 @@ export class UsersService {
   async remove(id: number) {
     const snap = await this.fb.db.collection(COL).doc(String(id)).get();
     if (!snap.exists) throw new NotFoundException(`User con id ${id} no encontrado`);
-    await this.fb.db.collection(COL).doc(String(id)).delete();
+
+    // Limpiar sus membresías del organigrama para no dejar registros huérfanos
+    const membSnap = await this.fb.db.collection('org_memberships').where('userId', '==', id).get();
+    const batch = this.fb.db.batch();
+    membSnap.docs.forEach((d) => batch.delete(d.ref));
+    batch.delete(this.fb.db.collection(COL).doc(String(id)));
+    await batch.commit();
+
     return { id };
   }
 
@@ -236,7 +248,7 @@ export class UsersService {
       gender:            null,
       ministerialTitle:  null,
       avatarUrl:         data.avatarUrl ?? null,
-      status:            'active',
+      status:            'pending',
       departmentId: null,
       lastLoginAt:  null,
       createdAt:    this.fb.now(),
@@ -247,6 +259,54 @@ export class UsersService {
     // Retorna raw (con passwordHash) igual que findByEmail, para que AuthService lo procese
     const snap = await this.fb.db.collection(COL).doc(String(id)).get();
     return this.fb.toObj(snap);
+  }
+
+  async approve(id: number, roleId?: number) {
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    if (!snap.exists) throw new NotFoundException(`User con id ${id} no encontrado`);
+    const currentStatus = snap.data()!.status;
+    // 'rejected' también es aprobable: un admin puede reconsiderar una decisión anterior.
+    if (currentStatus !== 'pending' && currentStatus !== 'rejected') {
+      throw new ConflictException('El usuario no está pendiente de aprobación ni fue rechazado previamente');
+    }
+
+    const data: Record<string, any> = { status: 'active', updatedAt: this.fb.now() };
+    if (roleId !== undefined) {
+      const roleSnap = await this.fb.db.collection('roles').doc(String(roleId)).get();
+      if (!roleSnap.exists) throw new NotFoundException(`Rol con id ${roleId} no encontrado`);
+      data.roleId = roleId;
+      data.role   = { id: roleId, name: roleSnap.data()!.name };
+    }
+    await this.fb.db.collection(COL).doc(String(id)).update(data);
+
+    this.notifications.create({
+      userId: id,
+      title: 'Tu cuenta fue aprobada',
+      body: 'Un administrador aprobó tu registro. Ya puedes iniciar sesión.',
+      link: '/auth/login',
+      channel: 'in_app',
+    }, 0).catch((e) => this.logger.warn(`No se pudo notificar aprobación a user ${id}: ${e.message}`));
+
+    return this.findOne(id);
+  }
+
+  async reject(id: number) {
+    const snap = await this.fb.db.collection(COL).doc(String(id)).get();
+    if (!snap.exists) throw new NotFoundException(`User con id ${id} no encontrado`);
+    if (snap.data()!.status !== 'pending') {
+      throw new ConflictException('El usuario no está pendiente de aprobación');
+    }
+    await this.fb.db.collection(COL).doc(String(id)).update({ status: 'rejected', updatedAt: this.fb.now() });
+
+    this.notifications.create({
+      userId: id,
+      title: 'Tu solicitud de registro fue rechazada',
+      body: 'Un administrador rechazó tu solicitud de registro. Contacta a un administrador si crees que es un error.',
+      link: '/auth/login',
+      channel: 'in_app',
+    }, 0).catch((e) => this.logger.warn(`No se pudo notificar rechazo a user ${id}: ${e.message}`));
+
+    return this.findOne(id);
   }
 
   async uploadAvatar(id: number, file: Express.Multer.File) {
