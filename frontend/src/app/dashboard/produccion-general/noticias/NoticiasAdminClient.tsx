@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { CanDo } from '@/components/shared/CanDo';
 import { useActiveCampuses } from '@/hooks/useCampus';
 
@@ -525,6 +526,7 @@ function NoticiaPanel({
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export function NoticiasAdminClient() {
+  const allowed = useRequirePermission('content:view');
   const router = useRouter();
   const { isAdmin, can } = usePermissions();
   const canCreate = isAdmin || can('content:create');
@@ -580,6 +582,8 @@ export function NoticiasAdminClient() {
     draft:     noticias.filter((n) => n.status === 'draft').length,
     global:    noticias.filter((n) => !n.campusId).length,
   }), [noticias]);
+
+  if (!allowed) return null;
 
   if (!canCreate) {
     return (

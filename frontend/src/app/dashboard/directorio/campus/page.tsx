@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { CanDo } from '@/components/shared/CanDo';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import {
   useAllCampuses,
   useCreateCampus,
@@ -499,6 +500,7 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
 // ── CampusPage ────────────────────────────────────────────────────────────────
 
 export default function CampusPage() {
+  const allowed = useRequirePermission('campus:view');
   const { data: campuses = [], isLoading } = useAllCampuses();
   const { data: allUsers = [] }            = useUsers();
   const update  = useUpdateCampus();
@@ -560,6 +562,8 @@ export default function CampusPage() {
   function usersForIds(ids: number[]) {
     return allUsers.filter((u) => ids.includes(u.id));
   }
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-5">

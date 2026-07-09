@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { CanDo } from '@/components/shared/CanDo';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import {
   useOrgAreas,
   useOrgAllTeams,
@@ -310,6 +311,7 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
 // ── EquiposPage ───────────────────────────────────────────────────────────────
 
 export default function EquiposPage() {
+  const allowed = useRequirePermission('equipos:view');
   const { data: teams = [],  isLoading } = useOrgAllTeams();
   const { data: areas = [] }             = useOrgAreas();
   const update  = useUpdateOrgTeam();
@@ -372,6 +374,8 @@ export default function EquiposPage() {
     if (!confirmDelete) return;
     destroy.mutate(confirmDelete.id, { onSuccess: () => setConfirmDelete(null) });
   }
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-5">

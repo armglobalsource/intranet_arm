@@ -192,10 +192,11 @@ function SoporteIcon({ active }: { active: boolean }) {
 // ── Estructura de navegación ──────────────────────────────────────────────────
 
 interface NavGroup {
-  href:      string;
-  label:     string;
-  icon:      (p: { active: boolean }) => React.JSX.Element;
-  children?: { href: string; label: string; icon: (p: { active: boolean }) => React.JSX.Element }[];
+  href:        string;
+  label:       string;
+  icon:        (p: { active: boolean }) => React.JSX.Element;
+  permission?: string;
+  children?: { href: string; label: string; icon: (p: { active: boolean }) => React.JSX.Element; permission?: string }[];
 }
 
 const NAV: NavGroup[] = [
@@ -218,25 +219,25 @@ const NAV: NavGroup[] = [
     label: 'Producción General',
     icon:  ProduccionIcon,
     children: [
-      { href: '/dashboard/fichas-tecnicas',             label: 'Fichas Técnicas', icon: FichaIcon    },
-      { href: '/dashboard/produccion-general/noticias', label: 'Noticias',        icon: NoticiasIcon },
+      { href: '/dashboard/fichas-tecnicas',             label: 'Fichas Técnicas', icon: FichaIcon,    permission: 'fichas:view' },
+      { href: '/dashboard/produccion-general/noticias', label: 'Noticias',        icon: NoticiasIcon, permission: 'content:view' },
     ],
   },
-  { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon          },
-  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon        },
+  { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon,   permission: 'orgchart:view' },
+  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon, permission: 'estadisticas:view' },
   {
     href:  '/dashboard/ministerios',
     label: 'Ministerios',
     icon:  MinisteriosIcon,
     children: [
-      { href: '/dashboard/ministerios/ar-kids',    label: 'AR Kids',    icon: MinisterioSubIcon },
-      { href: '/dashboard/ministerios/ar-tweens',  label: 'AR Tweens',  icon: MinisterioSubIcon },
-      { href: '/dashboard/ministerios/ar-teens',   label: 'AR Teens',   icon: MinisterioSubIcon },
-      { href: '/dashboard/ministerios/ar-jovenes', label: 'AR Jóvenes', icon: MinisterioSubIcon },
-      { href: '/dashboard/ministerios/ar-worship', label: 'AR Worship', icon: MinisterioSubIcon },
-      { href: '/dashboard/ministerios/ar-hombres', label: 'AR Hombres', icon: MinisterioSubIcon },
-      { href: '/dashboard/ministerios/ar-mujeres', label: 'AR Mujeres', icon: MinisterioSubIcon },
-      { href: '/dashboard/ministerios/ar-gold',    label: 'AR Gold',    icon: MinisterioSubIcon },
+      { href: '/dashboard/ministerios/ar-kids',    label: 'AR Kids',    icon: MinisterioSubIcon, permission: 'ministerio_ar_kids:view' },
+      { href: '/dashboard/ministerios/ar-tweens',  label: 'AR Tweens',  icon: MinisterioSubIcon, permission: 'ministerio_ar_tweens:view' },
+      { href: '/dashboard/ministerios/ar-teens',   label: 'AR Teens',   icon: MinisterioSubIcon, permission: 'ministerio_ar_teens:view' },
+      { href: '/dashboard/ministerios/ar-jovenes', label: 'AR Jóvenes', icon: MinisterioSubIcon, permission: 'ministerio_ar_jovenes:view' },
+      { href: '/dashboard/ministerios/ar-worship', label: 'AR Worship', icon: MinisterioSubIcon, permission: 'ministerio_ar_worship:view' },
+      { href: '/dashboard/ministerios/ar-hombres', label: 'AR Hombres', icon: MinisterioSubIcon, permission: 'ministerio_ar_hombres:view' },
+      { href: '/dashboard/ministerios/ar-mujeres', label: 'AR Mujeres', icon: MinisterioSubIcon, permission: 'ministerio_ar_mujeres:view' },
+      { href: '/dashboard/ministerios/ar-gold',    label: 'AR Gold',    icon: MinisterioSubIcon, permission: 'ministerio_ar_gold:view' },
     ],
   },
 ];
@@ -249,6 +250,24 @@ export function Sidebar() {
   const { logout, refreshToken, user } = useAuthStore();
   const { isAdmin, can } = usePermissions();
   const { data: allRoles } = useSystemRoles();
+
+  // Filtra el menú según los permisos del rol: un item sin `permission` siempre
+  // se muestra; un grupo con `children` se oculta si ninguno de sus hijos quedó visible.
+  const visibleNav = NAV
+    .map((item) => {
+      if (item.children) {
+        const visibleChildren = item.children.filter((c) => !c.permission || isAdmin || can(c.permission));
+        if (visibleChildren.length === 0) return null;
+        return { ...item, children: visibleChildren };
+      }
+      if (item.permission && !isAdmin && !can(item.permission)) return null;
+      return item;
+    })
+    .filter((item): item is NavGroup => item !== null);
+
+  const canSeeConfiguracion = isAdmin
+    || can('users:view') || can('roles:view') || can('cargos:view')
+    || can('campus:view') || can('areas:view') || can('equipos:view');
   const impersonation = useAuthStore((s) => s.impersonation);
   const { start: startImpersonation, exit: exitImpersonation } = useImpersonation();
 
@@ -268,7 +287,7 @@ export function Sidebar() {
 
   // Auto-expandir el grupo cuyo hijo esté activo al cambiar de ruta
   useEffect(() => {
-    NAV.forEach(({ href, children }) => {
+    visibleNav.forEach(({ href, children }) => {
       if (children?.some((c) => pathname.startsWith(c.href))) {
         setExpandedGroups((prev) => {
           if (prev.has(href)) return prev;
@@ -375,7 +394,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 p-3 pt-4 space-y-0.5 min-w-[224px]">
-        {NAV.map(({ href, label, icon: Icon, children }) => {
+        {visibleNav.map(({ href, label, icon: Icon, children }) => {
           const childActive  = children?.some((c) => pathname.startsWith(c.href)) ?? false;
           const isExpanded   = expandedGroups.has(href);
 
@@ -465,7 +484,7 @@ export function Sidebar() {
 
       {/* Configuración + Soporte (admin-only) */}
       <div className="px-3 pb-1 min-w-[224px] space-y-0.5">
-        {(() => {
+        {canSeeConfiguracion && (() => {
           const href   = '/dashboard/directorio';
           const active = pathname.startsWith(href);
           return (

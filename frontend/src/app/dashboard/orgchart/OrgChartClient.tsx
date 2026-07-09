@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { api } from '@/lib/api';
 import {
   useOrgAreas, useOrgAreaTree, useOrgSearch, useOrgUserProfile,
@@ -2893,6 +2894,7 @@ type SelectedItem =
   | { kind: 'team';       data: OrgTeam;       color: string };
 
 export function OrgChartClient() {
+  const allowed = useRequirePermission('orgchart:view');
   const { data: areas, isLoading: areasLoading } = useOrgAreas();
   const user    = useAuthStore((s) => s.user);
   const { can } = usePermissions();
@@ -2917,6 +2919,8 @@ export function OrgChartClient() {
   function handleSelectTeam(t: OrgTeam, color: string) {
     setSelected({ kind: 'team', data: t, color });
   }
+
+  if (!allowed) return null;
 
   if (areasLoading) {
     return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" /></div>;

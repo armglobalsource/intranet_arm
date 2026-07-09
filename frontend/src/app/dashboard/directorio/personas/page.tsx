@@ -20,6 +20,7 @@ import { useActiveCampuses, useAllCampuses }  from '@/hooks/useCampus';
 import type { User, UpdateUserDto, MinisterialTitle } from '@/types/user';
 import { MINISTERIAL_LABEL, MINISTERIAL_PREFIX, displayName } from '@/types/user';
 import type { CreateUserDto, Role }           from '@/hooks/useUsers';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { userJobTitleNames } from '@/types/user';
 import { useOrgAllTeams, useCreateOrgMembership, useDeleteOrgMembership, useOrgUserProfile } from '@/hooks/useOrgChart';
 import { apiErrorMessage } from '@/lib/api';
@@ -1416,6 +1417,7 @@ export default function PersonasPage() {
 }
 
 function PersonasPageInner() {
+  const allowed = useRequirePermission('users:view');
   const searchParams = useSearchParams();
   const [search,    setSearch]    = useState('');
   const [debounced, setDebounced] = useState('');
@@ -1505,6 +1507,8 @@ function PersonasPageInner() {
 
   // Active job titles for the cargo filter dropdown
   const activeJobTitles = allJobTitles.filter((jt) => jt.isActive);
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-5">

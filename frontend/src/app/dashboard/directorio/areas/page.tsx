@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { CanDo } from '@/components/shared/CanDo';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import Link from 'next/link';
 import {
   useOrgAllAreas,
@@ -315,6 +316,7 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
 // ── AreasPage ─────────────────────────────────────────────────────────────────
 
 export default function AreasPage() {
+  const allowed = useRequirePermission('areas:view');
   const { data: areas = [], isLoading } = useOrgAllAreas();
   const update  = useUpdateOrgArea();
   const destroy = useDeleteOrgArea();
@@ -361,6 +363,8 @@ export default function AreasPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const hasFilters = !!statusFilter;
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-5">

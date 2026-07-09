@@ -201,11 +201,13 @@ export class UsersService {
     return this.fb.toObj(snap);
   }
 
-  async claimAccount(id: number, data: { firstName: string; lastName: string }) {
+  async claimAccount(id: number, data: { firstName: string; lastName: string; password: string }) {
+    const passwordHash = await bcrypt.hash(data.password, 12);
     await this.fb.db.collection(COL).doc(String(id)).update({
       firstName: data.firstName.trim(),
       lastName:  data.lastName.trim(),
       nameLower: `${data.firstName} ${data.lastName}`.toLowerCase(),
+      passwordHash,
       updatedAt: this.fb.now(),
     });
     const snap = await this.fb.db.collection(COL).doc(String(id)).get();

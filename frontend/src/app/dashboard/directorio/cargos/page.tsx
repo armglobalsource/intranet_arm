@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { CanDo } from '@/components/shared/CanDo';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import {
   useAllJobTitles,
   useCreateJobTitle,
@@ -244,6 +245,7 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
 // ── CargosPage ────────────────────────────────────────────────────────────────
 
 export default function CargosPage() {
+  const allowed = useRequirePermission('cargos:view');
   const { data: cargos = [], isLoading } = useAllJobTitles();
   const update = useUpdateJobTitle();
   const remove = useDeleteJobTitle();
@@ -292,6 +294,8 @@ export default function CargosPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const hasFilters = !!statusFilter;
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-5">

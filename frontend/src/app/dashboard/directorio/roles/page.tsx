@@ -6,7 +6,9 @@ import {
   useSystemRoles, useCreateRole, useUpdateRole, useDeleteRole,
   type SystemRole,
 } from '@/hooks/useRoles';
-import { PERMISSION_CATALOG } from '@/lib/permissions';
+import { PERMISSION_CATALOG, PERMISSION_UI_CONFIG } from '@/lib/permissions';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
+import { CanDo } from '@/components/shared/CanDo';
 
 const PAGE_SIZE = 20;
 
@@ -57,23 +59,37 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
   const [wildcard,  setWildcard]  = useState(isWildcard);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-  function toggle(perm: string) {
+  function isGroupOn(resource: string, actions: string[]): boolean {
+    return actions.length > 0 && actions.every((a) => selected.has(`${resource}:${a}`));
+  }
+
+  function setGroup(resource: string, actions: string[], on: boolean) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(perm)) next.delete(perm); else next.add(perm);
+      actions.forEach((a) => {
+        const perm = `${resource}:${a}`;
+        if (on) next.add(perm); else next.delete(perm);
+      });
       return next;
     });
   }
 
-  function toggleResource(resource: string, actions: string[]) {
-    setSelected((prev) => {
-      const next      = new Set(prev);
-      const allChecked = actions.every((a) => next.has(`${resource}:${a}`));
-      actions.forEach((a) => {
-        allChecked ? next.delete(`${resource}:${a}`) : next.add(`${resource}:${a}`);
-      });
-      return next;
-    });
+  function toggleView(resource: string, viewActions: string[], editActions: string[]) {
+    const on = isGroupOn(resource, viewActions);
+    setGroup(resource, viewActions, !on);
+    // No tiene sentido poder editar sin poder ver — se apaga junto con "ver"
+    if (on) setGroup(resource, editActions, false);
+  }
+
+  function toggleEdit(resource: string, viewActions: string[], editActions: string[]) {
+    const on = isGroupOn(resource, editActions);
+    setGroup(resource, editActions, !on);
+    // Activar "editar" implica poder ver también
+    if (!on) setGroup(resource, viewActions, true);
+  }
+
+  function toggleExtra(resource: string, actions: string[]) {
+    setGroup(resource, actions, !isGroupOn(resource, actions));
   }
 
   function toggleWildcard() { setWildcard((w) => !w); setSelected(new Set()); }
@@ -126,54 +142,51 @@ function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
 
         <div className={`overflow-y-auto flex-1 px-5 py-4 ${wildcard ? 'opacity-40 pointer-events-none' : ''}`}>
           <div className="flex flex-col gap-4">
-            {Object.entries(PERMISSION_CATALOG).map(([resource, cfg]) => {
-              const actions    = Object.keys(cfg.actions);
-              const allChecked = actions.every((a) => selected.has(`${resource}:${a}`));
-              const someChecked = !allChecked && actions.some((a) => selected.has(`${resource}:${a}`));
+            {Object.entries(PERMISSION_UI_CONFIG).map(([resource, uiCfg]) => {
+              const cfg = (PERMISSION_CATALOG as any)[resource];
+              if (!cfg) return null;
+              const viewOn = isGroupOn(resource, uiCfg.viewActions);
+              const editOn = isGroupOn(resource, uiCfg.editActions);
               return (
               <div key={resource}>
                 <div className="mb-2">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => toggleResource(resource, actions)}
-                      className="flex-shrink-0 w-4 h-4 rounded flex items-center justify-center transition-colors"
-                      style={{
-                        background:  allChecked ? '#4F46E5' : someChecked ? '#C7D2FE' : 'transparent',
-                        border:      allChecked || someChecked ? 'none' : '2px solid #CBD5E1',
-                      }}
-                      title={allChecked ? 'Desmarcar todo' : 'Marcar todo'}
-                    >
-                      {allChecked && (
-                        <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                      )}
-                      {someChecked && (
-                        <svg className="w-2.5 h-2.5 text-indigo-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="5" y1="12" x2="19" y2="12"/>
-                        </svg>
-                      )}
-                    </button>
-                    <p className="text-[11.5px] font-bold text-slate-700 uppercase tracking-wider">{cfg.label}</p>
-                    <div className="flex-1 h-px bg-slate-100"/>
-                  </div>
-                  {'description' in cfg && (
-                    <p className="text-[11px] text-slate-400 mt-0.5">{(cfg as any).description}</p>
+                  <p className="text-[11.5px] font-bold text-slate-700 uppercase tracking-wider">{cfg.label}</p>
+                  {uiCfg.breadcrumb.length > 0 && (
+                    <p className="text-[10.5px] text-slate-400 mt-0.5">{uiCfg.breadcrumb.join(' › ')}</p>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(cfg.actions).map(([action, label]) => {
-                    const perm    = `${resource}:${action}`;
-                    const checked = selected.has(perm);
+                  <label onClick={() => toggleView(resource, uiCfg.viewActions, uiCfg.editActions)}
+                    className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer border transition-colors ${
+                      viewOn ? 'bg-indigo-50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'
+                    }`}>
+                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${viewOn ? 'bg-indigo-600' : 'border-2 border-slate-300'}`}>
+                      {viewOn && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    </div>
+                    <p className="text-[12px] font-medium text-slate-800 leading-tight">Puede ver</p>
+                  </label>
+                  {uiCfg.editActions.length > 0 && (
+                    <label onClick={() => toggleEdit(resource, uiCfg.viewActions, uiCfg.editActions)}
+                      className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer border transition-colors ${
+                        editOn ? 'bg-indigo-50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'
+                      }`}>
+                      <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${editOn ? 'bg-indigo-600' : 'border-2 border-slate-300'}`}>
+                        {editOn && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                      </div>
+                      <p className="text-[12px] font-medium text-slate-800 leading-tight">Puede editar</p>
+                    </label>
+                  )}
+                  {uiCfg.extra?.map((ex) => {
+                    const exOn = isGroupOn(resource, ex.actions);
                     return (
-                      <label key={perm} onClick={() => toggle(perm)}
+                      <label key={ex.key} onClick={() => toggleExtra(resource, ex.actions)}
                         className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer border transition-colors ${
-                          checked ? 'bg-indigo-50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'
+                          exOn ? 'bg-indigo-50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'
                         }`}>
-                        <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${checked ? 'bg-indigo-600' : 'border-2 border-slate-300'}`}>
-                          {checked && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                        <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${exOn ? 'bg-indigo-600' : 'border-2 border-slate-300'}`}>
+                          {exOn && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                         </div>
-                        <p className="text-[12px] font-medium text-slate-800 leading-tight">{label as string}</p>
+                        <p className="text-[12px] font-medium text-slate-800 leading-tight">{ex.label}</p>
                       </label>
                     );
                   })}
@@ -440,6 +453,7 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
 // ── RolesPage ─────────────────────────────────────────────────────────────────
 
 export default function RolesPage() {
+  const allowed = useRequirePermission('roles:view');
   const { data: roles = [], isLoading } = useSystemRoles();
   const update = useUpdateRole();
   const remove = useDeleteRole();
@@ -504,6 +518,8 @@ export default function RolesPage() {
   // Resources for the permission filter
   const permResources = Object.entries(PERMISSION_CATALOG).map(([key, cfg]) => ({ key, label: cfg.label }));
 
+  if (!allowed) return null;
+
   return (
     <div className="space-y-5">
 
@@ -529,13 +545,15 @@ export default function RolesPage() {
             }
           </p>
         </div>
-        <button onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all bg-indigo-600 hover:bg-indigo-700">
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Nuevo rol
-        </button>
+        <CanDo permission="roles:manage">
+          <button onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all bg-indigo-600 hover:bg-indigo-700">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Nuevo rol
+          </button>
+        </CanDo>
       </div>
 
       {/* Info banner */}
@@ -655,51 +673,59 @@ export default function RolesPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
 
-                          {/* Configurar permisos */}
-                          <button onClick={() => setPermsFor(rol)} title="Configurar permisos"
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                            </svg>
-                          </button>
+                          <CanDo permission="roles:manage">
+                            {/* Configurar permisos */}
+                            <button onClick={() => setPermsFor(rol)} title="Configurar permisos"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                              </svg>
+                            </button>
+                          </CanDo>
 
-                          {/* Editar */}
-                          <button onClick={() => openEdit(rol)} title="Editar"
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                          </button>
+                          <CanDo permission="roles:manage">
+                            {/* Editar */}
+                            <button onClick={() => openEdit(rol)} title="Editar"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                            </button>
+                          </CanDo>
 
-                          {/* Toggle activo */}
-                          <button
-                            onClick={() => handleToggle(rol)}
-                            disabled={isToggling || rol.isSystem}
-                            title={rol.isSystem ? 'Los roles del sistema no pueden deshabilitarse' : rol.isActive ? 'Desactivar' : 'Activar'}
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-                              rol.isActive ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                            }`}
-                          >
-                            {isToggling
-                              ? <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"/>
-                              : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
-                                </svg>
-                            }
-                          </button>
+                          <CanDo permission="roles:manage">
+                            {/* Toggle activo */}
+                            <button
+                              onClick={() => handleToggle(rol)}
+                              disabled={isToggling || rol.isSystem}
+                              title={rol.isSystem ? 'Los roles del sistema no pueden deshabilitarse' : rol.isActive ? 'Desactivar' : 'Activar'}
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                                rol.isActive ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              {isToggling
+                                ? <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"/>
+                                : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
+                                  </svg>
+                              }
+                            </button>
+                          </CanDo>
 
-                          {/* Eliminar */}
-                          <button
-                            onClick={() => !rol.isSystem && setConfirmDelete(rol)}
-                            disabled={rol.isSystem}
-                            title={rol.isSystem ? 'Los roles del sistema no pueden eliminarse' : 'Eliminar'}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                            </svg>
-                          </button>
+                          <CanDo permission="roles:manage">
+                            {/* Eliminar */}
+                            <button
+                              onClick={() => !rol.isSystem && setConfirmDelete(rol)}
+                              disabled={rol.isSystem}
+                              title={rol.isSystem ? 'Los roles del sistema no pueden eliminarse' : 'Eliminar'}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                              </svg>
+                            </button>
+                          </CanDo>
                         </div>
                       </td>
                     </tr>

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useFichas, useDeleteFicha, useArchiveFicha, usePublishFicha, useUnpublishFicha } from '@/hooks/useFichas';
 import { CloneModal } from '@/components/fichas/CloneModal';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useActiveCampuses } from '@/hooks/useCampus';
 import {
@@ -502,6 +503,7 @@ type StatusFilter = 'all' | FichaStatus;
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function FichasTecnicasClient() {
+  const allowed = useRequirePermission('fichas:view');
   const router = useRouter();
   const { can, isAdmin } = usePermissions();
   const user = useAuthStore((s) => s.user);
@@ -585,6 +587,8 @@ export function FichasTecnicasClient() {
       archived:   fichas.filter((f) => f.archived).length,
     };
   }, [fichas]);
+
+  if (!allowed) return null;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 

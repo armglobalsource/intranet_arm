@@ -118,6 +118,7 @@ export class AuthService {
       user = await this.users.claimAccount(user.id, {
         firstName: dto.firstName || user.firstName,
         lastName:  dto.lastName  || user.lastName,
+        password:  dto.password,
       });
     } else {
       user = await this.users.selfRegister({
