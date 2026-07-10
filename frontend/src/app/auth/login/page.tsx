@@ -161,6 +161,18 @@ export default function LoginPage() {
               </div>
             )}
 
+            {errors.root?.message === 'Credenciales inválidas' && (
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid #2a2a2a' }}
+                className="text-white/50 text-xs rounded-lg px-3.5 py-2.5 leading-relaxed">
+                ¿Primera vez? Si ya estás registrado pero nunca creaste tu contraseña,
+                usa{' '}
+                <Link href="/auth/register" className="text-white/80 underline underline-offset-2 hover:text-white">
+                  Crear cuenta
+                </Link>
+                {' '}con tu mismo correo — el sistema la reconocerá y te dejará entrar.
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={isSubmitting}
