@@ -9,6 +9,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { getAllowedOrigins } from './common/allowed-origins';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -23,19 +24,9 @@ async function bootstrap() {
 
   // ── Seguridad ────────────────────────────────────────────────
   app.use(helmet());
-  // FRONTEND_URL puede ser una lista separada por comas (ej: prod,dev)
-  const allowedOrigins = (config.get<string>('FRONTEND_URL', 'http://localhost:3000'))
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean)
-    .concat([
-      'http://localhost:3000',
-      'http://localhost:3002',
-      'https://intranet-arm.web.app',
-      'https://intranet-arm-dev.web.app',
-      'https://ecosistema-arm.web.app',
-      'https://ecosistema-arm-dev.web.app',
-    ]);
+  // Orígenes permitidos = FRONTEND_URL (CSV) ∪ allowlist fija (incluye la PWA
+  // móvil armglobal.web.app). Ver common/allowed-origins.ts
+  const allowedOrigins = getAllowedOrigins(config);
   app.enableCors({
     origin: (origin, callback) => {
       // Permitir requests sin origin (ej: Postman, server-to-server)

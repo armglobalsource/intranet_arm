@@ -74,6 +74,18 @@ export function useDisponibilidadMatrix(campusId: number | null, weekLabel: stri
   });
 }
 
+export function useMyCommitments(campusId: number | null) {
+  return useQuery<DisponibilidadDoc[]>({
+    queryKey: ['disponibilidad', 'my-commitments', campusId ?? 0],
+    queryFn:  async () => {
+      const res = await api.get('/disponibilidad/my-commitments', { params: { campusId } });
+      return res.data;
+    },
+    enabled:   !!campusId,
+    staleTime: 60_000,
+  });
+}
+
 export function useDisponibilidadWeeks(campusId: number | null) {
   return useQuery<string[]>({
     queryKey: KEYS.weeks(campusId ?? 0),

@@ -79,6 +79,7 @@ function HubCard({ href, icon, title, description, accentColor, stat, loading }:
 export function ProduccionGeneralClient() {
   const { can, isAdmin } = usePermissions();
   const canDisponibilidad = isAdmin || can('disponibilidad:submit') || can('disponibilidad:view');
+  const canTecnicos       = isAdmin || can('tecnicos:submit')       || can('tecnicos:view');
 
   const { data: fichas, isLoading } = useFichas();
   const { data: noticias, isLoading: loadingNoticias } = useQuery<Noticia[]>({
@@ -182,6 +183,25 @@ export function ProduccionGeneralClient() {
             title="Disponibilidad Worship"
             description="Disponibilidad semanal de músicos y cantantes para los encuentros de cada campus."
             accentColor="#16a34a"
+          />
+        )}
+
+        {canTecnicos && (
+          <HubCard
+            href="/dashboard/produccion-general/tecnicos/disponibilidad"
+            icon={
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
+                stroke="#2563eb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <path d="M9 16h2l1-3 2 6 1-3h2" />
+              </svg>
+            }
+            title="Disponibilidad Técnicos"
+            description="Disponibilidad semanal del equipo técnico (sonido, streaming, iluminación, stage y visuales)."
+            accentColor="#2563eb"
           />
         )}
 

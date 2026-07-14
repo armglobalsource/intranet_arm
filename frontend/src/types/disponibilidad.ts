@@ -18,6 +18,7 @@ export interface DisponibilidadDoc {
   encounterDate: string;
   dia:           string;
   hora:          string;
+  bloque?:       string | null;
   available:     boolean;
   nota:          string | null;
 }

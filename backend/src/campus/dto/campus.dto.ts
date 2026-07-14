@@ -33,6 +33,18 @@ export class CreateCampusDto {
   @ApiProperty({ type: [ScheduleDto] })
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ScheduleDto)
   schedules?: ScheduleDto[];
+
+  @ApiProperty({ type: [String] })
+  @IsOptional() @IsArray() @IsString({ each: true })
+  asistenciaCategoriaKeys?: string[];
+
+  @ApiProperty({ type: [String] })
+  @IsOptional() @IsArray() @IsString({ each: true })
+  voluntarioCategoriaKeys?: string[];
+
+  @ApiProperty({ type: [String] })
+  @IsOptional() @IsArray() @IsString({ each: true })
+  monedaCodes?: string[];
 }
 
 export class UpdateCampusDto {
@@ -56,4 +68,16 @@ export class UpdateCampusDto {
   @ApiProperty({ type: [ScheduleDto] })
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ScheduleDto)
   schedules?: ScheduleDto[];
+
+  @ApiProperty({ type: [String] })
+  @IsOptional() @IsArray() @IsString({ each: true })
+  asistenciaCategoriaKeys?: string[];
+
+  @ApiProperty({ type: [String] })
+  @IsOptional() @IsArray() @IsString({ each: true })
+  voluntarioCategoriaKeys?: string[];
+
+  @ApiProperty({ type: [String] })
+  @IsOptional() @IsArray() @IsString({ each: true })
+  monedaCodes?: string[];
 }

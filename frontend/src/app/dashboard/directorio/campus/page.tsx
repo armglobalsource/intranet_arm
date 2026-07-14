@@ -14,6 +14,7 @@ import {
   type CreateCampusPayload,
 } from '@/hooks/useCampus';
 import { useUsers } from '@/hooks/useUsers';
+import { useActiveArmCatalogos, type ArmCatalogoActive } from '@/hooks/useArmCatalogos';
 import type { User } from '@/types/user';
 
 const PAGE_SIZE = 20;
@@ -174,16 +175,75 @@ function ScheduleEditor({ schedules, onChange }: { schedules: CampusSchedule[]; 
   );
 }
 
+// ── CatalogoPicker ────────────────────────────────────────────────────────────
+
+function CatalogoPicker({ label, options, selectedKeys, onChange }: {
+  label: string; options: ArmCatalogoActive[]; selectedKeys: string[]; onChange: (keys: string[]) => void;
+}) {
+  const allSelected = options.length > 0 && options.every((o) => selectedKeys.includes(o.key));
+
+  function toggle(key: string) {
+    onChange(selectedKeys.includes(key) ? selectedKeys.filter((k) => k !== key) : [...selectedKeys, key]);
+  }
+  function toggleAll() {
+    onChange(allSelected ? [] : options.map((o) => o.key));
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className={labelCls}>{label}</label>
+        {options.length > 0 && (
+          <button type="button" onClick={toggleAll}
+            className="text-[11px] text-teal-600 hover:text-teal-700 font-semibold transition-colors">
+            {allSelected ? 'Ninguno' : 'Todos'}
+          </button>
+        )}
+      </div>
+
+      {options.length === 0 ? (
+        <p className="text-[11.5px] text-slate-400 italic py-1">Sin entradas activas en este catálogo.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {options.map((o) => {
+            const checked = selectedKeys.includes(o.key);
+            return (
+              <button type="button" key={o.key} onClick={() => toggle(o.key)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11.5px] font-medium transition-colors ${
+                  checked ? 'bg-teal-50 border-teal-200 text-teal-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                }`}
+              >
+                <div className={`w-3.5 h-3.5 rounded flex items-center justify-center flex-shrink-0 ${checked ? 'bg-teal-600' : 'border-2 border-slate-300'}`}>
+                  {checked && (
+                    <svg className="w-2 h-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </div>
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── CampusModal ───────────────────────────────────────────────────────────────
 
 function CampusModal({ campus, onClose }: { campus?: Campus; onClose: () => void }) {
   const isEdit = !!campus;
   const { data: allUsers = [] } = useUsers();
+  const { data: activeAsistencia  = [] } = useActiveArmCatalogos('asistencia');
+  const { data: activeVoluntarios = [] } = useActiveArmCatalogos('voluntarios');
+  const { data: activeMonedas     = [] } = useActiveArmCatalogos('moneda');
 
   const empty: CreateCampusPayload = {
     name: '', siglas: '', address: '', city: '', country: '',
     phone: '', email: '', website: '', description: '',
     pastorIds: [], adminIds: [], schedules: [],
+    asistenciaCategoriaKeys: [], voluntarioCategoriaKeys: [], monedaCodes: [],
   };
 
   const [form, setForm] = useState<CreateCampusPayload>(
@@ -200,8 +260,26 @@ function CampusModal({ campus, onClose }: { campus?: Campus; onClose: () => void
       pastorIds:   campus.pastorIds    ?? [],
       adminIds:    campus.adminIds     ?? [],
       schedules:   campus.schedules    ?? [],
+      asistenciaCategoriaKeys: campus.asistenciaCategoriaKeys ?? [],
+      voluntarioCategoriaKeys: campus.voluntarioCategoriaKeys ?? [],
+      monedaCodes:             campus.monedaCodes             ?? [],
     } : empty,
   );
+
+  // Campus nuevo: pre-marcar todas las categorías/monedas activas apenas cargan,
+  // para que la UI refleje visualmente el default que aplicará el servidor.
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (isEdit || prefilledRef.current) return;
+    if (!activeAsistencia.length && !activeVoluntarios.length && !activeMonedas.length) return;
+    prefilledRef.current = true;
+    setForm((f) => ({
+      ...f,
+      asistenciaCategoriaKeys: activeAsistencia.map((c) => c.key),
+      voluntarioCategoriaKeys: activeVoluntarios.map((c) => c.key),
+      monedaCodes:             activeMonedas.map((c) => c.key),
+    }));
+  }, [isEdit, activeAsistencia, activeVoluntarios, activeMonedas]);
 
   const [errorMsg, setErrorMsg] = useState('');
   const create    = useCreateCampus();
@@ -342,6 +420,25 @@ function CampusModal({ campus, onClose }: { campus?: Campus; onClose: () => void
           <p className={sectionCls}>Horarios</p>
 
           <ScheduleEditor schedules={form.schedules ?? []} onChange={(s) => set('schedules', s)} />
+
+          {/* Categorías y monedas */}
+          <p className={sectionCls}>Categorías y monedas</p>
+          <p className="text-[11px] text-slate-400 -mt-3">
+            Qué categorías de asistencia, voluntariado y monedas usa este campus. Se administran en{' '}
+            <a href="/dashboard/directorio/arm-catalogos" className="text-teal-600 hover:underline">Configuración APP Web</a>.
+          </p>
+
+          <CatalogoPicker label="Asistencia" options={activeAsistencia}
+            selectedKeys={form.asistenciaCategoriaKeys ?? []}
+            onChange={(keys) => set('asistenciaCategoriaKeys', keys)} />
+
+          <CatalogoPicker label="Voluntarios" options={activeVoluntarios}
+            selectedKeys={form.voluntarioCategoriaKeys ?? []}
+            onChange={(keys) => set('voluntarioCategoriaKeys', keys)} />
+
+          <CatalogoPicker label="Monedas de siembra" options={activeMonedas}
+            selectedKeys={form.monedaCodes ?? []}
+            onChange={(keys) => set('monedaCodes', keys)} />
 
           {/* Error */}
           {errorMsg && (

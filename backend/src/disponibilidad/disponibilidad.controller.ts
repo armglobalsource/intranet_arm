@@ -30,6 +30,16 @@ export class DisponibilidadController {
     return this.svc.bulkSubmit(user.sub, name, dto);
   }
 
+  /** Todos mis compromisos disponibles — para el calendario del dashboard */
+  @Get('my-commitments')
+  @RequirePermission('disponibilidad:submit')
+  getMyCommitments(
+    @Query('campusId') campusId: string,
+    @CurrentUser()     user: any,
+  ) {
+    return this.svc.getMyCommitments(user.sub, Number(campusId));
+  }
+
   /** Mis respuestas para una semana (voluntario worship) */
   @Get('mine')
   @RequirePermission('disponibilidad:submit')

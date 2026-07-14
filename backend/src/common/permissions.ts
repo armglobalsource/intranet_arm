@@ -97,6 +97,61 @@ export const PERMISSION_CATALOG = {
       admin:   'Administrar configuración de fichas',
     },
   },
+  encuentros: {
+    label: 'Encuentros',
+    description: 'Registro de servicios: asistencia, voluntarios y decisiones',
+    actions: {
+      view:   'Ver los registros de encuentros',
+      create: 'Registrar nuevos encuentros',
+      edit:   'Editar encuentros existentes',
+      delete: 'Eliminar encuentros',
+    },
+  },
+  siembra: {
+    label: 'Siembra',
+    description: 'Registro de ofrendas y diezmos por campus',
+    actions: {
+      view:   'Ver los registros de siembra',
+      create: 'Registrar nueva siembra',
+      edit:   'Editar registros de siembra',
+      delete: 'Eliminar registros de siembra',
+    },
+  },
+  kiloamor: {
+    label: 'Kilo de Amor',
+    description: 'Registro de cajas de donación de alimentos',
+    actions: {
+      view:   'Ver los registros de Kilo de Amor',
+      create: 'Registrar nuevas cajas',
+      edit:   'Editar registros',
+      delete: 'Eliminar registros',
+    },
+  },
+  anuncios: {
+    label: 'Anuncios',
+    description: 'Anuncios a miembros por campus (con notificación push)',
+    actions: {
+      view:   'Ver los anuncios',
+      create: 'Publicar anuncios',
+      edit:   'Editar y desactivar anuncios',
+      delete: 'Eliminar anuncios',
+    },
+  },
+  'arm-dashboard': {
+    label: 'Dashboard ARM',
+    description: 'Analítica y reportes de operaciones de campus',
+    actions: {
+      view: 'Ver el dashboard de ARM',
+    },
+  },
+  'arm-catalogos': {
+    label: 'Configuración APP Web',
+    description: 'Categorías de asistencia, voluntarios y monedas usadas en encuentros y siembra',
+    actions: {
+      view:   'Ver los catálogos de ARM',
+      manage: 'Crear, modificar y eliminar entradas de catálogo',
+    },
+  },
 } as const;
 
 export type PermissionResource = keyof typeof PERMISSION_CATALOG;

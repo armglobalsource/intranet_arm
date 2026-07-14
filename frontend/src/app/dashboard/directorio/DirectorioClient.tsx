@@ -186,6 +186,16 @@ export function DirectorioClient() {
           />
         )}
 
+        {can('arm-catalogos:view') && (
+          <HubRow
+            href="/dashboard/directorio/arm-catalogos"
+            icon="🧾"
+            title="Configuración APP Web"
+            description="Categorías de asistencia, voluntarios y monedas para el registro de encuentros."
+            accentColor="#DB2777"
+          />
+        )}
+
         {can('roles:view') && (
           <HubRow
             href="/dashboard/directorio/roles"

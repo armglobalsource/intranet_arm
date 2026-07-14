@@ -22,6 +22,9 @@ export interface Campus {
   pastorIds:    number[];
   adminIds:     number[];
   schedules:    CampusSchedule[];
+  asistenciaCategoriaKeys: string[];
+  voluntarioCategoriaKeys: string[];
+  monedaCodes:             string[];
   isActive:     boolean;
   createdAt:    string;
   updatedAt:    string;
@@ -49,6 +52,9 @@ export interface CreateCampusPayload {
   pastorIds?:   number[];
   adminIds?:    number[];
   schedules?:   CampusSchedule[];
+  asistenciaCategoriaKeys?: string[];
+  voluntarioCategoriaKeys?: string[];
+  monedaCodes?:             string[];
 }
 
 const campusKeys = {

@@ -189,6 +189,20 @@ function SoporteIcon({ active }: { active: boolean }) {
   );
 }
 
+function TecnicosIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
+  return (
+    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <path d="M9 16h2l1-3 2 6 1-3h2" />
+    </svg>
+  );
+}
+
 // ── Estructura de navegación ──────────────────────────────────────────────────
 
 interface NavGroup {
@@ -219,8 +233,9 @@ const NAV: NavGroup[] = [
     label: 'Producción General',
     icon:  ProduccionIcon,
     children: [
-      { href: '/dashboard/fichas-tecnicas',             label: 'Fichas Técnicas', icon: FichaIcon,    permission: 'fichas:view' },
-      { href: '/dashboard/produccion-general/noticias', label: 'Noticias',        icon: NoticiasIcon, permission: 'content:view' },
+      { href: '/dashboard/fichas-tecnicas',                             label: 'Fichas Técnicas', icon: FichaIcon,    permission: 'fichas:view' },
+      { href: '/dashboard/produccion-general/noticias',                 label: 'Noticias',        icon: NoticiasIcon, permission: 'content:view' },
+      { href: '/dashboard/produccion-general/tecnicos/disponibilidad',  label: 'Disp. Técnicos',  icon: TecnicosIcon, permission: 'tecnicos:submit' },
     ],
   },
   { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon,   permission: 'orgchart:view' },

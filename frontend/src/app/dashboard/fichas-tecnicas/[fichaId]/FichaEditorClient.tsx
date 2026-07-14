@@ -8,6 +8,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { FichaDocumentView } from './FichaDocumentView';
 import { DisponibilidadSideCard } from '@/components/fichas/DisponibilidadSideCard';
+import { TecnicosDisponibilidadSideCard } from '@/components/fichas/TecnicosDisponibilidadSideCard';
 import type { Row, SectionName, Section } from '@/types/ficha';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -373,7 +374,8 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   }
 
   const canViewDisponibilidad = isAdmin || can('disponibilidad:view');
-  const showSidePanel = editable && canViewDisponibilidad;
+  const canViewTecnicos       = isAdmin || can('tecnicos:view');
+  const showSidePanel = editable && (canViewDisponibilidad || canViewTecnicos);
 
   return (
     <div className="space-y-4" style={{ position: 'relative' }}>
@@ -460,8 +462,9 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         </div>
 
         {showSidePanel && (
-          <div className="w-56 flex-shrink-0 sticky top-4">
-            <DisponibilidadSideCard fichaDate={ficha.date} />
+          <div className="w-56 flex-shrink-0 sticky top-4 flex flex-col gap-3">
+            {canViewDisponibilidad && <DisponibilidadSideCard fichaDate={ficha.date} />}
+            {canViewTecnicos       && <TecnicosDisponibilidadSideCard fichaDate={ficha.date} />}
           </div>
         )}
       </div>

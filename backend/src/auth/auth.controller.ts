@@ -14,6 +14,7 @@ import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { resolveReturnOrigin } from '../common/allowed-origins';
 
 @ApiTags('Auth')
 @Controller({ path: 'auth', version: '1' })
@@ -64,9 +65,12 @@ export class AuthController {
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: 'Callback de Google OAuth' })
   async googleCallback(@Req() req: any, @Res() res: Response) {
-    // FRONTEND_URL puede ser CSV ("https://a.com,https://b.com") — usar solo la primera
-    const frontendUrl = (this.config.get<string>('FRONTEND_URL', 'http://localhost:3000'))
+    // Destino del redirect: si vino un `return_to` (via OAuth `state`) y es un
+    // origen permitido, se usa ese (p.ej. la PWA móvil armglobal.web.app).
+    // Si no, el primero de FRONTEND_URL. resolveReturnOrigin previene open redirect.
+    const defaultUrl = (this.config.get<string>('FRONTEND_URL', 'http://localhost:3000'))
       .split(',')[0].trim();
+    const frontendUrl = resolveReturnOrigin(req.query?.state, this.config) ?? defaultUrl;
     try {
       const result = await this.authService.googleAuth(
         req.user,

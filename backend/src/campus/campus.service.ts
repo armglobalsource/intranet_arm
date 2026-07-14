@@ -1,12 +1,28 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
-import { CreateCampusDto, UpdateCampusDto } from './dto/campus.dto';
+import { ArmCatalogosService } from '../arm-catalogos/arm-catalogos.service';
+import { CreateCampusDto, ScheduleDto, UpdateCampusDto } from './dto/campus.dto';
 
 const COL = 'campuses';
 
+/** Objetos planos: los ScheduleDto son instancias de clase (class-transformer) y
+ *  Firestore no serializa objetos con prototipo custom — mismo fix que encuentros.service.ts. */
+function plainSchedules(schedules: ScheduleDto[]) {
+  return schedules.map((s) => ({ ...s }));
+}
+
 @Injectable()
 export class CampusService {
-  constructor(private fb: FirebaseService) {}
+  constructor(
+    private fb:           FirebaseService,
+    private armCatalogos: ArmCatalogosService,
+  ) {}
+
+  /** Todas las claves activas de un catálogo ARM — default cuando un campus no especifica su selección. */
+  private async allActiveKeys(tipo: 'asistencia' | 'voluntarios' | 'moneda'): Promise<string[]> {
+    const entries = await this.armCatalogos.findActive(tipo);
+    return entries.map((e) => e.key);
+  }
 
   async findAll() {
     const snap = await this.fb.db.collection(COL).orderBy('name').get();
@@ -19,7 +35,7 @@ export class CampusService {
     return this.fb.toDocs(snap)
       .filter((c) => c.isActive)
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map(({ id, name, siglas, address, country, phone }) => ({ id, name, siglas, address, country, phone }));
+      .map(({ id, name, siglas, address, country, phone, schedules }) => ({ id, name, siglas, address, country, phone, schedules: schedules ?? [] }));
   }
 
   async findOne(id: number) {
@@ -34,6 +50,14 @@ export class CampusService {
       .where('nameLower', '==', name.toLowerCase())
       .limit(1).get();
     if (!snap.empty) throw new ConflictException(`Ya existe un campus con el nombre "${name}"`);
+
+    // Si el admin no especifica su selección de categorías/monedas, el campus parte con
+    // TODAS las claves activas habilitadas — hoy todo campus las usa implícitamente
+    // (están hardcodeadas para todos), así que este default preserva el comportamiento
+    // actual sin requerir acción manual; el admin solo necesita desmarcar lo que no aplique.
+    const asistenciaCategoriaKeys = dto.asistenciaCategoriaKeys ?? await this.allActiveKeys('asistencia');
+    const voluntarioCategoriaKeys = dto.voluntarioCategoriaKeys ?? await this.allActiveKeys('voluntarios');
+    const monedaCodes             = dto.monedaCodes             ?? await this.allActiveKeys('moneda');
 
     const id = await this.fb.nextId(COL);
     const doc = {
@@ -50,7 +74,10 @@ export class CampusService {
       description:  dto.description?.trim() ?? null,
       pastorIds:    dto.pastorIds           ?? [],
       adminIds:     dto.adminIds            ?? [],
-      schedules:    dto.schedules           ?? [],
+      schedules:    dto.schedules ? plainSchedules(dto.schedules) : [],
+      asistenciaCategoriaKeys,
+      voluntarioCategoriaKeys,
+      monedaCodes,
       isActive:     true,
       createdAt:    this.fb.now(),
       updatedAt:    this.fb.now(),
@@ -83,7 +110,10 @@ export class CampusService {
     if (dto.isActive    !== undefined) data.isActive    = dto.isActive;
     if (dto.pastorIds !== undefined) data.pastorIds = dto.pastorIds;
     if (dto.adminIds  !== undefined) data.adminIds  = dto.adminIds;
-    if (dto.schedules !== undefined) data.schedules = dto.schedules;
+    if (dto.schedules !== undefined) data.schedules = plainSchedules(dto.schedules);
+    if (dto.asistenciaCategoriaKeys !== undefined) data.asistenciaCategoriaKeys = dto.asistenciaCategoriaKeys;
+    if (dto.voluntarioCategoriaKeys !== undefined) data.voluntarioCategoriaKeys = dto.voluntarioCategoriaKeys;
+    if (dto.monedaCodes             !== undefined) data.monedaCodes             = dto.monedaCodes;
 
     await this.fb.db.collection(COL).doc(String(id)).update(data);
     return this.findOne(id);

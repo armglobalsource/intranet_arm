@@ -24,6 +24,12 @@ import { FeedbackModule } from './feedback/feedback.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { ReconciliationModule } from './reconciliation/reconciliation.module';
 import { PaletasModule } from './paletas/paletas.module';
+import { TecnicosModule } from './tecnicos/tecnicos.module';
+import { EncuentrosModule } from './encuentros/encuentros.module';
+import { SiembraModule } from './siembra/siembra.module';
+import { KiloamorModule } from './kiloamor/kiloamor.module';
+import { AnunciosModule } from './anuncios/anuncios.module';
+import { ArmCatalogosModule } from './arm-catalogos/arm-catalogos.module';
 
 const envSchema = Joi.object({
   NODE_ENV:             Joi.string().valid('development', 'production', 'test').default('development'),
@@ -77,6 +83,12 @@ const envSchema = Joi.object({
     OnboardingModule,
     ReconciliationModule,
     PaletasModule,
+    TecnicosModule,
+    EncuentrosModule,
+    SiembraModule,
+    KiloamorModule,
+    AnunciosModule,
+    ArmCatalogosModule,
   ],
 })
 export class AppModule {}

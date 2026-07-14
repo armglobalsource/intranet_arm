@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useMiFichas } from '@/hooks/useFichas';
 import { useNoticiasGlobal, useNoticiasCampus } from '@/hooks/useNoticias';
@@ -11,7 +12,8 @@ import { CalendarioAnual } from './CalendarioAnual';
 import { useOrgUserProfile } from '@/hooks/useOrgChart';
 import { membershipArea } from '@/types/orgchart';
 import { useMyDisponibilidad } from '@/hooks/useDisponibilidad';
-import { toWeekLabel, formatWeekLabel } from '@/types/disponibilidad';
+import { useMyTecnicosDisponibilidad } from '@/hooks/useTecnicos';
+import { toWeekLabel, shiftWeek, formatWeekLabel } from '@/types/disponibilidad';
 
 // ── Helper fecha ──────────────────────────────────────────────────────────────
 
@@ -131,55 +133,153 @@ function HubNoticias({
   );
 }
 
-// ── DisponibilidadWidget ──────────────────────────────────────────────────────
+// ── DisponibilidadWidget (inteligente) ───────────────────────────────────────
 
 function DisponibilidadWidget({ campusId }: { campusId: number | null }) {
-  const weekLabel = toWeekLabel(new Date());
-  const { data: saved = [], isLoading } = useMyDisponibilidad(campusId, weekLabel);
-  const responded = saved.length > 0;
+  const { can, isAdmin }  = usePermissions();
+  const hasWorship        = isAdmin || can('disponibilidad:submit');
+  const hasTecnicos       = isAdmin || can('tecnicos:submit');
+  const hasBoth           = hasWorship && hasTecnicos;
+
+  const [activeTab, setActiveTab] = useState<'worship' | 'tecnicos'>(
+    hasWorship ? 'worship' : 'tecnicos',
+  );
+
+  const weekCurrent = toWeekLabel(new Date());
+  const weekNext    = shiftWeek(weekCurrent, 1);
+
+  // Carga semana actual + siguiente para ambos canales
+  const { data: worshipCur  = [], isLoading: loadWC } = useMyDisponibilidad(campusId, weekCurrent);
+  const { data: worshipNext = [], isLoading: loadWN } = useMyDisponibilidad(campusId, weekNext);
+  const { data: tecnicosCur  = [], isLoading: loadTC } = useMyTecnicosDisponibilidad(campusId, weekCurrent);
+  const { data: tecnicosNext = [], isLoading: loadTN } = useMyTecnicosDisponibilidad(campusId, weekNext);
+
+  // Combinar: primero los de esta semana, luego los de la siguiente
+  const savedWorship  = [...worshipCur,  ...worshipNext];
+  const savedTecnicos = [...tecnicosCur, ...tecnicosNext];
+  const loadW = loadWC || loadWN;
+  const loadT = loadTC || loadTN;
+
+  // Si no tiene ningún permiso, no renderizar
+  if (!hasWorship && !hasTecnicos) return null;
+
+  // Semana relevante = la que tiene datos (prioridad semana actual)
+  const activeWeekW = worshipCur.length  > 0 ? weekCurrent : weekNext;
+  const activeWeekT = tecnicosCur.length > 0 ? weekCurrent : weekNext;
+  const activeWeek  = activeTab === 'worship' ? activeWeekW : activeWeekT;
+
+  const current = activeTab === 'worship'
+    ? { saved: savedWorship,  isLoading: loadW, href: `/dashboard/worship/disponibilidad`,                             color: '#16a34a' }
+    : { saved: savedTecnicos, isLoading: loadT, href: `/dashboard/produccion-general/tecnicos/disponibilidad`,         color: '#2563eb' };
+
+  const responded = current.saved.length > 0;
 
   return (
-    <Link
-      href="/dashboard/worship/disponibilidad"
-      className="p-5 flex items-start gap-4 rounded-2xl transition-all group"
-      style={{ background: '#E5E7EB', border: '1px solid #D1D5DB' }}
-      onMouseEnter={e => (e.currentTarget.style.background = '#D1D5DB')}
-      onMouseLeave={e => (e.currentTarget.style.background = '#E5E7EB')}
-    >
-      <div className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center"
-        style={{ background: 'rgba(0,0,0,0.07)' }}>
-        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none"
-          stroke="#374151" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" />
-          <line x1="16" y1="2" x2="16" y2="6" />
-          <line x1="8" y1="2" x2="8" y2="6" />
-          <line x1="3" y1="10" x2="21" y2="10" />
-          <polyline points="9 16 11 18 15 14" />
-        </svg>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold leading-tight text-gray-900">Mi disponibilidad</p>
-        <p className="text-xs mt-0.5 text-gray-500">{formatWeekLabel(weekLabel)}</p>
-        <div className="mt-1.5">
-          {isLoading ? (
-            <div className="h-4 w-20 rounded-full animate-pulse bg-gray-300" />
-          ) : !campusId ? (
-            <span className="text-[10px] font-semibold text-yellow-600">Sin campus asignado</span>
-          ) : responded ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-green-700 bg-green-100 border border-green-200">
-              ✓ Enviada
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-100 border border-amber-200">
-              Pendiente
-            </span>
-          )}
+    <div className="rounded-2xl overflow-hidden" style={{ background: '#E5E7EB', border: '1px solid #D1D5DB' }}>
+
+      {/* Tabs — solo visibles cuando tiene ambos permisos */}
+      {hasBoth && (
+        <div className="flex border-b border-gray-300/60">
+          {(['worship', 'tecnicos'] as const).map((tab) => {
+            const isActive = activeTab === tab;
+            const color    = tab === 'worship' ? '#16a34a' : '#2563eb';
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className="flex-1 py-2 text-[11px] font-semibold transition-all"
+                style={{
+                  color:        isActive ? color : '#6B7280',
+                  background:   isActive ? '#fff' : 'transparent',
+                  borderBottom: isActive ? `2px solid ${color}` : '2px solid transparent',
+                }}
+              >
+                {tab === 'worship' ? '🎵 Worship' : '🔧 Técnicos'}
+              </button>
+            );
+          })}
         </div>
-        <p className="text-[10px] font-medium mt-1.5 text-gray-500">
-          {responded ? 'Actualizar mi disponibilidad →' : 'Enviar mi disponibilidad →'}
-        </p>
-      </div>
-    </Link>
+      )}
+
+      {/* Contenido — link a la página del canal activo */}
+      <Link
+        href={current.href}
+        className="p-4 flex items-start gap-3.5 transition-all"
+        style={{ background: '#E5E7EB', display: 'flex' }}
+        onMouseEnter={e => (e.currentTarget.style.background = '#D1D5DB')}
+        onMouseLeave={e => (e.currentTarget.style.background = '#E5E7EB')}
+      >
+        <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.06)' }}>
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
+            stroke="#374151" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+            <polyline points="9 16 11 18 15 14" />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold leading-tight text-gray-900">Mi disponibilidad</p>
+          <p className="text-[10px] mt-0.5 text-gray-500">{formatWeekLabel(activeWeek)}</p>
+          <div className="mt-1.5">
+            {current.isLoading ? (
+              <div className="h-3.5 w-16 rounded-full animate-pulse bg-gray-300" />
+            ) : !campusId ? (
+              <span className="text-[10px] font-semibold text-yellow-600">Sin campus asignado</span>
+            ) : responded ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-green-700 bg-green-100 border border-green-200">
+                ✓ Enviada
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-100 border border-amber-200">
+                Pendiente
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] font-medium mt-1 text-gray-500">
+            {responded ? 'Actualizar →' : 'Enviar mi disponibilidad →'}
+          </p>
+        </div>
+      </Link>
+
+      {/* Encuentros confirmados (available === true) */}
+      {(() => {
+        const confirmados = current.saved.filter((s) => s.available);
+        if (!confirmados.length) return null;
+        return (
+          <div style={{ borderTop: '1px solid #D1D5DB', padding: '10px 14px 12px' }}>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
+              Comprometido a servir
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {confirmados.map((s) => (
+                <div key={s.scheduleKey}
+                  className="flex items-center gap-2 rounded-lg px-2.5 py-1.5"
+                  style={{ background: '#fff', border: '1px solid #E5E7EB' }}>
+                  {/* Punto verde */}
+                  <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#16a34a' }} />
+                  <span className="text-[11px] font-semibold text-gray-800 capitalize">{s.dia}</span>
+                  {s.bloque && (
+                    <span className="text-[10px] font-bold px-1.5 py-px rounded"
+                      style={{ background: 'rgba(0,0,0,0.05)', color: '#6B7280' }}>
+                      {s.bloque}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-gray-500 ml-auto">{s.hora} hrs</span>
+                  {s.nota && (
+                    <span className="text-[9px] text-gray-400 truncate max-w-[80px]" title={s.nota}>
+                      · {s.nota}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
   );
 }
 
@@ -226,12 +326,14 @@ function PendingUsersBanner({ enabled }: { enabled: boolean }) {
 
 export function DashboardClient() {
   const { can, isAdmin } = usePermissions();
-  const canDisponibilidad = true; // todos los usuarios ven la card; el backend valida al enviar
 
   const { data: fichas, isLoading: fichasLoading } = useMiFichas();
   const { data: noticiasGlobal, isLoading: loadingGlobal } = useNoticiasGlobal();
   const { data: noticiasCampus, isLoading: loadingCampus } = useNoticiasCampus();
   const { user } = useAuthStore();
+
+  const hasWorship  = isAdmin || can('disponibilidad:submit');
+  const hasTecnicos = isAdmin || can('tecnicos:submit');
 
   // Mis equipos y ministerios
   const { data: orgProfile, isLoading: orgLoading } = useOrgUserProfile(user?.id ?? null);
@@ -377,8 +479,8 @@ export function DashboardClient() {
           </div>
         </Link>
 
-        {/* Disponibilidad / Notificaciones */}
-        {canDisponibilidad ? (
+        {/* Disponibilidad */}
+        {(hasWorship || hasTecnicos) ? (
           <DisponibilidadWidget campusId={user?.campusId ?? null} />
         ) : (
           <div className="card p-5 flex items-center gap-4">

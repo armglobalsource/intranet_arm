@@ -168,6 +168,21 @@ export class DisponibilidadService {
     return this.fb.toDocs(snap);
   }
 
+  /** Todos los compromisos (available=true) del voluntario para el calendario */
+  async getMyCommitments(userId: number, campusId: number) {
+    const snap = await this.fb.db.collection(COL)
+      .where('userId',    '==', userId)
+      .where('campusId',  '==', campusId)
+      .where('available', '==', true)
+      .get();
+    const docs = this.fb.toDocs(snap) as any[];
+    return docs.sort((a, b) => {
+      const da = a.encounterDate?.seconds ?? 0;
+      const db = b.encounterDate?.seconds ?? 0;
+      return da - db;
+    });
+  }
+
   /** Matriz completa voluntario × encuentro para el productor */
   async getMatrix(campusId: number, weekLabel: string): Promise<MatrixResult> {
     const encounters = await this.getEncounters(campusId, weekLabel);
