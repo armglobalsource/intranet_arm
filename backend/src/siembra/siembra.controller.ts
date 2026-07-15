@@ -20,6 +20,13 @@ export class SiembraController {
     return this.siembra.findAll(campusId, periodo);
   }
 
+  @Get('mine')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('siembra:create')
+  findMine(@CurrentUser() user: any) {
+    return this.siembra.findMine(user.sub);
+  }
+
   @Get(':id')
   @UseGuards(PermissionsGuard)
   @RequirePermission('siembra:view')

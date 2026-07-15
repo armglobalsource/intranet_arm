@@ -1,17 +1,41 @@
 import {
-  Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards,
+  BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CampusService } from '../campus/campus.service';
 import { EncuentrosService } from './encuentros.service';
 import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('encuentros')
 export class EncuentrosController {
-  constructor(private readonly encuentros: EncuentrosService) {}
+  constructor(
+    private readonly encuentros: EncuentrosService,
+    private readonly campusService: CampusService,
+  ) {}
+
+  /** Resumen agregado del campus del usuario autenticado (nunca del campus que el cliente pida). */
+  @Get('resumen')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('encuentros:create')
+  async resumen(
+    @Query('year')  yearStr: string,
+    @Query('month') monthStr: string | undefined,
+    @CurrentUser()  user: any,
+  ) {
+    if (!user.campusId) throw new BadRequestException('Tu cuenta no tiene un campus asignado.');
+    const year  = parseInt(yearStr, 10);
+    const month = monthStr !== undefined ? parseInt(monthStr, 10) : undefined;
+    if (!Number.isInteger(year)) throw new BadRequestException('year inválido');
+    if (month !== undefined && (!Number.isInteger(month) || month < 1 || month > 12)) {
+      throw new BadRequestException('month inválido (1-12)');
+    }
+    const campus = await this.campusService.findOne(user.campusId);
+    return this.encuentros.resumen(campus.name, year, month);
+  }
 
   @Get()
   @UseGuards(PermissionsGuard)
@@ -21,6 +45,13 @@ export class EncuentrosController {
     @Query('periodo')  periodo?: any,
   ) {
     return this.encuentros.findAll(campusId, periodo);
+  }
+
+  @Get('mine')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('encuentros:create')
+  findMine(@CurrentUser() user: any) {
+    return this.encuentros.findMine(user.sub);
   }
 
   @Get(':id')

@@ -50,3 +50,13 @@ export function inPeriodo(fecha: string | undefined, periodo: Periodo = 'todo'):
     default: return true;
   }
 }
+
+/** ¿La fecha cae en el año (y mes opcional, 1-12) pedido? Filtrado en memoria, mismo estilo que inPeriodo. */
+export function inMonth(fecha: string | undefined, year: number, month?: number): boolean {
+  if (!fecha) return false;
+  const f = new Date(fecha);
+  if (isNaN(f.getTime())) return false;
+  if (f.getFullYear() !== year) return false;
+  if (month !== undefined && f.getMonth() + 1 !== month) return false;
+  return true;
+}

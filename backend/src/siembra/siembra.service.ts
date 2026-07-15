@@ -36,6 +36,15 @@ export class SiembraService {
     return mapId(this.fb.toObj(snap));
   }
 
+  /** Registros creados por el usuario autenticado — para la sección "Mis registros" del perfil. */
+  async findMine(userId: number | string) {
+    const snap = await this.fb.db.collection(COL)
+      .where('registradoPor.uid', '==', userId).limit(500).get();
+    return this.fb.toDocs(snap)
+      .map((r) => mapId(r))
+      .sort((a, b) => String(b.fechaRegistroISO ?? '').localeCompare(String(a.fechaRegistroISO ?? '')));
+  }
+
   async create(dto: CreateSiembraDto, user: { sub: string; email: string }) {
     if (dto.idempotencyKey) {
       const existing = await this.fb.db.collection(COL)

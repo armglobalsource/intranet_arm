@@ -1,9 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
-import { Periodo, mapId, sumCounts, inPeriodo } from '../common/arm-records.util';
+import { Periodo, mapId, sumCounts, inPeriodo, inMonth } from '../common/arm-records.util';
 import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
 
 const COL = 'encuentros';
+
+export interface ResumenTipo {
+  count:            number;
+  totalAsistencia:  number;
+  decisiones:       number;
+  totalVoluntarios: number;
+}
+
+export interface EncuentrosResumen {
+  encuentros: ResumenTipo;
+  eventos:    ResumenTipo;
+}
 
 @Injectable()
 export class EncuentrosService {
@@ -26,6 +38,34 @@ export class EncuentrosService {
     const snap = await this.fb.db.collection(COL).doc(id).get();
     if (!snap.exists) throw new NotFoundException(`Encuentro ${id} no encontrado`);
     return mapId(this.fb.toObj(snap));
+  }
+
+  /** Registros creados por el usuario autenticado — para la sección "Mis registros" del perfil. */
+  async findMine(userId: number | string) {
+    const snap = await this.fb.db.collection(COL)
+      .where('registradoPor.uid', '==', userId).limit(500).get();
+    return this.fb.toDocs(snap)
+      .map((r) => mapId(r))
+      .sort((a, b) => String(b.fechaRegistroISO ?? '').localeCompare(String(a.fechaRegistroISO ?? '')));
+  }
+
+  /** Resumen agregado (decisiones, voluntarios, asistencia) por campus y período, separado encuentro/evento. */
+  async resumen(campus: string, year: number, month?: number): Promise<EncuentrosResumen> {
+    const snap = await this.fb.db.collection(COL).where('campus', '==', campus).limit(2000).get();
+    const rows = this.fb.toDocs(snap).filter((r) => inMonth(r.fecha, year, month));
+
+    const empty = (): ResumenTipo => ({ count: 0, totalAsistencia: 0, decisiones: 0, totalVoluntarios: 0 });
+    const acc: EncuentrosResumen = { encuentros: empty(), eventos: empty() };
+
+    for (const r of rows) {
+      const bucket = r.tipo === 'evento' ? acc.eventos : acc.encuentros;
+      bucket.count += 1;
+      bucket.totalAsistencia += r.totalAsistencia ?? 0;
+      bucket.totalVoluntarios += r.totalVoluntarios ?? 0;
+      bucket.decisiones += (r.presencial?.acepto ?? 0) + (r.online?.acepto ?? 0);
+    }
+
+    return acc;
   }
 
   // ── Escritura ──────────────────────────────────────────────────────────────

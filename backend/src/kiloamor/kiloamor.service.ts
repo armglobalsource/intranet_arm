@@ -1,9 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
-import { Periodo, mapId, inPeriodo } from '../common/arm-records.util';
+import { Periodo, mapId, inPeriodo, inMonth } from '../common/arm-records.util';
 import { CreateKiloamorDto, UpdateKiloamorDto } from './dto/kiloamor.dto';
 
 const COL = 'kiloamor';
+
+export interface KiloamorResumen {
+  count:      number;
+  totalCajas: number;
+}
 
 @Injectable()
 export class KiloamorService {
@@ -23,6 +28,25 @@ export class KiloamorService {
     const snap = await this.fb.db.collection(COL).doc(id).get();
     if (!snap.exists) throw new NotFoundException(`Registro Kilo de Amor ${id} no encontrado`);
     return mapId(this.fb.toObj(snap));
+  }
+
+  /** Registros creados por el usuario autenticado — para la sección "Mis registros" del perfil. */
+  async findMine(userId: number | string) {
+    const snap = await this.fb.db.collection(COL)
+      .where('registradoPor.uid', '==', userId).limit(500).get();
+    return this.fb.toDocs(snap)
+      .map((r) => mapId(r))
+      .sort((a, b) => String(b.fechaRegistroISO ?? '').localeCompare(String(a.fechaRegistroISO ?? '')));
+  }
+
+  /** Resumen agregado (cajas entregadas) por campus y período. */
+  async resumen(campus: string, year: number, month?: number): Promise<KiloamorResumen> {
+    const snap = await this.fb.db.collection(COL).where('campus', '==', campus).limit(2000).get();
+    const rows = this.fb.toDocs(snap).filter((r) => inMonth(r.fecha, year, month));
+    return rows.reduce<KiloamorResumen>((acc, r) => ({
+      count:      acc.count + 1,
+      totalCajas: acc.totalCajas + (r.cajas ?? 0),
+    }), { count: 0, totalCajas: 0 });
   }
 
   async create(dto: CreateKiloamorDto, user: { sub: string; email: string }) {
