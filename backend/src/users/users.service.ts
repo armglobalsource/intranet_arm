@@ -31,7 +31,10 @@ export class UsersService {
   // ── Usuarios ──────────────────────────────────────────────────────────────
 
   async findAll(_userId: number, _roleId: number, search?: string, page = 1, limit = 50) {
-    const safeLimit = Math.min(limit, 200);
+    // Tope generoso, no una paginación real — el frontend siempre pide "todos"
+    // para filtrar/paginar en el cliente (useUsersPaginated con paginación real
+    // de servidor está definido pero no se usa en ningún lado todavía).
+    const safeLimit = Math.min(limit, 2000);
     let all = await this.fb.db.collection(COL).get();
     let docs = this.fb.toDocs(all).sort((a, b) =>
       (a.firstName ?? '').localeCompare(b.firstName ?? '') ||

@@ -45,7 +45,7 @@ export function useUsers(search?: string, options?: { enabled?: boolean }) {
     queryKey: userKeys.list(search),
     queryFn: () =>
       api
-        .get<PaginatedUsers>('/users', { params: { search: search || undefined, limit: 200 } })
+        .get<PaginatedUsers>('/users', { params: { search: search || undefined, limit: 2000 } })
         .then((r) => r.data.data),
     staleTime: 2 * 60 * 1000,
     enabled: options?.enabled,
