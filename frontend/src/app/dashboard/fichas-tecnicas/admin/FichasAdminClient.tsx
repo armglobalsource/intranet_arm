@@ -27,18 +27,36 @@ function buildEncuentrosConfig(campus: Campus): EncuentrosDia[] {
   const schedules = campus.schedules ?? [];
   if (schedules.length === 0) return [];
 
-  // Agrupar por día
-  const byDay: Record<string, typeof schedules> = {};
+  // Agrupar por (día + bloque), cada combinación es su propio tipo de evento
+  // (su propia ficha técnica) aunque compartan el mismo día:
+  //   - "oración" siempre es su propio grupo, sin importar bloque
+  //     (ej. Miércoles Oración 06:00 vs Miércoles Global 20:00).
+  //   - un bloque (AM/PM) agrupa sus propios horarios en un evento multi
+  //     (ej. Domingo Bloque AM vs Domingo Bloque PM).
+  //   - un horario suelto (sin bloque, sin oración) usa su descripción como
+  //     nombre del evento si la tiene (ej. "Miércoles Global").
+  const byGroup: Record<string, { dia: string; slots: typeof schedules }> = {};
   schedules.forEach((s) => {
-    byDay[s.dia] = byDay[s.dia] ?? [];
-    byDay[s.dia].push(s);
+    const isOracion = s.fichaType === 'oracion';
+    const key = isOracion
+      ? `${s.dia}:oracion`
+      : s.bloque
+      ? `${s.dia}:${s.bloque}`
+      : `${s.dia}:${s.descripcion ?? s.hora}`;
+    const label = isOracion
+      ? `${s.dia} Oración`
+      : s.bloque
+      ? `${s.dia} Bloque ${s.bloque}`
+      : (s.descripcion || s.dia);
+    byGroup[key] = byGroup[key] ?? { dia: label, slots: [] };
+    byGroup[key].slots.push(s);
   });
 
   const ORDER = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
-  return Object.entries(byDay)
-    .sort(([a], [b]) => ORDER.indexOf(a) - ORDER.indexOf(b))
-    .map(([dia, slots]) => {
+  return Object.values(byGroup)
+    .sort((a, b) => ORDER.indexOf(a.slots[0].dia) - ORDER.indexOf(b.slots[0].dia))
+    .map(({ dia, slots }) => {
       const isMulti    = slots.length > 1;
       const fichaType  = (slots[0].fichaType as FichaType | undefined) ?? (isMulti ? 'multi' : 'unico');
       const encuentros: Encuentro[] = slots.map((s, i) => ({

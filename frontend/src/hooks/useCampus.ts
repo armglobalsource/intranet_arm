@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 export interface CampusSchedule {
   dia:          string;
   hora:         string;
+  bloque?:      string;
   descripcion?: string;
   fichaType?:   'unico' | 'multi' | 'oracion';
 }

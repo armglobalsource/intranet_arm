@@ -2174,6 +2174,7 @@ export function FichaDocumentView({
 
   const isSaving = saveState === 'saving';
   const isSaved  = saveState === 'saved';
+  const isSaveError = saveState === 'error';
 
   return (
     <div
@@ -2434,8 +2435,8 @@ export function FichaDocumentView({
                     padding: '6px 13px', borderRadius: 8, fontSize: 12, fontWeight: 600,
                     border: 'none', cursor: isSaving ? 'default' : 'pointer',
                     transition: 'all 0.2s',
-                    background: isSaved ? C.green : 'rgba(255,255,255,0.1)',
-                    color: D.textPrimary,
+                    background: isSaveError ? 'rgba(220,38,38,0.15)' : isSaved ? C.green : 'rgba(255,255,255,0.1)',
+                    color: isSaveError ? '#f87171' : D.textPrimary,
                     opacity: isSaving ? 0.7 : 1,
                   }}
                 >
@@ -2443,6 +2444,11 @@ export function FichaDocumentView({
                     <>
                       <svg style={{ animation: 'spin 1s linear infinite' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
                       Guardando…
+                    </>
+                  ) : isSaveError ? (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                      Error al guardar
                     </>
                   ) : isSaved ? (
                     <>

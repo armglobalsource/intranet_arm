@@ -162,7 +162,20 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     const next = current.includes(name)
       ? current.filter((s) => s !== name)
       : [...current, name];
-    updateFicha({ fichaId: ficha.fichaId, hiddenSections: next });
+    setSaveState('saving');
+    updateFicha(
+      { fichaId: ficha.fichaId, hiddenSections: next },
+      {
+        onSuccess: () => {
+          setSaveState('saved');
+          setTimeout(() => setSaveState('idle'), 800);
+        },
+        onError: () => {
+          setSaveState('error');
+          setTimeout(() => setSaveState('idle'), 3000);
+        },
+      },
+    );
   }
 
   function handleUpdateLayout(layout: { left: string[]; right: string[] }) {
