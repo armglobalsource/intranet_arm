@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { StorageService } from '../common/storage/storage.service';
+import { UsersService } from '../users/users.service';
+import { JobTitlesService } from '../job-titles/job-titles.service';
 import {
   CreateOrgAreaDto, UpdateOrgAreaDto,
   CreateOrgTeamDto, UpdateOrgTeamDto,
@@ -26,7 +28,17 @@ export class OrgChartService {
   constructor(
     private fb: FirebaseService,
     private storage: StorageService,
+    private users: UsersService,
+    private jobTitles: JobTitlesService,
   ) {}
+
+  /** Sincroniza el customTitle de una membresía como Cargo de la persona (solo agrega, nunca quita). */
+  private async syncCustomTitleToJobTitle(userId: number, customTitle: string | null | undefined) {
+    const name = customTitle?.trim();
+    if (!name) return;
+    const jobTitle = await this.jobTitles.findOrCreateByName(name);
+    await this.users.ensureJobTitle(userId, jobTitle.id, jobTitle.name);
+  }
 
   // ── ÁREAS ─────────────────────────────────────────────────────────────────
 
@@ -262,6 +274,7 @@ export class OrgChartService {
       updatedAt:   this.fb.now(),
     };
     await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).set(doc);
+    await this.syncCustomTitleToJobTitle(dto.userId, dto.customTitle);
     return this.fb.toObj(await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).get());
   }
 
@@ -269,6 +282,9 @@ export class OrgChartService {
     const snap = await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).get();
     if (!snap.exists) throw new NotFoundException(`Membresía ${id} no encontrada`);
     await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).update({ ...dto, updatedAt: this.fb.now() });
+    if (dto.customTitle !== undefined) {
+      await this.syncCustomTitleToJobTitle(snap.data()!.userId, dto.customTitle);
+    }
     return this.fb.toObj(await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).get());
   }
 

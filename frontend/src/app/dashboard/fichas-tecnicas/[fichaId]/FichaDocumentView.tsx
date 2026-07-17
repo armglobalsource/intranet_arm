@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Ficha, Row, SectionName, Encuentro } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
 import { SongInput } from '@/components/fichas/SongInput';
+import { useUsers } from '@/hooks/useUsers';
+import { displayName } from '@/types/user';
 
 // Secciones disponibles por tipo de ficha (para el panel de módulos)
 const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
@@ -206,6 +208,94 @@ function CellInput({ value, onChange, placeholder, style }: {
         ...style,
       }}
     />
+  );
+}
+
+// ── PersonCellInput ───────────────────────────────────────────────────────────
+// Mismo contrato que CellInput (drop-in), pero con autocomplete: al escribir
+// 3+ caracteres busca entre todas las personas registradas y permite
+// seleccionarlas. Si la persona no está en el sistema, se puede seguir
+// escribiendo el nombre a mano igual que antes — no obliga a elegir de la lista.
+
+const PERSON_SEARCH_MIN_CHARS = 3;
+
+function PersonCellInput({ value, onChange, placeholder, style, multiline, rows }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  style?: React.CSSProperties;
+  multiline?: boolean;
+  rows?: number;
+}) {
+  const { data: users = [] } = useUsers();
+  const [open, setOpen] = useState(false);
+
+  const suggestions = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    if (q.length < PERSON_SEARCH_MIN_CHARS) return [];
+    return users
+      .filter((u) => displayName(u).toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [value, users]);
+
+  const showDrop = open && suggestions.length > 0;
+
+  const sharedProps = {
+    value,
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { onChange(e.target.value); setOpen(true); },
+    onFocus: () => setOpen(true),
+    onBlur: () => setTimeout(() => setOpen(false), 150),
+    placeholder: placeholder ?? '—',
+    className: 'ficha-cell-input',
+    style: {
+      border: 'none',
+      borderBottom: `1px dashed ${D.inputBorder}`,
+      outline: 'none',
+      background: 'transparent',
+      padding: '1px 2px',
+      font: 'inherit',
+      color: 'inherit',
+      width: '100%',
+      minWidth: 0,
+      caretColor: C.purple,
+      ...style,
+    },
+  };
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      {multiline ? (
+        <textarea rows={rows ?? 2} {...sharedProps} style={{ ...sharedProps.style, resize: 'none' }} />
+      ) : (
+        <input type="text" {...sharedProps} />
+      )}
+      {showDrop && (
+        <div
+          className="ficha-no-print"
+          style={{
+            position: 'absolute', zIndex: 50, left: 0, right: 0, top: '100%', marginTop: 3,
+            background: '#1c1c1c', border: `1px solid ${D.cardBorder}`, borderRadius: 8,
+            boxShadow: '0 8px 20px rgba(0,0,0,0.35)', maxHeight: 180, overflowY: 'auto', textAlign: 'left',
+          }}
+        >
+          {suggestions.map((u) => (
+            <button
+              key={u.id}
+              type="button"
+              onMouseDown={() => { onChange(displayName(u)); setOpen(false); }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '6px 10px', background: 'transparent', border: 'none', cursor: 'pointer',
+                borderBottom: `1px solid ${D.divider}`,
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary }}>{displayName(u)}</div>
+              {u.email && <div style={{ fontSize: 10, color: D.textMuted }}>{u.email}</div>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -488,7 +578,7 @@ function RoleCard({
                 <span style={S.roleLabel}>{row.label}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                   {editable ? (
-                    <CellInput
+                    <PersonCellInput
                       value={rawVal(row, colId)}
                       onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
                       style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
@@ -537,7 +627,7 @@ function StreamingCard({
                 <span style={S.roleLabel}>{row.label}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                   {editable ? (
-                    <CellInput
+                    <PersonCellInput
                       value={rawVal(row, colId)}
                       onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
                       style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
@@ -567,7 +657,7 @@ function StreamingCard({
                       {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                     </div>
                     {editable ? (
-                      <CellInput
+                      <PersonCellInput
                         value={rawVal(row, colId)}
                         onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
                         style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, marginTop: 2 }}
@@ -616,7 +706,7 @@ function EscenaCard({
                 {handle}
                 <span style={S.roleLabel}>VIO</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-                  <CellInput
+                  <PersonCellInput
                     value={rawVal(vio, colId)}
                     onChange={(v) => onCellChange?.(vio.id, effectiveColId(vio, colId), v)}
                     style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
@@ -650,7 +740,7 @@ function EscenaCard({
                         {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                       </div>
                       {editable ? (
-                        <CellInput
+                        <PersonCellInput
                           value={rawVal(row, colId)}
                           onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
                           style={{ fontSize: 12, fontWeight: 600, color: D.textPrimary, textAlign: 'center', marginTop: 2 }}
@@ -682,7 +772,7 @@ function EscenaCard({
                     <span style={{ fontSize: 11, color: D.textSecond, flexShrink: 0 }}>{row.label}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                       {editable ? (
-                        <CellInput
+                        <PersonCellInput
                           value={rawVal(row, colId)}
                           onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
                           style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, textAlign: 'right' }}
@@ -1460,7 +1550,7 @@ function WorshipSetListCard({
                   {handle}
                   <span style={S.roleLabel}>VIO</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-                    <CellInput
+                    <PersonCellInput
                       value={rawVal(vio, colId)}
                       onChange={(v) => escena.onCellChange?.(vio.id, effectiveColId(vio, colId), v)}
                       style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
@@ -1487,17 +1577,15 @@ function WorshipSetListCard({
                           {editable && escena.onDeleteRow && <DeleteBtn onClick={() => escena.onDeleteRow!(row.id)} />}
                         </div>
                         {editable ? (
-                          <textarea
+                          <PersonCellInput
                             value={rawVal(row, colId)}
-                            onChange={(e) => escena.onCellChange?.(row.id, effectiveColId(row, colId), e.target.value)}
+                            onChange={(v) => escena.onCellChange?.(row.id, effectiveColId(row, colId), v)}
                             placeholder="Nombre…"
+                            multiline
                             rows={2}
                             style={{
-                              width: '100%', background: 'transparent', border: 'none',
-                              borderBottom: `1px dashed ${D.inputBorder}`, outline: 'none',
-                              resize: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
-                              color: D.textPrimary, textAlign: 'center', marginTop: 4,
-                              padding: 0, lineHeight: 1.45, caretColor: C.purple,
+                              fontSize: 12, fontWeight: 600, color: D.textPrimary,
+                              textAlign: 'center', marginTop: 4, lineHeight: 1.45,
                             }}
                           />
                         ) : (
@@ -1527,7 +1615,7 @@ function WorshipSetListCard({
                       <span style={{ fontSize: 11, color: D.textSecond, flexShrink: 0, minWidth: 120 }}>{row.label}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                         {editable ? (
-                          <CellInput
+                          <PersonCellInput
                             value={rawVal(row, colId)}
                             onChange={(v) => escena.onCellChange?.(row.id, effectiveColId(row, colId), v)}
                             style={{ fontSize: 13, fontWeight: 500, color: D.textPrimary, textAlign: 'right' }}
@@ -1824,33 +1912,31 @@ function VoluntariosCard({
     <div className="ficha-card" style={{ ...S.card, marginBottom: 14 }}>
       <div style={S.cardTitle}>Voluntarios de Servicio</div>
       <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 24px' }}>
-          {displayed.map((row, i) => (
-            <SortableRow key={row.id} id={row.id} editable={editable}>
-              {(handle) => (
-                <div style={{
-                  ...S.roleRow,
-                  ...(i === displayed.length - 1 ? { borderBottom: 'none' } : {}),
-                }}>
-                  {handle}
-                  <span style={S.roleLabel}>{row.label}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-                    {editable ? (
-                      <CellInput
-                        value={rawVal(row, colId)}
-                        onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                        style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
-                      />
-                    ) : (
-                      <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
-                    )}
-                    {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-                  </div>
+        {displayed.map((row, i) => (
+          <SortableRow key={row.id} id={row.id} editable={editable}>
+            {(handle) => (
+              <div style={{
+                ...S.roleRow,
+                ...(i === displayed.length - 1 ? { borderBottom: 'none' } : {}),
+              }}>
+                {handle}
+                <span style={S.roleLabel}>{row.label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
+                  {editable ? (
+                    <PersonCellInput
+                      value={rawVal(row, colId)}
+                      onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                      style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
+                    />
+                  ) : (
+                    <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
+                  )}
+                  {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                 </div>
-              )}
-            </SortableRow>
-          ))}
-        </div>
+              </div>
+            )}
+          </SortableRow>
+        ))}
       </SortableSection>
       <SectionFooter sectionName="voluntarios" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
     </div>
@@ -2374,13 +2460,13 @@ export function FichaDocumentView({
             </div>
           </div>
 
-          {/* Fila 2: campus + título (izq) + botones (der) */}
+          {/* Fila 2: campus + título en su propia fila, botones debajo */}
           <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            padding: '1rem 2rem 1.2rem', gap: 16,
+            display: 'flex', flexDirection: 'column',
+            padding: '1rem 2rem 1.2rem', gap: 12,
           }}>
             {/* Campus + título */}
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600, marginBottom: 4 }}>
                 {/^(campus|arm)\s/i.test(campusName ?? '') ? campusName : `Campus ${campusName}`}
               </div>
@@ -2423,7 +2509,7 @@ export function FichaDocumentView({
             </div>
 
             {/* ── Botones de acción (ocultos en impresión) ── */}
-            <div className="ficha-no-print" style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <div className="ficha-no-print" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
 
               {/* Guardar (solo modo edición) */}
               {editable && onSave && (

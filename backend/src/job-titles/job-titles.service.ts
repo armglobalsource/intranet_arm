@@ -75,4 +75,26 @@ export class JobTitlesService {
     await this.fb.db.collection(COL).doc(String(id)).delete();
     return { id };
   }
+
+  /** Busca un cargo por nombre (case/espacios-insensitive) o lo crea si no existe. */
+  async findOrCreateByName(rawName: string): Promise<{ id: number; name: string }> {
+    const name = rawName.trim();
+    const nameLower = name.toLowerCase();
+    const snap = await this.fb.db.collection(COL).where('nameLower', '==', nameLower).limit(1).get();
+    if (!snap.empty) {
+      const data = snap.docs[0].data();
+      return { id: data.id, name: data.name };
+    }
+    const id = await this.fb.nextId(COL);
+    const doc = {
+      id, name,
+      nameLower,
+      sortOrder:  0,
+      isActive:   true,
+      createdAt:  this.fb.now(),
+      updatedAt:  this.fb.now(),
+    };
+    await this.fb.db.collection(COL).doc(String(id)).set(doc);
+    return { id, name };
+  }
 }

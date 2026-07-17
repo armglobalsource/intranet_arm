@@ -11,6 +11,8 @@ import {
   useDeleteJobTitle,
   type JobTitle,
 } from '@/hooks/useJobTitles';
+import { useUsers, useUpdateUser } from '@/hooks/useUsers';
+import { displayName } from '@/types/user';
 
 const PAGE_SIZE = 20;
 
@@ -124,15 +126,49 @@ interface DeleteConfirmModalProps {
 }
 
 function DeleteConfirmModal({ cargo, onConfirm, onCancel, isPending }: DeleteConfirmModalProps) {
+  const { data: users = [] } = useUsers();
+  const { data: allCargos = [] } = useAllJobTitles();
+  const updateUser = useUpdateUser();
+  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [replacements, setReplacements] = useState<Record<number, number | ''>>({});
+
+  const peopleWithCargo = useMemo(
+    () => users.filter((u) => u.jobTitles.some((jt) => jt.jobTitle.id === cargo.id)),
+    [users, cargo.id],
+  );
+
+  const replacementOptions = useMemo(
+    () => allCargos
+      .filter((c) => c.isActive && c.id !== cargo.id)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    [allCargos, cargo.id],
+  );
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
     document.addEventListener('keydown', h);
     return () => document.removeEventListener('keydown', h);
   }, [onCancel]);
 
+  function handleRemoveFromPerson(personId: number) {
+    const person = peopleWithCargo.find((u) => u.id === personId);
+    if (!person) return;
+    const replacementId = replacements[personId];
+    let jobTitleIds = person.jobTitles
+      .map((jt) => jt.jobTitle.id)
+      .filter((id) => id !== cargo.id);
+    if (replacementId && !jobTitleIds.includes(replacementId)) {
+      jobTitleIds = [...jobTitleIds, replacementId];
+    }
+    setRemovingId(personId);
+    updateUser.mutate({ id: personId, data: { jobTitleIds } }, { onSettled: () => setRemovingId(null) });
+  }
+
+  const blocked = peopleWithCargo.length > 0;
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onCancel}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[380px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="p-6 flex flex-col items-center gap-4 text-center">
           <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
             <svg className="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -154,13 +190,53 @@ function DeleteConfirmModal({ cargo, onConfirm, onCancel, isPending }: DeleteCon
             <p className="text-[12px] font-semibold text-slate-800 truncate text-left">{cargo.name}</p>
           </div>
 
+          {blocked && (
+            <div className="w-full text-left bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <p className="text-[12px] font-semibold text-amber-800">
+                {peopleWithCargo.length} persona{peopleWithCargo.length !== 1 ? 's tienen' : ' tiene'} este cargo asignado
+              </p>
+              <p className="text-[11.5px] text-amber-700 mt-0.5 mb-2">
+                Quítaselo a todas antes de poder eliminarlo.
+              </p>
+              <div className="flex flex-col gap-1.5 max-h-[220px] overflow-y-auto">
+                {peopleWithCargo.map((p) => (
+                  <div key={p.id} className="flex flex-col gap-1.5 px-2.5 py-2 bg-white rounded-lg border border-amber-100">
+                    <span className="text-[12px] font-medium text-slate-700 truncate">{displayName(p)}</span>
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={replacements[p.id] ?? ''}
+                        onChange={(e) => setReplacements((prev) => ({ ...prev, [p.id]: e.target.value ? Number(e.target.value) : '' }))}
+                        className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-slate-200 text-[11px] text-slate-600 focus:outline-none focus:border-amber-400 bg-white"
+                      >
+                        <option value="">Sin reemplazo</option>
+                        {replacementOptions.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => handleRemoveFromPerson(p.id)}
+                        disabled={removingId === p.id}
+                        className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        {removingId === p.id
+                          ? <div className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                          : (replacements[p.id] ? 'Reemplazar' : 'Quitar')
+                        }
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2 w-full pt-1">
             <button onClick={onCancel} disabled={isPending}
               className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50">
               Cancelar
             </button>
-            <button onClick={onConfirm} disabled={isPending}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-[13px] font-semibold text-white transition-colors disabled:opacity-50">
+            <button onClick={onConfirm} disabled={isPending || blocked} title={blocked ? 'Quita el cargo de todas las personas primero' : undefined}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-[13px] font-semibold text-white transition-colors disabled:opacity-50 disabled:hover:bg-red-600">
               {isPending
                 ? <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Eliminando...</>
                 : 'Sí, eliminar'

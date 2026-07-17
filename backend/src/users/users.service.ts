@@ -352,6 +352,20 @@ export class UsersService {
     return map[mime] ?? '.jpg';
   }
 
+  /** Agrega un cargo a la persona si todavía no lo tiene (no elimina cargos existentes). */
+  async ensureJobTitle(userId: number, jobTitleId: number, jobTitleName: string): Promise<boolean> {
+    const ref  = this.fb.db.collection(COL).doc(String(userId));
+    const snap = await ref.get();
+    if (!snap.exists) return false;
+
+    const current: any[] = snap.data()!.jobTitles ?? [];
+    if (current.some((jt) => jt.jobTitleId === jobTitleId)) return false;
+
+    const updated = [...current, { jobTitleId, name: jobTitleName, sortOrder: current.length }];
+    await ref.update({ jobTitles: updated, updatedAt: this.fb.now() });
+    return true;
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private async resolveJobTitles(ids: number[]) {

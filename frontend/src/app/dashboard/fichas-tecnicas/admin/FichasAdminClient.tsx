@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFichas, useCreateFicha, useDeleteFicha } from '@/hooks/useFichas';
@@ -99,6 +99,7 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
   const [diaIdx,   setDiaIdx]   = useState<number>(0);
   const [type,     setType]     = useState<FichaType>('multi');
   const [title,    setTitle]    = useState('');
+  const [titleTouched, setTitleTouched] = useState(false);
   const [date,     setDate]     = useState('');
 
   // Estado para evento especial
@@ -130,6 +131,24 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
           color:  ENCOUNTER_COLORS[i % ENCOUNTER_COLORS.length],
         }))
     : diaSeleccionado?.encuentros ?? [];
+
+  // ── Título automático (tipo de evento + fecha + hora) ───────────────────
+  // Se recalcula mientras el usuario no haya editado el título a mano; una
+  // vez que lo toca, se respeta su valor sin volver a pisarlo.
+  const tipoEventoLabel = isCustom ? customName : diaSeleccionado?.dia;
+  const primeraHora     = encuentros[0]?.time;
+
+  useEffect(() => {
+    if (titleTouched) return;
+    if (!tipoEventoLabel) { setTitle(''); return; }
+    const parts = [tipoEventoLabel];
+    if (date) {
+      const fechaLabel = new Date(`${date}T12:00:00`).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+      parts.push(fechaLabel);
+    }
+    if (primeraHora) parts.push(primeraHora);
+    setTitle(parts.join(' · '));
+  }, [tipoEventoLabel, date, primeraHora, titleTouched]);
 
   // ── Campus change ────────────────────────────────────────────────────────
   function handleCampusChange(id: string) {
@@ -196,12 +215,12 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
   // Validation hint shown above the submit button
   const validationHint = !campusId
     ? 'Selecciona un campus'
-    : !title
-    ? 'Agrega un título'
     : !date
     ? 'Elige la fecha del evento'
     : isCustom && encuentros.length === 0
     ? 'El evento necesita al menos un horario'
+    : !title
+    ? 'Agrega un título'
     : null;
 
   return (
@@ -390,25 +409,6 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
         </div>
       )}
 
-      {/* Título */}
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1.5">Título *</label>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          placeholder={
-            isCustom && customName
-              ? `ej: ${customName} ${new Date().toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}`
-              : diaSeleccionado
-              ? `ej: ${diaSeleccionado.dia} ${new Date().toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}`
-              : 'ej: Encuentro Domingo 18 Mayo'
-          }
-          className="input text-sm"
-        />
-      </div>
-
       {/* Fecha */}
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1.5">Fecha del evento *</label>
@@ -417,6 +417,20 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
           value={date}
           onChange={(e) => setDate(e.target.value)}
           required
+          className="input text-sm"
+        />
+      </div>
+
+      {/* Título — al final del formulario; se autocompleta con tipo de evento + fecha + hora,
+          pero es editable: apenas el usuario lo modifica a mano, deja de recalcularse. */}
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1.5">Título *</label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => { setTitle(e.target.value); setTitleTouched(true); }}
+          required
+          placeholder="ej: Encuentro Domingo 18 Mayo"
           className="input text-sm"
         />
       </div>
