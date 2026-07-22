@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import {
+  CampusTurnoTipo,
   CreateAdministradorDto, UpdateAdministradorDto,
   CreateEquipoDto, UpdateEquipoDto,
   GenerarCalendarioDto, UpdateTurnoDto,
@@ -10,23 +11,30 @@ const COL_ADMIN  = 'campus_administradores';
 const COL_EQUIPO = 'campus_equipos';
 const COL_TURNO  = 'campus_turnos';
 
+// Docs creados antes de soportar múltiples tipos no tienen el campo `tipo` —
+// se tratan como 'administradores' (el único tipo que existía entonces), igual
+// al patrón ya usado en este módulo para `isActive` faltante.
+function matchesTipo(row: any, tipo: CampusTurnoTipo): boolean {
+  return (row.tipo ?? 'administradores') === tipo;
+}
+
 @Injectable()
 export class CampusTurnosService {
   constructor(private fb: FirebaseService) {}
 
   // ── Administradores (roster por campus) ─────────────────────────────────────
 
-  async findAdministradores(campusId: number) {
+  async findAdministradores(campusId: number, tipo: CampusTurnoTipo) {
     const snap = await this.fb.db.collection(COL_ADMIN).where('campusId', '==', campusId).get();
     return this.fb.toDocs(snap)
-      .filter((a) => a.isActive !== false)
+      .filter((a) => a.isActive !== false && matchesTipo(a, tipo))
       .sort((a, b) => String(a.nombre).localeCompare(String(b.nombre)));
   }
 
   async createAdministrador(dto: CreateAdministradorDto) {
     const id = await this.fb.nextId(COL_ADMIN);
     const doc = {
-      id, campusId: dto.campusId, nombre: dto.nombre.trim(), isActive: true,
+      id, campusId: dto.campusId, tipo: dto.tipo, nombre: dto.nombre.trim(), isActive: true,
       createdAt: this.fb.now(), updatedAt: this.fb.now(),
     };
     await this.fb.db.collection(COL_ADMIN).doc(String(id)).set(doc);
@@ -45,15 +53,15 @@ export class CampusTurnosService {
 
   // ── Equipos (agrupaciones que rotan) ────────────────────────────────────────
 
-  async findEquipos(campusId: number) {
+  async findEquipos(campusId: number, tipo: CampusTurnoTipo) {
     const snap = await this.fb.db.collection(COL_EQUIPO).where('campusId', '==', campusId).get();
-    return this.fb.toDocs(snap).filter((e) => e.isActive !== false);
+    return this.fb.toDocs(snap).filter((e) => e.isActive !== false && matchesTipo(e, tipo));
   }
 
   async createEquipo(dto: CreateEquipoDto) {
     const id = await this.fb.nextId(COL_EQUIPO);
     const doc = {
-      id, campusId: dto.campusId, nombre: dto.nombre.trim(),
+      id, campusId: dto.campusId, tipo: dto.tipo, nombre: dto.nombre.trim(),
       administradorIds: dto.administradorIds, isActive: true,
       createdAt: this.fb.now(), updatedAt: this.fb.now(),
     };
@@ -74,9 +82,9 @@ export class CampusTurnosService {
 
   // ── Turnos (calendario semanal) ──────────────────────────────────────────────
 
-  async findTurnos(campusId: number, desde?: string, hasta?: string) {
+  async findTurnos(campusId: number, tipo: CampusTurnoTipo, desde?: string, hasta?: string) {
     const snap = await this.fb.db.collection(COL_TURNO).where('campusId', '==', campusId).get();
-    let rows = this.fb.toDocs(snap);
+    let rows = this.fb.toDocs(snap).filter((r) => matchesTipo(r, tipo));
     if (desde) rows = rows.filter((r) => r.fecha >= desde);
     if (hasta) rows = rows.filter((r) => r.fecha <= hasta);
     return rows.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
@@ -84,8 +92,8 @@ export class CampusTurnosService {
 
   /**
    * Genera filas semanales rotando `equipoIds` en orden a partir de `fechaInicio`.
-   * No pisa fechas que ya tengan un turno (permite re-ejecutar sin duplicar ni
-   * perder ediciones manuales de semanas puntuales).
+   * No pisa fechas que ya tengan un turno del mismo tipo (permite re-ejecutar sin
+   * duplicar ni perder ediciones manuales de semanas puntuales).
    */
   async generar(dto: GenerarCalendarioDto) {
     const equipoSnaps = await Promise.all(
@@ -98,7 +106,9 @@ export class CampusTurnosService {
     });
 
     const existing = await this.fb.db.collection(COL_TURNO).where('campusId', '==', dto.campusId).get();
-    const existingFechas = new Set(this.fb.toDocs(existing).map((r) => r.fecha));
+    const existingFechas = new Set(
+      this.fb.toDocs(existing).filter((r) => matchesTipo(r, dto.tipo)).map((r) => r.fecha),
+    );
 
     const start = new Date(`${dto.fechaInicio}T12:00:00Z`);
     let creados = 0;
@@ -111,7 +121,7 @@ export class CampusTurnosService {
       const equipoId = dto.equipoIds[i % dto.equipoIds.length];
       const id = await this.fb.nextId(COL_TURNO);
       await this.fb.db.collection(COL_TURNO).doc(String(id)).set({
-        id, campusId: dto.campusId, fecha, equipoId,
+        id, campusId: dto.campusId, tipo: dto.tipo, fecha, equipoId,
         equipoNombreSnapshot: equipoNombres.get(equipoId) ?? '',
         isManualOverride: false,
         createdAt: this.fb.now(), updatedAt: this.fb.now(),

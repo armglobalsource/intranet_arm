@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CampusTurnosService } from './campus-turnos.service';
 import {
+  CAMPUS_TURNO_TIPOS, CampusTurnoTipo,
   CreateAdministradorDto, UpdateAdministradorDto,
   CreateEquipoDto, UpdateEquipoDto,
   GenerarCalendarioDto, UpdateTurnoDto,
@@ -16,14 +17,20 @@ function requireAdmin(user: any) {
   if (!isAdmin) throw new ForbiddenException('Solo un administrador puede modificar el calendario de turnos');
 }
 
+// 'administradores' es el default por compatibilidad con datos creados antes de
+// soportar múltiples tipos (ver matchesTipo() en el service).
+function parseTipo(tipo?: string): CampusTurnoTipo {
+  return CAMPUS_TURNO_TIPOS.includes(tipo as CampusTurnoTipo) ? (tipo as CampusTurnoTipo) : 'administradores';
+}
+
 @UseGuards(JwtAuthGuard)
 @Controller('campus-turnos')
 export class CampusTurnosController {
   constructor(private readonly service: CampusTurnosService) {}
 
   @Get('administradores')
-  findAdministradores(@Query('campusId', ParseIntPipe) campusId: number) {
-    return this.service.findAdministradores(campusId);
+  findAdministradores(@Query('campusId', ParseIntPipe) campusId: number, @Query('tipo') tipo?: string) {
+    return this.service.findAdministradores(campusId, parseTipo(tipo));
   }
 
   @Post('administradores')
@@ -41,8 +48,8 @@ export class CampusTurnosController {
   }
 
   @Get('equipos')
-  findEquipos(@Query('campusId', ParseIntPipe) campusId: number) {
-    return this.service.findEquipos(campusId);
+  findEquipos(@Query('campusId', ParseIntPipe) campusId: number, @Query('tipo') tipo?: string) {
+    return this.service.findEquipos(campusId, parseTipo(tipo));
   }
 
   @Post('equipos')
@@ -60,10 +67,11 @@ export class CampusTurnosController {
   @Get('turnos')
   findTurnos(
     @Query('campusId', ParseIntPipe) campusId: number,
+    @Query('tipo') tipo?: string,
     @Query('desde') desde?: string,
     @Query('hasta') hasta?: string,
   ) {
-    return this.service.findTurnos(campusId, desde, hasta);
+    return this.service.findTurnos(campusId, parseTipo(tipo), desde, hasta);
   }
 
   @Post('turnos/generar')

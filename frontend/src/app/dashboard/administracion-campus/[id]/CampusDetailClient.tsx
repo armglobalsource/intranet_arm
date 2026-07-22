@@ -9,7 +9,7 @@ import {
   useAdministradores, useCreateAdministrador, useUpdateAdministrador,
   useEquipos, useCreateEquipo,
   useTurnos, useGenerarCalendario, useUpdateTurno,
-  type Administrador, type Equipo, type Turno,
+  type Administrador, type Equipo, type Turno, type CampusTurnoTipo,
 } from '@/hooks/useCampusTurnos';
 
 const ACCENT = '#059669'; // emerald-600, consistente con los acentos ya usados en esta pantalla
@@ -69,12 +69,12 @@ const labelCls = 'text-[10px] font-semibold uppercase tracking-widest text-gray-
 
 // ── Roster de administradores ─────────────────────────────────────────────────
 
-function RosterSection({ campusId, administradores, isAdmin }: {
-  campusId: number; administradores: Administrador[]; isAdmin: boolean;
+function RosterSection({ campusId, tipo, titulo, administradores, isAdmin }: {
+  campusId: number; tipo: CampusTurnoTipo; titulo: string; administradores: Administrador[]; isAdmin: boolean;
 }) {
   const [nombre, setNombre] = useState('');
-  const create = useCreateAdministrador(campusId);
-  const update = useUpdateAdministrador(campusId);
+  const create = useCreateAdministrador(campusId, tipo);
+  const update = useUpdateAdministrador(campusId, tipo);
 
   function handleAdd() {
     const trimmed = nombre.trim();
@@ -84,7 +84,7 @@ function RosterSection({ campusId, administradores, isAdmin }: {
 
   return (
     <div className={cardCls}>
-      <p className={labelCls}>Administradores</p>
+      <p className={labelCls}>{titulo}</p>
       <p className="text-xs text-gray-400 mt-1 mb-3">
         Personas disponibles para formar equipos. No requieren cuenta en el sistema.
       </p>
@@ -106,7 +106,7 @@ function RosterSection({ campusId, administradores, isAdmin }: {
           </span>
         ))}
         {administradores.length === 0 && (
-          <span className="text-xs text-gray-400">Sin administradores aún.</span>
+          <span className="text-xs text-gray-400">Sin {titulo.toLowerCase()} aún.</span>
         )}
       </div>
 
@@ -135,13 +135,13 @@ function RosterSection({ campusId, administradores, isAdmin }: {
 
 // ── Equipos rotativos ─────────────────────────────────────────────────────────
 
-function EquiposSection({ campusId, equipos, administradores, isAdmin }: {
-  campusId: number; equipos: Equipo[]; administradores: Administrador[]; isAdmin: boolean;
+function EquiposSection({ campusId, tipo, equipos, administradores, isAdmin }: {
+  campusId: number; tipo: CampusTurnoTipo; equipos: Equipo[]; administradores: Administrador[]; isAdmin: boolean;
 }) {
   const [selected, setSelected] = useState<number[]>([]);
   const [nombre, setNombre]     = useState('');
   const [nombreTouched, setNombreTouched] = useState(false);
-  const create = useCreateEquipo(campusId);
+  const create = useCreateEquipo(campusId, tipo);
 
   const nombreById = useMemo(
     () => new Map(administradores.map((a) => [a.id, a.nombre])),
@@ -167,7 +167,7 @@ function EquiposSection({ campusId, equipos, administradores, isAdmin }: {
     <div className={cardCls}>
       <p className={labelCls}>Equipos</p>
       <p className="text-xs text-gray-400 mt-1 mb-3">
-        Agrupaciones de administradores que rotan juntas semana a semana.
+        Agrupaciones de personas que rotan juntas semana a semana.
       </p>
 
       <div className="space-y-2 mb-4">
@@ -227,11 +227,11 @@ function EquiposSection({ campusId, equipos, administradores, isAdmin }: {
 
 // ── Generar calendario ────────────────────────────────────────────────────────
 
-function GenerarCalendarioSection({ campusId, equipos }: { campusId: number; equipos: Equipo[] }) {
+function GenerarCalendarioSection({ campusId, tipo, equipos }: { campusId: number; tipo: CampusTurnoTipo; equipos: Equipo[] }) {
   const [orden, setOrden]             = useState<number[]>([]);
   const [fechaInicio, setFechaInicio] = useState(proximoLunes());
   const [semanas, setSemanas]         = useState(12);
-  const generar = useGenerarCalendario(campusId);
+  const generar = useGenerarCalendario(campusId, tipo);
   const [msg, setMsg] = useState<string | null>(null);
 
   const equipoById = useMemo(() => new Map(equipos.map((e) => [e.id, e.nombre])), [equipos]);
@@ -305,10 +305,10 @@ function GenerarCalendarioSection({ campusId, equipos }: { campusId: number; equ
 
 // ── Tabla del calendario ──────────────────────────────────────────────────────
 
-function CalendarioTable({ campusId, turnos, equipos, isAdmin }: {
-  campusId: number; turnos: Turno[]; equipos: Equipo[]; isAdmin: boolean;
+function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
+  campusId: number; tipo: CampusTurnoTipo; turnos: Turno[]; equipos: Equipo[]; isAdmin: boolean;
 }) {
-  const update = useUpdateTurno(campusId);
+  const update = useUpdateTurno(campusId, tipo);
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const grupos = useMemo(() => {
@@ -408,21 +408,23 @@ function CalendarioTable({ campusId, turnos, equipos, isAdmin }: {
   );
 }
 
-// ── Calendario de Administradores (pestaña) ──────────────────────────────────
+// ── Calendario (pestaña, reutilizable por tipo) ──────────────────────────────
 
-function CalendarioAdministradoresTab({ campusId, isAdmin }: { campusId: number; isAdmin: boolean }) {
-  const { data: administradores = [] } = useAdministradores(campusId);
-  const { data: equipos = [] }         = useEquipos(campusId);
-  const { data: turnos = [] }          = useTurnos(campusId);
+function CalendarioTab({ campusId, tipo, titulo, isAdmin }: {
+  campusId: number; tipo: CampusTurnoTipo; titulo: string; isAdmin: boolean;
+}) {
+  const { data: administradores = [] } = useAdministradores(campusId, tipo);
+  const { data: equipos = [] }         = useEquipos(campusId, tipo);
+  const { data: turnos = [] }          = useTurnos(campusId, tipo);
 
   return (
     <div className="space-y-5">
-      <RosterSection campusId={campusId} administradores={administradores} isAdmin={isAdmin} />
-      <EquiposSection campusId={campusId} equipos={equipos} administradores={administradores} isAdmin={isAdmin} />
-      {isAdmin && <GenerarCalendarioSection campusId={campusId} equipos={equipos} />}
+      <RosterSection campusId={campusId} tipo={tipo} titulo={titulo} administradores={administradores} isAdmin={isAdmin} />
+      <EquiposSection campusId={campusId} tipo={tipo} equipos={equipos} administradores={administradores} isAdmin={isAdmin} />
+      {isAdmin && <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equipos} />}
       <div>
         <p className={`${labelCls} mb-3`}>Calendario</p>
-        <CalendarioTable campusId={campusId} turnos={turnos} equipos={equipos} isAdmin={isAdmin} />
+        <CalendarioTable campusId={campusId} tipo={tipo} turnos={turnos} equipos={equipos} isAdmin={isAdmin} />
       </div>
     </div>
   );
@@ -430,9 +432,9 @@ function CalendarioAdministradoresTab({ campusId, isAdmin }: { campusId: number;
 
 // ── Página principal ──────────────────────────────────────────────────────────
 
-type Tab = 'calendario';
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'calendario', label: 'Calendario de Administradores' },
+const TABS: { key: CampusTurnoTipo; label: string; titulo: string }[] = [
+  { key: 'administradores',     label: 'Calendario de Administradores',        titulo: 'Administradores' },
+  { key: 'lideres_voluntarios', label: 'Calendario de Líderes de Voluntarios', titulo: 'Líderes de voluntarios' },
 ];
 
 export function CampusDetailClient({ campusId }: { campusId: number }) {
@@ -440,7 +442,7 @@ export function CampusDetailClient({ campusId }: { campusId: number }) {
   const { isAdmin, can } = usePermissions();
   const hasAccess = isAdmin || can('campus:manage');
   const { data: campus, isLoading } = useCampus(campusId);
-  const [tab, setTab] = useState<Tab>('calendario');
+  const [tab, setTab] = useState<CampusTurnoTipo>('administradores');
 
   useEffect(() => {
     if (!hasAccess) router.replace('/dashboard');
@@ -483,7 +485,12 @@ export function CampusDetailClient({ campusId }: { campusId: number }) {
             ))}
           </div>
 
-          {tab === 'calendario' && <CalendarioAdministradoresTab campusId={campusId} isAdmin={isAdmin} />}
+          <CalendarioTab
+            campusId={campusId}
+            tipo={tab}
+            titulo={TABS.find((t) => t.key === tab)!.titulo}
+            isAdmin={isAdmin}
+          />
         </>
       )}
     </div>
