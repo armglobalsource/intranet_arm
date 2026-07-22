@@ -38,6 +38,17 @@ function formatFechaCompacta(fecha: string): { dia: string; mes: string } {
   return { dia: String(d).padStart(2, '0'), mes: MESES_ABBR[m - 1] };
 }
 
+function sumarDias(fecha: string, dias: number): string {
+  const d = new Date(`${fecha}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatFechaServicio(fecha: string, diaSemana: string): string {
+  const [, m, d] = fecha.split('-').map(Number);
+  return `${diaSemana} ${String(d).padStart(2, '0')} ${MESES_ABBR[m - 1]}`;
+}
+
 /** true si `fecha` (lunes) cae dentro de la semana calendario actual. */
 function isSemanaActual(fecha: string): boolean {
   const [y, m, d] = fecha.split('-').map(Number);
@@ -191,9 +202,11 @@ function EquiposSection({ campusId, tipo, equipos, administradores, isAdmin }: {
               )}
               <span className="text-[13px] font-medium text-gray-800">{eq.nombre}</span>
             </span>
-            <span className="text-[11px] text-gray-400">
-              {eq.administradorIds.map((id) => nombreById.get(id)).filter(Boolean).join(', ')}
-            </span>
+            {!usaModalidad && (
+              <span className="text-[11px] text-gray-400">
+                {eq.administradorIds.map((id) => nombreById.get(id)).filter(Boolean).join(', ')}
+              </span>
+            )}
           </div>
         ))}
         {equipos.length === 0 && (
@@ -405,17 +418,91 @@ function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
 
     const porMes = new Map<string, typeof filas>();
     for (const fila of filas) {
-      const key = mesLabel(fila.fecha);
+      const key = mesLabel(usaModalidad ? sumarDias(fila.fecha, 2) : fila.fecha);
       if (!porMes.has(key)) porMes.set(key, []);
       porMes.get(key)!.push(fila);
     }
     return Array.from(porMes.entries());
-  }, [turnos]);
+  }, [turnos, usaModalidad]);
 
   if (turnos.length === 0) {
     return (
       <div className={cardCls}>
         <p className="text-sm text-gray-400 text-center py-6">Aún no hay calendario generado.</p>
+      </div>
+    );
+  }
+
+
+  if (usaModalidad) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-gray-200 overflow-hidden bg-white">
+          <div className="hidden md:grid grid-cols-[140px_1fr_1fr_1fr] bg-gray-50 border-b border-gray-200">
+            {['Semana', 'Miércoles · AM', 'Domingo · AM', 'Domingo · PM'].map((label) => (
+              <div key={label} className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                {label}
+              </div>
+            ))}
+          </div>
+
+          {filasPorMes.map(([mes, filas]) => (
+            <div key={mes}>
+              <div className="px-4 py-2.5 bg-gray-100/80 border-b border-gray-200 text-[11px] font-bold uppercase tracking-widest text-gray-600">
+                {mes}
+              </div>
+              <div className="divide-y divide-gray-100">
+                {filas.map(({ fecha, turnos: ts }) => {
+                  const miercoles = sumarDias(fecha, 2);
+                  const domingo = sumarDias(fecha, 6);
+                  const turnoAM = ts.find((t) => t.modalidad === 'AM');
+                  const turnoPM = ts.find((t) => t.modalidad === 'PM');
+                  const esActual = isSemanaActual(fecha);
+
+                  const servicio = (t: Turno | undefined) => {
+                    if (!t) return <span className="text-xs text-gray-300">Sin asignar</span>;
+                    return (
+                      <div className="min-w-0">
+                        <TurnoBadge
+                          t={t} equipos={equipos} isAdmin={isAdmin}
+                          editingId={editingId} setEditingId={setEditingId}
+                          onUpdate={(id, equipoId) => update.mutate({ id, equipoId })}
+                          showModalidadTag={false}
+                        />
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <div key={fecha} className={`grid grid-cols-1 md:grid-cols-[140px_1fr_1fr_1fr] ${esActual ? 'bg-emerald-50/60' : ''}`}>
+                      <div className="px-4 py-3 md:border-r border-gray-100 flex md:block items-center justify-between">
+                        <span className="text-[12px] font-semibold text-gray-700">
+                          {formatFechaServicio(miercoles, 'Mié')}
+                        </span>
+                        {esActual && <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide">Esta semana</span>}
+                      </div>
+                      <div className="px-4 py-3 md:border-r border-gray-100">
+                        <p className="md:hidden text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Miércoles AM</p>
+                        {servicio(turnoAM)}
+                      </div>
+                      <div className="px-4 py-3 md:border-r border-gray-100">
+                        <p className="md:hidden text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">{formatFechaServicio(domingo, 'Dom')} · AM</p>
+                        <p className="hidden md:block text-[10px] text-gray-400 mb-1">{formatFechaServicio(domingo, 'Dom')}</p>
+                        {servicio(turnoAM)}
+                      </div>
+                      <div className="px-4 py-3">
+                        <p className="md:hidden text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">{formatFechaServicio(domingo, 'Dom')} · PM</p>
+                        <p className="hidden md:block text-[10px] text-gray-400 mb-1">{formatFechaServicio(domingo, 'Dom')}</p>
+                        {servicio(turnoPM)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+        {isAdmin && <p className="text-[11px] text-gray-400">Haz clic sobre un equipo para cambiar una fecha puntual.</p>}
       </div>
     );
   }
@@ -496,7 +583,6 @@ function CalendarioTab({ campusId, tipo, titulo, isAdmin }: {
 
   const equiposAM = useMemo(() => equipos.filter((e) => e.modalidad === 'AM'), [equipos]);
   const equiposPM = useMemo(() => equipos.filter((e) => e.modalidad === 'PM'), [equipos]);
-
   return (
     <div className="space-y-5">
       <RosterSection campusId={campusId} tipo={tipo} titulo={titulo} administradores={administradores} isAdmin={isAdmin} />

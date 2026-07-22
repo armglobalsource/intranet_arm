@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "seed:santiago-lideres": "node scripts/seed-santiago-lideres-calendario.js",
     "db:migrate": "echo 'Migración no aplica — usando Firestore'",
     "db:seed": "echo 'Seed no aplica — usar scripts/migrate-to-firestore.js'"
   },
