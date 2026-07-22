@@ -62,7 +62,7 @@ export class CampusTurnosService {
     const id = await this.fb.nextId(COL_EQUIPO);
     const doc = {
       id, campusId: dto.campusId, tipo: dto.tipo, nombre: dto.nombre.trim(),
-      administradorIds: dto.administradorIds, isActive: true,
+      administradorIds: dto.administradorIds, modalidad: dto.modalidad ?? null, isActive: true,
       createdAt: this.fb.now(), updatedAt: this.fb.now(),
     };
     await this.fb.db.collection(COL_EQUIPO).doc(String(id)).set(doc);
@@ -76,6 +76,7 @@ export class CampusTurnosService {
     if (dto.nombre !== undefined) data.nombre = dto.nombre.trim();
     if (dto.administradorIds !== undefined) data.administradorIds = dto.administradorIds;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.modalidad !== undefined) data.modalidad = dto.modalidad;
     await ref.update(data);
     return this.fb.toObj(await ref.get());
   }
@@ -105,9 +106,12 @@ export class CampusTurnosService {
       equipoNombres.set(dto.equipoIds[i], snap.data()!.nombre);
     });
 
+    const modalidad = dto.modalidad ?? null;
     const existing = await this.fb.db.collection(COL_TURNO).where('campusId', '==', dto.campusId).get();
-    const existingFechas = new Set(
-      this.fb.toDocs(existing).filter((r) => matchesTipo(r, dto.tipo)).map((r) => r.fecha),
+    const existingKeys = new Set(
+      this.fb.toDocs(existing)
+        .filter((r) => matchesTipo(r, dto.tipo) && (r.modalidad ?? null) === modalidad)
+        .map((r) => r.fecha),
     );
 
     const start = new Date(`${dto.fechaInicio}T12:00:00Z`);
@@ -116,12 +120,12 @@ export class CampusTurnosService {
       const d = new Date(start);
       d.setUTCDate(d.getUTCDate() + i * 7);
       const fecha = d.toISOString().slice(0, 10);
-      if (existingFechas.has(fecha)) continue;
+      if (existingKeys.has(fecha)) continue;
 
       const equipoId = dto.equipoIds[i % dto.equipoIds.length];
       const id = await this.fb.nextId(COL_TURNO);
       await this.fb.db.collection(COL_TURNO).doc(String(id)).set({
-        id, campusId: dto.campusId, tipo: dto.tipo, fecha, equipoId,
+        id, campusId: dto.campusId, tipo: dto.tipo, fecha, equipoId, modalidad,
         equipoNombreSnapshot: equipoNombres.get(equipoId) ?? '',
         isManualOverride: false,
         createdAt: this.fb.now(), updatedAt: this.fb.now(),

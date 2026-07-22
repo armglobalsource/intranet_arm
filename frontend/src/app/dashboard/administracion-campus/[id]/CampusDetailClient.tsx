@@ -9,8 +9,15 @@ import {
   useAdministradores, useCreateAdministrador, useUpdateAdministrador,
   useEquipos, useCreateEquipo,
   useTurnos, useGenerarCalendario, useUpdateTurno,
-  type Administrador, type Equipo, type Turno, type CampusTurnoTipo,
+  type Administrador, type Equipo, type Turno, type CampusTurnoTipo, type Modalidad,
 } from '@/hooks/useCampusTurnos';
+
+// Solo 'lideres_voluntarios' usa modalidad (dos rotaciones en paralelo, AM y PM);
+// 'administradores' sigue siendo una sola rotación semanal, sin cambios.
+const MODALIDAD_LABEL: Record<Modalidad, string> = {
+  AM: 'Miércoles + Dom. AM',
+  PM: 'Domingo PM',
+};
 
 const ACCENT = '#059669'; // emerald-600, consistente con los acentos ya usados en esta pantalla
 
@@ -138,9 +145,11 @@ function RosterSection({ campusId, tipo, titulo, administradores, isAdmin }: {
 function EquiposSection({ campusId, tipo, equipos, administradores, isAdmin }: {
   campusId: number; tipo: CampusTurnoTipo; equipos: Equipo[]; administradores: Administrador[]; isAdmin: boolean;
 }) {
+  const usaModalidad = tipo === 'lideres_voluntarios';
   const [selected, setSelected] = useState<number[]>([]);
   const [nombre, setNombre]     = useState('');
   const [nombreTouched, setNombreTouched] = useState(false);
+  const [modalidad, setModalidad] = useState<Modalidad>('AM');
   const create = useCreateEquipo(campusId, tipo);
 
   const nombreById = useMemo(
@@ -158,7 +167,7 @@ function EquiposSection({ campusId, tipo, equipos, administradores, isAdmin }: {
     const finalNombre = (nombreTouched ? nombre : nombreSugerido).trim();
     if (!finalNombre || selected.length === 0) return;
     create.mutate(
-      { nombre: finalNombre, administradorIds: selected },
+      { nombre: finalNombre, administradorIds: selected, ...(usaModalidad ? { modalidad } : {}) },
       { onSuccess: () => { setSelected([]); setNombre(''); setNombreTouched(false); } },
     );
   }
@@ -168,12 +177,20 @@ function EquiposSection({ campusId, tipo, equipos, administradores, isAdmin }: {
       <p className={labelCls}>Equipos</p>
       <p className="text-xs text-gray-400 mt-1 mb-3">
         Agrupaciones de personas que rotan juntas semana a semana.
+        {usaModalidad && ' AM cubre Miércoles + Domingo AM; PM cubre Domingo PM.'}
       </p>
 
       <div className="space-y-2 mb-4">
         {equipos.map((eq) => (
           <div key={eq.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
-            <span className="text-[13px] font-medium text-gray-800">{eq.nombre}</span>
+            <span className="flex items-center gap-2">
+              {usaModalidad && eq.modalidad && (
+                <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">
+                  {eq.modalidad}
+                </span>
+              )}
+              <span className="text-[13px] font-medium text-gray-800">{eq.nombre}</span>
+            </span>
             <span className="text-[11px] text-gray-400">
               {eq.administradorIds.map((id) => nombreById.get(id)).filter(Boolean).join(', ')}
             </span>
@@ -187,6 +204,22 @@ function EquiposSection({ campusId, tipo, equipos, administradores, isAdmin }: {
       {isAdmin && (
         <div className="border-t border-gray-100 pt-3 space-y-2.5">
           <p className="text-[11px] font-medium text-gray-500">Nuevo equipo — elige sus integrantes</p>
+          {usaModalidad && (
+            <div className="flex gap-1.5">
+              {(['AM', 'PM'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setModalidad(m)}
+                  className={`text-[12px] px-3 py-1 rounded-full border transition-colors ${
+                    modalidad === m ? 'text-white border-transparent' : 'text-gray-600 border-gray-200 hover:border-gray-300'
+                  }`}
+                  style={modalidad === m ? { background: ACCENT } : {}}
+                >
+                  {m} · {MODALIDAD_LABEL[m]}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5">
             {administradores.map((a) => (
               <button
@@ -227,7 +260,9 @@ function EquiposSection({ campusId, tipo, equipos, administradores, isAdmin }: {
 
 // ── Generar calendario ────────────────────────────────────────────────────────
 
-function GenerarCalendarioSection({ campusId, tipo, equipos }: { campusId: number; tipo: CampusTurnoTipo; equipos: Equipo[] }) {
+function GenerarCalendarioSection({ campusId, tipo, equipos, modalidad, titulo }: {
+  campusId: number; tipo: CampusTurnoTipo; equipos: Equipo[]; modalidad?: Modalidad; titulo?: string;
+}) {
   const [orden, setOrden]             = useState<number[]>([]);
   const [fechaInicio, setFechaInicio] = useState(proximoLunes());
   const [semanas, setSemanas]         = useState(12);
@@ -240,7 +275,7 @@ function GenerarCalendarioSection({ campusId, tipo, equipos }: { campusId: numbe
   function handleGenerar() {
     if (orden.length === 0) return;
     generar.mutate(
-      { equipoIds: orden, fechaInicio, semanas },
+      { equipoIds: orden, fechaInicio, semanas, ...(modalidad ? { modalidad } : {}) },
       {
         onSuccess: (data) => { setMsg(`${data.creados} semana(s) generada(s).`); setTimeout(() => setMsg(null), 3000); },
         onError:   () => { setMsg('No se pudo generar el calendario.'); setTimeout(() => setMsg(null), 3000); },
@@ -250,7 +285,7 @@ function GenerarCalendarioSection({ campusId, tipo, equipos }: { campusId: numbe
 
   return (
     <div className={cardCls}>
-      <p className={labelCls}>Generar calendario</p>
+      <p className={labelCls}>{titulo ?? 'Generar calendario'}</p>
       <p className="text-xs text-gray-400 mt-1 mb-3">
         Define el orden de rotación de los equipos y el rango de semanas a generar. No pisa semanas ya asignadas.
       </p>
@@ -305,20 +340,76 @@ function GenerarCalendarioSection({ campusId, tipo, equipos }: { campusId: numbe
 
 // ── Tabla del calendario ──────────────────────────────────────────────────────
 
+// Un badge de equipo, clicable para editar ese turno puntual (mismo comportamiento
+// que antes, pero factorizado para poder renderizar 1 o 2 badges por fila de fecha).
+function TurnoBadge({ t, equipos, isAdmin, editingId, setEditingId, onUpdate, showModalidadTag }: {
+  t: Turno; equipos: Equipo[]; isAdmin: boolean;
+  editingId: number | null; setEditingId: (id: number | null) => void;
+  onUpdate: (id: number, equipoId: number) => void; showModalidadTag: boolean;
+}) {
+  const c = teamColor(t.equipoId);
+  // Al editar, solo se ofrecen equipos de la misma modalidad (no tiene sentido
+  // poner un equipo PM en el slot AM y viceversa).
+  const opciones = t.modalidad ? equipos.filter((eq) => eq.modalidad === t.modalidad) : equipos;
+
+  if (isAdmin && editingId === t.id) {
+    return (
+      <select
+        autoFocus
+        defaultValue={t.equipoId}
+        onChange={(e) => { onUpdate(t.id, Number(e.target.value)); setEditingId(null); }}
+        onBlur={() => setEditingId(null)}
+        className="min-w-0 text-[12.5px] border border-gray-200 rounded-lg px-2 py-1"
+      >
+        {opciones.map((eq) => <option key={eq.id} value={eq.id}>{eq.nombre}</option>)}
+      </select>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => isAdmin && setEditingId(t.id)}
+      className={`flex items-center gap-1 ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
+    >
+      {showModalidadTag && t.modalidad && (
+        <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400">{t.modalidad}</span>
+      )}
+      <span className={`px-2 py-0.5 rounded-full text-[11.5px] font-medium truncate ${c.bg} ${c.text}`}>
+        {t.equipoNombreSnapshot}
+      </span>
+      {t.isManualOverride && (
+        <span title="Editado manualmente" className="text-amber-500 text-[11px] flex-shrink-0">✎</span>
+      )}
+    </button>
+  );
+}
+
 function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
   campusId: number; tipo: CampusTurnoTipo; turnos: Turno[]; equipos: Equipo[]; isAdmin: boolean;
 }) {
   const update = useUpdateTurno(campusId, tipo);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const usaModalidad = tipo === 'lideres_voluntarios';
 
-  const grupos = useMemo(() => {
-    const map = new Map<string, Turno[]>();
+  // Agrupa primero por fecha (una fila por semana) — si hay turnos AM y PM para la
+  // misma fecha (lideres_voluntarios), se muestran juntos en la misma fila.
+  const filasPorMes = useMemo(() => {
+    const porFecha = new Map<string, Turno[]>();
     for (const t of turnos) {
-      const key = mesLabel(t.fecha);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(t);
+      if (!porFecha.has(t.fecha)) porFecha.set(t.fecha, []);
+      porFecha.get(t.fecha)!.push(t);
     }
-    return Array.from(map.entries());
+    const filas = Array.from(porFecha.entries())
+      .map(([fecha, ts]) => ({ fecha, turnos: ts.sort((a, b) => (a.modalidad ?? '').localeCompare(b.modalidad ?? '')) }))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+    const porMes = new Map<string, typeof filas>();
+    for (const fila of filas) {
+      const key = mesLabel(fila.fecha);
+      if (!porMes.has(key)) porMes.set(key, []);
+      porMes.get(key)!.push(fila);
+    }
+    return Array.from(porMes.entries());
   }, [turnos]);
 
   if (turnos.length === 0) {
@@ -338,6 +429,7 @@ function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
             return (
               <span key={eq.id} className="inline-flex items-center gap-1.5 text-[12px] text-gray-500">
                 <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+                {usaModalidad && eq.modalidad && <span className="text-[10px] font-bold uppercase text-gray-400">{eq.modalidad}</span>}
                 {eq.nombre}
               </span>
             );
@@ -346,19 +438,18 @@ function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {grupos.map(([mes, rows]) => (
+        {filasPorMes.map(([mes, filas]) => (
           <div key={mes} className="bg-white rounded-2xl border border-gray-200 overflow-hidden self-start">
             <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500 bg-gray-50 px-4 py-2.5 border-b border-gray-100">
               {mes}
             </p>
             <div className="divide-y divide-gray-50">
-              {rows.map((t) => {
-                const c = teamColor(t.equipoId);
-                const { dia, mes: mesAbbr } = formatFechaCompacta(t.fecha);
-                const esActual = isSemanaActual(t.fecha);
+              {filas.map(({ fecha, turnos: ts }) => {
+                const { dia, mes: mesAbbr } = formatFechaCompacta(fecha);
+                const esActual = isSemanaActual(fecha);
                 return (
                   <div
-                    key={t.id}
+                    key={fecha}
                     className={`flex items-center gap-3 px-4 py-2.5 ${esActual ? 'bg-emerald-50/60' : ''}`}
                   >
                     <div className="flex flex-col items-center justify-center w-8 flex-shrink-0 leading-none">
@@ -366,36 +457,21 @@ function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
                       <span className="text-[9px] font-semibold uppercase text-gray-400 mt-0.5">{mesAbbr}</span>
                     </div>
 
-                    {isAdmin && editingId === t.id ? (
-                      <select
-                        autoFocus
-                        defaultValue={t.equipoId}
-                        onChange={(e) => {
-                          update.mutate({ id: t.id, equipoId: Number(e.target.value) });
-                          setEditingId(null);
-                        }}
-                        onBlur={() => setEditingId(null)}
-                        className="flex-1 min-w-0 text-[12.5px] border border-gray-200 rounded-lg px-2 py-1"
-                      >
-                        {equipos.map((eq) => <option key={eq.id} value={eq.id}>{eq.nombre}</option>)}
-                      </select>
-                    ) : (
-                      <button
-                        onClick={() => isAdmin && setEditingId(t.id)}
-                        className={`flex-1 min-w-0 flex items-center gap-1.5 ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
-                      >
-                        <span className={`px-2 py-0.5 rounded-full text-[11.5px] font-medium truncate ${c.bg} ${c.text}`}>
-                          {t.equipoNombreSnapshot}
-                        </span>
-                        {t.isManualOverride && (
-                          <span title="Editado manualmente" className="text-amber-500 text-[11px] flex-shrink-0">✎</span>
-                        )}
-                        {esActual && (
-                          <span className="ml-auto text-[9px] font-bold text-emerald-600 uppercase tracking-wide flex-shrink-0">
-                            Hoy
-                          </span>
-                        )}
-                      </button>
+                    <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      {ts.map((t) => (
+                        <TurnoBadge
+                          key={t.id} t={t} equipos={equipos} isAdmin={isAdmin}
+                          editingId={editingId} setEditingId={setEditingId}
+                          onUpdate={(id, equipoId) => update.mutate({ id, equipoId })}
+                          showModalidadTag={usaModalidad}
+                        />
+                      ))}
+                    </div>
+
+                    {esActual && (
+                      <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide flex-shrink-0">
+                        Hoy
+                      </span>
                     )}
                   </div>
                 );
@@ -413,15 +489,30 @@ function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
 function CalendarioTab({ campusId, tipo, titulo, isAdmin }: {
   campusId: number; tipo: CampusTurnoTipo; titulo: string; isAdmin: boolean;
 }) {
+  const usaModalidad = tipo === 'lideres_voluntarios';
   const { data: administradores = [] } = useAdministradores(campusId, tipo);
   const { data: equipos = [] }         = useEquipos(campusId, tipo);
   const { data: turnos = [] }          = useTurnos(campusId, tipo);
+
+  const equiposAM = useMemo(() => equipos.filter((e) => e.modalidad === 'AM'), [equipos]);
+  const equiposPM = useMemo(() => equipos.filter((e) => e.modalidad === 'PM'), [equipos]);
 
   return (
     <div className="space-y-5">
       <RosterSection campusId={campusId} tipo={tipo} titulo={titulo} administradores={administradores} isAdmin={isAdmin} />
       <EquiposSection campusId={campusId} tipo={tipo} equipos={equipos} administradores={administradores} isAdmin={isAdmin} />
-      {isAdmin && <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equipos} />}
+      {isAdmin && (
+        usaModalidad ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equiposAM} modalidad="AM"
+              titulo={`Generar calendario — ${MODALIDAD_LABEL.AM}`} />
+            <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equiposPM} modalidad="PM"
+              titulo={`Generar calendario — ${MODALIDAD_LABEL.PM}`} />
+          </div>
+        ) : (
+          <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equipos} />
+        )
+      )}
       <div>
         <p className={`${labelCls} mb-3`}>Calendario</p>
         <CalendarioTable campusId={campusId} tipo={tipo} turnos={turnos} equipos={equipos} isAdmin={isAdmin} />

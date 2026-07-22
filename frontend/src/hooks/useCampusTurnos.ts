@@ -3,6 +3,11 @@ import { api } from '@/lib/api';
 
 export type CampusTurnoTipo = 'administradores' | 'lideres_voluntarios';
 
+// Rotación paralela opcional dentro del mismo tipo — hoy usada por lideres_voluntarios
+// para separar Miércoles + Domingo AM (modalidad 'AM') de Domingo PM (modalidad 'PM').
+// `administradores` no la usa (queda undefined en equipos/turnos existentes).
+export type Modalidad = 'AM' | 'PM';
+
 export interface Administrador {
   id:        number;
   campusId:  number;
@@ -17,6 +22,7 @@ export interface Equipo {
   tipo:             CampusTurnoTipo;
   nombre:           string;
   administradorIds: number[];
+  modalidad?:       Modalidad | null;
   isActive:         boolean;
 }
 
@@ -26,6 +32,7 @@ export interface Turno {
   tipo:                 CampusTurnoTipo;
   fecha:                string; // 'YYYY-MM-DD', lunes
   equipoId:             number;
+  modalidad?:           Modalidad | null;
   equipoNombreSnapshot: string;
   isManualOverride:     boolean;
 }
@@ -79,7 +86,7 @@ export function useEquipos(campusId: number, tipo: CampusTurnoTipo) {
 export function useCreateEquipo(campusId: number, tipo: CampusTurnoTipo) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { nombre: string; administradorIds: number[] }) =>
+    mutationFn: (data: { nombre: string; administradorIds: number[]; modalidad?: Modalidad }) =>
       api.post('/campus-turnos/equipos', { campusId, tipo, ...data }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.equipos(campusId, tipo) }),
   });
@@ -88,7 +95,7 @@ export function useCreateEquipo(campusId: number, tipo: CampusTurnoTipo) {
 export function useUpdateEquipo(campusId: number, tipo: CampusTurnoTipo) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { nombre?: string; administradorIds?: number[]; isActive?: boolean } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { nombre?: string; administradorIds?: number[]; isActive?: boolean; modalidad?: Modalidad } }) =>
       api.patch(`/campus-turnos/equipos/${id}`, data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.equipos(campusId, tipo) }),
   });
@@ -108,7 +115,7 @@ export function useTurnos(campusId: number, tipo: CampusTurnoTipo) {
 export function useGenerarCalendario(campusId: number, tipo: CampusTurnoTipo) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { equipoIds: number[]; fechaInicio: string; semanas: number }) =>
+    mutationFn: (data: { equipoIds: number[]; fechaInicio: string; semanas: number; modalidad?: Modalidad }) =>
       api.post('/campus-turnos/turnos/generar', { campusId, tipo, ...data }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.turnos(campusId, tipo) }),
   });
