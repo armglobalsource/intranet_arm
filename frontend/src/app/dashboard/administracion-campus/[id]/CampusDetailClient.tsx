@@ -19,18 +19,40 @@ const MESES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
-function formatFechaCorta(fecha: string): string {
-  const [y, m, d] = fecha.split('-');
-  return `${d}-${m}-${y.slice(2)}`;
-}
-
 function mesLabel(fecha: string): string {
   const [y, m] = fecha.split('-').map(Number);
   return `${MESES[m - 1]} ${y}`;
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
+const MESES_ABBR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+function formatFechaCompacta(fecha: string): { dia: string; mes: string } {
+  const [, m, d] = fecha.split('-').map(Number);
+  return { dia: String(d).padStart(2, '0'), mes: MESES_ABBR[m - 1] };
+}
+
+/** true si `fecha` (lunes) cae dentro de la semana calendario actual. */
+function isSemanaActual(fecha: string): boolean {
+  const [y, m, d] = fecha.split('-').map(Number);
+  const lunes = new Date(y, m - 1, d);
+  const domingo = new Date(lunes); domingo.setDate(lunes.getDate() + 6);
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  return now >= lunes && now <= domingo;
+}
+
+// Paleta cíclica por equipo (estable por id, no por posición en la lista) para que la
+// rotación se pueda escanear visualmente de un vistazo en vez de leer cada nombre.
+const TEAM_COLORS = [
+  { bg: 'bg-blue-50',   text: 'text-blue-700',   dot: 'bg-blue-500' },
+  { bg: 'bg-amber-50',  text: 'text-amber-700',  dot: 'bg-amber-500' },
+  { bg: 'bg-rose-50',   text: 'text-rose-700',   dot: 'bg-rose-500' },
+  { bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500' },
+  { bg: 'bg-cyan-50',   text: 'text-cyan-700',   dot: 'bg-cyan-500' },
+  { bg: 'bg-lime-50',   text: 'text-lime-700',   dot: 'bg-lime-500' },
+];
+
+function teamColor(equipoId: number) {
+  return TEAM_COLORS[equipoId % TEAM_COLORS.length];
 }
 
 /** Próximo lunes desde hoy (o hoy si ya es lunes) — default sensato para "fecha de inicio". */
@@ -308,16 +330,42 @@ function CalendarioTable({ campusId, turnos, equipos, isAdmin }: {
   }
 
   return (
-    <div className={`${cardCls} overflow-hidden p-0`}>
-      {grupos.map(([mes, rows]) => (
-        <div key={mes} className="border-b border-gray-100 last:border-0">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 px-5 pt-4 pb-2">{mes}</p>
-          <table className="w-full">
-            <tbody>
-              {rows.map((t) => (
-                <tr key={t.id} className="border-t border-gray-50 first:border-0">
-                  <td className="px-5 py-2 text-[12.5px] text-gray-400 w-24">{formatFechaCorta(t.fecha)}</td>
-                  <td className="px-5 py-2">
+    <div className="space-y-4">
+      {equipos.length > 1 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+          {equipos.map((eq) => {
+            const c = teamColor(eq.id);
+            return (
+              <span key={eq.id} className="inline-flex items-center gap-1.5 text-[12px] text-gray-500">
+                <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+                {eq.nombre}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {grupos.map(([mes, rows]) => (
+          <div key={mes} className="bg-white rounded-2xl border border-gray-200 overflow-hidden self-start">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500 bg-gray-50 px-4 py-2.5 border-b border-gray-100">
+              {mes}
+            </p>
+            <div className="divide-y divide-gray-50">
+              {rows.map((t) => {
+                const c = teamColor(t.equipoId);
+                const { dia, mes: mesAbbr } = formatFechaCompacta(t.fecha);
+                const esActual = isSemanaActual(t.fecha);
+                return (
+                  <div
+                    key={t.id}
+                    className={`flex items-center gap-3 px-4 py-2.5 ${esActual ? 'bg-emerald-50/60' : ''}`}
+                  >
+                    <div className="flex flex-col items-center justify-center w-8 flex-shrink-0 leading-none">
+                      <span className="text-[15px] font-bold text-gray-800">{dia}</span>
+                      <span className="text-[9px] font-semibold uppercase text-gray-400 mt-0.5">{mesAbbr}</span>
+                    </div>
+
                     {isAdmin && editingId === t.id ? (
                       <select
                         autoFocus
@@ -327,26 +375,35 @@ function CalendarioTable({ campusId, turnos, equipos, isAdmin }: {
                           setEditingId(null);
                         }}
                         onBlur={() => setEditingId(null)}
-                        className="text-[13px] border border-gray-200 rounded-lg px-2 py-1"
+                        className="flex-1 min-w-0 text-[12.5px] border border-gray-200 rounded-lg px-2 py-1"
                       >
                         {equipos.map((eq) => <option key={eq.id} value={eq.id}>{eq.nombre}</option>)}
                       </select>
                     ) : (
                       <button
                         onClick={() => isAdmin && setEditingId(t.id)}
-                        className={`text-[13px] text-gray-800 ${isAdmin ? 'hover:underline cursor-pointer' : 'cursor-default'}`}
+                        className={`flex-1 min-w-0 flex items-center gap-1.5 ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
                       >
-                        {t.equipoNombreSnapshot}
-                        {t.isManualOverride && <span className="ml-1.5 text-[10px] text-amber-600">(editado)</span>}
+                        <span className={`px-2 py-0.5 rounded-full text-[11.5px] font-medium truncate ${c.bg} ${c.text}`}>
+                          {t.equipoNombreSnapshot}
+                        </span>
+                        {t.isManualOverride && (
+                          <span title="Editado manualmente" className="text-amber-500 text-[11px] flex-shrink-0">✎</span>
+                        )}
+                        {esActual && (
+                          <span className="ml-auto text-[9px] font-bold text-emerald-600 uppercase tracking-wide flex-shrink-0">
+                            Hoy
+                          </span>
+                        )}
                       </button>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
