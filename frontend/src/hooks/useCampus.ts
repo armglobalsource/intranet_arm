@@ -61,12 +61,22 @@ export interface CreateCampusPayload {
 const campusKeys = {
   all:    ['campus'] as const,
   active: ['campus', 'active'] as const,
+  detail: (id: number) => ['campus', id] as const,
 };
 
 export function useAllCampuses() {
   return useQuery<Campus[]>({
     queryKey: campusKeys.all,
     queryFn:  () => api.get('/campus').then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCampus(id: number) {
+  return useQuery<Campus>({
+    queryKey: campusKeys.detail(id),
+    queryFn:  () => api.get(`/campus/${id}`).then((r) => r.data),
+    enabled:  Number.isFinite(id),
     staleTime: 5 * 60 * 1000,
   });
 }

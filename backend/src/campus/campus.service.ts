@@ -35,7 +35,7 @@ export class CampusService {
     return this.fb.toDocs(snap)
       .filter((c) => c.isActive)
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map(({ id, name, siglas, address, country, phone, schedules }) => ({ id, name, siglas, address, country, phone, schedules: schedules ?? [] }));
+      .map(({ id, name, siglas, address, country, phone, schedules, monedaCodes }) => ({ id, name, siglas, address, country, phone, schedules: schedules ?? [], monedaCodes: monedaCodes ?? [] }));
   }
 
   async findOne(id: number) {

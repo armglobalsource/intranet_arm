@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { Periodo, mapId, inPeriodo } from '../common/arm-records.util';
-import { CreateSiembraDto, UpdateSiembraDto, MontoDto } from './dto/siembra.dto';
+import { CreateSiembraDto, UpdateSiembraDto, MontoDto, MetodoPagoDto, AporteDto } from './dto/siembra.dto';
 
 const COL = 'siembra';
 
@@ -9,15 +9,40 @@ const COL = 'siembra';
 export class SiembraService {
   constructor(private fb: FirebaseService) {}
 
-  /** Arma cada línea como objeto plano (no instancia de MontoDto) para que Firestore pueda serializarla. */
+  /** Objetos planos (no instancias de clase) para que Firestore pueda serializarlos — mismo fix que encuentros.service.ts. */
+  private plainAportes(aportes?: AporteDto[]) {
+    return (aportes ?? []).map((a) => ({ nombre: a.nombre ?? '', monto: a.monto ?? 0, nota: a.nota ?? '' }));
+  }
+
+  /** Arma un método de pago (Efectivo/Sobres o SumUp) con sus totales calculados en el servidor. */
+  private buildMetodo(m?: MetodoPagoDto) {
+    const diezmos = this.plainAportes(m?.diezmos);
+    const otrosAportes = this.plainAportes(m?.otrosAportes);
+    const ofrendas = m?.ofrendas ?? 0;
+    const totalDiezmos = diezmos.reduce((acc, a) => acc + a.monto, 0);
+    const totalOtros = otrosAportes.reduce((acc, a) => acc + a.monto, 0);
+    return {
+      ofrendas,
+      diezmos,
+      otrosAportes,
+      totalDiezmos,
+      totalOtros,
+      total: ofrendas + totalDiezmos + totalOtros,
+    };
+  }
+
+  /** Arma cada línea de moneda como objeto plano, con efectivo/sumup y sus totales calculados en el servidor. */
   private buildMontos(montos: MontoDto[]) {
-    return montos.map((m) => ({
-      moneda:   m.moneda,
-      sumup:    m.sumup ?? 0,
-      efectivo: m.efectivo ?? 0,
-      diezmo:   m.diezmo ?? 0,
-      total:    (m.sumup ?? 0) + (m.efectivo ?? 0) + (m.diezmo ?? 0),
-    }));
+    return montos.map((m) => {
+      const efectivo = this.buildMetodo(m.efectivo);
+      const sumup = this.buildMetodo(m.sumup);
+      return {
+        moneda: m.moneda,
+        efectivo,
+        sumup,
+        total: efectivo.total + sumup.total,
+      };
+    });
   }
 
   async findAll(campusId?: string, periodo: Periodo = 'todo') {

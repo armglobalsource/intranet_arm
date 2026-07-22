@@ -3,12 +3,33 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-// El total de cada línea (sumup + efectivo + diezmo) lo calcula el servidor.
+// Una fila individual de diezmo u "otro aporte" (nombre + monto), como se registra en el Excel de campus.
+export class AporteDto {
+  @IsOptional() @IsString() nombre?: string;
+  @IsNumber() @Min(0) monto: number;
+  @IsOptional() @IsString() nota?: string; // ej: "VZLA", "Misiones" — solo aplica a otrosAportes
+}
+
+// Un método de pago (Efectivo/Sobres o SumUp) dentro de una moneda.
+// Los totales (diezmos, otrosAportes, total) los calcula el servidor.
+export class MetodoPagoDto {
+  @IsOptional() @IsNumber() @Min(0) ofrendas?: number;
+
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => AporteDto)
+  diezmos?: AporteDto[];
+
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => AporteDto)
+  otrosAportes?: AporteDto[];
+}
+
 export class MontoDto {
   @IsString() @IsNotEmpty() moneda: string;
-  @IsOptional() @IsNumber() @Min(0) sumup?: number;   // total tarjeta (SumUp)
-  @IsOptional() @IsNumber() @Min(0) efectivo?: number;
-  @IsOptional() @IsNumber() @Min(0) diezmo?: number;
+
+  @IsOptional() @ValidateNested() @Type(() => MetodoPagoDto)
+  efectivo?: MetodoPagoDto;
+
+  @IsOptional() @ValidateNested() @Type(() => MetodoPagoDto)
+  sumup?: MetodoPagoDto;
 }
 
 export class CreateSiembraDto {

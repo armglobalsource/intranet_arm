@@ -244,7 +244,17 @@ export class AuthService {
   }
 
   async getMe(userId: number) {
-    return this.users.findOne(userId);
+    const user = await this.users.findOne(userId);
+    if (!user) return user;
+
+    // El doc de usuario no guarda los permisos (dependen del rol) — se recalculan aquí
+    // igual que en generateTokens(), para que /auth/me siempre refleje el rol vigente.
+    const roleSnap = user.roleId
+      ? await this.fb.db.collection('roles').doc(String(user.roleId)).get()
+      : null;
+    const permissions: string[] = roleSnap?.exists ? (roleSnap.data()!.permissions ?? []) : [];
+
+    return { ...user, permissions };
   }
 
   async completeProfile(userId: number, dto: CompleteProfileDto) {

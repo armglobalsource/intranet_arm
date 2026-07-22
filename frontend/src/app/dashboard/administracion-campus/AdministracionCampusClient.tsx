@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAllCampuses, Campus } from '@/hooks/useCampus';
 
@@ -13,6 +14,19 @@ function CampusIcon() {
       stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
       <polyline points="9 21 9 13 15 13 15 21" />
+    </svg>
+  );
+}
+
+// ── Calendario de Administradores (módulo activo) ──────────────────────────────
+
+function CalendarioIcon() {
+  return (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+      <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
     </svg>
   );
 }
@@ -44,9 +58,12 @@ const MODULES = [
 
 function CampusCard({ campus }: { campus: Campus }) {
   return (
-    <div className={`bg-white rounded-2xl border p-5 flex flex-col gap-3 transition-all ${
-      campus.isActive ? 'border-gray-200' : 'border-gray-100 opacity-60'
-    }`}>
+    <Link
+      href={`/dashboard/administracion-campus/${campus.id}`}
+      className={`bg-white rounded-2xl border p-5 flex flex-col gap-3 transition-all hover:border-gray-300 hover:shadow-sm ${
+        campus.isActive ? 'border-gray-200' : 'border-gray-100 opacity-60'
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
@@ -85,7 +102,7 @@ function CampusCard({ campus }: { campus: Campus }) {
         {campus.email && <span>{campus.email}</span>}
         {campus.phone && <span>{campus.phone}</span>}
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -96,6 +113,8 @@ export function AdministracionCampusClient() {
   const { isAdmin, can } = usePermissions();
   const { data: campuses = [], isLoading } = useAllCampuses();
   const hasAccess = isAdmin || can('campus:manage');
+  const campusSectionRef = useRef<HTMLDivElement>(null);
+  const [highlightCampus, setHighlightCampus] = useState(false);
 
   useEffect(() => {
     if (!hasAccess) router.replace('/dashboard');
@@ -105,6 +124,12 @@ export function AdministracionCampusClient() {
 
   const active   = campuses.filter((c) => c.isActive);
   const inactive = campuses.filter((c) => !c.isActive);
+
+  function goToCalendario() {
+    campusSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setHighlightCampus(true);
+    setTimeout(() => setHighlightCampus(false), 2000);
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -122,10 +147,24 @@ export function AdministracionCampusClient() {
         </div>
       </div>
 
-      {/* Módulos (próximamente) */}
+      {/* Módulos */}
       <div>
         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Módulos</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <button
+            onClick={goToCalendario}
+            className="text-left bg-white border border-emerald-200 rounded-2xl p-4 flex flex-col gap-2 hover:border-emerald-400 hover:shadow-sm transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                <CalendarioIcon />
+              </span>
+              <span className="text-xs font-bold text-gray-900">Calendario de Administradores</span>
+            </div>
+            <p className="text-xs text-gray-500 leading-snug">
+              Rotación semanal de administradores por campus. Elige un campus para verlo.
+            </p>
+          </button>
           {MODULES.map((mod) => (
             <div key={mod.title}
               className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-2 opacity-60">
@@ -143,8 +182,12 @@ export function AdministracionCampusClient() {
       </div>
 
       {/* Lista de campus */}
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Campus</p>
+      <div
+        ref={campusSectionRef}
+        className={`rounded-2xl transition-all ${highlightCampus ? 'ring-2 ring-emerald-400 ring-offset-4' : ''}`}
+      >
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Campus</p>
+        <p className="text-xs text-gray-400 mb-3">Elige un campus para ver su calendario de administradores.</p>
         {isLoading ? (
           <div className="text-sm text-gray-400 py-8 text-center">Cargando campus...</div>
         ) : (
