@@ -148,6 +148,15 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const [isEditing, setIsEditing]             = useState(true);
   const [transitioningToEdit, setTransitioningToEdit] = useState(false);
 
+  const [localHidden, setLocalHidden] = useState<SectionName[]>([]);
+  const hiddenInflight = useRef(false);
+
+  useEffect(() => {
+    if (!hiddenInflight.current) {
+      setLocalHidden(ficha?.hiddenSections ?? []);
+    }
+  }, [ficha?.hiddenSections]);
+
   const { mutate: updateSection } = useUpdateSection();
   const { mutate: completeSection } = useCompleteSection();
   const { mutate: archiveFicha } = useArchiveFicha();
@@ -158,19 +167,23 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
   function handleToggleModule(name: SectionName) {
     if (!ficha) return;
-    const current = ficha.hiddenSections ?? [];
-    const next = current.includes(name)
-      ? current.filter((s) => s !== name)
-      : [...current, name];
+    const next = localHidden.includes(name)
+      ? localHidden.filter((s) => s !== name)
+      : [...localHidden, name];
+    setLocalHidden(next);
+    hiddenInflight.current = true;
     setSaveState('saving');
     updateFicha(
       { fichaId: ficha.fichaId, hiddenSections: next },
       {
         onSuccess: () => {
+          hiddenInflight.current = false;
           setSaveState('saved');
           setTimeout(() => setSaveState('idle'), 800);
         },
         onError: () => {
+          hiddenInflight.current = false;
+          setLocalHidden(ficha.hiddenSections ?? []);
           setSaveState('error');
           setTimeout(() => setSaveState('idle'), 3000);
         },
@@ -467,7 +480,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             onSectionComplete={handleSectionComplete}
             sectionStatus={sectionStatus}
             saveState={saveState}
-            hiddenSections={ficha.hiddenSections ?? []}
+            hiddenSections={localHidden}
             onToggleModule={canEdit ? handleToggleModule : undefined}
             sectionLayout={ficha.sectionLayout}
             onUpdateLayout={canEdit ? handleUpdateLayout : undefined}
