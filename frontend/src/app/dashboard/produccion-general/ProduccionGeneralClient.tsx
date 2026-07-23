@@ -131,9 +131,9 @@ export function ProduccionGeneralClient() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <section className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-8 font-sans sm:px-9 sm:py-10 shadow-xl shadow-slate-200/70">
-        <div className="absolute -right-20 -top-28 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
-        <div className="absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-black via-neutral-950 to-neutral-800 px-6 py-8 font-sans sm:px-9 sm:py-10 shadow-xl shadow-neutral-300/60">
+        <div className="absolute -right-20 -top-28 h-64 w-64 rounded-full bg-white/[0.08] blur-3xl" />
+        <div className="absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-neutral-400/10 blur-3xl" />
         <div className="relative flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
             <p className="mb-3 text-sm font-bold text-emerald-400">
