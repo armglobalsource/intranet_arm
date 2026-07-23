@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useFichas, useUnarchiveFicha } from '@/hooks/useFichas';
 import { useActiveCampuses } from '@/hooks/useCampus';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { completionPercent, statusColor, statusLabel, SECTION_LABELS } from '@/types/ficha';
 import type { FichaListItem, FichaStatus, SectionName } from '@/types/ficha';
+import { parseFichaDate } from '@/lib/ficha-date';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -28,11 +30,7 @@ function getCampusInitials(name: string): string {
 
 function formatDate(raw: any): string {
   if (!raw) return '—';
-  let d: Date;
-  if (typeof raw?.toDate === 'function') d = raw.toDate();
-  else if (typeof raw === 'string' || typeof raw === 'number') d = new Date(raw);
-  else if (raw instanceof Date) d = raw;
-  else d = new Date(raw.seconds * 1000);
+  const d = parseFichaDate(raw);
   return d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -50,9 +48,13 @@ const SECTION_COLORS: Record<SectionName, string> = {
 
 // ── ProgressBar ───────────────────────────────────────────────────────────────
 
-function ProgressBar({ completionStatus }: { completionStatus: Record<string, boolean> }) {
-  const pct = completionPercent(completionStatus as any);
-  const sections = Object.keys(completionStatus) as SectionName[];
+function ProgressBar({ completionStatus, hiddenSections = [] }: {
+  completionStatus: Record<string, boolean>;
+  hiddenSections?: SectionName[];
+}) {
+  const pct = completionPercent(completionStatus as any, hiddenSections);
+  const sections = (Object.keys(completionStatus) as SectionName[])
+    .filter((section) => !hiddenSections.includes(section));
   return (
     <div className="mt-3">
       <div className="flex items-center justify-between mb-1.5">
@@ -101,7 +103,7 @@ function StatusBadge({ status }: { status: FichaStatus }) {
 
 // ── ArchivedFichaCard ─────────────────────────────────────────────────────────
 
-function ArchivedFichaCard({ ficha }: { ficha: FichaListItem }) {
+function ArchivedFichaCard({ ficha, canRestore }: { ficha: FichaListItem; canRestore: boolean }) {
   const [confirmingUnarchive, setConfirmingUnarchive] = useState(false);
   const { mutate: unarchiveFicha, isPending: unarchiving } = useUnarchiveFicha();
 
@@ -144,7 +146,7 @@ function ArchivedFichaCard({ ficha }: { ficha: FichaListItem }) {
         </div>
       </div>
 
-      <ProgressBar completionStatus={ficha.completionStatus} />
+      <ProgressBar completionStatus={ficha.completionStatus} hiddenSections={ficha.hiddenSections} />
 
       {/* Confirmación Desarchivar */}
       {confirmingUnarchive && (
@@ -178,22 +180,24 @@ function ArchivedFichaCard({ ficha }: { ficha: FichaListItem }) {
           Ver ficha
         </Link>
 
-        <button
-          onClick={() => setConfirmingUnarchive((v) => !v)}
-          title="Desarchivar ficha"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-          style={{
-            background: confirmingUnarchive ? 'rgba(251,191,36,0.15)' : 'rgba(251,191,36,0.08)',
-            color: '#F59E0B',
-            border: `1px solid ${confirmingUnarchive ? 'rgba(251,191,36,0.35)' : 'rgba(251,191,36,0.2)'}`,
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="1 4 1 10 7 10" />
-            <path d="M3.51 15a9 9 0 1 0 .49-4.51" />
-          </svg>
-          Desarchivar
-        </button>
+        {canRestore && (
+          <button
+            onClick={() => setConfirmingUnarchive((v) => !v)}
+            title="Desarchivar ficha"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style={{
+              background: confirmingUnarchive ? 'rgba(251,191,36,0.15)' : 'rgba(251,191,36,0.08)',
+              color: '#F59E0B',
+              border: `1px solid ${confirmingUnarchive ? 'rgba(251,191,36,0.35)' : 'rgba(251,191,36,0.2)'}`,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 .49-4.51" />
+            </svg>
+            Desarchivar
+          </button>
+        )}
       </div>
     </div>
   );
@@ -201,7 +205,7 @@ function ArchivedFichaCard({ ficha }: { ficha: FichaListItem }) {
 
 // ── CampusSection ─────────────────────────────────────────────────────────────
 
-function CampusSection({ campusName, fichas }: { campusName: string; fichas: FichaListItem[] }) {
+function CampusSection({ campusName, fichas, canRestore }: { campusName: string; fichas: FichaListItem[]; canRestore: boolean }) {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -233,7 +237,7 @@ function CampusSection({ campusName, fichas }: { campusName: string; fichas: Fic
         <div className="px-4 pb-4 border-t border-gray-100">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
             {fichas.map((f) => (
-              <ArchivedFichaCard key={f.fichaId} ficha={f} />
+              <ArchivedFichaCard key={f.fichaId} ficha={f} canRestore={canRestore} />
             ))}
           </div>
         </div>
@@ -245,6 +249,7 @@ function CampusSection({ campusName, fichas }: { campusName: string; fichas: Fic
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function FichasArchivadasClient() {
+  const allowed = useRequirePermission('fichas:view');
   const { can, isAdmin } = usePermissions();
   const user = useAuthStore((s) => s.user);
 
@@ -309,6 +314,7 @@ export function FichasArchivadasClient() {
   );
 
   const campusNames = Object.keys(grouped).sort((a, b) => grouped[b].length - grouped[a].length);
+  const canRestore = isAdmin || can('fichas:admin') || can('fichas:edit');
 
   // Lista de campus disponibles para el filtro
   const availableCampuses = useMemo(() => {
@@ -320,6 +326,8 @@ export function FichasArchivadasClient() {
     }
     return result.sort();
   }, [archived, campusNormMap]);
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">
@@ -427,7 +435,7 @@ export function FichasArchivadasClient() {
       ) : (
         <div className="space-y-4">
           {campusNames.map((name) => (
-            <CampusSection key={name} campusName={name} fichas={grouped[name]} />
+            <CampusSection key={name} campusName={name} fichas={grouped[name]} canRestore={canRestore} />
           ))}
         </div>
       )}

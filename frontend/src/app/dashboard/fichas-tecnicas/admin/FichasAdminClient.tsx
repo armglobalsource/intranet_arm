@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation';
 import { useFichas, useCreateFicha, useDeleteFicha } from '@/hooks/useFichas';
 import { CloneModal } from '@/components/fichas/CloneModal';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAuthStore } from '@/lib/store/auth.store';
 import { statusColor, statusLabel, completionPercent } from '@/types/ficha';
 import type { FichaListItem, FichaType, Encuentro } from '@/types/ficha';
 import { useAllCampuses } from '@/hooks/useCampus';
 import type { Campus } from '@/hooks/useCampus';
+import { parseFichaDate } from '@/lib/ficha-date';
 
 // ── Campus helpers ────────────────────────────────────────────────────────────
 
@@ -74,11 +76,7 @@ function buildEncuentrosConfig(campus: Campus): EncuentrosDia[] {
 
 function formatDate(raw: any): string {
   if (!raw) return '—';
-  let d: Date;
-  if (typeof raw?.toDate === 'function') d = raw.toDate();
-  else if (typeof raw === 'string' || typeof raw === 'number') d = new Date(raw);
-  else if (raw instanceof Date) d = raw;
-  else d = new Date(raw.seconds * 1000);
+  const d = parseFichaDate(raw);
   return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -91,9 +89,13 @@ interface CustomEncuentro { label: string; time: string; }
 function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }) {
   const { data: rawCampuses = [], isLoading: loadingCampus } = useAllCampuses();
   const { mutate: createFicha, isPending, isError, error } = useCreateFicha();
+  const { isAdmin, can } = usePermissions();
+  const user = useAuthStore((state) => state.user);
 
-  // Solo campus activos
-  const campuses = rawCampuses.filter((c) => c.isActive);
+  const canUseAllCampuses = isAdmin || can('fichas:admin') || can('fichas:viewAll');
+  const campuses = rawCampuses.filter((campus) =>
+    campus.isActive && (canUseAllCampuses || String(campus.id) === String(user?.campusId ?? '')),
+  );
 
   const [campusId, setCampusId] = useState('');
   const [diaIdx,   setDiaIdx]   = useState<number>(0);
@@ -512,14 +514,18 @@ function FichaRow({
   ficha,
   onClone,
   onDelete,
+  canClone,
+  canDelete,
 }: {
   ficha: FichaListItem;
   onClone: (id: string) => void;
   onDelete: (id: string) => void;
+  canClone: boolean;
+  canDelete: boolean;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { bg, text } = statusColor(ficha.status);
-  const pct = completionPercent(ficha.completionStatus);
+  const pct = completionPercent(ficha.completionStatus, ficha.hiddenSections ?? []);
 
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
@@ -558,18 +564,20 @@ function FichaRow({
               <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
             </svg>
           </Link>
-          <button
-            onClick={() => onClone(ficha.fichaId)}
-            className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-            title="Clonar"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
-          </button>
-          {confirmDelete ? (
+          {canClone && (
+            <button
+              onClick={() => onClone(ficha.fichaId)}
+              className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Clonar"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+          )}
+          {canDelete && (confirmDelete ? (
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onDelete(ficha.fichaId)}
@@ -598,7 +606,7 @@ function FichaRow({
                 <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
               </svg>
             </button>
-          )}
+          ))}
         </div>
       </td>
     </tr>
@@ -616,6 +624,8 @@ export function FichasAdminClient() {
   const [cloneTarget, setCloneTarget] = useState<import('@/types/ficha').FichaListItem | null>(null);
 
   const canAccess = isAdmin || can('fichas:admin') || can('fichas:create');
+  const canDelete = isAdmin || can('fichas:admin') || can('fichas:delete');
+  const canClone = isAdmin || can('fichas:admin') || can('fichas:create');
 
   function handleDelete(fichaId: string) {
     deleteFicha(fichaId);
@@ -697,6 +707,8 @@ export function FichasAdminClient() {
                       ficha={f}
                       onClone={(id) => setCloneTarget(fichas?.find((f) => f.fichaId === id) ?? null)}
                       onDelete={handleDelete}
+                      canClone={canClone}
+                      canDelete={canDelete}
                     />
                   ))}
                 </tbody>

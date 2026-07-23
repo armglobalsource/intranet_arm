@@ -1,10 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { api } from '@/lib/api';
-import { clientDb } from '@/lib/firebase-client';
+import { api, apiErrorMessage } from '@/lib/api';
 import type { Ficha, FichaListItem, CreateFichaPayload, SectionName } from '@/types/ficha';
 
 const KEYS = {
@@ -40,31 +37,23 @@ export function useMiFichas() {
   });
 }
 
-// ─── Ficha individual en tiempo real (Firestore onSnapshot) ──────────────────
+// ─── Ficha individual con actualización periódica vía API protegida ─────────
 
 export function useFichaRealtime(fichaId: string) {
-  const [ficha, setFicha]   = useState<Ficha | null>(null);
-  const [loading, setLoad]  = useState(true);
-  const [error, setError]   = useState<string | null>(null);
+  const query = useQuery<Ficha>({
+    queryKey: KEYS.detail(fichaId),
+    queryFn: () => api.get(`/fichas/${fichaId}`).then((response) => response.data),
+    enabled: !!fichaId,
+    staleTime: 1_000,
+    refetchInterval: 3_000,
+    refetchIntervalInBackground: false,
+  });
 
-  useEffect(() => {
-    if (!fichaId) return;
-    setLoad(true);
-    const ref = doc(clientDb, 'fichas', fichaId);
-    const unsub = onSnapshot(
-      ref,
-      snap => {
-        if (!snap.exists()) { setError('Ficha no encontrada'); setLoad(false); return; }
-        setFicha({ ...snap.data(), fichaId: snap.id } as Ficha);
-        setLoad(false);
-        setError(null);
-      },
-      err => { setError(err.message); setLoad(false); },
-    );
-    return () => unsub();
-  }, [fichaId]);
-
-  return { ficha, loading, error };
+  return {
+    ficha: query.data ?? null,
+    loading: query.isLoading,
+    error: query.error ? apiErrorMessage(query.error, 'No se pudo cargar la ficha') : null,
+  };
 }
 
 // ─── Mutations (escrituras via NestJS API) ────────────────────────────────────
@@ -81,9 +70,13 @@ export function useCreateFicha() {
 export function useUpdateFicha() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ fichaId, ...dto }: { fichaId: string; title?: string; date?: string; status?: string; hiddenSections?: string[]; sectionLayout?: { left: string[]; right: string[] } }) =>
+    mutationFn: ({ fichaId, ...dto }: { fichaId: string; title?: string; date?: string; hiddenSections?: string[]; sectionLayout?: { left: string[]; right: string[] } }) =>
       api.patch(`/fichas/${fichaId}`, dto).then(r => r.data),
-    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: KEYS.list() }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: KEYS.detail(v.fichaId) });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
   });
 }
 
@@ -91,7 +84,11 @@ export function useDeleteFicha() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (fichaId: string) => api.delete(`/fichas/${fichaId}`).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onSuccess: (_data, fichaId) => {
+      qc.removeQueries({ queryKey: KEYS.detail(fichaId) });
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
   });
 }
 
@@ -107,7 +104,10 @@ export function useCloneFicha() {
   return useMutation({
     mutationFn: ({ fichaId, ...dto }: CloneFichaOptions) =>
       api.post(`/fichas/${fichaId}/clone`, dto).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
   });
 }
 
@@ -115,7 +115,11 @@ export function useArchiveFicha() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (fichaId: string) => api.patch(`/fichas/${fichaId}/archive`).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onSuccess: (_data, fichaId) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(fichaId) });
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
   });
 }
 
@@ -123,7 +127,11 @@ export function useUnarchiveFicha() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (fichaId: string) => api.patch(`/fichas/${fichaId}/unarchive`).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onSuccess: (_data, fichaId) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(fichaId) });
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
   });
 }
 
@@ -131,7 +139,11 @@ export function usePublishFicha() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (fichaId: string) => api.patch(`/fichas/${fichaId}/publish`).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onSuccess: (_data, fichaId) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(fichaId) });
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
   });
 }
 
@@ -139,21 +151,50 @@ export function useUnpublishFicha() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (fichaId: string) => api.patch(`/fichas/${fichaId}/unpublish`).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onSuccess: (_data, fichaId) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(fichaId) });
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
   });
 }
 
 export function useUpdateSection() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ fichaId, sectionName, ...dto }: { fichaId: string; sectionName: SectionName; [key: string]: any }) =>
       api.patch(`/fichas/${fichaId}/sections/${sectionName}`, dto).then(r => r.data),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(variables.fichaId) });
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
   });
 }
 
 export function useCompleteSection() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ fichaId, sectionName }: { fichaId: string; sectionName: SectionName }) =>
       api.patch(`/fichas/${fichaId}/sections/${sectionName}/complete`, {}).then(r => r.data),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(variables.fichaId) });
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
+  });
+}
+
+export function useReopenSection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fichaId, sectionName }: { fichaId: string; sectionName: SectionName }) =>
+      api.patch(`/fichas/${fichaId}/sections/${sectionName}/reopen`, {}).then(r => r.data),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(variables.fichaId) });
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
   });
 }
 

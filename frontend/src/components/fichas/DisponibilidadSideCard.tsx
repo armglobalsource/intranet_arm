@@ -2,39 +2,27 @@
 
 import { useState } from 'react';
 import { useDisponibilidadMatrix } from '@/hooks/useDisponibilidad';
-import { useAuthStore } from '@/lib/store/auth.store';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toWeekLabel, formatWeekLabel } from '@/types/disponibilidad';
+import { parseFichaDate } from '@/lib/ficha-date';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function parseDate(raw: any): Date {
-  if (typeof raw?.toDate === 'function') return raw.toDate();
-  if (raw instanceof Date) return raw;
-  if (raw?.seconds) return new Date(raw.seconds * 1000);
-  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const [y, m, d] = raw.split('-').map(Number);
-    return new Date(y, m - 1, d, 12, 0, 0);
-  }
-  return new Date(raw);
-}
 
 // ── DisponibilidadSideCard ────────────────────────────────────────────────────
 
 interface Props {
   fichaDate: any;
+  campusId: number | null;
 }
 
-export function DisponibilidadSideCard({ fichaDate }: Props) {
-  const { user } = useAuthStore();
+export function DisponibilidadSideCard({ fichaDate, campusId }: Props) {
   const { can, isAdmin } = usePermissions();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const canView = isAdmin || can('disponibilidad:view');
   if (!canView) return null;
 
-  const campusId  = user?.campusId ?? null;
-  const date      = fichaDate ? parseDate(fichaDate) : new Date();
+  const date      = fichaDate ? parseFichaDate(fichaDate) : new Date();
   const weekLabel = toWeekLabel(date);
 
   const { data: matrix, isLoading } = useDisponibilidadMatrix(campusId, weekLabel);

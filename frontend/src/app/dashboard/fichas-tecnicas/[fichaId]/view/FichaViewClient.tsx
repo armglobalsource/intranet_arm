@@ -2,10 +2,17 @@
 
 import Link from 'next/link';
 import { useFichaRealtime } from '@/hooks/useFichas';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { FichaDocumentView } from '../FichaDocumentView';
 
 export function FichaViewClient({ fichaId }: { fichaId: string }) {
+  const allowed = useRequirePermission('fichas:view');
+  const { can, isAdmin } = usePermissions();
   const { ficha, loading, error } = useFichaRealtime(fichaId);
+  const canEdit = isAdmin || can('fichas:edit') || can('fichas:admin');
+
+  if (!allowed) return null;
 
   if (loading) {
     return (
@@ -58,7 +65,7 @@ export function FichaViewClient({ fichaId }: { fichaId: string }) {
       {/* Vista documento (read-only) */}
       <FichaDocumentView
         ficha={ficha}
-        onEdit={() => { window.location.href = `/dashboard/fichas-tecnicas/${fichaId}`; }}
+        onEdit={canEdit ? () => { window.location.href = `/dashboard/fichas-tecnicas/${fichaId}`; } : undefined}
       />
     </div>
   );

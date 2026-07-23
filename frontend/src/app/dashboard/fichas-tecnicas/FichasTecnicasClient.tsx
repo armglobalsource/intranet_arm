@@ -9,6 +9,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useActiveCampuses } from '@/hooks/useCampus';
+import { parseFichaDate } from '@/lib/ficha-date';
 import {
   completionPercent, statusColor, statusLabel,
   SECTION_LABELS,
@@ -34,12 +35,7 @@ function getCampusInitials(name: string): string {
 
 function formatDate(raw: any): string {
   if (!raw) return '—';
-  // Firestore Timestamp tiene .toDate(), string ISO, o number
-  let d: Date;
-  if (typeof raw?.toDate === 'function') d = raw.toDate();
-  else if (typeof raw === 'string' || typeof raw === 'number') d = new Date(raw);
-  else if (raw instanceof Date) d = raw;
-  else d = new Date(raw.seconds * 1000); // Firestore Timestamp serializado
+  const d = parseFichaDate(raw);
   return d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
@@ -75,7 +71,8 @@ const SECTION_COLORS: Record<SectionName, string> = {
 
 function ProgressBar({ completionStatus, hiddenSections }: { completionStatus: Record<string, boolean>; hiddenSections?: SectionName[] }) {
   const pct = completionPercent(completionStatus as any, hiddenSections ?? []);
-  const sections = Object.keys(completionStatus) as SectionName[];
+  const sections = (Object.keys(completionStatus) as SectionName[])
+    .filter((section) => !(hiddenSections ?? []).includes(section));
 
   return (
     <div className="mt-3">
@@ -573,7 +570,8 @@ export function FichasTecnicasClient() {
 
   const campusNames = Object.keys(grouped).sort((a, b) => grouped[b].length - grouped[a].length);
   const canCreate = isAdmin || can('fichas:create') || can('fichas:admin');
-  const canDelete = isAdmin || can('fichas:admin');
+  const canDelete = isAdmin || can('fichas:delete') || can('fichas:admin');
+  const canArchive = isAdmin || can('fichas:edit') || can('fichas:admin');
 
   // ── Stats rápidos ──────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -742,7 +740,7 @@ export function FichasTecnicasClient() {
               campusName={name}
               fichas={grouped[name]}
               canDelete={canDelete}
-              canArchive={canDelete}
+              canArchive={canArchive}
               canPublish={isAdmin || can('fichas:create') || can('fichas:admin')}
               currentUserId={user?.id}
               onClone={canClone ? (f) => setCloneTarget(f) : undefined}

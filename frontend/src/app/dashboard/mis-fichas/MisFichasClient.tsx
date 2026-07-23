@@ -7,16 +7,14 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { completionPercent, statusLabel, SECTION_LABELS } from '@/types/ficha';
 import type { FichaListItem, FichaStatus, SectionName } from '@/types/ficha';
+import { parseFichaDate } from '@/lib/ficha-date';
 
 // ── Helpers de fecha ──────────────────────────────────────────────────────────
 
 function parseDate(raw: any): Date | null {
   if (!raw) return null;
-  if (typeof raw?.toDate === 'function') return raw.toDate();
-  if (typeof raw === 'string' || typeof raw === 'number') return new Date(raw);
-  if (raw instanceof Date) return raw;
-  if (raw.seconds) return new Date(raw.seconds * 1000);
-  return null;
+  const parsed = parseFichaDate(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function formatFull(raw: any): string {
@@ -27,7 +25,9 @@ function formatFull(raw: any): string {
 
 function isUpcoming(raw: any): boolean {
   const d = parseDate(raw);
-  return d ? d >= new Date() : false;
+  if (!d) return false;
+  d.setHours(23, 59, 59, 999);
+  return d >= new Date();
 }
 
 function getDayNum(raw: any): string {
@@ -102,9 +102,13 @@ function StatusBadge({ status }: { status: FichaStatus }) {
 
 // ── ProgressBar ───────────────────────────────────────────────────────────────
 
-function ProgressBar({ completionStatus }: { completionStatus: Record<string, boolean> }) {
-  const sections = Object.keys(completionStatus) as SectionName[];
-  const pct = completionPercent(completionStatus as any);
+function ProgressBar({ completionStatus, hiddenSections = [] }: {
+  completionStatus: Record<string, boolean>;
+  hiddenSections?: SectionName[];
+}) {
+  const sections = (Object.keys(completionStatus) as SectionName[])
+    .filter((section) => !hiddenSections.includes(section));
+  const pct = completionPercent(completionStatus as any, hiddenSections);
   const done = sections.filter((s) => completionStatus[s]);
   const pending = sections.filter((s) => !completionStatus[s]);
 
@@ -149,12 +153,15 @@ function ProgressBar({ completionStatus }: { completionStatus: Record<string, bo
 function FichaCard({ ficha, campusColor }: { ficha: FichaListItem; campusColor: string }) {
   const upcoming = isUpcoming(ficha.date);
   const st = STATUS_STYLES[ficha.status];
+  const href = ficha.published
+    ? `/ficha/${ficha.fichaId}`
+    : `/dashboard/fichas-tecnicas/${ficha.fichaId}/view`;
 
   return (
     <Link
-      href={`/ficha/${ficha.fichaId}`}
-      target="_blank"
-      rel="noopener noreferrer"
+      href={href}
+      target={ficha.published ? '_blank' : undefined}
+      rel={ficha.published ? 'noopener noreferrer' : undefined}
       className="group block rounded-2xl bg-white transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
       style={{ border: '1px solid #E5E7EB', overflow: 'hidden' }}
     >
@@ -209,7 +216,7 @@ function FichaCard({ ficha, campusColor }: { ficha: FichaListItem; campusColor: 
         </div>
 
         {/* Progreso */}
-        <ProgressBar completionStatus={ficha.completionStatus} />
+        <ProgressBar completionStatus={ficha.completionStatus} hiddenSections={ficha.hiddenSections} />
       </div>
 
       {/* Footer */}
@@ -242,7 +249,7 @@ function CampusSection({ campusName, fichas }: { campusName: string; fichas: Fic
   const completas = fichas.filter((f) => f.status === 'complete').length;
   const proximas  = fichas.filter((f) => isUpcoming(f.date)).length;
   const avgPct = fichas.length
-    ? Math.round(fichas.reduce((a, f) => a + completionPercent(f.completionStatus), 0) / fichas.length)
+    ? Math.round(fichas.reduce((a, f) => a + completionPercent(f.completionStatus, f.hiddenSections ?? []), 0) / fichas.length)
     : 0;
 
   return (

@@ -1,32 +1,50 @@
-import { IsString, IsOptional, IsIn, IsArray, ValidateNested, IsBoolean, IsNumber, IsObject, IsDateString } from 'class-validator';
+import {
+  ArrayMaxSize, IsString, IsOptional, IsIn, IsArray, ValidateNested,
+  IsBoolean, IsNumber, IsObject, IsDateString, IsNotEmpty, MaxLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
+const SECTION_NAMES = [
+  'pastoral', 'escena', 'produccion', 'streaming',
+  'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit',
+] as const;
+const LAYOUT_SLOTS = ['pastoral', 'produccion', 'streaming', 'horarios', 'worship', 'voluntarios', 'anuncios'] as const;
+
 export class EncuentroDto {
-  @IsString() id: string;       // 'e1' | 'e2' | 'e3' | 'unico'
-  @IsString() label: string;    // "Encuentro I · 9:00"
-  @IsString() time: string;     // "09:00"
+  @IsString() @IsNotEmpty() @MaxLength(40) id: string;
+  @IsString() @IsNotEmpty() @MaxLength(120) label: string;
+  @IsString() @IsNotEmpty() @MaxLength(10) time: string;
   @IsBoolean() isLive: boolean;
-  @IsString() color: string;    // hex o nombre
+  @IsString() @MaxLength(30) color: string;
 }
 
 export class CreateFichaDto {
-  @IsString() campusId: string;
-  @IsString() campusName: string;
+  @IsString() @IsNotEmpty() @MaxLength(80) campusId: string;
+  @IsString() @IsNotEmpty() @MaxLength(120) campusName: string;
   @IsIn(['unico', 'multi', 'oracion']) type: 'unico' | 'multi' | 'oracion';
-  @IsString() title: string;
-  @IsString() date: string;  // ISO string
-  @IsArray() @ValidateNested({ each: true }) @Type(() => EncuentroDto)
+  @IsString() @IsNotEmpty() @MaxLength(160) title: string;
+  @IsDateString() date: string;
+  @IsArray() @ArrayMaxSize(12) @ValidateNested({ each: true }) @Type(() => EncuentroDto)
   encuentros: EncuentroDto[];
-  @IsOptional() @IsString() descripcion?: string;
-  @IsOptional() @IsString() ubicacion?: string;
+  @IsOptional() @IsString() @MaxLength(1000) descripcion?: string;
+  @IsOptional() @IsString() @MaxLength(200) ubicacion?: string;
+}
+
+export class SectionLayoutDto {
+  @IsArray() @ArrayMaxSize(7) @IsIn(LAYOUT_SLOTS, { each: true })
+  left: string[];
+
+  @IsArray() @ArrayMaxSize(7) @IsIn(LAYOUT_SLOTS, { each: true })
+  right: string[];
 }
 
 export class UpdateFichaDto {
-  @IsOptional() @IsString() title?: string;
-  @IsOptional() @IsString() date?: string;
-  @IsOptional() @IsIn(['draft', 'in_progress', 'complete']) status?: string;
-  @IsOptional() @IsArray()  hiddenSections?: string[];
-  @IsOptional() @IsObject() sectionLayout?:  { left: string[]; right: string[] };
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(160) title?: string;
+  @IsOptional() @IsDateString() date?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(9) @IsIn(SECTION_NAMES, { each: true })
+  hiddenSections?: string[];
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => SectionLayoutDto)
+  sectionLayout?: SectionLayoutDto;
 }
 
 export class CloneFichaDto {
@@ -40,8 +58,8 @@ export class RowValueDto {
 }
 
 export class RowDto {
-  @IsString()  id: string;
-  @IsString()  label: string;
+  @IsString() @IsNotEmpty() @MaxLength(80) id: string;
+  @IsString() @IsNotEmpty() @MaxLength(160) label: string;
   @IsIn(['text', 'person', 'song']) type: 'text' | 'person' | 'song';
   @IsBoolean() shared: boolean;
   @IsObject()  values: Record<string, string>;
@@ -50,9 +68,9 @@ export class RowDto {
 }
 
 export class UpdateSectionDto {
-  @IsOptional() @IsNumber() assignedTo?: number;
-  @IsOptional() @IsString() assignedName?: string;
-  @IsOptional() @IsBoolean() isCompleted?: boolean;
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => RowDto)
+  @IsOptional() @IsNumber() expectedRevision?: number;
+  @IsOptional() @IsNumber() assignedTo?: number | null;
+  @IsOptional() @IsString() assignedName?: string | null;
+  @IsOptional() @IsArray() @ArrayMaxSize(100) @ValidateNested({ each: true }) @Type(() => RowDto)
   rows?: RowDto[];
 }

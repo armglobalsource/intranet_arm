@@ -3,13 +3,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import Link from 'next/link';
-import { useFichaRealtime, useUpdateSection, useCompleteSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, usePublishFicha, useUnpublishFicha } from '@/hooks/useFichas';
+import { useFichaRealtime, useUpdateSection, useCompleteSection, useReopenSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, usePublishFicha, useUnpublishFicha } from '@/hooks/useFichas';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { apiErrorMessage } from '@/lib/api';
+import { useUsers } from '@/hooks/useUsers';
+import { displayName } from '@/types/user';
 import { FichaDocumentView } from './FichaDocumentView';
 import { DisponibilidadSideCard } from '@/components/fichas/DisponibilidadSideCard';
 import { TecnicosDisponibilidadSideCard } from '@/components/fichas/TecnicosDisponibilidadSideCard';
-import type { Row, SectionName, Section } from '@/types/ficha';
+import { SECTION_LABELS } from '@/types/ficha';
+import type { Ficha, Row, SectionName, Section } from '@/types/ficha';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -131,19 +136,81 @@ function FichaSkeleton() {
   );
 }
 
+function SectionAssignments({
+  ficha,
+  onAssign,
+}: {
+  ficha: Ficha;
+  onAssign: (sectionName: SectionName, userId: number | null, userName: string | null) => void;
+}) {
+  const { data: users = [], isLoading } = useUsers();
+  const campusId = Number(ficha.campusId);
+  const availableUsers = users
+    .filter((candidate) => candidate.status === 'active')
+    .filter((candidate) => !Number.isFinite(campusId) || candidate.campusId == null || candidate.campusId === campusId)
+    .sort((a, b) => displayName(a).localeCompare(displayName(b), 'es'));
+  const sectionNames = Object.keys(ficha.sections ?? {}) as SectionName[];
+
+  return (
+    <details className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <summary className="cursor-pointer list-none px-5 py-4 text-sm font-bold text-slate-800">
+        Responsables de sección
+        <span className="ml-2 text-xs font-normal text-slate-400">
+          Define quién recibirá esta ficha en “Mis Fichas”
+        </span>
+      </summary>
+      <div className="grid grid-cols-1 gap-3 border-t border-slate-100 px-5 py-4 sm:grid-cols-2 lg:grid-cols-3">
+        {sectionNames.map((sectionName) => {
+          const section = ficha.sections[sectionName];
+          return (
+            <label key={sectionName} className="block">
+              <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {SECTION_LABELS[sectionName]}
+              </span>
+              <select
+                className="input w-full text-xs"
+                value={section?.assignedTo ?? ''}
+                disabled={isLoading}
+                onChange={(event) => {
+                  const id = event.target.value ? Number(event.target.value) : null;
+                  const selected = id == null ? null : availableUsers.find((candidate) => candidate.id === id);
+                  onAssign(sectionName, id, selected ? displayName(selected) : null);
+                }}
+              >
+                <option value="">Sin responsable</option>
+                {availableUsers.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {displayName(candidate)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
 // ── FichaEditorClient ─────────────────────────────────────────────────────────
 
 export function FichaEditorClient({ fichaId }: { fichaId: string }) {
+  const allowed = useRequirePermission('fichas:view');
   const { can, isAdmin } = usePermissions();
   const { user } = useAuthStore();
   const { ficha, loading, error } = useFichaRealtime(fichaId);
   const [saveState, setSaveState]       = useState<SaveState>('idle');
+  const [actionError, setActionError]   = useState<string | null>(null);
   const [localSections, setLocalSections] =
     useState<Partial<Record<SectionName, Row[]>>>({});
 
   // Un debounce ref por sección
   const debounceRefs =
     useRef<Partial<Record<SectionName, ReturnType<typeof setTimeout>>>>({});
+  const saveQueuesRef =
+    useRef<Partial<Record<SectionName, Promise<unknown>>>>({});
+  const sectionRevisionRefs =
+    useRef<Partial<Record<SectionName, number>>>({});
 
   const [isEditing, setIsEditing]             = useState(true);
   const [transitioningToEdit, setTransitioningToEdit] = useState(false);
@@ -157,8 +224,9 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     }
   }, [ficha?.hiddenSections]);
 
-  const { mutate: updateSection } = useUpdateSection();
-  const { mutate: completeSection } = useCompleteSection();
+  const { mutateAsync: updateSectionAsync } = useUpdateSection();
+  const { mutateAsync: completeSection } = useCompleteSection();
+  const { mutateAsync: reopenSection } = useReopenSection();
   const { mutate: archiveFicha } = useArchiveFicha();
   const { mutate: unarchiveFicha } = useUnarchiveFicha();
   const { mutate: updateFicha } = useUpdateFicha();
@@ -196,15 +264,17 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     updateFicha({ fichaId: ficha.fichaId, sectionLayout: layout });
   }
 
-  // ── Sincronizar filas desde Firestore ──────────────────────────────────────
+  // ── Sincronizar filas desde la versión más reciente de la API ─────────────
   // Solo sincronizamos secciones que NO tienen una edición pendiente
   useEffect(() => {
     if (!ficha?.sections) return;
     setLocalSections((prev) => {
       const next = { ...prev };
       for (const [k, sec] of Object.entries(ficha.sections!)) {
-        if (!debounceRefs.current[k as SectionName]) {
+        const sectionName = k as SectionName;
+        if (!debounceRefs.current[sectionName] && !saveQueuesRef.current[sectionName]) {
           next[k as SectionName] = (sec as Section).rows ?? [];
+          sectionRevisionRefs.current[sectionName] = Number((sec as Section).revision ?? 0);
         }
       }
       return next;
@@ -220,6 +290,33 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     Object.entries(ficha?.sections ?? {}).map(([k, sec]) => [k, (sec as Section).isCompleted ?? false]),
   ) as Partial<Record<SectionName, boolean>>;
 
+  const enqueueSectionUpdate = useCallback(
+    (sectionName: SectionName, patch: Record<string, unknown>) => {
+      const previous = saveQueuesRef.current[sectionName] ?? Promise.resolve();
+      const task = previous
+        .catch(() => undefined)
+        .then(async () => {
+          const data = await updateSectionAsync({
+            fichaId,
+            sectionName,
+            expectedRevision: sectionRevisionRefs.current[sectionName] ?? 0,
+            ...patch,
+          });
+          sectionRevisionRefs.current[sectionName] =
+            Number(data?.sections?.[sectionName]?.revision ?? sectionRevisionRefs.current[sectionName] ?? 0);
+          return data;
+        });
+      saveQueuesRef.current[sectionName] = task;
+      task.finally(() => {
+        if (saveQueuesRef.current[sectionName] === task) {
+          saveQueuesRef.current[sectionName] = undefined;
+        }
+      }).catch(() => undefined);
+      return task;
+    },
+    [fichaId, updateSectionAsync],
+  );
+
   // ── Guardar sección con debounce ───────────────────────────────────────────
   const scheduleSave = useCallback(
     (sectionName: SectionName, rows: Row[], immediate = false) => {
@@ -228,24 +325,20 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
       }
       setSaveState('saving');
       debounceRefs.current[sectionName] = setTimeout(() => {
-        updateSection(
-          { fichaId, sectionName, rows },
-          {
-            onSuccess: () => {
-              debounceRefs.current[sectionName] = undefined;
-              setSaveState('saved');
-              setTimeout(() => setSaveState('idle'), 2000);
-            },
-            onError: () => {
-              debounceRefs.current[sectionName] = undefined;
-              setSaveState('error');
-              setTimeout(() => setSaveState('idle'), 3000);
-            },
-          },
-        );
+        debounceRefs.current[sectionName] = undefined;
+        enqueueSectionUpdate(sectionName, { rows })
+          .then(() => {
+            setSaveState('saved');
+            setTimeout(() => setSaveState('idle'), 2000);
+          })
+          .catch((err) => {
+            setSaveState('error');
+            setActionError(apiErrorMessage(err, 'No se pudieron guardar los cambios'));
+            setTimeout(() => setSaveState('idle'), 3000);
+          });
       }, immediate ? 0 : 800);
     },
-    [fichaId, updateSection],
+    [enqueueSectionUpdate],
   );
 
   // ── Cambio de celda ────────────────────────────────────────────────────────
@@ -335,55 +428,53 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
       return;
     }
 
-    // Guardar todas las secciones en paralelo y esperar a que TODAS terminen
+    // Guardar todas las secciones respetando la cola individual de cada una.
     setSaveState('saving');
-    let done = 0;
-    let hasError = false;
-
-    for (const { sectionName, rows } of pending) {
-      updateSection(
-        { fichaId, sectionName, rows },
-        {
-          onSuccess: () => {
-            done++;
-            if (done === pending.length) {
-              setSaveState(hasError ? 'error' : 'saved');
-              setTimeout(() => {
-                setSaveState('idle');
-                if (!hasError) setIsEditing(false);
-              }, 800);
-            }
-          },
-          onError: () => {
-            done++;
-            hasError = true;
-            if (done === pending.length) {
-              setSaveState('error');
-              setTimeout(() => setSaveState('idle'), 3000);
-            }
-          },
-        },
-      );
-    }
-  }, [fichaId, localSections, updateSection]);
+    Promise.all(pending.map(({ sectionName, rows }) => enqueueSectionUpdate(sectionName, { rows })))
+      .then(() => {
+        setSaveState('saved');
+        setTimeout(() => {
+          setSaveState('idle');
+          setIsEditing(false);
+        }, 800);
+      })
+      .catch((err) => {
+        setSaveState('error');
+        setActionError(apiErrorMessage(err, 'No se pudieron guardar todos los cambios'));
+        setTimeout(() => setSaveState('idle'), 3000);
+      });
+  }, [localSections, enqueueSectionUpdate]);
 
   // ── Marcar sección como completada ─────────────────────────────────────────
   const handleSectionComplete = useCallback(
-    (sectionName: SectionName) => {
-      completeSection(
-        { fichaId, sectionName },
-        {
-          onSuccess: () => {
-            setSaveState('saved');
-            setTimeout(() => setSaveState('idle'), 2000);
-          },
-        },
-      );
+    async (sectionName: SectionName) => {
+      setActionError(null);
+      setSaveState('saving');
+      try {
+        const pendingTimeout = debounceRefs.current[sectionName];
+        if (pendingTimeout) {
+          clearTimeout(pendingTimeout);
+          debounceRefs.current[sectionName] = undefined;
+          await enqueueSectionUpdate(sectionName, { rows: localSections[sectionName] ?? [] });
+        } else if (saveQueuesRef.current[sectionName]) {
+          await saveQueuesRef.current[sectionName];
+        }
+        const mutation = sectionStatus[sectionName] ? reopenSection : completeSection;
+        await mutation({ fichaId, sectionName });
+        setSaveState('saved');
+        setTimeout(() => setSaveState('idle'), 2000);
+      } catch (err) {
+        setSaveState('error');
+        setActionError(apiErrorMessage(err, 'No se pudo actualizar el estado de la sección'));
+        setTimeout(() => setSaveState('idle'), 3000);
+      }
     },
-    [fichaId, completeSection],
+    [fichaId, completeSection, reopenSection, sectionStatus, enqueueSectionUpdate, localSections],
   );
 
-  // ── Loading inicial (Firestore) ────────────────────────────────────────────
+  // ── Carga inicial ─────────────────────────────────────────────────────────
+  if (!allowed) return null;
+
   if (loading) {
     return <FichaSkeleton />;
   }
@@ -402,6 +493,21 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const canViewDisponibilidad = isAdmin || can('disponibilidad:view');
   const canViewTecnicos       = isAdmin || can('tecnicos:view');
   const showSidePanel = editable && (canViewDisponibilidad || canViewTecnicos);
+  const fichaCampusId = Number.isFinite(Number(ficha.campusId)) ? Number(ficha.campusId) : null;
+
+  function handleAssignSection(sectionName: SectionName, userId: number | null, userName: string | null) {
+    setActionError(null);
+    setSaveState('saving');
+    enqueueSectionUpdate(sectionName, { assignedTo: userId, assignedName: userName })
+      .then(() => {
+        setSaveState('saved');
+        setTimeout(() => setSaveState('idle'), 1200);
+      })
+      .catch((err) => {
+        setSaveState('error');
+        setActionError(apiErrorMessage(err, 'No se pudo asignar el responsable'));
+      });
+  }
 
   return (
     <div className="space-y-4" style={{ position: 'relative' }}>
@@ -448,6 +554,24 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         </Link>
       </div>
 
+      {actionError && (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="font-bold text-red-400 hover:text-red-700"
+            aria-label="Cerrar mensaje"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {editable && (
+        <SectionAssignments ficha={ficha} onAssign={handleAssignSection} />
+      )}
+
       {/* Layout: ficha + panel lateral cuando está en edición */}
       <div className={showSidePanel ? 'flex gap-5 items-start' : ''}>
         <div className={showSidePanel ? 'flex-1 min-w-0' : ''}>
@@ -489,8 +613,8 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
         {showSidePanel && (
           <div className="w-56 flex-shrink-0 sticky top-4 flex flex-col gap-3">
-            {canViewDisponibilidad && <DisponibilidadSideCard fichaDate={ficha.date} />}
-            {canViewTecnicos       && <TecnicosDisponibilidadSideCard fichaDate={ficha.date} />}
+            {canViewDisponibilidad && <DisponibilidadSideCard fichaDate={ficha.date} campusId={fichaCampusId} />}
+            {canViewTecnicos       && <TecnicosDisponibilidadSideCard fichaDate={ficha.date} campusId={fichaCampusId} />}
           </div>
         )}
       </div>

@@ -1,18 +1,32 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
+import { hasPermission } from '../common/permissions';
 import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto } from './dto/ficha.dto';
+import {
+  ALL_FICHA_SECTIONS,
+  activeSectionsForType,
+  deriveFichaStatus,
+  formatFichaDateLabel,
+  missingRequiredRows,
+  parseFichaDate,
+  type FichaSectionName,
+} from './fichas.utils';
 
 const COL = 'fichas';
 
-const SECTIONS = [
-  'pastoral', 'escena', 'produccion', 'streaming',
-  'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit',
-] as const;
-type SectionName = typeof SECTIONS[number];
+const SECTIONS = ALL_FICHA_SECTIONS;
+type SectionName = FichaSectionName;
 
 // Secciones activas según tipo de ficha
 const SECTIONS_ORACION: SectionName[] = ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'outfit'];
 const SECTIONS_REGULAR: SectionName[] = ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'];
+
+interface FichaAuthUser {
+  sub: number;
+  email: string;
+  campusId?: number | null;
+  permissions?: string[];
+}
 
 // ── Filas predeterminadas — Servicios regulares ───────────────────────────────
 
@@ -227,6 +241,7 @@ function buildDefaultSections(type: string) {
   const sections: Record<string, any> = {};
   for (const name of activeSections) {
     sections[name] = {
+      revision:     0,
       assignedTo:   null,
       assignedName: null,
       isCompleted:  false,
@@ -249,17 +264,58 @@ function buildDefaultCompletion(type: string): Partial<Record<SectionName, boole
 export class FichasService {
   constructor(private fb: FirebaseService) {}
 
-  async findAll(campusId?: string, status?: string) {
+  private has(user: FichaAuthUser, permission: string): boolean {
+    return hasPermission(user.permissions ?? [], permission);
+  }
+
+  private isGlobal(user: FichaAuthUser): boolean {
+    return this.has(user, 'fichas:viewAll') || this.has(user, 'fichas:admin');
+  }
+
+  private canAccessFicha(ficha: any, user: FichaAuthUser): boolean {
+    if (this.isGlobal(user)) return true;
+    if (ficha.createdBy === user.sub) return true;
+    if (user.campusId != null && String(ficha.campusId) === String(user.campusId)) return true;
+    if (!ficha.published) return false;
+    return Object.values(ficha.sections ?? {}).some((section: any) => section?.assignedTo === user.sub);
+  }
+
+  private assertCanAccessFicha(ficha: any, user: FichaAuthUser) {
+    if (!this.canAccessFicha(ficha, user)) {
+      throw new ForbiddenException('No tienes acceso a esta ficha');
+    }
+  }
+
+  private assertCanManageFicha(ficha: any, user: FichaAuthUser) {
+    if (this.isGlobal(user)) return;
+    if (user.campusId != null && String(ficha.campusId) === String(user.campusId)) return;
+    throw new ForbiddenException('No puedes modificar fichas de otro campus');
+  }
+
+  private assertCanPublishFicha(ficha: any, user: FichaAuthUser) {
+    if (this.isGlobal(user) || ficha.createdBy === user.sub) return;
+    throw new ForbiddenException('Solo el creador o un administrador puede publicar esta ficha');
+  }
+
+  async findAll(user: FichaAuthUser, campusId?: string, status?: string) {
+    const effectiveCampusId = this.isGlobal(user)
+      ? campusId
+      : user.campusId != null ? String(user.campusId) : '__none__';
+
     let query: any = this.fb.db.collection(COL).orderBy('date', 'desc');
-    if (campusId) query = query.where('campusId', '==', campusId);
+    if (effectiveCampusId) query = query.where('campusId', '==', effectiveCampusId);
     if (status)   query = query.where('status',   '==', status);
-    const snap = await query.limit(50).get();
+    query = query.select(
+      'fichaId', 'campusId', 'campusName', 'type', 'title', 'date', 'status',
+      'completionStatus', 'archived', 'published', 'createdBy', 'hiddenSections',
+    );
+    const snap = await query.get();
     return this.fb.toDocs(snap);
   }
 
   async findMine(userId: number, isAdmin: boolean) {
-    const snap = await this.fb.db.collection(COL).orderBy('date', 'desc').limit(200).get();
-    const all  = this.fb.toDocs(snap);
+    const snap = await this.fb.db.collection(COL).orderBy('date', 'desc').get();
+    const all  = this.fb.toDocs(snap).filter((ficha: any) => !ficha.archived);
     if (isAdmin) return all;
 
     return all.filter((ficha: any) => {
@@ -278,13 +334,37 @@ export class FichasService {
     return this.fb.toObj(snap);
   }
 
-  async findPublic(fichaId: string) {
+  async findOneForUser(fichaId: string, user: FichaAuthUser) {
     const ficha = await this.findOne(fichaId);
-    if (!ficha.published) throw new ForbiddenException('Esta ficha no está publicada');
+    this.assertCanAccessFicha(ficha, user);
     return ficha;
   }
 
-  async create(dto: CreateFichaDto, userId: number, userName: string) {
+  async findPublic(fichaId: string) {
+    const ficha = await this.findOne(fichaId);
+    if (!ficha.published || ficha.archived) {
+      throw new ForbiddenException('Esta ficha no está publicada');
+    }
+    const {
+      createdBy, createdByName, lastModifiedBy, lastModifiedByName,
+      archivedBy, archivedByName, publishedBy, publishedByName,
+      ...publicFicha
+    } = ficha;
+    publicFicha.sections = Object.fromEntries(
+      Object.entries(ficha.sections ?? {}).map(([name, section]: [string, any]) => {
+        const { assignedTo, completedBy, revision, ...publicSection } = section;
+        return [name, publicSection];
+      }),
+    );
+    return publicFicha;
+  }
+
+  async create(dto: CreateFichaDto, user: FichaAuthUser) {
+    if (!this.isGlobal(user)) {
+      if (user.campusId == null || String(user.campusId) !== String(dto.campusId)) {
+        throw new ForbiddenException('Solo puedes crear fichas para tu campus');
+      }
+    }
     const ref     = this.fb.db.collection(COL).doc();
     const fichaId = ref.id;
     const encuentrosPlain = JSON.parse(JSON.stringify(dto.encuentros));
@@ -294,7 +374,7 @@ export class FichasService {
       campusName:       dto.campusName,
       type:             dto.type,
       title:            dto.title,
-      date:             this.fb.ts(new Date(dto.date)),
+      date:             this.fb.ts(parseFichaDate(dto.date)),
       encuentros:       encuentrosPlain,
       ...(dto.descripcion ? { descripcion: dto.descripcion } : {}),
       ...(dto.ubicacion   ? { ubicacion:   dto.ubicacion }   : {}),
@@ -303,23 +383,27 @@ export class FichasService {
       hiddenSections:   [],
       status:           'draft',
       published:        false,
-      createdBy:        userId,
-      createdByName:    userName,
+      createdBy:        user.sub,
+      createdByName:    user.email,
       createdAt:        this.fb.now(),
-      lastModifiedBy:   userId,
+      lastModifiedBy:   user.sub,
+      lastModifiedByName: user.email,
       lastModifiedAt:   this.fb.now(),
     };
     await ref.set(doc);
     return this.findOne(fichaId);
   }
 
-  async update(fichaId: string, dto: UpdateFichaDto, userId: number, userName?: string) {
+  async update(fichaId: string, dto: UpdateFichaDto, user: FichaAuthUser) {
     const ficha = await this.findOne(fichaId);
-    const data: any = { lastModifiedBy: userId, lastModifiedAt: this.fb.now() };
-    if (userName !== undefined) data.lastModifiedByName = userName;
+    this.assertCanManageFicha(ficha, user);
+    const data: any = {
+      lastModifiedBy: user.sub,
+      lastModifiedByName: user.email,
+      lastModifiedAt: this.fb.now(),
+    };
     if (dto.title          !== undefined) data.title          = dto.title;
-    if (dto.status         !== undefined) data.status         = dto.status;
-    if (dto.date           !== undefined) data.date           = this.fb.ts(new Date(dto.date));
+    if (dto.date           !== undefined) data.date           = this.fb.ts(parseFichaDate(dto.date));
     if (dto.hiddenSections !== undefined) {
       data.hiddenSections = dto.hiddenSections;
 
@@ -332,6 +416,7 @@ export class FichasService {
         const needsInit = !existing || !existing.rows?.length;
         if (needsInit) {
           data[`sections.${sectionName}`] = {
+            revision:     0,
             assignedTo:   existing?.assignedTo   ?? null,
             assignedName: existing?.assignedName ?? null,
             isCompleted:  false,
@@ -342,6 +427,12 @@ export class FichasService {
           data[`completionStatus.${sectionName}`] = false;
         }
       }
+
+      data.status = deriveFichaStatus(
+        ficha.type,
+        ficha.completionStatus ?? {},
+        dto.hiddenSections,
+      );
     }
     if (dto.sectionLayout !== undefined) {
       data.sectionLayout = dto.sectionLayout;
@@ -350,20 +441,33 @@ export class FichasService {
     return this.findOne(fichaId);
   }
 
-  async remove(fichaId: string) {
-    await this.findOne(fichaId);
-    await this.fb.db.collection(COL).doc(fichaId).delete();
+  async remove(fichaId: string, user: FichaAuthUser) {
+    const ficha = await this.findOne(fichaId);
+    this.assertCanManageFicha(ficha, user);
+    const ref = this.fb.db.collection(COL).doc(fichaId);
+    const changelog = await ref.collection('changelog').get();
+    for (let index = 0; index < changelog.docs.length; index += 400) {
+      const batch = this.fb.db.batch();
+      changelog.docs.slice(index, index + 400).forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    }
+    await ref.delete();
     return { fichaId };
   }
 
-  async clone(fichaId: string, userId: number, userName: string, dto: CloneFichaDto = {}) {
+  async clone(fichaId: string, user: FichaAuthUser, dto: CloneFichaDto = {}) {
     const original = await this.findOne(fichaId);
+    this.assertCanAccessFicha(original, user);
+    if (!this.isGlobal(user) && user.campusId != null && String(original.campusId) !== String(user.campusId)) {
+      throw new ForbiddenException('No puedes clonar fichas de otro campus');
+    }
     const ref   = this.fb.db.collection(COL).doc();
     const newId = ref.id;
     const sections = JSON.parse(JSON.stringify(original.sections));
 
     for (const name of SECTIONS) {
       if (sections[name]) {
+        sections[name].revision = 0;
         sections[name].isCompleted = false;
         sections[name].completedBy = null;
         sections[name].completedAt = null;
@@ -379,8 +483,7 @@ export class FichasService {
     // Generar título automático si se provee fecha
     let title = dto.title ?? `${original.title} (copia)`;
     if (!dto.title && dto.date) {
-      const d = new Date(dto.date);
-      const dateStr = d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+      const dateStr = formatFichaDateLabel(dto.date);
       // Usar el título base quitando cualquier "(copia)" previo
       const baseTitle = original.title.replace(/\s*\(copia\).*$/, '').trim();
       title = `${baseTitle} — ${dateStr}`;
@@ -390,7 +493,7 @@ export class FichasService {
       ...original,
       fichaId:          newId,
       title,
-      date:             dto.date ? this.fb.ts(new Date(dto.date)) : original.date,
+      date:             dto.date ? this.fb.ts(parseFichaDate(dto.date)) : original.date,
       sections,
       completionStatus: buildDefaultCompletion(original.type ?? 'multi'),
       status:           'draft',
@@ -398,10 +501,15 @@ export class FichasService {
       publishedBy:      null,
       publishedByName:  null,
       publishedAt:      null,
-      createdBy:        userId,
-      createdByName:    userName,
+      archived:         false,
+      archivedBy:       null,
+      archivedByName:   null,
+      archivedAt:       null,
+      createdBy:        user.sub,
+      createdByName:    user.email,
       createdAt:        this.fb.now(),
-      lastModifiedBy:   userId,
+      lastModifiedBy:   user.sub,
+      lastModifiedByName: user.email,
       lastModifiedAt:   this.fb.now(),
     };
     await ref.set(doc);
@@ -412,31 +520,90 @@ export class FichasService {
     fichaId: string,
     sectionName: string,
     dto: UpdateSectionDto,
-    userId: number,
-    userName: string,
+    user: FichaAuthUser,
   ) {
-    const ficha = await this.findOne(fichaId);
     if (!SECTIONS.includes(sectionName as SectionName)) {
       throw new NotFoundException(`Sección ${sectionName} no existe`);
     }
-    const dtoPlain = JSON.parse(JSON.stringify(dto));
-    const update: any = {
-      [`sections.${sectionName}`]: {
-        ...ficha.sections[sectionName],
-        ...dtoPlain,
-      },
-      lastModifiedBy:     userId,
-      lastModifiedByName: userName,
-      lastModifiedAt:     this.fb.now(),
-    };
-    await this.fb.db.collection(COL).doc(fichaId).update(update);
+    const { expectedRevision, ...sectionDto } = JSON.parse(JSON.stringify(dto));
+    const ref = this.fb.db.collection(COL).doc(fichaId);
+    await this.fb.db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists) throw new NotFoundException(`Ficha ${fichaId} no encontrada`);
+      const ficha = snap.data()!;
+      this.assertCanManageFicha(ficha, user);
+      const currentSection = ficha.sections?.[sectionName];
+      if (!currentSection) {
+        throw new NotFoundException(`La sección ${sectionName} no está activa en esta ficha`);
+      }
+      const currentRevision = Number(currentSection.revision ?? 0);
+      if (expectedRevision !== undefined && Number(expectedRevision) !== currentRevision) {
+        throw new ConflictException(
+          'Esta sección fue modificada por otra persona. Recarga la ficha antes de continuar.',
+        );
+      }
+
+      const sectionChanged = Array.isArray(sectionDto.rows);
+      if (sectionChanged) {
+        const incomingRows = new Map(
+          sectionDto.rows.map((row: any) => [row.id, row]),
+        );
+        const rowIds = sectionDto.rows.map((row: any) => row.id);
+
+        if (new Set(rowIds).size !== rowIds.length) {
+          throw new BadRequestException(
+            'La sección contiene filas duplicadas.',
+          );
+        }
+
+        const removedRequiredRow = (currentSection.rows ?? []).find(
+          (row: any) =>
+            row.required &&
+            (!incomingRows.has(row.id) ||
+              (incomingRows.get(row.id) as any)?.required !== true),
+        );
+
+        if (removedRequiredRow) {
+          throw new BadRequestException(
+            `La fila obligatoria "${removedRequiredRow.label}" no se puede eliminar ni convertir en opcional.`,
+          );
+        }
+      }
+
+      const nextCompletion = {
+        ...(ficha.completionStatus ?? {}),
+        ...(sectionChanged ? { [sectionName]: false } : {}),
+      };
+      const update: any = {
+        [`sections.${sectionName}`]: {
+          ...currentSection,
+          ...sectionDto,
+          revision: currentRevision + 1,
+          ...(sectionChanged ? {
+            isCompleted: false,
+            completedBy: null,
+            completedAt: null,
+          } : {}),
+        },
+        ...(sectionChanged ? {
+          [`completionStatus.${sectionName}`]: false,
+          status: deriveFichaStatus(ficha.type, nextCompletion, ficha.hiddenSections ?? []),
+        } : {}),
+        lastModifiedBy:     user.sub,
+        lastModifiedByName: user.email,
+        lastModifiedAt:     this.fb.now(),
+      };
+      transaction.update(ref, update);
+    });
 
     await this.fb.db.collection(COL).doc(fichaId).collection('changelog').add({
-      userId,
-      userName,
+      userId:    user.sub,
+      userName:  user.email,
       timestamp: this.fb.now(),
       seccion:   sectionName,
-      cambios:   dtoPlain,
+      cambios:   sectionDto.rows
+        ? { fields: ['rows'], rowCount: sectionDto.rows.length }
+        : sectionDto,
     });
 
     return this.findOne(fichaId);
@@ -445,91 +612,142 @@ export class FichasService {
   async completeSection(
     fichaId: string,
     sectionName: string,
-    userId: number,
-    userName: string,
+    user: FichaAuthUser,
   ) {
-    const ficha = await this.findOne(fichaId);
     if (!SECTIONS.includes(sectionName as SectionName)) {
       throw new NotFoundException(`Sección ${sectionName} no existe`);
     }
-    const update: any = {
-      [`sections.${sectionName}.isCompleted`]: true,
-      [`sections.${sectionName}.completedBy`]: userId,
-      [`sections.${sectionName}.completedAt`]: this.fb.now(),
-      [`completionStatus.${sectionName}`]:     true,
-      lastModifiedBy:     userId,
-      lastModifiedByName: userName,
-      lastModifiedAt:     this.fb.now(),
-    };
-    const visibleSections = SECTIONS.filter(s => !(ficha.hiddenSections ?? []).includes(s));
-    const allDone = visibleSections.every(s =>
-      s === sectionName ? true : ficha.completionStatus?.[s] === true,
-    );
-    if (allDone)                        update.status = 'complete';
-    else if (ficha.status === 'draft')  update.status = 'in_progress';
-
-    await this.fb.db.collection(COL).doc(fichaId).update(update);
+    const ref = this.fb.db.collection(COL).doc(fichaId);
+    await this.fb.db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists) throw new NotFoundException(`Ficha ${fichaId} no encontrada`);
+      const ficha = snap.data()!;
+      this.assertCanManageFicha(ficha, user);
+      const section = ficha.sections?.[sectionName];
+      if (!section) {
+        throw new NotFoundException(`La sección ${sectionName} no está activa en esta ficha`);
+      }
+      const missing = missingRequiredRows(
+        section.rows ?? [],
+        (ficha.encuentros ?? []).map((encuentro: any) => encuentro.id),
+      );
+      if (missing.length > 0) {
+        throw new BadRequestException(`Completa los campos obligatorios: ${missing.join(', ')}`);
+      }
+      const nextCompletion = {
+        ...(ficha.completionStatus ?? {}),
+        [sectionName]: true,
+      };
+      transaction.update(ref, {
+        [`sections.${sectionName}.isCompleted`]: true,
+        [`sections.${sectionName}.completedBy`]: user.sub,
+        [`sections.${sectionName}.completedAt`]: this.fb.now(),
+        [`completionStatus.${sectionName}`]: true,
+        status: deriveFichaStatus(ficha.type, nextCompletion, ficha.hiddenSections ?? []),
+        lastModifiedBy: user.sub,
+        lastModifiedByName: user.email,
+        lastModifiedAt: this.fb.now(),
+      });
+    });
     return this.findOne(fichaId);
   }
 
-  async archive(fichaId: string, userId: number, userName: string) {
-    await this.findOne(fichaId);
+  async reopenSection(fichaId: string, sectionName: string, user: FichaAuthUser) {
+    const ref = this.fb.db.collection(COL).doc(fichaId);
+    await this.fb.db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists) throw new NotFoundException(`Ficha ${fichaId} no encontrada`);
+      const ficha = snap.data()!;
+      this.assertCanManageFicha(ficha, user);
+      if (!activeSectionsForType(ficha.type).includes(sectionName as SectionName)) {
+        throw new NotFoundException(`La sección ${sectionName} no está activa en esta ficha`);
+      }
+      const nextCompletion = {
+        ...(ficha.completionStatus ?? {}),
+        [sectionName]: false,
+      };
+      transaction.update(ref, {
+        [`sections.${sectionName}.isCompleted`]: false,
+        [`sections.${sectionName}.completedBy`]: null,
+        [`sections.${sectionName}.completedAt`]: null,
+        [`completionStatus.${sectionName}`]: false,
+        status: deriveFichaStatus(ficha.type, nextCompletion, ficha.hiddenSections ?? []),
+        lastModifiedBy: user.sub,
+        lastModifiedByName: user.email,
+        lastModifiedAt: this.fb.now(),
+      });
+    });
+    return this.findOne(fichaId);
+  }
+
+  async archive(fichaId: string, user: FichaAuthUser) {
+    const ficha = await this.findOne(fichaId);
+    this.assertCanManageFicha(ficha, user);
     await this.fb.db.collection(COL).doc(fichaId).update({
       archived:           true,
-      archivedBy:         userId,
-      archivedByName:     userName,
+      archivedBy:         user.sub,
+      archivedByName:     user.email,
       archivedAt:         this.fb.now(),
-      lastModifiedBy:     userId,
-      lastModifiedByName: userName,
+      published:          false,
+      publishedBy:        null,
+      publishedByName:    null,
+      publishedAt:        null,
+      lastModifiedBy:     user.sub,
+      lastModifiedByName: user.email,
       lastModifiedAt:     this.fb.now(),
     });
     return this.findOne(fichaId);
   }
 
-  async unarchive(fichaId: string, userId: number, userName: string) {
-    await this.findOne(fichaId);
+  async unarchive(fichaId: string, user: FichaAuthUser) {
+    const ficha = await this.findOne(fichaId);
+    this.assertCanManageFicha(ficha, user);
     await this.fb.db.collection(COL).doc(fichaId).update({
       archived:           false,
       archivedBy:         null,
       archivedByName:     null,
       archivedAt:         null,
-      lastModifiedBy:     userId,
-      lastModifiedByName: userName,
+      lastModifiedBy:     user.sub,
+      lastModifiedByName: user.email,
       lastModifiedAt:     this.fb.now(),
     });
     return this.findOne(fichaId);
   }
 
-  async publish(fichaId: string, userId: number, userName: string) {
-    await this.findOne(fichaId);
+  async publish(fichaId: string, user: FichaAuthUser) {
+    const ficha = await this.findOne(fichaId);
+    this.assertCanPublishFicha(ficha, user);
+    if (ficha.archived) throw new BadRequestException('Desarchiva la ficha antes de publicarla');
     await this.fb.db.collection(COL).doc(fichaId).update({
       published:        true,
-      publishedBy:      userId,
-      publishedByName:  userName,
+      publishedBy:      user.sub,
+      publishedByName:  user.email,
       publishedAt:      this.fb.now(),
-      lastModifiedBy:     userId,
-      lastModifiedByName: userName,
+      lastModifiedBy:     user.sub,
+      lastModifiedByName: user.email,
       lastModifiedAt:     this.fb.now(),
     });
     return this.findOne(fichaId);
   }
 
-  async unpublish(fichaId: string, userId: number, userName: string) {
-    await this.findOne(fichaId);
+  async unpublish(fichaId: string, user: FichaAuthUser) {
+    const ficha = await this.findOne(fichaId);
+    this.assertCanPublishFicha(ficha, user);
     await this.fb.db.collection(COL).doc(fichaId).update({
       published:        false,
       publishedBy:      null,
       publishedByName:  null,
       publishedAt:      null,
-      lastModifiedBy:     userId,
-      lastModifiedByName: userName,
+      lastModifiedBy:     user.sub,
+      lastModifiedByName: user.email,
       lastModifiedAt:     this.fb.now(),
     });
     return this.findOne(fichaId);
   }
 
-  async getChangelog(fichaId: string) {
-    await this.findOne(fichaId);
+  async getChangelog(fichaId: string, user: FichaAuthUser) {
+    const ficha = await this.findOne(fichaId);
+    this.assertCanAccessFicha(ficha, user);
     const snap = await this.fb.db
       .collection(COL).doc(fichaId)
       .collection('changelog').orderBy('timestamp', 'desc').limit(100).get();

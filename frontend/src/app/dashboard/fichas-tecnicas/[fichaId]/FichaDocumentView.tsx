@@ -14,6 +14,7 @@ const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
   oracion: ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'outfit'],
 };
 import { useUpdateFicha } from '@/hooks/useFichas';
+import { parseFichaDate as parseLocalDate, toFichaInputDate } from '@/lib/ficha-date';
 import { usePaletas, useCreatePaleta, type Paleta, type PaletaColor } from '@/hooks/usePaletas';
 import {
   DndContext,
@@ -63,17 +64,6 @@ const D = {
 } as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function parseLocalDate(raw: any): Date {
-  if (typeof raw?.toDate === 'function') return raw.toDate();
-  if (raw instanceof Date)               return raw;
-  if (raw?.seconds)                      return new Date(raw.seconds * 1000);
-  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const [y, m, d] = raw.split('-').map(Number);
-    return new Date(y, m - 1, d, 12, 0, 0); // mediodía local evita desfases UTC
-  }
-  return new Date(raw);
-}
 
 function formatDate(raw: any): string {
   if (!raw) return '—';
@@ -523,8 +513,14 @@ function SectionFooter({ sectionName, editable, isCompleted, onAddRow, onComplet
     <div className="ficha-no-print" style={{ marginTop: 10, borderTop: `0.5px solid ${D.divider}`, paddingTop: 8 }}>
       {onAddRow && <AddRowInline sectionName={sectionName} onAdd={onAddRow} />}
       <div style={{ marginTop: 8, textAlign: 'right' }}>
-        {isCompleted ? (
-          <span style={{ fontSize: 10, fontWeight: 600, color: C.green }}>✓ Sección completada</span>
+        {isCompleted && onComplete ? (
+          <button onClick={onComplete} style={{
+            fontSize: 10, fontWeight: 600, color: D.textSecond,
+            background: 'rgba(255,255,255,0.05)', border: `1px solid ${D.cardBorder}`,
+            borderRadius: 6, padding: '3px 8px', cursor: 'pointer',
+          }}>
+            ↺ Reabrir sección
+          </button>
         ) : onComplete ? (
           <button onClick={onComplete} style={{
             fontSize: 10, fontWeight: 600, color: C.green,
@@ -586,7 +582,7 @@ function RoleCard({
                   ) : (
                     <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
                   )}
-                  {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                  {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                 </div>
               </div>
             )}
@@ -635,7 +631,7 @@ function StreamingCard({
                   ) : (
                     <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
                   )}
-                  {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                  {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                 </div>
               </div>
             )}
@@ -654,7 +650,7 @@ function StreamingCard({
                           {row.label}
                         </div>
                       </div>
-                      {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                      {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                     </div>
                     {editable ? (
                       <PersonCellInput
@@ -737,7 +733,7 @@ function EscenaCard({
                             {posLabel}
                           </div>
                         </div>
-                        {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                        {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                       </div>
                       {editable ? (
                         <PersonCellInput
@@ -780,7 +776,7 @@ function EscenaCard({
                       ) : (
                         <span style={{ fontSize: 12, fontWeight: 500, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
                       )}
-                      {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                      {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                     </div>
                   </div>
                 )}
@@ -951,7 +947,7 @@ function SetListCard({
                   row={row} colId={colId} editable={editable}
                   onCellChange={onCellChange} singers={singers}
                 />
-                {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
               </div>
             )}
           </SortableRow>
@@ -1391,8 +1387,14 @@ function OutfitCard({
       />
       {editable && (
         <div className="ficha-no-print" style={{ marginTop: 10, borderTop: `0.5px solid ${D.divider}`, paddingTop: 8, textAlign: 'right' }}>
-          {isCompleted ? (
-            <span style={{ fontSize: 10, fontWeight: 600, color: C.green }}>✓ Sección completada</span>
+          {isCompleted && onComplete ? (
+            <button onClick={onComplete} style={{
+              fontSize: 10, fontWeight: 600, color: D.textSecond,
+              background: 'rgba(255,255,255,0.05)', border: `1px solid ${D.cardBorder}`,
+              borderRadius: 6, padding: '3px 8px', cursor: 'pointer',
+            }}>
+              ↺ Reabrir sección
+            </button>
           ) : onComplete ? (
             <button onClick={onComplete} style={{
               fontSize: 10, fontWeight: 600, color: C.green,
@@ -1574,7 +1576,7 @@ function WorshipSetListCard({
                             {handle}
                             <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{posLabel}</div>
                           </div>
-                          {editable && escena.onDeleteRow && <DeleteBtn onClick={() => escena.onDeleteRow!(row.id)} />}
+                          {editable && escena.onDeleteRow && !row.required && <DeleteBtn onClick={() => escena.onDeleteRow!(row.id)} />}
                         </div>
                         {editable ? (
                           <PersonCellInput
@@ -1625,7 +1627,7 @@ function WorshipSetListCard({
                             {val(row, colId) || '—'}
                           </span>
                         )}
-                        {editable && escena.onDeleteRow && <DeleteBtn onClick={() => escena.onDeleteRow!(row.id)} />}
+                        {editable && escena.onDeleteRow && !row.required && <DeleteBtn onClick={() => escena.onDeleteRow!(row.id)} />}
                       </div>
                     </div>
                   )}
@@ -1641,8 +1643,10 @@ function WorshipSetListCard({
         <div className="ficha-no-print" style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `0.5px solid ${D.divider}`, paddingTop: 8 }}>
           {escena.onAddRow && <AddRowInline sectionName="escena" onAdd={escena.onAddRow} />}
           <div>
-            {escena.isCompleted ? (
-              <span style={{ fontSize: 10, fontWeight: 600, color: C.green }}>✓ Banda completada</span>
+            {escena.isCompleted && escena.onComplete ? (
+              <button onClick={escena.onComplete} style={{ fontSize: 10, fontWeight: 600, color: D.textSecond, background: 'rgba(255,255,255,0.05)', border: `1px solid ${D.cardBorder}`, borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
+                ↺ Reabrir banda
+              </button>
             ) : escena.onComplete ? (
               <button onClick={escena.onComplete} style={{ fontSize: 10, fontWeight: 600, color: C.green, background: 'rgba(29,158,117,0.1)', border: `1px solid rgba(29,158,117,0.25)`, borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
                 ✓ Marcar banda
@@ -1668,7 +1672,7 @@ function WorshipSetListCard({
                       row={row} colId={colId} editable={editable}
                       onCellChange={setList.onCellChange} singers={singers}
                     />
-                    {editable && setList.onDeleteRow && <DeleteBtn onClick={() => setList.onDeleteRow!(row.id)} />}
+                    {editable && setList.onDeleteRow && !row.required && <DeleteBtn onClick={() => setList.onDeleteRow!(row.id)} />}
                   </div>
                 )}
               </SortableRow>
@@ -1809,7 +1813,7 @@ function HorariosCard({
                     {row.label}
                   </span>
 
-                  {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                  {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                 </div>
               )}
             </SortableRow>
@@ -1931,7 +1935,7 @@ function VoluntariosCard({
                   ) : (
                     <span style={{ ...S.roleValue, color: val(row, colId) ? D.textPrimary : D.textMuted }}>{val(row, colId) || '—'}</span>
                   )}
-                  {editable && onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                  {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                 </div>
               </div>
             )}
@@ -2196,13 +2200,7 @@ export function FichaDocumentView({
   // ── Edición inline de la fecha ────────────────────────────────────────────
   // date puede ser ISO string "2026-05-24" o timestamp; normalizar a "YYYY-MM-DD"
   function toInputDate(raw: any): string {
-    if (!raw) return '';
-    if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-    const d = parseLocalDate(raw);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return toFichaInputDate(raw);
   }
 
   const [editingDate, setEditingDate] = useState(false);

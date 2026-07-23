@@ -43,6 +43,7 @@ export interface Row {
 }
 
 export interface Section {
+  revision?:     number;
   assignedTo:   number | null;
   assignedName: string | null;
   isCompleted:  boolean;

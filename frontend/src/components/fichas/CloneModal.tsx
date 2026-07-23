@@ -4,31 +4,19 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCloneFicha } from '@/hooks/useFichas';
 import type { FichaListItem } from '@/types/ficha';
+import { parseFichaDate, toFichaInputDate } from '@/lib/ficha-date';
 
 interface CloneModalProps {
   ficha:   FichaListItem;
   onClose: () => void;
 }
 
-function parseDate(raw: any): Date | null {
-  if (!raw) return null;
-  if (typeof raw?.toDate === 'function') return raw.toDate();
-  if (typeof raw === 'string' || typeof raw === 'number') return new Date(raw);
-  if (raw instanceof Date) return raw;
-  if (raw.seconds) return new Date(raw.seconds * 1000);
-  return null;
-}
-
-function toIsoDateStr(d: Date): string {
-  return d.toISOString().split('T')[0];
-}
-
 function nextWeek(raw: any): string {
-  const d = parseDate(raw);
-  if (!d) return toIsoDateStr(new Date());
+  const d = parseFichaDate(raw);
+  if (Number.isNaN(d.getTime())) return toFichaInputDate(new Date());
   const next = new Date(d);
   next.setDate(next.getDate() + 7);
-  return toIsoDateStr(next);
+  return toFichaInputDate(next);
 }
 
 export function CloneModal({ ficha, onClose }: CloneModalProps) {
