@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { Periodo, mapId, inPeriodo, inMonth } from '../common/arm-records.util';
 import { CreateKiloamorDto, UpdateKiloamorDto } from './dto/kiloamor.dto';
+import { CampusService } from '../campus/campus.service';
 
 const COL = 'kiloamor';
 
@@ -12,7 +13,10 @@ export interface KiloamorResumen {
 
 @Injectable()
 export class KiloamorService {
-  constructor(private fb: FirebaseService) {}
+  constructor(
+    private fb: FirebaseService,
+    private campuses: CampusService,
+  ) {}
 
   async findAll(campusId?: string, periodo: Periodo = 'todo') {
     let query: FirebaseFirestore.Query = this.fb.db.collection(COL);
@@ -56,9 +60,11 @@ export class KiloamorService {
       if (!existing.empty) return mapId(this.fb.toObj(existing.docs[0]));
     }
 
+    const campus = await this.campuses.findByName(dto.campus);
     const doc = {
       idempotencyKey:   dto.idempotencyKey ?? null,
       tipo:             'kiloamor',
+      campusId:         campus.id,
       campus:           dto.campus,
       fecha:            dto.fecha,
       cajas:            dto.cajas ?? 0,

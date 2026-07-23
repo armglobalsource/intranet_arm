@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { Periodo, mapId, sumCounts, inPeriodo, inMonth } from '../common/arm-records.util';
 import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
+import { CampusService } from '../campus/campus.service';
 
 const COL = 'encuentros';
 
@@ -19,7 +20,10 @@ export interface EncuentrosResumen {
 
 @Injectable()
 export class EncuentrosService {
-  constructor(private fb: FirebaseService) {}
+  constructor(
+    private fb: FirebaseService,
+    private campuses: CampusService,
+  ) {}
 
   // ── Lectura ──────────────────────────────────────────────────────────────
 
@@ -81,10 +85,12 @@ export class EncuentrosService {
 
     const now = new Date();
     const isEvento = dto.tipo === 'evento';
+    const campus = await this.campuses.findByName(dto.campus);
 
     const doc = {
       idempotencyKey:   dto.idempotencyKey ?? null,
       tipo:             dto.tipo,
+      campusId:         campus.id,
       campus:           dto.campus,
       fecha:            dto.fecha,
       encuentro:        isEvento ? (dto.eventoHorario || 'Evento') : (dto.encuentro ?? ''),

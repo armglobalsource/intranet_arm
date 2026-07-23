@@ -108,7 +108,14 @@ export const PERMISSION_CATALOG = {
   ministerio_ar_hombres: { label: 'AR Hombres',   description: 'Página del ministerio AR Hombres',   actions: { view: 'Ver la página de AR Hombres' } },
   ministerio_ar_mujeres: { label: 'AR Mujeres',   description: 'Página del ministerio AR Mujeres',   actions: { view: 'Ver la página de AR Mujeres' } },
   ministerio_ar_gold:    { label: 'AR Gold',      description: 'Página del ministerio AR Gold',      actions: { view: 'Ver la página de AR Gold' } },
-  estadisticas:          { label: 'Estadísticas', description: 'Panel de estadísticas de producción general', actions: { view: 'Ver el panel de estadísticas' } },
+  estadisticas: {
+    label: 'Estadísticas',
+    description: 'Panel de estadísticas operativas de campus',
+    actions: {
+      view: 'Ver estadísticas del campus asignado',
+      viewAll: 'Ver estadísticas y comparaciones de todos los campus',
+    },
+  },
   events: {
     label: 'Eventos',
     description: 'Calendario de eventos de la organización',
@@ -227,5 +234,12 @@ export const PERMISSION_UI_CONFIG: Record<string, PermissionUiSection> = {
   ministerio_ar_hombres: { breadcrumb: ['Ministerios', 'AR Hombres'],   viewActions: ['view'], editActions: [] },
   ministerio_ar_mujeres: { breadcrumb: ['Ministerios', 'AR Mujeres'],   viewActions: ['view'], editActions: [] },
   ministerio_ar_gold:    { breadcrumb: ['Ministerios', 'AR Gold'],      viewActions: ['view'], editActions: [] },
-  estadisticas:          { breadcrumb: ['Producción General', 'Estadísticas'], viewActions: ['view'], editActions: [] },
+  estadisticas: {
+    breadcrumb: ['Producción General', 'Estadísticas'],
+    viewActions: ['view'],
+    editActions: [],
+    extra: [
+      { key: 'viewAll', label: 'Ver estadísticas de todos los campus', actions: ['viewAll'] },
+    ],
+  },
 };

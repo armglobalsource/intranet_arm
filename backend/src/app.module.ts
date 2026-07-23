@@ -31,6 +31,7 @@ import { KiloamorModule } from './kiloamor/kiloamor.module';
 import { AnunciosModule } from './anuncios/anuncios.module';
 import { ArmCatalogosModule } from './arm-catalogos/arm-catalogos.module';
 import { CampusTurnosModule } from './campus-turnos/campus-turnos.module';
+import { EstadisticasModule } from './estadisticas/estadisticas.module';
 
 const envSchema = Joi.object({
   NODE_ENV:             Joi.string().valid('development', 'production', 'test').default('development'),
@@ -91,6 +92,7 @@ const envSchema = Joi.object({
     AnunciosModule,
     ArmCatalogosModule,
     CampusTurnosModule,
+    EstadisticasModule,
   ],
 })
 export class AppModule {}

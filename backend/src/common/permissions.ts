@@ -144,6 +144,14 @@ export const PERMISSION_CATALOG = {
       view: 'Ver el dashboard de ARM',
     },
   },
+  estadisticas: {
+    label: 'Estadísticas',
+    description: 'Panel de estadísticas operativas de campus',
+    actions: {
+      view:    'Ver estadísticas del campus asignado',
+      viewAll: 'Ver estadísticas y comparaciones de todos los campus',
+    },
+  },
   'arm-catalogos': {
     label: 'Configuración APP Web',
     description: 'Categorías de asistencia, voluntarios y monedas usadas en encuentros y siembra',

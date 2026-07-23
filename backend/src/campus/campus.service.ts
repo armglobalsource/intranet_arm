@@ -44,6 +44,15 @@ export class CampusService {
     return this.fb.toObj(snap);
   }
 
+  async findByName(name: string) {
+    const snap = await this.fb.db.collection(COL)
+      .where('nameLower', '==', name.trim().toLowerCase())
+      .limit(1)
+      .get();
+    if (snap.empty) throw new NotFoundException(`Campus "${name}" no encontrado`);
+    return this.fb.toObj(snap.docs[0]);
+  }
+
   async create(dto: CreateCampusDto) {
     const name = dto.name.trim();
     const snap = await this.fb.db.collection(COL)
