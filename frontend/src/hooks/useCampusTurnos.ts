@@ -4,7 +4,8 @@ import { api } from '@/lib/api';
 export type CampusTurnoTipo = 'administradores' | 'lideres_voluntarios';
 
 // Rotación paralela opcional dentro del mismo tipo — hoy usada por lideres_voluntarios
-// para separar Miércoles + Domingo AM (modalidad 'AM') de Domingo PM (modalidad 'PM').
+// para separar ambos Miércoles (06:00 y 20:00) + Domingo AM (modalidad 'AM')
+// de Domingo PM (modalidad 'PM').
 // `administradores` no la usa (queda undefined en equipos/turnos existentes).
 export type Modalidad = 'AM' | 'PM';
 

@@ -9,7 +9,8 @@ export type CampusTurnoTipo = typeof CAMPUS_TURNO_TIPOS[number];
 
 // Modalidad opcional: permite que un mismo tipo (ej. lideres_voluntarios) tenga dos
 // rotaciones independientes en paralelo dentro de la misma semana — AM (que cubre
-// Miércoles + Domingo AM como un solo equipo) y PM (Domingo PM). `administradores`
+// ambos encuentros del Miércoles (06:00 y 20:00) + Domingo AM como un solo equipo)
+// y PM (Domingo PM). `administradores`
 // no usa modalidad (queda undefined/null, tratado como una sola rotación).
 export const MODALIDADES = ['AM', 'PM'] as const;
 export type Modalidad = typeof MODALIDADES[number];

@@ -15,7 +15,7 @@ import {
 // Solo 'lideres_voluntarios' usa modalidad (dos rotaciones en paralelo, AM y PM);
 // 'administradores' sigue siendo una sola rotación semanal, sin cambios.
 const MODALIDAD_LABEL: Record<Modalidad, string> = {
-  AM: 'Miércoles + Dom. AM',
+  AM: 'Miércoles AM + PM · Dom. AM',
   PM: 'Domingo PM',
 };
 
@@ -84,6 +84,25 @@ function proximoLunes(): string {
 
 const cardCls  = 'bg-white rounded-2xl border border-gray-200 p-5';
 const labelCls = 'text-[10px] font-semibold uppercase tracking-widest text-gray-400';
+
+function CalendarIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+
+function SettingsIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="8" cy="17" r="2" />
+    </svg>
+  );
+}
 
 // ── Roster de administradores ─────────────────────────────────────────────────
 
@@ -188,7 +207,7 @@ function EquiposSection({ campusId, tipo, equipos, administradores, isAdmin }: {
       <p className={labelCls}>Equipos</p>
       <p className="text-xs text-gray-400 mt-1 mb-3">
         Agrupaciones de personas que rotan juntas semana a semana.
-        {usaModalidad && ' AM cubre Miércoles + Domingo AM; PM cubre Domingo PM.'}
+        {usaModalidad && ' El mismo equipo cubre Miércoles AM y PM + Domingo AM; PM cubre Domingo PM.'}
       </p>
 
       <div className="space-y-2 mb-4">
@@ -372,7 +391,7 @@ function TurnoBadge({ t, equipos, isAdmin, editingId, setEditingId, onUpdate, sh
         defaultValue={t.equipoId}
         onChange={(e) => { onUpdate(t.id, Number(e.target.value)); setEditingId(null); }}
         onBlur={() => setEditingId(null)}
-        className="min-w-0 text-[12.5px] border border-gray-200 rounded-lg px-2 py-1"
+        className="min-w-0 max-w-full text-[12.5px] border border-gray-200 rounded-lg px-2 py-1"
       >
         {opciones.map((eq) => <option key={eq.id} value={eq.id}>{eq.nombre}</option>)}
       </select>
@@ -382,12 +401,12 @@ function TurnoBadge({ t, equipos, isAdmin, editingId, setEditingId, onUpdate, sh
   return (
     <button
       onClick={() => isAdmin && setEditingId(t.id)}
-      className={`flex items-center gap-1 ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
+      className={`flex min-w-0 max-w-full items-center gap-1 text-left ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
     >
       {showModalidadTag && t.modalidad && (
         <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400">{t.modalidad}</span>
       )}
-      <span className={`px-2 py-0.5 rounded-full text-[11.5px] font-medium truncate ${c.bg} ${c.text}`}>
+      <span className={`max-w-full px-2.5 py-1 rounded-xl text-[11.5px] font-medium whitespace-normal leading-snug ${c.bg} ${c.text}`}>
         {t.equipoNombreSnapshot}
       </span>
       {t.isManualOverride && (
@@ -437,21 +456,27 @@ function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
   if (usaModalidad) {
     return (
       <div className="space-y-4">
-        <div className="rounded-2xl border border-gray-200 overflow-hidden bg-white">
-          <div className="hidden md:grid grid-cols-[140px_1fr_1fr_1fr] bg-gray-50 border-b border-gray-200">
-            {['Semana', 'Miércoles · AM', 'Domingo · AM', 'Domingo · PM'].map((label) => (
-              <div key={label} className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                {label}
-              </div>
-            ))}
+        {equipos.length > 1 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+            {equipos.map((eq) => {
+              const c = teamColor(eq.id);
+              return (
+                <span key={eq.id} className="inline-flex items-center gap-1.5 text-[12px] text-gray-500">
+                  <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+                  {eq.nombre}
+                </span>
+              );
+            })}
           </div>
+        )}
 
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filasPorMes.map(([mes, filas]) => (
-            <div key={mes}>
-              <div className="px-4 py-2.5 bg-gray-100/80 border-b border-gray-200 text-[11px] font-bold uppercase tracking-widest text-gray-600">
+            <div key={mes} className="h-full bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm flex flex-col">
+              <div className="px-4 py-3 bg-slate-950 border-b border-slate-900 text-[11px] font-bold uppercase tracking-widest text-white">
                 {mes}
               </div>
-              <div className="divide-y divide-gray-100">
+              <div className="flex-1 divide-y divide-gray-100">
                 {filas.map(({ fecha, turnos: ts }) => {
                   const miercoles = sumarDias(fecha, 2);
                   const domingo = sumarDias(fecha, 6);
@@ -474,26 +499,34 @@ function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
                   };
 
                   return (
-                    <div key={fecha} className={`grid grid-cols-1 md:grid-cols-[140px_1fr_1fr_1fr] ${esActual ? 'bg-emerald-50/60' : ''}`}>
-                      <div className="px-4 py-3 md:border-r border-gray-100 flex md:block items-center justify-between">
-                        <span className="text-[12px] font-semibold text-gray-700">
-                          {formatFechaServicio(miercoles, 'Mié')}
+                    <div key={fecha} className={`grid grid-cols-[52px_minmax(0,1fr)] gap-3 px-4 py-4 ${esActual ? 'bg-emerald-50/70' : ''}`}>
+                      <div className="flex flex-col items-start leading-none pt-0.5">
+                        <span className="text-[16px] font-bold text-gray-800">
+                          {miercoles.slice(8, 10)}
                         </span>
-                        {esActual && <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide">Esta semana</span>}
+                        <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400 mt-1">
+                          {MESES_ABBR[Number(miercoles.slice(5, 7)) - 1]}
+                        </span>
+                        {esActual && (
+                          <span className="text-[8px] font-bold text-emerald-600 uppercase tracking-wide mt-2">
+                            Esta semana
+                          </span>
+                        )}
                       </div>
-                      <div className="px-4 py-3 md:border-r border-gray-100">
-                        <p className="md:hidden text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Miércoles AM</p>
-                        {servicio(turnoAM)}
-                      </div>
-                      <div className="px-4 py-3 md:border-r border-gray-100">
-                        <p className="md:hidden text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">{formatFechaServicio(domingo, 'Dom')} · AM</p>
-                        <p className="hidden md:block text-[10px] text-gray-400 mb-1">{formatFechaServicio(domingo, 'Dom')}</p>
-                        {servicio(turnoAM)}
-                      </div>
-                      <div className="px-4 py-3">
-                        <p className="md:hidden text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">{formatFechaServicio(domingo, 'Dom')} · PM</p>
-                        <p className="hidden md:block text-[10px] text-gray-400 mb-1">{formatFechaServicio(domingo, 'Dom')}</p>
-                        {servicio(turnoPM)}
+
+                      <div className="min-w-0 space-y-3 pr-1">
+                        <div className="min-w-0 space-y-1.5">
+                          <span className="block text-[9px] font-bold uppercase tracking-wide text-gray-400">
+                            Mié AM + PM · Dom AM
+                          </span>
+                          {servicio(turnoAM)}
+                        </div>
+                        <div className="min-w-0 space-y-1.5">
+                          <span className="block text-[9px] font-bold uppercase tracking-wide text-gray-400">
+                            Dom {domingo.slice(8, 10)} · PM
+                          </span>
+                          {servicio(turnoPM)}
+                        </div>
                       </div>
                     </div>
                   );
@@ -526,11 +559,11 @@ function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filasPorMes.map(([mes, filas]) => (
-          <div key={mes} className="bg-white rounded-2xl border border-gray-200 overflow-hidden self-start">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500 bg-gray-50 px-4 py-2.5 border-b border-gray-100">
+          <div key={mes} className="h-full bg-white rounded-2xl border border-gray-200 overflow-hidden flex flex-col">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-white bg-slate-950 px-4 py-3 border-b border-slate-900">
               {mes}
             </p>
-            <div className="divide-y divide-gray-50">
+            <div className="flex-1 divide-y divide-gray-50">
               {filas.map(({ fecha, turnos: ts }) => {
                 const { dia, mes: mesAbbr } = formatFechaCompacta(fecha);
                 const esActual = isSemanaActual(fecha);
@@ -557,7 +590,7 @@ function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
 
                     {esActual && (
                       <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide flex-shrink-0">
-                        Hoy
+                        Esta semana
                       </span>
                     )}
                   </div>
@@ -566,6 +599,65 @@ function CalendarioTable({ campusId, tipo, turnos, equipos, isAdmin }: {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function SemanaActualCard({ tipo, turnos }: { tipo: CampusTurnoTipo; turnos: Turno[] }) {
+  const actuales = turnos.filter((turno) => isSemanaActual(turno.fecha));
+  const usaModalidad = tipo === 'lideres_voluntarios';
+  const turnoAM = actuales.find((turno) => turno.modalidad === 'AM');
+  const turnoPM = actuales.find((turno) => turno.modalidad === 'PM');
+  const turno = actuales[0];
+  const fecha = turno?.fecha;
+  const serviciosActuales: Array<{ dia: string; bloque: string; turno?: Turno }> = [
+    { dia: 'Miércoles', bloque: 'AM', turno: turnoAM },
+    { dia: 'Miércoles', bloque: 'PM', turno: turnoAM },
+    { dia: 'Domingo', bloque: 'AM', turno: turnoAM },
+    { dia: 'Domingo', bloque: 'PM', turno: turnoPM },
+  ];
+
+  return (
+    <div className="overflow-hidden rounded-2xl bg-slate-900 text-white shadow-sm">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-5 px-5 py-5">
+        <div className="lg:w-48 flex-shrink-0">
+          <div className="flex items-center gap-2 text-emerald-300 mb-2">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.16em]">Esta semana</span>
+          </div>
+          <p className="text-sm font-semibold text-white">
+            {fecha ? `${formatFechaServicio(fecha, 'Lun')} — ${formatFechaServicio(sumarDias(fecha, 6), 'Dom')}` : 'Sin programación'}
+          </p>
+          <p className="text-[11px] text-slate-400 mt-1">Asignación vigente del campus</p>
+        </div>
+
+        {fecha ? (
+          usaModalidad ? (
+            <div className="grid flex-1 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+              {serviciosActuales.map(({ dia, bloque, turno: item }) => (
+                <div key={`${dia}-${bloque}`} className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 min-w-0">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{dia} · {bloque}</p>
+                  <p className="text-[12px] font-semibold text-white mt-1 truncate" title={item?.equipoNombreSnapshot}>
+                    {item?.equipoNombreSnapshot ?? 'Sin asignar'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1 rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Equipo responsable</p>
+              <p className="text-sm font-semibold text-white mt-1">{turno.equipoNombreSnapshot}</p>
+            </div>
+          )
+        ) : (
+          <div className="flex-1 rounded-xl border border-dashed border-white/15 px-4 py-4 text-sm text-slate-400">
+            No hay un equipo asignado para la semana actual.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -584,25 +676,53 @@ function CalendarioTab({ campusId, tipo, titulo, isAdmin }: {
   const equiposAM = useMemo(() => equipos.filter((e) => e.modalidad === 'AM'), [equipos]);
   const equiposPM = useMemo(() => equipos.filter((e) => e.modalidad === 'PM'), [equipos]);
   return (
-    <div className="space-y-5">
-      <RosterSection campusId={campusId} tipo={tipo} titulo={titulo} administradores={administradores} isAdmin={isAdmin} />
-      <EquiposSection campusId={campusId} tipo={tipo} equipos={equipos} administradores={administradores} isAdmin={isAdmin} />
-      {isAdmin && (
-        usaModalidad ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equiposAM} modalidad="AM"
-              titulo={`Generar calendario — ${MODALIDAD_LABEL.AM}`} />
-            <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equiposPM} modalidad="PM"
-              titulo={`Generar calendario — ${MODALIDAD_LABEL.PM}`} />
+    <div className="space-y-8">
+      <section className="space-y-4">
+        <SemanaActualCard tipo={tipo} turnos={turnos} />
+        <div className="flex items-end justify-between gap-4 pt-1">
+          <div>
+            <div className="flex items-center gap-2 text-gray-900">
+              <CalendarIcon className="w-4 h-4 text-emerald-600" />
+              <h2 className="text-sm font-bold">Calendario completo</h2>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Consulta la rotación por mes y edita una asignación puntual haciendo clic en el equipo.</p>
           </div>
-        ) : (
-          <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equipos} />
-        )
-      )}
-      <div>
-        <p className={`${labelCls} mb-3`}>Calendario</p>
+          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
+            {turnos.length} asignaciones
+          </span>
+        </div>
         <CalendarioTable campusId={campusId} tipo={tipo} turnos={turnos} equipos={equipos} isAdmin={isAdmin} />
-      </div>
+      </section>
+
+      <section className="rounded-3xl border border-gray-200 bg-gray-50/70 p-4 sm:p-5 space-y-4">
+        <div className="flex items-start gap-3 px-1">
+          <span className="w-9 h-9 rounded-xl bg-white border border-gray-200 text-gray-500 flex items-center justify-center flex-shrink-0">
+            <SettingsIcon className="w-4 h-4" />
+          </span>
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">Configuración del calendario</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Administra personas, equipos y generación de nuevas semanas.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <RosterSection campusId={campusId} tipo={tipo} titulo={titulo} administradores={administradores} isAdmin={isAdmin} />
+          <EquiposSection campusId={campusId} tipo={tipo} equipos={equipos} administradores={administradores} isAdmin={isAdmin} />
+        </div>
+
+        {isAdmin && (
+          usaModalidad ? (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equiposAM} modalidad="AM"
+                titulo={`Generar calendario — ${MODALIDAD_LABEL.AM}`} />
+              <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equiposPM} modalidad="PM"
+                titulo={`Generar calendario — ${MODALIDAD_LABEL.PM}`} />
+            </div>
+          ) : (
+            <GenerarCalendarioSection campusId={campusId} tipo={tipo} equipos={equipos} />
+          )
+        )}
+      </section>
     </div>
   );
 }
@@ -610,8 +730,8 @@ function CalendarioTab({ campusId, tipo, titulo, isAdmin }: {
 // ── Página principal ──────────────────────────────────────────────────────────
 
 const TABS: { key: CampusTurnoTipo; label: string; titulo: string }[] = [
-  { key: 'administradores',     label: 'Calendario de Administradores',        titulo: 'Administradores' },
-  { key: 'lideres_voluntarios', label: 'Calendario de Líderes de Voluntarios', titulo: 'Líderes de voluntarios' },
+  { key: 'administradores',     label: 'Administradores',        titulo: 'Administradores' },
+  { key: 'lideres_voluntarios', label: 'Líderes de voluntarios', titulo: 'Líderes de voluntarios' },
 ];
 
 export function CampusDetailClient({ campusId }: { campusId: number }) {
@@ -628,7 +748,7 @@ export function CampusDetailClient({ campusId }: { campusId: number }) {
   if (!hasAccess) return null;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-5">
       <Link
         href="/dashboard/administracion-campus"
         className="inline-flex items-center gap-1.5 text-[12.5px] text-gray-400 hover:text-gray-700 transition-colors group"
@@ -643,23 +763,30 @@ export function CampusDetailClient({ campusId }: { campusId: number }) {
         <div className="text-sm text-gray-400 py-8 text-center">Cargando campus...</div>
       ) : (
         <>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{campus.name}</h1>
-            {(campus.city || campus.address) && (
-              <p className="text-sm text-gray-500 mt-1">{campus.address ?? campus.city}</p>
-            )}
-          </div>
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
+            <div className="flex items-start gap-4">
+              <span className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                <CalendarIcon />
+              </span>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600 mb-1">Calendarios del campus</p>
+                <h1 className="text-2xl font-bold text-gray-900">{campus.name}</h1>
+                {(campus.city || campus.address) && (
+                  <p className="text-sm text-gray-500 mt-1">{campus.address ?? campus.city}</p>
+                )}
+              </div>
+            </div>
 
-          <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
-            {TABS.map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className="px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-all"
-                style={tab === t.key
-                  ? { background: '#fff', color: ACCENT, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
-                  : { color: '#6B7280' }}>
-                {t.label}
-              </button>
-            ))}
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-full sm:w-fit overflow-x-auto">
+              {TABS.map((t) => (
+                <button key={t.key} onClick={() => setTab(t.key)}
+                  className={`flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-[12.5px] font-semibold whitespace-nowrap transition-all ${
+                    tab === t.key ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                  }`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <CalendarioTab

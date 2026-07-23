@@ -121,8 +121,8 @@ async function main() {
     equipoIdByNumber.set(equipo.numero, await upsertEquipo(campusId, equipo, ids, equiposExistentes));
   }
 
-  // La fecha almacenada es el lunes de la semana. AM cubre miércoles + domingo AM.
-  // PM cubre el domingo PM. El patrón de la planilla inicia la semana 29-06-2026.
+  // La fecha almacenada es el lunes de la semana. AM cubre los encuentros del
+  // miércoles a las 06:00 y 20:00, además del domingo AM. PM cubre el domingo PM.
   const inicio = '2026-06-29';
   const semanas = 31;
   const rotacionAM = [3, 4, 1, 2];
