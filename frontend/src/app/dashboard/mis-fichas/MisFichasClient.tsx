@@ -74,6 +74,7 @@ const STATUS_STYLES: Record<FichaStatus, { bg: string; text: string; border: str
 const SECTION_COLORS: Record<SectionName, string> = {
   pastoral:    '#8B5CF6',
   produccion:  '#F97316',
+  media:       '#06B6D4',
   streaming:   '#3B82F6',
   escena:      '#EC4899',
   setList:     '#EAB308',

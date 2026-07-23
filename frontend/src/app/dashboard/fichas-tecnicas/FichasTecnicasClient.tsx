@@ -58,6 +58,7 @@ function StatusBadge({ status }: { status: FichaStatus }) {
 const SECTION_COLORS: Record<SectionName, string> = {
   pastoral:    '#A78BFA', // violeta
   produccion:  '#FB923C', // naranja
+  media:       '#22D3EE', // cian
   streaming:   '#60A5FA', // azul
   escena:      '#F472B6', // rosado
   setList:     '#FACC15', // amarillo

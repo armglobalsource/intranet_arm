@@ -9,9 +9,9 @@ import { displayName } from '@/types/user';
 
 // Secciones disponibles por tipo de ficha (para el panel de módulos)
 const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
-  unico:   ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'],
-  multi:   ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'],
-  oracion: ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'outfit'],
+  unico:   ['pastoral', 'escena', 'produccion', 'media', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'],
+  multi:   ['pastoral', 'escena', 'produccion', 'media', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'],
+  oracion: ['pastoral', 'escena', 'produccion', 'media', 'streaming', 'setList', 'horarios', 'outfit'],
 };
 import { useUpdateFicha } from '@/hooks/useFichas';
 import { parseFichaDate as parseLocalDate, toFichaInputDate } from '@/lib/ficha-date';
@@ -1976,15 +1976,15 @@ function EncuentroTabs({
 
 // ── Layout drag-to-reorder ────────────────────────────────────────────────────
 
-type LayoutSlot = 'pastoral' | 'produccion' | 'streaming' | 'horarios' | 'worship' | 'voluntarios' | 'anuncios';
+type LayoutSlot = 'pastoral' | 'produccion' | 'media' | 'streaming' | 'horarios' | 'worship' | 'voluntarios' | 'anuncios';
 
 const DEFAULT_LAYOUT: { left: LayoutSlot[]; right: LayoutSlot[] } = {
   left:  ['pastoral', 'produccion', 'streaming', 'horarios'],
-  right: ['worship', 'voluntarios', 'anuncios'],
+  right: ['worship', 'media', 'voluntarios', 'anuncios'],
 };
 const DEFAULT_LAYOUT_ORACION: { left: LayoutSlot[]; right: LayoutSlot[] } = {
   left:  ['pastoral', 'produccion', 'streaming', 'horarios'],
-  right: ['worship'],
+  right: ['worship', 'media'],
 };
 
 /** Columna droppable (target para soltar desde otra columna) */
@@ -2108,7 +2108,11 @@ export function FichaDocumentView({
 
   // ── Layout drag-to-reorder ────────────────────────────────────────────────
   const defaultLayout = ficha.type === 'oracion' ? DEFAULT_LAYOUT_ORACION : DEFAULT_LAYOUT;
-  const resolvedLayout = (sectionLayoutProp ?? defaultLayout) as { left: LayoutSlot[]; right: LayoutSlot[] };
+  const storedLayout = (sectionLayoutProp ?? defaultLayout) as { left: LayoutSlot[]; right: LayoutSlot[] };
+  const layoutHasMedia = [...storedLayout.left, ...storedLayout.right].includes('media');
+  const resolvedLayout: { left: LayoutSlot[]; right: LayoutSlot[] } = layoutHasMedia
+    ? storedLayout
+    : { left: [...storedLayout.left], right: [...storedLayout.right, 'media'] };
 
   const [activeSlot, setActiveSlot] = useState<LayoutSlot | null>(null);
 
@@ -2812,6 +2816,8 @@ export function FichaDocumentView({
                   return !hidden('pastoral') ? <RoleCard key="pastoral" title="Equipo Pastoral" rows={sec('pastoral')} {...editProps('pastoral')} /> : null;
                 case 'produccion':
                   return !hidden('produccion') ? <RoleCard key="produccion" title="Producción" rows={sec('produccion')} {...editProps('produccion')} /> : null;
+                case 'media':
+                  return !hidden('media') ? <RoleCard key="media" title="Media" rows={sec('media')} {...editProps('media')} /> : null;
                 case 'streaming':
                   return !hidden('streaming') ? <StreamingCard key="streaming" rows={sec('streaming')} {...editProps('streaming')} /> : null;
                 case 'horarios':

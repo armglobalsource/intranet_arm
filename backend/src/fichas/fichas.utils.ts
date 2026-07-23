@@ -1,12 +1,12 @@
 export const ALL_FICHA_SECTIONS = [
-  'pastoral', 'escena', 'produccion', 'streaming',
+  'pastoral', 'escena', 'produccion', 'media', 'streaming',
   'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit',
 ] as const;
 
 export type FichaSectionName = typeof ALL_FICHA_SECTIONS[number];
 
 const ORACION_SECTIONS: FichaSectionName[] = [
-  'pastoral', 'escena', 'produccion', 'streaming',
+  'pastoral', 'escena', 'produccion', 'media', 'streaming',
   'setList', 'horarios', 'outfit',
 ];
 

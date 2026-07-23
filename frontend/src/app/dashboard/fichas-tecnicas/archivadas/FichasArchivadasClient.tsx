@@ -37,6 +37,7 @@ function formatDate(raw: any): string {
 const SECTION_COLORS: Record<SectionName, string> = {
   pastoral:    '#A78BFA',
   produccion:  '#FB923C',
+  media:       '#22D3EE',
   streaming:   '#60A5FA',
   escena:      '#F472B6',
   setList:     '#FACC15',

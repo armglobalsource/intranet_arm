@@ -12,6 +12,7 @@ export interface Encuentro {
 export type SectionName =
   | 'pastoral'
   | 'produccion'
+  | 'media'
   | 'streaming'
   | 'escena'        // AR Worship / Banda
   | 'setList'
@@ -23,6 +24,7 @@ export type SectionName =
 export const SECTION_LABELS: Record<SectionName, string> = {
   pastoral:    'Equipo Pastoral',
   produccion:  'Producción',
+  media:       'Media',
   streaming:   'Streaming',
   escena:      'AR Worship',
   setList:     'Set List',

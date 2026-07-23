@@ -12,9 +12,10 @@ describe('fichas utils', () => {
     expect(parsed.toISOString()).toBe('2026-07-22T12:00:00.000Z');
   });
 
-  it('usa solo las siete secciones activas de una ficha de oración', () => {
+  it('incluye Media entre las secciones activas de una ficha de oración', () => {
     const active = activeSectionsForType('oracion');
-    expect(active).toHaveLength(7);
+    expect(active).toHaveLength(8);
+    expect(active).toContain('media');
     expect(active).not.toContain('anuncios');
     expect(active).not.toContain('voluntarios');
   });
@@ -33,6 +34,7 @@ describe('fichas utils', () => {
         pastoral: true,
         escena: false,
         produccion: false,
+        media: false,
         streaming: false,
         setList: false,
         horarios: false,
@@ -40,7 +42,7 @@ describe('fichas utils', () => {
         voluntarios: false,
         outfit: false,
       },
-      ['escena', 'produccion', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'],
+      ['escena', 'produccion', 'media', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'],
     )).toBe('complete');
   });
 

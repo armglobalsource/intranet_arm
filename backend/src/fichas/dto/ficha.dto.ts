@@ -5,10 +5,10 @@ import {
 import { Type } from 'class-transformer';
 
 const SECTION_NAMES = [
-  'pastoral', 'escena', 'produccion', 'streaming',
+  'pastoral', 'escena', 'produccion', 'media', 'streaming',
   'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit',
 ] as const;
-const LAYOUT_SLOTS = ['pastoral', 'produccion', 'streaming', 'horarios', 'worship', 'voluntarios', 'anuncios'] as const;
+const LAYOUT_SLOTS = ['pastoral', 'produccion', 'media', 'streaming', 'horarios', 'worship', 'voluntarios', 'anuncios'] as const;
 
 export class EncuentroDto {
   @IsString() @IsNotEmpty() @MaxLength(40) id: string;
@@ -41,7 +41,7 @@ export class SectionLayoutDto {
 export class UpdateFichaDto {
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(160) title?: string;
   @IsOptional() @IsDateString() date?: string;
-  @IsOptional() @IsArray() @ArrayMaxSize(9) @IsIn(SECTION_NAMES, { each: true })
+  @IsOptional() @IsArray() @ArrayMaxSize(10) @IsIn(SECTION_NAMES, { each: true })
   hiddenSections?: string[];
   @IsOptional() @IsObject() @ValidateNested() @Type(() => SectionLayoutDto)
   sectionLayout?: SectionLayoutDto;

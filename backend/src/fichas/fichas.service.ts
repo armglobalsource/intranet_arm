@@ -18,8 +18,8 @@ const SECTIONS = ALL_FICHA_SECTIONS;
 type SectionName = FichaSectionName;
 
 // Secciones activas según tipo de ficha
-const SECTIONS_ORACION: SectionName[] = ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'outfit'];
-const SECTIONS_REGULAR: SectionName[] = ['pastoral', 'escena', 'produccion', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'];
+const SECTIONS_ORACION: SectionName[] = ['pastoral', 'escena', 'produccion', 'media', 'streaming', 'setList', 'horarios', 'outfit'];
+const SECTIONS_REGULAR: SectionName[] = ['pastoral', 'escena', 'produccion', 'media', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'];
 
 interface FichaAuthUser {
   sub: number;
@@ -74,9 +74,15 @@ function defaultRows(section: SectionName): any[] {
         { id: 'pr9',  label: 'ProPresenter',             type: 'person', shared: true, values: {},                               order: 8,  required: false },
         { id: 'pr10', label: 'Broadcast',                type: 'person', shared: true, values: {},                               order: 9,  required: false },
         { id: 'pr11', label: 'RRSS',                     type: 'person', shared: true, values: {},                               order: 10, required: false },
-        { id: 'pr12', label: 'Fotografía y Edición',     type: 'person', shared: true, values: {},                               order: 11, required: false },
-        { id: 'pr13', label: 'Registro Audiovisual',     type: 'person', shared: true, values: {},                               order: 12, required: false },
-        { id: 'pr14', label: 'Historias',                type: 'person', shared: true, values: {},                               order: 13, required: false },
+      ];
+
+    // ── Media ──────────────────────────────────────────────────────────────
+    case 'media':
+      return [
+        { id: 'media1', label: 'Historias',            type: 'person', shared: true, values: {}, order: 0, required: false },
+        { id: 'media2', label: 'Fotografía',           type: 'person', shared: true, values: {}, order: 1, required: false },
+        { id: 'media3', label: 'Edición',              type: 'person', shared: true, values: {}, order: 2, required: false },
+        { id: 'media4', label: 'Registro Audiovisual', type: 'person', shared: true, values: {}, order: 3, required: false },
       ];
 
     // ── Streaming ──────────────────────────────────────────────────────────
@@ -179,11 +185,11 @@ function defaultRowsOracion(section: SectionName): any[] {
         { id: 'or_pr6',  label: 'Stage',               type: 'person', shared: true, values: {}, order: 5,  required: false },
         { id: 'or_pr7',  label: 'Visual / ProPresenter', type: 'person', shared: true, values: {}, order: 6, required: false },
         { id: 'or_pr8',  label: 'Visual / Arena',      type: 'person', shared: true, values: {}, order: 7,  required: false },
-        { id: 'or_pr9',  label: 'Historias',           type: 'person', shared: true, values: {}, order: 8,  required: false },
         { id: 'or_pr10', label: 'Iluminación',         type: 'person', shared: true, values: {}, order: 9,  required: false },
-        { id: 'or_pr11', label: 'Registro',            type: 'person', shared: true, values: {}, order: 10, required: false },
-        { id: 'or_pr12', label: 'Fotografía',          type: 'person', shared: true, values: {}, order: 11, required: false },
       ];
+
+    case 'media':
+      return defaultRows('media');
 
     // ── Equipo Streaming (oración) ─────────────────────────────────────────
     case 'streaming':
@@ -256,6 +262,94 @@ function buildDefaultSections(type: string) {
 function buildDefaultCompletion(type: string): Partial<Record<SectionName, boolean>> {
   const activeSections = type === 'oracion' ? SECTIONS_ORACION : SECTIONS_REGULAR;
   return Object.fromEntries(activeSections.map((s) => [s, false]));
+}
+
+function mediaTargetsForLabel(label: string): string[] {
+  const normalized = label
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .toLowerCase();
+  const targets: string[] = [];
+  if (normalized.includes('historias')) targets.push('media1');
+  if (normalized.includes('fotografia')) targets.push('media2');
+  if (normalized.includes('edicion')) targets.push('media3');
+  if (normalized === 'registro' || normalized.includes('registro audiovisual')) targets.push('media4');
+  return targets;
+}
+
+export function migrateMediaData(ficha: any) {
+  const sections = Object.fromEntries(
+    Object.entries(ficha.sections ?? {}).map(([name, section]: [string, any]) => [
+      name,
+      {
+        ...section,
+        rows: (section.rows ?? []).map((row: any) => ({
+          ...row,
+          values: { ...(row.values ?? {}) },
+        })),
+      },
+    ]),
+  );
+  const production = sections.produccion;
+  const legacyRows = (production?.rows ?? []).filter(
+    (row: any) => mediaTargetsForLabel(String(row.label ?? '')).length > 0,
+  );
+  if (sections.media && legacyRows.length === 0) return null;
+
+  const media = sections.media ?? {
+    revision: 0,
+    assignedTo: production?.assignedTo ?? null,
+    assignedName: production?.assignedName ?? null,
+    isCompleted: false,
+    completedBy: null,
+    completedAt: null,
+    rows: defaultRows('media'),
+  };
+  const mediaRows = defaultRows('media').map((defaultRow) => {
+    const existing = (media.rows ?? []).find((row: any) => row.id === defaultRow.id);
+    return existing ? { ...defaultRow, ...existing } : defaultRow;
+  });
+
+  for (const legacyRow of legacyRows) {
+    for (const targetId of mediaTargetsForLabel(String(legacyRow.label ?? ''))) {
+      const target = mediaRows.find((row: any) => row.id === targetId);
+      if (!target) continue;
+      const existingValues = Object.values(target.values ?? {}).some(
+        (value) => String(value ?? '').trim().length > 0,
+      );
+      if (!existingValues) target.values = { ...(legacyRow.values ?? {}) };
+    }
+  }
+
+  sections.media = {
+    ...media,
+    revision: Number(media.revision ?? 0),
+    rows: mediaRows,
+  };
+  if (production) {
+    sections.produccion = {
+      ...production,
+      revision: Number(production.revision ?? 0) + (legacyRows.length > 0 ? 1 : 0),
+      rows: (production.rows ?? []).filter(
+        (row: any) => mediaTargetsForLabel(String(row.label ?? '')).length === 0,
+      ),
+    };
+  }
+
+  const completionStatus = {
+    ...(ficha.completionStatus ?? {}),
+    media: Boolean(ficha.completionStatus?.media),
+  };
+  return {
+    sections,
+    completionStatus,
+    status: deriveFichaStatus(
+      ficha.type,
+      completionStatus,
+      ficha.hiddenSections ?? [],
+    ),
+  };
 }
 
 function encounterValue(row: any, encounterId: string): string {
@@ -415,9 +509,32 @@ export class FichasService {
   }
 
   async findOne(fichaId: string) {
-    const snap = await this.fb.db.collection(COL).doc(fichaId).get();
+    const ref = this.fb.db.collection(COL).doc(fichaId);
+    const snap = await ref.get();
     if (!snap.exists) throw new NotFoundException(`Ficha ${fichaId} no encontrada`);
-    return this.fb.toObj(snap);
+    const ficha = this.fb.toObj(snap);
+    const mediaMigration = migrateMediaData(ficha);
+    if (!mediaMigration) return ficha;
+
+    let migratedFicha = ficha;
+    await this.fb.db.runTransaction(async (transaction) => {
+      const currentSnap = await transaction.get(ref);
+      if (!currentSnap.exists) {
+        throw new NotFoundException(`Ficha ${fichaId} no encontrada`);
+      }
+      const currentFicha = this.fb.toObj(currentSnap);
+      const currentMigration = migrateMediaData(currentFicha);
+      if (!currentMigration) {
+        migratedFicha = currentFicha;
+        return;
+      }
+      transaction.update(ref, {
+        ...currentMigration,
+        mediaMigratedAt: this.fb.now(),
+      });
+      migratedFicha = { ...currentFicha, ...currentMigration };
+    });
+    return migratedFicha;
   }
 
   async findOneForUser(fichaId: string, user: FichaAuthUser) {
