@@ -18,19 +18,6 @@ function CampusIcon() {
   );
 }
 
-// ── Calendario de Administradores (módulo activo) ──────────────────────────────
-
-function CalendarioIcon() {
-  return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
-      <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
-    </svg>
-  );
-}
-
 // ── Campus card ───────────────────────────────────────────────────────────────
 
 function CampusCard({ campus }: { campus: Campus }) {
@@ -115,29 +102,32 @@ export function AdministracionCampusClient() {
   return (
     <div className="max-w-6xl mx-auto space-y-7">
       {/* Encabezado del módulo */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-          <div className="flex items-start gap-4">
-            <span className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-              <CalendarioIcon />
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-black via-neutral-950 to-neutral-800 px-6 py-8 font-sans shadow-xl shadow-neutral-300/60 sm:px-9 sm:py-10">
+        <div className="absolute -right-20 -top-28 h-64 w-64 rounded-full bg-white/[0.08] blur-3xl" />
+        <div className="absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-neutral-400/10 blur-3xl" />
+        <div className="relative flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="mb-3 text-sm font-bold text-emerald-400">Operación de campus</p>
+            <h1 className="text-3xl font-bold leading-tight tracking-normal text-white sm:text-4xl">
+              Administración de Campus
+            </h1>
+            <p className="mt-3 max-w-xl text-sm font-medium leading-relaxed text-neutral-300">
+              Consulta y administra las rotaciones semanales de administradores y líderes de voluntarios.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 self-start rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 backdrop-blur-sm lg:self-auto">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-300">
+              <CampusIcon />
             </span>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-600 mb-1">Operación de campus</p>
-              <h1 className="text-2xl font-bold text-gray-900">Administración de Campus</h1>
-              <p className="text-sm text-gray-500 mt-1 max-w-2xl">
-                Consulta y administra las rotaciones semanales de administradores y líderes de voluntarios.
+              <p className="text-xl font-bold leading-none text-white">{active.length}</p>
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                Campus activos
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-2xl bg-gray-50 border border-gray-100 px-4 py-3 self-start sm:self-auto">
-            <span className="text-gray-400"><CampusIcon /></span>
-            <div>
-              <p className="text-lg font-bold text-gray-900 leading-none">{active.length}</p>
-              <p className="text-[10px] uppercase tracking-wide text-gray-400 mt-1">Campus activos</p>
-            </div>
-          </div>
         </div>
-      </div>
+      </section>
 
       {/* Lista de campus */}
       <div>
