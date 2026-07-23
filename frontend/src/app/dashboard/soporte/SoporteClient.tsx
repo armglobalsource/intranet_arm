@@ -130,19 +130,22 @@ function DetailPanel({
             </div>
           </div>
 
-          {/* Nota interna */}
+          {/* Respuesta visible para la persona */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1.5">
-              Nota interna <span className="font-normal text-gray-400">(opcional)</span>
+              Respuesta al usuario <span className="font-normal text-gray-400">(opcional)</span>
             </label>
             <textarea
               rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Notas sobre la resolución o seguimiento..."
+              placeholder="Explica el avance, la solución o cualquier información que deba recibir la persona..."
               maxLength={500}
               className="w-full text-sm px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-gray-300 focus:bg-white resize-none transition-all"
             />
+            <p className="text-[10px] text-gray-400 mt-1">
+              Esta respuesta será visible en la app y generará una notificación.
+            </p>
           </div>
         </div>
 
@@ -205,7 +208,7 @@ function FeedbackRow({ item, onClick }: { item: FeedbackItem; onClick: () => voi
         <p className="text-sm text-gray-800 font-medium truncate">{item.message}</p>
         <p className="text-xs text-gray-400 mt-0.5">{item.userName} · {item.userEmail}</p>
         {item.note && (
-          <p className="text-xs text-blue-600 mt-1 truncate">Nota: {item.note}</p>
+          <p className="text-xs text-blue-600 mt-1 truncate">Respuesta: {item.note}</p>
         )}
       </div>
       {item.screenshotUrl && (

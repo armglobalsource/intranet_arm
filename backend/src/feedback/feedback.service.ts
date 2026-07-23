@@ -62,11 +62,31 @@ export class FeedbackService {
       channel: 'in_app',
     }, 0).catch(() => {});
 
+    this.notifications.create({
+      userId,
+      title: dto.type === 'bug' ? 'Recibimos tu reporte' : 'Recibimos tu sugerencia',
+      body: 'Puedes seguir su estado y leer la respuesta del equipo de soporte aquí.',
+      link: `/notificaciones?feedback=${id}`,
+      channel: 'in_app',
+    }, 0).catch(() => {});
+
     return { ...data, id };
   }
 
   async findAll() {
     const snap = await this.fb.db.collection(COL).limit(500).get();
+    return this.fb.toDocs(snap).sort((a: any, b: any) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
+  }
+
+  async findMine(userId: number) {
+    const snap = await this.fb.db.collection(COL)
+      .where('userId', '==', userId)
+      .limit(100)
+      .get();
     return this.fb.toDocs(snap).sort((a: any, b: any) => {
       const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -81,7 +101,7 @@ export class FeedbackService {
   }
 
   async updateStatus(id: number, dto: UpdateFeedbackStatusDto, userId: number, userName: string) {
-    await this.findOne(id);
+    const current: any = await this.findOne(id);
     const data: any = {
       status:    dto.status,
       note:      dto.note ?? null,
@@ -97,6 +117,27 @@ export class FeedbackService {
       data.resolvedByName = null;
     }
     await this.fb.db.collection(COL).doc(String(id)).update(data);
+
+    const responseChanged = (current.note ?? null) !== (data.note ?? null);
+    const statusChanged = current.status !== dto.status;
+    if (responseChanged || statusChanged) {
+      const statusLabel = {
+        open: 'abierto',
+        in_progress: 'en revisión',
+        resolved: 'resuelto',
+      }[dto.status];
+      const typeLabel = current.type === 'suggestion' ? 'sugerencia' : 'reporte';
+      this.notifications.create({
+        userId: current.userId,
+        title: data.note
+          ? `Nueva respuesta a tu ${typeLabel}`
+          : `Tu ${typeLabel} está ${statusLabel}`,
+        body: data.note ?? `El estado cambió a ${statusLabel}.`,
+        link: `/notificaciones?feedback=${id}`,
+        channel: 'in_app',
+      }, userId).catch(() => {});
+    }
+
     return this.findOne(id);
   }
 

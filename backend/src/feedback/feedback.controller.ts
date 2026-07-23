@@ -41,6 +41,12 @@ export class FeedbackController {
     return this.service.findAll();
   }
 
+  @Get('mine')
+  @ApiOperation({ summary: 'Listar reportes y sugerencias del usuario autenticado' })
+  findMine(@CurrentUser() user: any) {
+    return this.service.findMine(user.sub);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener feedback por ID (admin)' })
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 
@@ -22,6 +22,14 @@ export class NotificationsService {
     const snap = await this.fb.db.collection('notifications').doc(String(id)).get();
     if (!snap.exists) throw new NotFoundException(`Notification con id ${id} no encontrado`);
     return this.fb.toObj(snap);
+  }
+
+  async findOneForUser(id: number, userId: number, isAdmin: boolean) {
+    const notification: any = await this.findOne(id);
+    if (!isAdmin && notification.userId !== userId) {
+      throw new ForbiddenException('No puedes acceder a esta notificación');
+    }
+    return notification;
   }
 
   async create(dto: CreateNotificationDto, userId: number) {
@@ -52,8 +60,8 @@ export class NotificationsService {
     return this.findOne(id);
   }
 
-  async markRead(id: number) {
-    await this.findOne(id);
+  async markRead(id: number, userId: number, isAdmin: boolean) {
+    await this.findOneForUser(id, userId, isAdmin);
     await this.fb.db.collection('notifications').doc(String(id)).update({
       read: true,
       readAt: this.fb.now(),
