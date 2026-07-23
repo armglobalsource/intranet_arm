@@ -66,7 +66,7 @@ steps:
       - --allow-unauthenticated
       - --add-cloudsql-instances=$_CLOUD_SQL_INSTANCE
       - --set-env-vars=NODE_ENV=production,PORT=3001
-      - --set-secrets=DATABASE_URL=intranet-db-url:latest,DIRECT_URL=intranet-db-url:latest,JWT_SECRET=intranet-jwt-secret:latest,GCS_PROJECT_ID=intranet-gcs-project:latest,GCS_BUCKET_DOCUMENTS=intranet-gcs-bucket-docs:latest,GCS_BUCKET_AVATARS=intranet-gcs-bucket-avatars:latest,FRONTEND_URL=intranet-frontend-url:latest,SMTP_HOST=intranet-smtp-host:latest,SMTP_PORT=intranet-smtp-port:latest,SMTP_USER=intranet-smtp-user:latest,SMTP_PASS=intranet-smtp-pass:latest,EMAIL_FROM=intranet-email-from:latest
+      - --set-secrets=DATABASE_URL=intranet-db-url:latest,DIRECT_URL=intranet-db-url:latest,JWT_SECRET=intranet-jwt-secret:latest,GCS_PROJECT_ID=intranet-gcs-project:latest,GCS_BUCKET_DOCUMENTS=intranet-gcs-bucket-docs:latest,GCS_BUCKET_AVATARS=intranet-gcs-bucket-avatars:latest,FRONTEND_URL=intranet-frontend-url:latest,SMTP_HOST=intranet-smtp-host:latest,SMTP_PORT=intranet-smtp-port:latest,SMTP_USER=intranet-smtp-user:latest,SMTP_PASS=intranet-smtp-pass:latest,EMAIL_FROM=intranet-email-from:latest,GOOGLE_CLIENT_ID=intranet-google-client-id:latest,GOOGLE_CLIENT_SECRET=intranet-google-client-secret:latest,BACKEND_URL=intranet-backend-url:latest
       - --min-instances=0
       - --max-instances=3
       - --memory=512Mi
