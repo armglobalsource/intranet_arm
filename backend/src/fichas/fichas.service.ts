@@ -508,6 +508,45 @@ export class FichasService {
     });
   }
 
+  async findPublishedForMobile(user: FichaAuthUser) {
+    if (user.campusId == null) {
+      throw new BadRequestException('Tu cuenta no tiene un campus asignado');
+    }
+
+    const campusId = Number(user.campusId);
+    const campusValues: Array<string | number> = [String(user.campusId)];
+    if (Number.isFinite(campusId)) campusValues.push(campusId);
+
+    const snapshots = await Promise.all(
+      campusValues.map((value) =>
+        this.fb.db.collection(COL).where('campusId', '==', value).get(),
+      ),
+    );
+    const byId = new Map<string, any>();
+    for (const snapshot of snapshots) {
+      for (const ficha of this.fb.toDocs(snapshot)) {
+        if (ficha.published && !ficha.archived) byId.set(ficha.fichaId, ficha);
+      }
+    }
+
+    return Array.from(byId.values())
+      .map((ficha: any) => ({
+        fichaId: ficha.fichaId,
+        campusId: ficha.campusId,
+        campusName: ficha.campusName,
+        type: ficha.type,
+        title: ficha.title,
+        date: ficha.date,
+        encuentros: ficha.encuentros ?? [],
+        publishedAt: ficha.publishedAt ?? null,
+      }))
+      .sort((a: any, b: any) => {
+        const aDate = a.date?.toDate?.() ?? new Date(a.date?.seconds ? a.date.seconds * 1000 : a.date);
+        const bDate = b.date?.toDate?.() ?? new Date(b.date?.seconds ? b.date.seconds * 1000 : b.date);
+        return aDate.getTime() - bDate.getTime();
+      });
+  }
+
   async findOne(fichaId: string) {
     const ref = this.fb.db.collection(COL).doc(fichaId);
     const snap = await ref.get();

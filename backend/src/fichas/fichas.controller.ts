@@ -30,6 +30,11 @@ export class FichasController {
     return this.fichasService.findMine(user.sub, isAdmin);
   }
 
+  @Get('mobile/published')
+  findPublishedForMobile(@CurrentUser() user: any) {
+    return this.fichasService.findPublishedForMobile(user);
+  }
+
   @Public()
   @Get('public/:fichaId')
   findOnePublic(@Param('fichaId') fichaId: string) {
