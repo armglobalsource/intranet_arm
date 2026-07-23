@@ -11,6 +11,13 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: { default: 'Ecosistema ARM', template: '%s | Ecosistema' },
   description: 'Portal interno corporativo',
+  icons: {
+    icon: [
+      { url: '/favicon.png', type: 'image/png', sizes: '64x64' },
+      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
   robots: { index: false },
 };
 
