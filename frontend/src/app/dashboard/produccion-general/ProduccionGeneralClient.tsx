@@ -131,18 +131,18 @@ export function ProduccionGeneralClient() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <section className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-8 sm:px-9 sm:py-10 shadow-xl shadow-slate-200/70">
+      <section className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-8 font-sans sm:px-9 sm:py-10 shadow-xl shadow-slate-200/70">
         <div className="absolute -right-20 -top-28 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
         <div className="absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
         <div className="relative flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-400">
+            <p className="mb-3 text-sm font-bold text-emerald-400">
               Centro de operaciones
             </p>
-            <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
+            <h1 className="text-3xl font-bold leading-tight tracking-normal text-white sm:text-4xl">
               Producción General
             </h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-300">
+            <p className="mt-3 max-w-xl text-sm font-medium leading-relaxed text-slate-300">
               Planifica cada encuentro, coordina la disponibilidad de los equipos y mantén
               informada a toda la comunidad desde un solo lugar.
             </p>
