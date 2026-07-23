@@ -111,6 +111,20 @@ export function useCloneFicha() {
   });
 }
 
+export function useSplitPrayerGlobal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fichaId: string) =>
+      api.post(`/fichas/${fichaId}/split-prayer-global`).then(r => r.data),
+    onSuccess: (data, fichaId) => {
+      qc.setQueryData(KEYS.detail(fichaId), data.prayerFicha);
+      qc.setQueryData(KEYS.detail(data.globalFicha.fichaId), data.globalFicha);
+      qc.invalidateQueries({ queryKey: KEYS.all });
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
+  });
+}
+
 export function useArchiveFicha() {
   const qc = useQueryClient();
   return useMutation({

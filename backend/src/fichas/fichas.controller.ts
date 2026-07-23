@@ -70,6 +70,15 @@ export class FichasController {
     return this.fichasService.clone(fichaId, user, dto);
   }
 
+  @Post(':fichaId/split-prayer-global')
+  @RequirePermission('fichas:edit')
+  splitPrayerAndGlobal(
+    @Param('fichaId') fichaId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.fichasService.splitPrayerAndGlobal(fichaId, user);
+  }
+
   @Patch(':fichaId/publish')
   publish(@Param('fichaId') fichaId: string, @CurrentUser() user: any) {
     return this.fichasService.publish(fichaId, user);

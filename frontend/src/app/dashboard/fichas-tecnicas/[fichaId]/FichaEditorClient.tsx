@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import Link from 'next/link';
-import { useFichaRealtime, useUpdateSection, useCompleteSection, useReopenSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, usePublishFicha, useUnpublishFicha } from '@/hooks/useFichas';
+import { useFichaRealtime, useUpdateSection, useCompleteSection, useReopenSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, usePublishFicha, useUnpublishFicha, useSplitPrayerGlobal } from '@/hooks/useFichas';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -201,6 +201,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { ficha, loading, error } = useFichaRealtime(fichaId);
   const [saveState, setSaveState]       = useState<SaveState>('idle');
   const [actionError, setActionError]   = useState<string | null>(null);
+  const [splitGlobalFichaId, setSplitGlobalFichaId] = useState<string | null>(null);
   const [localSections, setLocalSections] =
     useState<Partial<Record<SectionName, Row[]>>>({});
 
@@ -232,6 +233,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { mutate: updateFicha } = useUpdateFicha();
   const { mutate: publishFicha,   isPending: isPublishing  } = usePublishFicha();
   const { mutate: unpublishFicha, isPending: isUnpublishing } = useUnpublishFicha();
+  const { mutateAsync: splitPrayerGlobal, isPending: isSplitting } = useSplitPrayerGlobal();
 
   function handleToggleModule(name: SectionName) {
     if (!ficha) return;
@@ -509,6 +511,21 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
       });
   }
 
+  async function handleSplitPrayerGlobal() {
+    const confirmed = window.confirm(
+      'Se crearán dos fichas independientes. La ficha de Oración conservará su contenido y Miércoles Global recibirá una ficha propia. Ambas quedarán en borrador para revisión.',
+    );
+    if (!confirmed) return;
+
+    setActionError(null);
+    try {
+      const result = await splitPrayerGlobal(fichaId);
+      setSplitGlobalFichaId(result.globalFicha.fichaId);
+    } catch (err) {
+      setActionError(apiErrorMessage(err, 'No se pudieron separar los encuentros'));
+    }
+  }
+
   return (
     <div className="space-y-4" style={{ position: 'relative' }}>
 
@@ -565,6 +582,42 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
           >
             ×
           </button>
+        </div>
+      )}
+
+      {ficha.type === 'oracion' && (ficha.encuentros?.length ?? 0) > 1 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-bold">Esta ficha contiene dos encuentros de carácter diferente</p>
+            <p className="mt-1 text-xs text-amber-700">
+              Encuentro de Oración y Miércoles Global deben administrarse, completarse y publicarse por separado.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSplitPrayerGlobal}
+            disabled={isSplitting || !(isAdmin || (can('fichas:edit') && can('fichas:create')))}
+            className="shrink-0 rounded-lg bg-amber-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSplitting ? 'Separando…' : 'Separar en dos fichas'}
+          </button>
+        </div>
+      )}
+
+      {splitGlobalFichaId && (
+        <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-bold">Las fichas quedaron separadas correctamente</p>
+            <p className="mt-1 text-xs text-emerald-700">
+              Revisa Miércoles Global antes de publicarlo.
+            </p>
+          </div>
+          <Link
+            href={`/dashboard/fichas-tecnicas/${splitGlobalFichaId}`}
+            className="shrink-0 rounded-lg bg-emerald-700 px-4 py-2 text-center text-xs font-bold text-white transition hover:bg-emerald-800"
+          >
+            Abrir Miércoles Global
+          </Link>
         </div>
       )}
 

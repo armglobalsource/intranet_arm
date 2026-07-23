@@ -258,6 +258,92 @@ function buildDefaultCompletion(type: string): Partial<Record<SectionName, boole
   return Object.fromEntries(activeSections.map((s) => [s, false]));
 }
 
+function encounterValue(row: any, encounterId: string): string {
+  const values = row?.values ?? {};
+  if (row?.shared) {
+    return String(
+      values.shared ??
+      Object.values(values).find((value) => String(value ?? '').trim()) ??
+      '',
+    );
+  }
+  return String(values[encounterId] ?? '');
+}
+
+function rowsForSingleEncounter(rows: any[] = [], encounterId: string): any[] {
+  return rows.map((row) => {
+    const value = encounterValue(row, encounterId);
+    return {
+      ...row,
+      values: row.shared
+        ? (value ? { shared: value } : {})
+        : (value ? { unico: value } : {}),
+    };
+  });
+}
+
+function preservePrayerSections(sections: Record<string, any>, encounterId: string) {
+  return Object.fromEntries(
+    Object.entries(sections ?? {}).map(([name, section]: [string, any]) => [
+      name,
+      {
+        ...section,
+        revision: 0,
+        isCompleted: false,
+        completedBy: null,
+        completedAt: null,
+        rows: rowsForSingleEncounter(section.rows, encounterId),
+      },
+    ]),
+  );
+}
+
+function buildGlobalSectionsFromMixedFicha(
+  sourceSections: Record<string, any>,
+  encounterId: string,
+) {
+  const target = buildDefaultSections('unico');
+
+  for (const sectionName of SECTIONS_REGULAR) {
+    const source = sourceSections?.[sectionName];
+    const targetSection = target[sectionName];
+    if (!source || !targetSection) continue;
+
+    targetSection.assignedTo = source.assignedTo ?? null;
+    targetSection.assignedName = source.assignedName ?? null;
+    const usedIds = new Set(targetSection.rows.map((row: any) => row.id));
+
+    for (const [index, sourceRow] of (source.rows ?? []).entries()) {
+      const value = encounterValue(sourceRow, encounterId).trim();
+      if (!value) continue;
+
+      const normalizedLabel = String(sourceRow.label ?? '').trim().toLocaleLowerCase('es');
+      const equivalent = targetSection.rows.find(
+        (row: any) => String(row.label ?? '').trim().toLocaleLowerCase('es') === normalizedLabel,
+      );
+      if (equivalent) {
+        equivalent.values = equivalent.shared ? { shared: value } : { unico: value };
+        continue;
+      }
+
+      let id = `separado_${sectionName}_${index + 1}`;
+      while (usedIds.has(id)) id = `${id}_x`;
+      usedIds.add(id);
+      targetSection.rows.push({
+        id,
+        label: sourceRow.label || `Dato conservado ${index + 1}`,
+        type: sourceRow.type ?? 'text',
+        shared: Boolean(sourceRow.shared),
+        values: sourceRow.shared ? { shared: value } : { unico: value },
+        order: targetSection.rows.length,
+        required: false,
+      });
+    }
+  }
+
+  return target;
+}
+
 // ── Service ──────────────────────────────────────────────────────────────────
 
 @Injectable()
@@ -360,6 +446,11 @@ export class FichasService {
   }
 
   async create(dto: CreateFichaDto, user: FichaAuthUser) {
+    if (dto.type === 'oracion' && dto.encuentros.length !== 1) {
+      throw new BadRequestException(
+        'El Encuentro de Oración debe tener una ficha independiente con un solo horario.',
+      );
+    }
     if (!this.isGlobal(user)) {
       if (user.campusId == null || String(user.campusId) !== String(dto.campusId)) {
         throw new ForbiddenException('Solo puedes crear fichas para tu campus');
@@ -458,6 +549,11 @@ export class FichasService {
   async clone(fichaId: string, user: FichaAuthUser, dto: CloneFichaDto = {}) {
     const original = await this.findOne(fichaId);
     this.assertCanAccessFicha(original, user);
+    if (original.type === 'oracion' && (original.encuentros?.length ?? 0) > 1) {
+      throw new BadRequestException(
+        'Separa primero los encuentros de esta ficha antes de clonarla.',
+      );
+    }
     if (!this.isGlobal(user) && user.campusId != null && String(original.campusId) !== String(user.campusId)) {
       throw new ForbiddenException('No puedes clonar fichas de otro campus');
     }
@@ -514,6 +610,97 @@ export class FichasService {
     };
     await ref.set(doc);
     return this.findOne(newId);
+  }
+
+  async splitPrayerAndGlobal(fichaId: string, user: FichaAuthUser) {
+    if (!this.isGlobal(user) && !this.has(user, 'fichas:create')) {
+      throw new ForbiddenException('Necesitas permiso para crear la ficha separada');
+    }
+
+    const sourceRef = this.fb.db.collection(COL).doc(fichaId);
+    const globalRef = this.fb.db.collection(COL).doc();
+
+    await this.fb.db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(sourceRef);
+      if (!snap.exists) throw new NotFoundException(`Ficha ${fichaId} no encontrada`);
+      const ficha = snap.data()!;
+      this.assertCanManageFicha(ficha, user);
+
+      const encuentros = ficha.encuentros ?? [];
+      if (ficha.type !== 'oracion' || encuentros.length !== 2) {
+        throw new BadRequestException(
+          'Solo se pueden separar fichas de oración que contengan exactamente dos encuentros.',
+        );
+      }
+      if (ficha.archived) {
+        throw new BadRequestException('Desarchiva la ficha antes de separarla');
+      }
+
+      const prayerIndex = encuentros.findIndex((encuentro: any) =>
+        /oraci[oó]n/i.test(String(encuentro.label ?? '')) &&
+        !/global/i.test(String(encuentro.label ?? '')),
+      );
+      const resolvedPrayerIndex = prayerIndex >= 0 ? prayerIndex : 0;
+      const prayerEncounter = encuentros[resolvedPrayerIndex];
+      const globalEncounter = encuentros[resolvedPrayerIndex === 0 ? 1 : 0];
+
+      const prayerSections = preservePrayerSections(
+        ficha.sections ?? {},
+        prayerEncounter.id,
+      );
+      const globalSections = buildGlobalSectionsFromMixedFicha(
+        ficha.sections ?? {},
+        globalEncounter.id,
+      );
+      const now = this.fb.now();
+
+      transaction.update(sourceRef, {
+        title: 'Encuentro de Oración',
+        encuentros: [{ ...prayerEncounter, id: 'unico' }],
+        sections: prayerSections,
+        completionStatus: buildDefaultCompletion('oracion'),
+        status: 'draft',
+        published: false,
+        publishedBy: null,
+        publishedByName: null,
+        publishedAt: null,
+        splitInto: [globalRef.id],
+        lastModifiedBy: user.sub,
+        lastModifiedByName: user.email,
+        lastModifiedAt: now,
+      });
+
+      transaction.set(globalRef, {
+        fichaId: globalRef.id,
+        campusId: ficha.campusId,
+        campusName: ficha.campusName,
+        type: 'unico',
+        title: String(globalEncounter.label || 'Miércoles Global').replace(/\s*[·|-]\s*\d{1,2}:\d{2}.*$/i, ''),
+        date: ficha.date,
+        encuentros: [{ ...globalEncounter, id: 'unico' }],
+        sections: globalSections,
+        completionStatus: buildDefaultCompletion('unico'),
+        hiddenSections: [],
+        status: 'draft',
+        published: false,
+        createdBy: user.sub,
+        createdByName: user.email,
+        createdAt: now,
+        lastModifiedBy: user.sub,
+        lastModifiedByName: user.email,
+        lastModifiedAt: now,
+        archived: false,
+        publishedBy: null,
+        publishedByName: null,
+        publishedAt: null,
+        splitFrom: fichaId,
+      });
+    });
+
+    return {
+      prayerFicha: await this.findOne(fichaId),
+      globalFicha: await this.findOne(globalRef.id),
+    };
   }
 
   async updateSection(
