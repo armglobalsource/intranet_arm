@@ -10,8 +10,6 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { api, apiErrorMessage } from '@/lib/api';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') ?? 'http://localhost:3001';
-
 const schema = z.object({
   firstName:       z.string().min(1, 'Ingresa tu nombre'),
   lastName:        z.string().min(1, 'Ingresa tu apellido'),
@@ -63,7 +61,7 @@ export default function RegisterPage() {
   };
 
   const handleGoogle = () => {
-    window.location.href = `${BACKEND_URL}/api/v1/auth/google`;
+    window.location.href = `${api.defaults.baseURL}/auth/google`;
   };
 
   return (
