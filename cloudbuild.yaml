@@ -33,7 +33,7 @@ steps:
       - build
       - --platform=linux/amd64
       - --build-arg
-      - NEXT_PUBLIC_API_URL=https://$PROJECT_ID.web.app/api/v1
+      - NEXT_PUBLIC_API_URL=https://ecosistema-arm.web.app/api/v1
       - -t
       - $_REGISTRY/frontend:$COMMIT_SHA
       - -t
