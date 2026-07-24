@@ -10,8 +10,8 @@
 
 substitutions:
   _REGION: us-central1
-  _REGISTRY: us-central1-docker.pkg.dev/$PROJECT_ID/intranet
-  _CLOUD_SQL_INSTANCE: $PROJECT_ID:us-central1:intranet-db
+  _REGISTRY: us-central1-docker.pkg.dev/intranet-arm/intranet
+  _CLOUD_SQL_INSTANCE: intranet-arm:us-central1:intranet-db
 
 steps:
   # ── Backend: build ───────────────────────────────────────────
