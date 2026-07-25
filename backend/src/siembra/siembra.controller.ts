@@ -27,6 +27,19 @@ export class SiembraController {
     return this.siembra.findMine(user.sub);
   }
 
+  @Get('dashboard')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('siembra:view')
+  dashboard(
+    @Query('year') yearText?: string,
+    @Query('groupBy') groupByText?: string,
+    @Query('campus') campus?: string,
+  ) {
+    const year = Number(yearText) || new Date().getFullYear();
+    const groupBy = groupByText === 'week' ? 'week' : 'month';
+    return this.siembra.dashboard(year, groupBy, campus);
+  }
+
   @Get(':id')
   @UseGuards(PermissionsGuard)
   @RequirePermission('siembra:view')

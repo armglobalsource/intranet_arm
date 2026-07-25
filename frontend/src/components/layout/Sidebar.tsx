@@ -121,6 +121,19 @@ function StatsIcon({ active }: { active: boolean }) {
   );
 }
 
+function SiembraIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
+  return (
+    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="8" />
+      <line x1="12" y1="8" x2="12" y2="16" />
+      <line x1="9" y1="10.5" x2="15" y2="10.5" />
+      <line x1="9" y1="13.5" x2="15" y2="13.5" />
+    </svg>
+  );
+}
+
 function MinisteriosIcon({ active }: { active: boolean }) {
   const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
   return (
@@ -240,6 +253,7 @@ const NAV: NavGroup[] = [
   },
   { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon,   permission: 'orgchart:view' },
   { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon, permission: 'estadisticas:view' },
+  { href: '/dashboard/produccion-general/finanzas',      label: 'Finanzas',      icon: SiembraIcon, permission: 'siembra:view' },
   {
     href:  '/dashboard/ministerios',
     label: 'Ministerios',

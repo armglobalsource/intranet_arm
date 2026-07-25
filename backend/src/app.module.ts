@@ -32,6 +32,7 @@ import { AnunciosModule } from './anuncios/anuncios.module';
 import { ArmCatalogosModule } from './arm-catalogos/arm-catalogos.module';
 import { CampusTurnosModule } from './campus-turnos/campus-turnos.module';
 import { EstadisticasModule } from './estadisticas/estadisticas.module';
+import { TipoCambioModule } from './tipo-cambio/tipo-cambio.module';
 
 const envSchema = Joi.object({
   NODE_ENV:             Joi.string().valid('development', 'production', 'test').default('development'),
@@ -93,6 +94,7 @@ const envSchema = Joi.object({
     ArmCatalogosModule,
     CampusTurnosModule,
     EstadisticasModule,
+    TipoCambioModule,
   ],
 })
 export class AppModule {}
