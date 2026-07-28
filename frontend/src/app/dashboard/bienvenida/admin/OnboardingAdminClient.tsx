@@ -223,7 +223,7 @@ export function OnboardingAdminClient() {
   const [confirmDel,  setConfirmDel]  = useState<number | null>(null);
 
   useEffect(() => {
-    if (!isAdmin) router.replace('/dashboard/bienvenida');
+    if (!isAdmin) router.replace('/dashboard/perfil');
   }, [isAdmin, router]);
 
   if (!isAdmin) return null;
@@ -241,13 +241,13 @@ export function OnboardingAdminClient() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <Link href="/dashboard/bienvenida"
+          <Link href="/dashboard/perfil"
             className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors mb-2">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
             </svg>
-            Bienvenida
+            Mi Perfil
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Gestionar Onboardings</h1>
           <p className="text-sm text-gray-500 mt-1">Crea y edita el proceso de bienvenida de cada equipo.</p>

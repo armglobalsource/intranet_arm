@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { StorageService } from '../common/storage/storage.service';
-import { UsersService } from '../users/users.service';
 import { JobTitlesService } from '../job-titles/job-titles.service';
 import {
   CreateOrgAreaDto, UpdateOrgAreaDto,
@@ -28,17 +27,8 @@ export class OrgChartService {
   constructor(
     private fb: FirebaseService,
     private storage: StorageService,
-    private users: UsersService,
     private jobTitles: JobTitlesService,
   ) {}
-
-  /** Sincroniza el customTitle de una membresía como Cargo de la persona (solo agrega, nunca quita). */
-  private async syncCustomTitleToJobTitle(userId: number, customTitle: string | null | undefined) {
-    const name = customTitle?.trim();
-    if (!name) return;
-    const jobTitle = await this.jobTitles.findOrCreateByName(name);
-    await this.users.ensureJobTitle(userId, jobTitle.id, jobTitle.name);
-  }
 
   // ── ÁREAS ─────────────────────────────────────────────────────────────────
 
@@ -90,11 +80,20 @@ export class OrgChartService {
     ]);
     const usersMap = await this.loadUsersMap(Array.from(userIds));
 
+    const jobTitleIds = [...new Set(
+      [...leaders, ...allTeamMembers].map((m) => m.jobTitleId).filter((v): v is number => v != null),
+    )];
+    const jobTitlesMap = await this.loadMap('job_titles', jobTitleIds);
+    const jobTitleOf = (m: any) => (m.jobTitleId != null && jobTitlesMap[m.jobTitleId])
+      ? { id: jobTitlesMap[m.jobTitleId].id, name: jobTitlesMap[m.jobTitleId].name }
+      : null;
+
     const formattedLeaders = leaders
       .map((m) => ({
         ...m,
         area: { id: area.id, name: area.name, color: area.color, slug: area.slug, icon: area.icon },
         team: null,
+        jobTitle: jobTitleOf(m),
         user: fmtUser(usersMap[m.userId]),
       }))
       // Ignorar membresías cuyo usuario fue eliminado
@@ -109,6 +108,7 @@ export class OrgChartService {
           ...m,
           area: null,
           team: { id: team.id, name: team.name, area: { id: area.id, name: area.name, color: area.color, slug: area.slug, icon: area.icon } },
+          jobTitle: jobTitleOf(m),
           user: fmtUser(usersMap[m.userId]),
         }))
         .filter((m) => m.user !== null),
@@ -260,6 +260,7 @@ export class OrgChartService {
     if (!dto.areaId && !dto.teamId) throw new BadRequestException('Debe indicar areaId o teamId');
     if (dto.areaId && dto.teamId)   throw new BadRequestException('Solo puede indicar areaId o teamId, no ambos');
     if (dto.areaId && dto.role !== 'area_leader') throw new BadRequestException('Las membresías de área solo pueden tener rol area_leader');
+    if (dto.jobTitleId != null) await this.jobTitles.findOne(dto.jobTitleId);
 
     const id  = await this.fb.nextId(MEMBERSHIPS);
     const doc = {
@@ -268,24 +269,21 @@ export class OrgChartService {
       areaId:      dto.areaId  ?? null,
       teamId:      dto.teamId  ?? null,
       role:        dto.role,
-      customTitle: dto.customTitle ?? null,
+      jobTitleId:  dto.jobTitleId ?? null,
       sortOrder:   dto.sortOrder ?? 0,
       createdAt:   this.fb.now(),
       updatedAt:   this.fb.now(),
     };
     await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).set(doc);
-    await this.syncCustomTitleToJobTitle(dto.userId, dto.customTitle);
-    return this.fb.toObj(await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).get());
+    return this.attachJobTitle(this.fb.toObj(await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).get()));
   }
 
   async updateMembership(id: number, dto: UpdateOrgMembershipDto) {
     const snap = await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).get();
     if (!snap.exists) throw new NotFoundException(`Membresía ${id} no encontrada`);
+    if (dto.jobTitleId != null) await this.jobTitles.findOne(dto.jobTitleId);
     await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).update({ ...dto, updatedAt: this.fb.now() });
-    if (dto.customTitle !== undefined) {
-      await this.syncCustomTitleToJobTitle(snap.data()!.userId, dto.customTitle);
-    }
-    return this.fb.toObj(await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).get());
+    return this.attachJobTitle(this.fb.toObj(await this.fb.db.collection(MEMBERSHIPS).doc(String(id)).get()));
   }
 
   async deleteMembership(id: number) {
@@ -314,6 +312,12 @@ export class OrgChartService {
     const allAreaIds = [...new Set([...directAreaIds, ...teamAreaIds])];
     const areasMap = await this.loadMap(AREAS, allAreaIds);
 
+    const jobTitleIds = [...new Set(memberships.map((m) => m.jobTitleId).filter((v): v is number => v != null))];
+    const jobTitlesMap = await this.loadMap('job_titles', jobTitleIds);
+    const jobTitleOf = (m: any) => (m.jobTitleId != null && jobTitlesMap[m.jobTitleId])
+      ? { id: jobTitlesMap[m.jobTitleId].id, name: jobTitlesMap[m.jobTitleId].name }
+      : null;
+
     const orgMemberships = memberships.map((m) => {
       const team = m.teamId ? teamsMap[m.teamId] : null;
       const teamArea = team ? areasMap[team.areaId] : null;
@@ -321,6 +325,7 @@ export class OrgChartService {
         ...m,
         area: m.areaId ? areasMap[m.areaId] : null,
         team: team ? { id: team.id, name: team.name, area: teamArea ? { id: teamArea.id, name: teamArea.name, color: teamArea.color, slug: teamArea.slug, icon: teamArea.icon } : null } : null,
+        jobTitle: jobTitleOf(m),
       };
     });
 
@@ -332,7 +337,21 @@ export class OrgChartService {
     const term = q.trim().toLowerCase();
 
     const membSnap = await this.fb.db.collection(MEMBERSHIPS).get();
-    const userIdsWithMembership = new Set(this.fb.toDocs(membSnap).map((m) => m.userId));
+    const memberships = this.fb.toDocs(membSnap);
+    const userIdsWithMembership = new Set(memberships.map((m) => m.userId));
+
+    const jobTitleIds = [...new Set(memberships.map((m) => m.jobTitleId).filter((v): v is number => v != null))];
+    const jobTitlesMap = await this.loadMap('job_titles', jobTitleIds);
+    const jobTitleOf = (m: any) => (m.jobTitleId != null && jobTitlesMap[m.jobTitleId])
+      ? { id: jobTitlesMap[m.jobTitleId].id, name: jobTitlesMap[m.jobTitleId].name }
+      : null;
+    const jobTitleNamesByUser = new Map<number, string[]>();
+    memberships.forEach((m) => {
+      const jt = jobTitleOf(m);
+      if (!jt) return;
+      if (!jobTitleNamesByUser.has(m.userId)) jobTitleNamesByUser.set(m.userId, []);
+      jobTitleNamesByUser.get(m.userId)!.push(jt.name);
+    });
 
     const usersSnap = await this.fb.db.collection('users').where('status', '==', 'active').get();
     const matched = this.fb.toDocs(usersSnap)
@@ -340,14 +359,14 @@ export class OrgChartService {
         userIdsWithMembership.has(u.id) && (
           u.firstName?.toLowerCase().includes(term) ||
           u.lastName?.toLowerCase().includes(term)  ||
-          (u.jobTitles ?? []).some((jt: any) => jt.name?.toLowerCase().includes(term))
+          (u.jobTitles ?? []).some((jt: any) => jt.name?.toLowerCase().includes(term)) ||
+          (jobTitleNamesByUser.get(u.id) ?? []).some((name) => name.toLowerCase().includes(term))
         ),
       )
       .slice(0, 40);
 
     if (!matched.length) return [];
 
-    const memberships = this.fb.toDocs(membSnap);
     const directAreaIds = memberships.map((m) => m.areaId).filter(Boolean);
     const teamIds = [...new Set(memberships.map((m) => m.teamId).filter(Boolean))];
 
@@ -368,12 +387,19 @@ export class OrgChartService {
             ...m,
             area: m.areaId ? areasMap[m.areaId] : null,
             team: team ? { id: team.id, name: team.name, area: teamArea ? { id: teamArea.id, name: teamArea.name, color: teamArea.color, slug: teamArea.slug, icon: teamArea.icon } : null } : null,
+            jobTitle: jobTitleOf(m),
           };
         }),
     }));
   }
 
   // ── HELPERS ───────────────────────────────────────────────────────────────
+
+  private async attachJobTitle(m: any) {
+    if (m.jobTitleId == null) return { ...m, jobTitle: null };
+    const jt = await this.jobTitles.findOne(m.jobTitleId).catch(() => null);
+    return { ...m, jobTitle: jt ? { id: jt.id, name: jt.name } : null };
+  }
 
   private async findAreaOrFail(id: number) {
     const snap = await this.fb.db.collection(AREAS).doc(String(id)).get();

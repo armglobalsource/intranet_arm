@@ -27,13 +27,13 @@ export const PERMISSION_CATALOG = {
     },
   },
   content: {
-    label: 'Contenido',
-    description: 'Noticias, anuncios y publicaciones internas',
+    label: 'Noticias',
+    description: 'Noticias globales y por campus (texto, imágenes, video e Instagram)',
     actions: {
-      view:    'Leer contenido publicado',
-      create:  'Redactar nuevo contenido',
-      publish: 'Publicar y despublicar contenido',
-      delete:  'Eliminar contenido',
+      view:    'Leer las noticias publicadas',
+      create:  'Redactar nuevas noticias',
+      publish: 'Publicar y despublicar noticias',
+      delete:  'Eliminar noticias',
     },
   },
   documents: {
@@ -95,6 +95,21 @@ export const PERMISSION_CATALOG = {
       edit:    'Editar fichas existentes',
       delete:  'Eliminar fichas',
       admin:   'Administrar configuración de fichas',
+    },
+  },
+  tecnicos: {
+    label: 'Disponibilidad de Técnicos',
+    description: 'Registro de disponibilidad de técnicos para producción',
+    actions: {
+      submit: 'Registrar la propia disponibilidad',
+      view:   'Ver la matriz de disponibilidad de todos los técnicos (coordinador)',
+    },
+  },
+  onboarding: {
+    label: 'Mis Onboardings',
+    description: 'Guías de bienvenida e inducción por equipo, dentro de Mi Perfil',
+    actions: {
+      view: 'Ver la sección de Mis Onboardings en el perfil',
     },
   },
   // Recursos de solo-vista, sin endpoint de backend que proteger —
@@ -224,7 +239,15 @@ export const PERMISSION_UI_CONFIG: Record<string, PermissionUiSection> = {
       { key: 'admin',   label: 'Administrar configuración de fichas',   actions: ['admin'] },
     ],
   },
-  content:   { breadcrumb: ['Producción General', 'Noticias'],       viewActions: ['view'], editActions: ['create', 'publish', 'delete'] },
+  content:   { breadcrumb: ['Noticias'],                             viewActions: ['view'], editActions: ['create', 'publish', 'delete'] },
+  siembra:   { breadcrumb: ['Producción General', 'Finanzas'],       viewActions: ['view'], editActions: ['create', 'edit', 'delete'] },
+  tecnicos:  {
+    breadcrumb: ['Producción General', 'Disp. Técnicos'],
+    viewActions: ['submit'], editActions: [],
+    extra: [
+      { key: 'view', label: 'Ver matriz de disponibilidad de todos los técnicos (coordinador)', actions: ['view'] },
+    ],
+  },
   documents: { breadcrumb: [],                                       viewActions: ['view'], editActions: ['upload', 'delete'] },
   ministerio_ar_kids:    { breadcrumb: ['Ministerios', 'AR Kids'],      viewActions: ['view'], editActions: [] },
   ministerio_ar_tweens:  { breadcrumb: ['Ministerios', 'AR Tweens'],    viewActions: ['view'], editActions: [] },
@@ -242,4 +265,5 @@ export const PERMISSION_UI_CONFIG: Record<string, PermissionUiSection> = {
       { key: 'viewAll', label: 'Ver estadísticas de todos los campus', actions: ['viewAll'] },
     ],
   },
+  onboarding: { breadcrumb: ['Mi Perfil', 'Mis Onboardings'], viewActions: ['view'], editActions: [] },
 };

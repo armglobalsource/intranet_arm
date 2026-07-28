@@ -122,7 +122,7 @@ export function useDeleteOrgTeam() {
 export function useCreateOrgMembership() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { userId: number; areaId?: number; teamId?: number; role: string; customTitle?: string | null; sortOrder?: number }) =>
+    mutationFn: (data: { userId: number; areaId?: number; teamId?: number; role: string; jobTitleId?: number | null; sortOrder?: number }) =>
       api.post('/orgchart/memberships', data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['orgchart'] }),
   });
@@ -159,7 +159,7 @@ export function useUploadAreaLogo() {
 export function useUpdateOrgMembership() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { role?: string; customTitle?: string | null; sortOrder?: number } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { role?: string; jobTitleId?: number | null; sortOrder?: number } }) =>
       api.patch(`/orgchart/memberships/${id}`, data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['orgchart'] }),
   });

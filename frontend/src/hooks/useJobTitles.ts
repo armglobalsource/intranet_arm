@@ -14,6 +14,22 @@ export const jobTitleKeys = {
   active: ['job-titles', 'active'] as const,
 };
 
+export interface JobTitleAffectedUser {
+  id:        number;
+  firstName: string;
+  lastName:  string;
+  sources:   ('manual' | 'orgchart')[];
+}
+
+/** Personas afectadas por un cargo — usado para advertir antes de editar/eliminar en el mantenedor. */
+export function useJobTitleAffectedUsers(id: number | null) {
+  return useQuery<JobTitleAffectedUser[]>({
+    queryKey: ['job-titles', id, 'affected-users'],
+    queryFn:  () => api.get(`/job-titles/${id}/affected-users`).then((r) => r.data),
+    enabled:  id !== null,
+  });
+}
+
 /** Todos los cargos (admin) */
 export function useAllJobTitles() {
   return useQuery<JobTitle[]>({

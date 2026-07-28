@@ -2,9 +2,6 @@
 
 import Link from 'next/link';
 import { useFichas } from '@/hooks/useFichas';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import type { Noticia } from '@/hooks/useNoticias';
 import { usePermissions } from '@/hooks/usePermissions';
 
 // ── HubCard ───────────────────────────────────────────────────────────────────
@@ -102,18 +99,10 @@ export function ProduccionGeneralClient() {
   const canTecnicos       = isAdmin || can('tecnicos:submit')       || can('tecnicos:view');
 
   const { data: fichas, isLoading } = useFichas();
-  const { data: noticias, isLoading: loadingNoticias } = useQuery<Noticia[]>({
-    queryKey: ['noticias-admin'],
-    queryFn:  () => api.get('/content/news').then((r) => r.data),
-    staleTime: 60_000,
-  });
 
   const total      = fichas?.length ?? 0;
   const completas  = fichas?.filter((f) => f.status === 'complete').length ?? 0;
   const enProgreso = fichas?.filter((f) => f.status === 'in_progress').length ?? 0;
-
-  const totalNoticias     = noticias?.length ?? 0;
-  const publicadas        = noticias?.filter((n) => n.status === 'published').length ?? 0;
 
   const statFichas = isLoading
     ? undefined
@@ -121,13 +110,7 @@ export function ProduccionGeneralClient() {
     ? `${completas}/${total} completas`
     : 'Sin fichas';
 
-  const statNoticias = loadingNoticias
-    ? undefined
-    : totalNoticias > 0
-    ? `${publicadas} publicadas`
-    : 'Sin noticias';
-
-  const modulosDisponibles = 2 + Number(canDisponibilidad) + Number(canTecnicos);
+  const modulosDisponibles = 1 + Number(canDisponibilidad) + Number(canTecnicos);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -171,11 +154,10 @@ export function ProduccionGeneralClient() {
           </p>
           <h2 className="mt-1 text-lg font-bold text-slate-900">Resumen de la producción</h2>
         </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <MetricCard label="Fichas activas" value={total} detail="Total registradas" color="#0f172a" loading={isLoading} />
           <MetricCard label="En progreso" value={enProgreso} detail="Requieren seguimiento" color="#7F77DD" loading={isLoading} />
           <MetricCard label="Completas" value={completas} detail="Listas para el encuentro" color="#1D9E75" loading={isLoading} />
-          <MetricCard label="Noticias" value={publicadas} detail={`${totalNoticias} registradas`} color="#4F46E5" loading={loadingNoticias} />
         </div>
       </section>
 
@@ -250,24 +232,6 @@ export function ProduccionGeneralClient() {
             accentColor="#2563eb"
           />
         )}
-
-        <HubCard
-          href="/dashboard/produccion-general/noticias"
-          icon={
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
-              stroke="#4F46E5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l6 6v8a2 2 0 0 1-2 2z" />
-              <polyline points="17 20 17 13 7 13 7 20" />
-              <polyline points="7 4 7 8 15 8" />
-            </svg>
-          }
-          eyebrow="Comunicaciones"
-          title="Noticias"
-          description="Publica y gestiona noticias globales y por campus. Comparte imágenes, videos e Instagram."
-          accentColor="#4F46E5"
-          stat={statNoticias}
-          loading={loadingNoticias}
-        />
         </div>
       </section>
 

@@ -5,8 +5,36 @@ import Link from 'next/link';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useUpdateUser, useUploadUserAvatar } from '@/hooks/useUsers';
 import { useActiveCampuses } from '@/hooks/useCampus';
+import { useOnboardingList, type OnboardingTeam } from '@/hooks/useOnboarding';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { UserGender } from '@/types/user';
 import { displayName } from '@/types/user';
+
+// ── Mis Onboardings ─────────────────────────────────────────────────────────────
+
+function OnboardingCard({ team }: { team: OnboardingTeam }) {
+  return (
+    <Link
+      href={`/dashboard/bienvenida/${team.slug}`}
+      className="group flex items-center gap-3 px-3.5 py-3 rounded-lg transition-all hover:bg-white/5"
+      style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }}
+    >
+      <div
+        className="w-9 h-9 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
+        style={{ background: team.color ? `${team.color}22` : 'rgba(99,102,241,0.15)' }}
+      >
+        {team.emoji ?? '👋'}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold text-white truncate">{team.teamName}</p>
+        {team.welcomeTitle && <p className="text-[11px] text-white/40 truncate mt-0.5">{team.welcomeTitle}</p>}
+      </div>
+      <svg className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="9 18 15 12 9 6" />
+      </svg>
+    </Link>
+  );
+}
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 
@@ -15,8 +43,8 @@ const PERMISSION_LABELS: Record<string, string> = {
   'orgchart:manage':  'Gestionar organigrama',
   'users:view':       'Ver usuarios',
   'users:manage':     'Gestionar usuarios',
-  'content:view':     'Ver contenido',
-  'content:manage':   'Gestionar contenido',
+  'content:view':     'Ver noticias',
+  'content:manage':   'Gestionar noticias',
   'documents:view':   'Ver documentos',
   'documents:manage': 'Gestionar documentos',
   'directory:view':   'Ver directorio',
@@ -157,6 +185,8 @@ export default function PerfilPage() {
   const updateMutation = useUpdateUser();
   const uploadMutation = useUploadUserAvatar();
   const { data: campuses = [] } = useActiveCampuses();
+  const { isAdmin, can } = usePermissions();
+  const { data: onboardingTeams = [], isLoading: loadingOnboarding } = useOnboardingList();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [editing, setEditing] = useState(false);
@@ -548,6 +578,47 @@ export default function PerfilPage() {
             </SectionCard>
           )}
         </div>
+
+        {/* Mis Onboardings */}
+        {(isAdmin || can('onboarding:view')) && (
+          <div className="lg:col-span-3">
+            <SectionCard title="Mis Onboardings" icon={
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+            }>
+              {loadingOnboarding ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-16 rounded-lg animate-pulse" style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }} />
+                  ))}
+                </div>
+              ) : onboardingTeams.length === 0 ? (
+                <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  {isAdmin ? 'No hay onboardings creados aún.' : 'No tienes onboardings asignados aún.'}
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {onboardingTeams.map((team) => (
+                    <OnboardingCard key={team.id} team={team} />
+                  ))}
+                </div>
+              )}
+              {isAdmin && (
+                <div className="pt-4">
+                  <Link href="/dashboard/bienvenida/admin"
+                    className="flex items-center gap-1.5 w-fit px-3.5 py-1.5 rounded-lg text-[12px] font-medium text-white/50 hover:text-white transition-all"
+                    style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }}>
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Gestionar onboardings
+                  </Link>
+                </div>
+              )}
+            </SectionCard>
+          </div>
+        )}
       </div>
     </div>
   );

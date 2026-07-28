@@ -8,7 +8,7 @@ import type { Noticia } from '@/hooks/useNoticias';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useUsers } from '@/hooks/useUsers';
-import { CalendarioAnual } from './CalendarioAnual';
+import { CalendarioResumenMes } from './CalendarioAnual';
 import { useOrgUserProfile } from '@/hooks/useOrgChart';
 import { membershipArea } from '@/types/orgchart';
 import { useMyDisponibilidad } from '@/hooks/useDisponibilidad';
@@ -527,7 +527,7 @@ export function DashboardClient() {
         />
       </div>
 
-      <CalendarioAnual />
+      <CalendarioResumenMes />
     </div>
   );
 }

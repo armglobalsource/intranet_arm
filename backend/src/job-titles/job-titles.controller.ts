@@ -27,6 +27,12 @@ export class JobTitlesController {
     return this.service.findActive();
   }
 
+  @Get(':id/affected-users')
+  @ApiOperation({ summary: 'Personas afectadas por este cargo (para advertir antes de editar/eliminar)' })
+  getAffectedUsers(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getAffectedUsers(id);
+  }
+
   @Post()
   @UseGuards(PermissionsGuard)
   @RequirePermission('directory:manage')

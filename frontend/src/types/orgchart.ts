@@ -14,7 +14,7 @@ export interface OrgUser {
   lastName: string;
   email: string;
   avatarUrl?: string | null;
-  jobTitles: { jobTitle: { id: number; name: string } }[];
+  jobTitles: { jobTitle: { id: number; name: string }; source?: 'manual' | 'orgchart' }[];
   phone?: string | null;
   country?: string | null;
   bio?: string | null;
@@ -31,7 +31,8 @@ export function orgUserJobTitle(u: OrgUser): string | null {
 export interface OrgMembership {
   id: number;
   role: OrgRole;
-  customTitle?: string | null;
+  jobTitleId?: number | null;
+  jobTitle?: { id: number; name: string } | null;
   sortOrder: number;
   userId: number;
   areaId?: number | null;
@@ -77,7 +78,8 @@ export interface OrgAreaTree extends OrgArea {
 export interface OrgMembershipFull {
   id: number;
   role: OrgRole;
-  customTitle?: string | null;
+  jobTitleId?: number | null;
+  jobTitle?: { id: number; name: string } | null;
   sortOrder: number;
   userId: number;
   areaId?: number | null;

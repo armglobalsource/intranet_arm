@@ -2,20 +2,30 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException, 
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { StorageService } from '../common/storage/storage.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { JobTitlesService } from '../job-titles/job-titles.service';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 
 const COL = 'users';
 
-/** Da formato a un doc de Firestore al shape esperado por el frontend */
-function formatUser(raw: any) {
+/**
+ * Da formato a un doc de Firestore al shape esperado por el frontend, uniendo los
+ * cargos manuales (guardados en el perfil) con los derivados en vivo de sus membresías
+ * activas en el organigrama. El organigrama es la fuente de verdad: si un cargo viene
+ * de ahí, se marca source: 'orgchart' y prevalece sobre un cargo manual duplicado.
+ */
+function formatUser(raw: any, orgJobTitles: { jobTitleId: number; name: string }[] = []) {
   if (!raw) return null;
   const { passwordHash, nameLower, ...rest } = raw;
-  // Asegurar jobTitles en formato { jobTitle: { id, name } }[]
-  const jobTitles = (raw.jobTitles ?? []).map((jt: any) => ({
+  const orgIds = new Set(orgJobTitles.map((jt) => jt.jobTitleId));
+  const manual = (raw.jobTitles ?? [])
+    .filter((jt: any) => !orgIds.has(jt.jobTitleId))
+    .map((jt: any) => ({ jobTitle: { id: jt.jobTitleId, name: jt.name }, source: 'manual' as const }));
+  const orgDerived = orgJobTitles.map((jt) => ({
     jobTitle: { id: jt.jobTitleId, name: jt.name },
+    source: 'orgchart' as const,
   }));
-  return { ...rest, jobTitles };
+  return { ...rest, jobTitles: [...orgDerived, ...manual] };
 }
 
 @Injectable()
@@ -26,6 +36,7 @@ export class UsersService {
     private fb: FirebaseService,
     private storage: StorageService,
     private notifications: NotificationsService,
+    private jobTitles: JobTitlesService,
   ) {}
 
   // ── Usuarios ──────────────────────────────────────────────────────────────
@@ -41,19 +52,24 @@ export class UsersService {
       (a.lastName  ?? '').localeCompare(b.lastName  ?? ''),
     );
 
+    const orgJobTitlesByUser = await this.jobTitles.getActiveByMembershipUserIds(docs.map((u) => u.id));
+
     if (search) {
       const q = search.toLowerCase();
       docs = docs.filter((u) =>
         u.firstName?.toLowerCase().includes(q) ||
         u.lastName?.toLowerCase().includes(q)  ||
         u.email?.toLowerCase().includes(q)     ||
-        (u.jobTitles ?? []).some((jt: any) => jt.name?.toLowerCase().includes(q)),
+        (u.jobTitles ?? []).some((jt: any) => jt.name?.toLowerCase().includes(q)) ||
+        (orgJobTitlesByUser[u.id] ?? []).some((jt) => jt.name.toLowerCase().includes(q)),
       );
     }
 
-    const total = docs.length;
-    const skip  = (page - 1) * safeLimit;
-    const data  = docs.slice(skip, skip + safeLimit).map(formatUser);
+    const total    = docs.length;
+    const skip     = (page - 1) * safeLimit;
+    const pageDocs = docs.slice(skip, skip + safeLimit);
+
+    const data = pageDocs.map((u) => formatUser(u, orgJobTitlesByUser[u.id] ?? []));
 
     return { data, total, page, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) };
   }
@@ -61,7 +77,8 @@ export class UsersService {
   async findOne(id: number) {
     const snap = await this.fb.db.collection(COL).doc(String(id)).get();
     if (!snap.exists) throw new NotFoundException(`User con id ${id} no encontrado`);
-    return formatUser(this.fb.toObj(snap));
+    const orgJobTitlesByUser = await this.jobTitles.getActiveByMembershipUserIds([id]);
+    return formatUser(this.fb.toObj(snap), orgJobTitlesByUser[id] ?? []);
   }
 
   async findByEmail(email: string) {
@@ -350,20 +367,6 @@ export class UsersService {
       'image/heif': '.heif',
     };
     return map[mime] ?? '.jpg';
-  }
-
-  /** Agrega un cargo a la persona si todavía no lo tiene (no elimina cargos existentes). */
-  async ensureJobTitle(userId: number, jobTitleId: number, jobTitleName: string): Promise<boolean> {
-    const ref  = this.fb.db.collection(COL).doc(String(userId));
-    const snap = await ref.get();
-    if (!snap.exists) return false;
-
-    const current: any[] = snap.data()!.jobTitles ?? [];
-    if (current.some((jt) => jt.jobTitleId === jobTitleId)) return false;
-
-    const updated = [...current, { jobTitleId, name: jobTitleName, sortOrder: current.length }];
-    await ref.update({ jobTitles: updated, updatedAt: this.fb.now() });
-    return true;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

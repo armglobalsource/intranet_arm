@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '@/lib/store/auth.store';
 import {
   useEvents,
@@ -71,6 +72,14 @@ function addDays(dateStr: string, n: number) {
 function isInRange(dateStr: string, start: string, end: string | null | undefined) {
   if (!end || end === start) return dateStr === start;
   return dateStr >= start && dateStr <= end;
+}
+
+/** ¿El rango del evento se solapa con el mes (year, month 0-indexed)? */
+function eventOverlapsMonth(ev: ArmEvent, year: number, month: number) {
+  const monthStart = toDateStr(year, month, 1);
+  const monthEnd   = toDateStr(year, month, new Date(year, month + 1, 0).getDate());
+  const end        = ev.endDate || ev.date;
+  return ev.date <= monthEnd && end >= monthStart;
 }
 
 /** Formatea "YYYY-MM-DD" → "15 de enero de 2026" */
@@ -825,6 +834,165 @@ export function CalendarioAnual() {
         {!isLoading && events.length === 0 && (
           <p className="text-center text-[12px] text-slate-400 mt-4 pb-1">
             No hay eventos registrados para {year}.
+            {isAdmin && ' Haz clic en "Nueva actividad" para agregar el primero.'}
+          </p>
+        )}
+      </div>
+
+      {/* Modal crear evento */}
+      {showAddModal && (
+        <AddEventModal
+          defaultDate={selectedDay ?? undefined}
+          onClose={() => setShowAddModal(false)}
+          onCreated={() => {}}
+        />
+      )}
+    </>
+  );
+}
+
+// ── CalendarioResumenMes (widget compacto para el home) ────────────────────────
+// Solo muestra el mes actual, con un botón para ir al calendario completo.
+
+export function CalendarioResumenMes() {
+  const { user }    = useAuthStore();
+  const isAdmin     = user?.role?.name === 'admin';
+  const today       = (() => {
+    const d = new Date();
+    return toDateStr(d.getFullYear(), d.getMonth(), d.getDate());
+  })();
+  const { year: currentYear, month: currentMonth } = parseDateStr(today);
+
+  const [selectedDay, setSelectedDay]   = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const { data: events = [], isLoading } = useEvents(currentYear);
+  const deleteEvent = useDeleteEvent();
+
+  const monthEvents = events.filter((ev) => eventOverlapsMonth(ev, currentYear, currentMonth));
+  const dayEvents = selectedDay
+    ? events.filter((ev) => isInRange(selectedDay, ev.date, ev.endDate))
+    : [];
+
+  function handleSelectDay(day: string) {
+    setSelectedDay((prev) => (prev === day ? null : day));
+  }
+
+  async function handleDelete(ev: ArmEvent) {
+    if (!confirm(`¿Eliminar "${ev.title}"?`)) return;
+    await deleteEvent.mutateAsync({ id: ev.id, year: currentYear });
+    if (dayEvents.length <= 1) setSelectedDay(null);
+  }
+
+  return (
+    <>
+      <div className="card p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5 gap-4 flex-wrap">
+          <div>
+            <h2 className="text-[15px] font-bold text-slate-900">Calendario ARM Global</h2>
+            <p className="text-[12px] text-slate-400 mt-0.5">{MONTH_NAMES[currentMonth]} {currentYear}</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Nueva actividad (admin) */}
+            {isAdmin && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-1.5 btn-primary text-[12px] py-1.5 px-3"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Nueva actividad
+              </button>
+            )}
+
+            {/* Ver calendario completo */}
+            <Link
+              href="/dashboard/calendario"
+              className="flex items-center gap-1.5 text-[12px] font-medium text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-all"
+            >
+              Ver calendario completo
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+
+        {/* Mes actual */}
+        {isLoading ? (
+          <div className="max-w-xs mx-auto">
+            <div className="rounded-xl border border-slate-100 bg-slate-50 h-64 animate-pulse" />
+          </div>
+        ) : (
+          <div className="max-w-xs mx-auto">
+            <MonthGrid
+              year={currentYear}
+              month={currentMonth}
+              events={events}
+              selectedDay={selectedDay}
+              today={today}
+              onSelect={handleSelectDay}
+            />
+          </div>
+        )}
+
+        {/* Leyenda */}
+        <Leyenda />
+
+        {/* Panel de eventos del día seleccionado */}
+        {selectedDay && dayEvents.length > 0 && (
+          <div className="mt-5 pt-5 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[13px] font-bold text-slate-800">
+                {formatFullDate(selectedDay)}
+              </h3>
+              <button
+                onClick={() => setSelectedDay(null)}
+                className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-slate-100 transition-all text-slate-400"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-2.5">
+              {dayEvents.map((ev) => (
+                <EventCard
+                  key={ev.id}
+                  event={ev}
+                  isAdmin={isAdmin}
+                  year={currentYear}
+                  onDelete={() => handleDelete(ev)}
+                />
+              ))}
+            </div>
+
+            {isAdmin && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="mt-3 flex items-center gap-1.5 text-[12px] text-slate-400 hover:text-slate-700 transition-all"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Agregar evento en esta fecha
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Sin eventos — info de ayuda */}
+        {!isLoading && monthEvents.length === 0 && (
+          <p className="text-center text-[12px] text-slate-400 mt-4 pb-1">
+            No hay eventos registrados para {MONTH_NAMES[currentMonth].toLowerCase()}.
             {isAdmin && ' Haz clic en "Nueva actividad" para agregar el primero.'}
           </p>
         )}

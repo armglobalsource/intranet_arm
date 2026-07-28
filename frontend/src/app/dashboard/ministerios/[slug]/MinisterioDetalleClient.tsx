@@ -13,7 +13,7 @@ type Config = MinistrioConfig;
 function UserCard({ m, color }: { m: OrgMembership; color: string }) {
   const u = m.user;
   const name  = `${u.firstName} ${u.lastName}`;
-  const title = m.customTitle || orgUserJobTitle(u) || null;
+  const title = m.jobTitle?.name || orgUserJobTitle(u) || null;
   const ini   = ((u.firstName[0] ?? '') + (u.lastName[0] ?? '')).toUpperCase();
 
   return (

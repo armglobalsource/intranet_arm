@@ -56,9 +56,10 @@ interface MultiJobTitleSelectProps {
   onChange:      (ids: number[]) => void;
   allJobTitles:  JobTitle[];
   onCreateNew:   (name: string) => Promise<JobTitle>;
+  lockedTitles?: { id: number; name: string }[];
 }
 
-function MultiJobTitleSelect({ selectedIds, onChange, allJobTitles, onCreateNew }: MultiJobTitleSelectProps) {
+function MultiJobTitleSelect({ selectedIds, onChange, allJobTitles, onCreateNew, lockedTitles = [] }: MultiJobTitleSelectProps) {
   const [open,    setOpen]    = useState(false);
   const [input,   setInput]   = useState('');
   const [creating, setCreating] = useState(false);
@@ -98,8 +99,20 @@ function MultiJobTitleSelect({ selectedIds, onChange, allJobTitles, onCreateNew 
 
   return (
     <div ref={ref} className="relative">
-      {selectedTitles.length > 0 && (
+      {(lockedTitles.length > 0 || selectedTitles.length > 0) && (
         <div className="flex flex-wrap gap-1.5 mb-2">
+          {lockedTitles.map((jt) => (
+            <span
+              key={`locked-${jt.id}`}
+              title="Este cargo viene del organigrama — se edita desde Organigrama"
+              className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 text-[11px] font-medium px-2 py-1 rounded-full border border-slate-200"
+            >
+              <svg className="w-2.5 h-2.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="11" width="14" height="9" rx="2" ry="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+              {jt.name}
+            </span>
+          ))}
           {selectedTitles.map((jt) => (
             <span key={jt.id} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[11px] font-medium px-2 py-1 rounded-full border border-blue-200">
               {jt.name}
@@ -256,7 +269,8 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
   const deleteMembership       = useDeleteOrgMembership();
   const updateUser             = useUpdateUser();
 
-  const currentJobTitleIds = user.jobTitles.map((jt) => jt.jobTitle.id);
+  const currentJobTitleIds = user.jobTitles.filter((jt) => jt.source !== 'orgchart').map((jt) => jt.jobTitle.id);
+  const orgDerivedJobTitles = user.jobTitles.filter((jt) => jt.source === 'orgchart').map((jt) => jt.jobTitle);
 
   const [firstName,   setFirstName]   = useState(user.firstName ?? '');
   const [lastName,    setLastName]    = useState(user.lastName  ?? '');
@@ -420,6 +434,7 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
               onChange={setJobTitleIds}
               allJobTitles={allJobTitles}
               onCreateNew={onCreateJobTitle}
+              lockedTitles={orgDerivedJobTitles}
             />
           </div>
 

@@ -121,6 +121,18 @@ function StatsIcon({ active }: { active: boolean }) {
   );
 }
 
+function NoticiasIcon({ active }: { active: boolean }) {
+  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
+  return (
+    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l6 6v8a2 2 0 0 1-2 2z" />
+      <polyline points="17 20 17 13 7 13 7 20" />
+      <polyline points="7 4 7 8 15 8" />
+    </svg>
+  );
+}
+
 function SiembraIcon({ active }: { active: boolean }) {
   const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
   return (
@@ -147,18 +159,6 @@ function MinisteriosIcon({ active }: { active: boolean }) {
   );
 }
 
-function NoticiasIcon({ active }: { active: boolean }) {
-  const c = active ? '#fff' : 'rgba(255,255,255,0.35)';
-  return (
-    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l6 6v8a2 2 0 0 1-2 2z" />
-      <polyline points="17 20 17 13 7 13 7 20" />
-      <polyline points="7 4 7 8 15 8" />
-    </svg>
-  );
-}
-
 // Ícono genérico para subítems de ministerios (punto + línea)
 function MinisterioSubIcon({ active }: { active: boolean }) {
   return (
@@ -166,16 +166,6 @@ function MinisterioSubIcon({ active }: { active: boolean }) {
       className="w-1.5 h-1.5 rounded-full flex-shrink-0"
       style={{ background: active ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.2)' }}
     />
-  );
-}
-
-function BienvenidaIcon({ active }: { active: boolean }) {
-  const c = active ? '#fff' : 'rgba(255,255,255,0.4)';
-  return (
-    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
   );
 }
 
@@ -228,11 +218,6 @@ interface NavGroup {
 
 const NAV: NavGroup[] = [
   {
-    href:  '/dashboard/bienvenida',
-    label: 'Bienvenida',
-    icon:  BienvenidaIcon,
-  },
-  {
     href:  '/dashboard',
     label: 'Inicio',
     icon:  HomeIcon,
@@ -247,11 +232,11 @@ const NAV: NavGroup[] = [
     icon:  ProduccionIcon,
     children: [
       { href: '/dashboard/fichas-tecnicas',                             label: 'Fichas Técnicas', icon: FichaIcon,    permission: 'fichas:view' },
-      { href: '/dashboard/produccion-general/noticias',                 label: 'Noticias',        icon: NoticiasIcon, permission: 'content:view' },
       { href: '/dashboard/produccion-general/tecnicos/disponibilidad',  label: 'Disp. Técnicos',  icon: TecnicosIcon, permission: 'tecnicos:submit' },
     ],
   },
   { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon,   permission: 'orgchart:view' },
+  { href: '/dashboard/produccion-general/noticias',     label: 'Noticias',      icon: NoticiasIcon, permission: 'content:view' },
   { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon, permission: 'estadisticas:view' },
   { href: '/dashboard/produccion-general/finanzas',      label: 'Finanzas',      icon: SiembraIcon, permission: 'siembra:view' },
   {

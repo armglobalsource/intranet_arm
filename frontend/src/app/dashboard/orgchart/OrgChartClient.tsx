@@ -171,7 +171,7 @@ function MemberCard({ membership, color, canEdit, onSelect, onRemove }: MemberCa
           {fullName(user)}
         </div>
         <div className="text-[10.5px] font-medium uppercase tracking-wide mt-0.5 text-slate-400 truncate">
-          {membership.customTitle ?? orgUserJobTitle(user) ?? ROLE_LABEL[role]}
+          {membership.jobTitle?.name ?? orgUserJobTitle(user) ?? ROLE_LABEL[role]}
         </div>
       </div>
 
@@ -346,7 +346,7 @@ function AreaLeaderCard({ membership, color, onSelect }: { membership: OrgMember
       <UserAvatar user={user} color={color} size={40} />
       <div className="min-w-0">
         <div className="text-sm font-bold text-slate-900 leading-snug truncate max-w-[160px]">{fullName(user)}</div>
-        <div className="text-[10.5px] font-medium uppercase tracking-wide text-slate-400 mt-0.5 truncate">{membership.customTitle ?? orgUserJobTitle(user) ?? 'Líder'}</div>
+        <div className="text-[10.5px] font-medium uppercase tracking-wide text-slate-400 mt-0.5 truncate">{membership.jobTitle?.name ?? orgUserJobTitle(user) ?? 'Líder'}</div>
       </div>
     </div>
   );
@@ -354,26 +354,32 @@ function AreaLeaderCard({ membership, color, onSelect }: { membership: OrgMember
 
 // ── FunctionPicker ─────────────────────────────────────────────────────────────
 // Selector de función/cargo para membresías del organigrama.
+// Siempre resuelve a un cargo real del catálogo (job_titles) — no admite texto
+// libre desconectado del catálogo, para mantener perfil y organigrama coherentes.
 // Abre un dropdown que permite:
 //   1. Buscar un cargo existente (filtra todos los cargos globales)
 //   2. Seleccionar un cargo asignado a la persona (aparecen cuando el campo está vacío)
 //   3. Crear un nuevo cargo global si el texto no coincide con ninguno
-//   4. Escribir una descripción libre (se guarda como customTitle sin crear cargo)
 
 interface FunctionPickerProps {
   user:         OrgUser;
-  value:        string;
-  onChange:     (v: string) => void;
+  value:        number | null;
+  onChange:     (jobTitleId: number | null) => void;
   color:        string;
   placeholder?: string;
 }
 
 function FunctionPicker({ user, value, onChange, color, placeholder }: FunctionPickerProps) {
-  const [open, setOpen] = useState(false);
+  const [open,    setOpen]    = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [input,   setInput]   = useState('');
   const { data: allJobTitles = [] } = useAllJobTitles();
   const createJobTitle = useCreateJobTitle();
 
-  const trimmed    = value.trim();
+  const selectedName = allJobTitles.find((jt) => jt.id === value)?.name ?? '';
+  const displayValue = editing ? input : selectedName;
+
+  const trimmed    = input.trim();
   const userJTs    = user.jobTitles.map((jt) => jt.jobTitle);
   // Cuando hay texto: filtra todos los cargos globales; cuando no hay: muestra los del usuario
   const filtered   = trimmed.length >= 1
@@ -383,30 +389,42 @@ function FunctionPicker({ user, value, onChange, color, placeholder }: FunctionP
   const showCreate = trimmed.length >= 1 && !exactMatch;
   const showDrop   = open && (filtered.length > 0 || showCreate);
 
+  function select(jt: { id: number; name: string }) {
+    onChange(jt.id);
+    setInput('');
+    setEditing(false);
+    setOpen(false);
+  }
+
+  async function handleCreate() {
+    if (!trimmed || createJobTitle.isPending) return;
+    const jt = await createJobTitle.mutateAsync({ name: trimmed });
+    select(jt);
+  }
+
   return (
     <div className="relative">
       <div className="relative">
         <input
           type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder={placeholder ?? 'Buscar cargo o escribir descripción…'}
+          value={displayValue}
+          onChange={(e) => { setInput(e.target.value); setEditing(true); setOpen(true); }}
+          onFocus={() => { setEditing(true); setInput(''); setOpen(true); }}
+          onBlur={() => setTimeout(() => { setOpen(false); setEditing(false); setInput(''); }, 150)}
+          placeholder={placeholder ?? 'Buscar cargo…'}
           className="w-full text-[11.5px] px-2.5 py-1.5 pr-6 rounded-lg border border-slate-200 bg-white text-slate-700 placeholder-slate-300 focus:outline-none focus:border-blue-300 transition-colors"
         />
-        {value && (
+        {value != null && (
           <button
             type="button"
-            onMouseDown={() => { onChange(''); }}
+            onMouseDown={() => { onChange(null); setInput(''); }}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors text-xs leading-none"
           >×</button>
         )}
       </div>
 
-      {/* Hint: escribir libremente es válido */}
       <p className="mt-1 text-[10px] text-slate-400 leading-snug px-0.5">
-        Puedes elegir un cargo existente o escribir una descripción libre
+        Elige un cargo del catálogo o crea uno nuevo
       </p>
 
       {showDrop && (
@@ -422,7 +440,7 @@ function FunctionPicker({ user, value, onChange, color, placeholder }: FunctionP
                 <button
                   key={jt.id}
                   type="button"
-                  onMouseDown={() => { onChange(jt.name); setOpen(false); }}
+                  onMouseDown={() => select(jt)}
                   className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 text-left transition-colors"
                 >
                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
@@ -432,32 +450,18 @@ function FunctionPicker({ user, value, onChange, color, placeholder }: FunctionP
             </>
           )}
           {showCreate && (
-            <>
-              {/* Opción 1: usar como descripción libre (no crea cargo global) */}
-              <button
-                type="button"
-                onMouseDown={() => setOpen(false)}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50 text-left transition-colors${filtered.length > 0 ? ' border-t border-slate-100' : ''}`}
-              >
-                <svg className="w-3 h-3 flex-shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                Usar &ldquo;{trimmed}&rdquo; como descripción libre
-              </button>
-              {/* Opción 2: crear cargo global */}
-              <button
-                type="button"
-                onMouseDown={() => { createJobTitle.mutate({ name: trimmed }); setOpen(false); }}
-                disabled={createJobTitle.isPending}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-left border-t border-slate-100 transition-colors"
-                style={{ color }}
-              >
-                {createJobTitle.isPending
-                  ? <><div className="w-2.5 h-2.5 border border-current/30 border-t-current rounded-full animate-spin" />Creando...</>
-                  : <><svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crear cargo &ldquo;{trimmed}&rdquo;</>
-                }
-              </button>
-            </>
+            <button
+              type="button"
+              onMouseDown={handleCreate}
+              disabled={createJobTitle.isPending}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-left transition-colors${filtered.length > 0 ? ' border-t border-slate-100' : ''}`}
+              style={{ color }}
+            >
+              {createJobTitle.isPending
+                ? <><div className="w-2.5 h-2.5 border border-current/30 border-t-current rounded-full animate-spin" />Creando...</>
+                : <><svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crear cargo &ldquo;{trimmed}&rdquo;</>
+              }
+            </button>
           )}
         </div>
       )}
@@ -498,9 +502,9 @@ function AreaDetailPanel({ slug, canEdit, onClose }: AreaDetailPanelProps) {
   const [searchingLeader, setSearchingLeader] = useState(false);
 
   // ── Estado diferido de líderes (no toca la BD hasta guardar) ──
-  const [toAddLeaders,     setToAddLeaders]     = useState<{ user: OrgUser; title: string; tempId: number }[]>([]);
+  const [toAddLeaders,     setToAddLeaders]     = useState<{ user: OrgUser; jobTitleId: number | null; tempId: number }[]>([]);
   const [toRemoveLeaders,  setToRemoveLeaders]  = useState<number[]>([]);
-  const [leaderTitleEdits, setLeaderTitleEdits] = useState<Record<number, string>>({});
+  const [leaderTitleEdits, setLeaderTitleEdits] = useState<Record<number, number | null>>({});
 
   // ── Creación de equipo ──
   const [showNewTeam,  setShowNewTeam]  = useState(false);
@@ -545,7 +549,7 @@ function AreaDetailPanel({ slug, canEdit, onClose }: AreaDetailPanelProps) {
     const alreadyPending = toAddLeaders.some((a) => a.user.id === u.id);
     const alreadyLeader  = visibleLeaders.some((m) => m.userId === u.id);
     if (alreadyPending || alreadyLeader) return;
-    setToAddLeaders((prev) => [...prev, { user: u, title: orgUserJobTitle(u) ?? '', tempId: -Date.now() }]);
+    setToAddLeaders((prev) => [...prev, { user: u, jobTitleId: u.jobTitles?.[0]?.jobTitle.id ?? null, tempId: -Date.now() }]);
     setLeaderQuery('');
     setLeaderResults([]);
   }
@@ -612,25 +616,25 @@ function AreaDetailPanel({ slug, canEdit, onClose }: AreaDetailPanelProps) {
       // 2. Quitar líderes marcados
       await Promise.all(toRemoveLeaders.map((id) => deleteMembership.mutateAsync(id)));
 
-      // 3. Agregar nuevos líderes con customTitle
+      // 3. Agregar nuevos líderes con su cargo
       await Promise.all(
         toAddLeaders.map((a) =>
           createMembership.mutateAsync({
             userId: a.user.id, areaId: data.id, role: 'area_leader',
-            customTitle: a.title.trim() || null,
+            jobTitleId: a.jobTitleId,
           }),
         ),
       );
 
-      // 4. Actualizar customTitle de líderes existentes
+      // 4. Actualizar cargo de líderes existentes
       await Promise.all(
         Object.entries(leaderTitleEdits)
-          .filter(([id, title]) => {
-            const original = data.leaders.find((m) => m.id === Number(id))?.customTitle ?? '';
-            return title !== original;
+          .filter(([id, jobTitleId]) => {
+            const original = data.leaders.find((m) => m.id === Number(id))?.jobTitle?.id ?? null;
+            return jobTitleId !== original;
           })
-          .map(([id, title]) =>
-            updateMembership.mutateAsync({ id: Number(id), data: { customTitle: title.trim() || null } }),
+          .map(([id, jobTitleId]) =>
+            updateMembership.mutateAsync({ id: Number(id), data: { jobTitleId } }),
           ),
       );
 
@@ -762,7 +766,7 @@ function AreaDetailPanel({ slug, canEdit, onClose }: AreaDetailPanelProps) {
                       {canEdit && (
                         <FunctionPicker
                           user={m.user}
-                          value={leaderTitleEdits[m.id] !== undefined ? leaderTitleEdits[m.id] : (m.customTitle ?? '')}
+                          value={leaderTitleEdits[m.id] !== undefined ? leaderTitleEdits[m.id] : (m.jobTitle?.id ?? null)}
                           onChange={(v) => setLeaderTitleEdits((prev) => ({ ...prev, [m.id]: v }))}
                           color={liveColor}
                           placeholder={`Función (ej: ${orgUserJobTitle(m.user) ?? 'Pastor, Director…'})`}
@@ -770,7 +774,7 @@ function AreaDetailPanel({ slug, canEdit, onClose }: AreaDetailPanelProps) {
                       )}
                       {!canEdit && (
                         <p className="text-[10px] text-slate-400 truncate">
-                          {m.customTitle ?? orgUserJobTitle(m.user) ?? 'Líder de Área'}
+                          {m.jobTitle?.name ?? orgUserJobTitle(m.user) ?? 'Líder de Área'}
                         </p>
                       )}
                     </div>
@@ -793,8 +797,8 @@ function AreaDetailPanel({ slug, canEdit, onClose }: AreaDetailPanelProps) {
                       </div>
                       <FunctionPicker
                         user={a.user}
-                        value={a.title}
-                        onChange={(v) => setToAddLeaders((prev) => prev.map((x) => x.tempId === a.tempId ? { ...x, title: v } : x))}
+                        value={a.jobTitleId}
+                        onChange={(v) => setToAddLeaders((prev) => prev.map((x) => x.tempId === a.tempId ? { ...x, jobTitleId: v } : x))}
                         color={liveColor}
                         placeholder="Función como líder…"
                       />
@@ -1163,8 +1167,8 @@ function MembershipRow({ m }: { m: OrgMembershipFull }) {
         {m.team && (
           <p className="text-[12px] font-semibold text-slate-700 truncate mt-0.5">{m.team.name}</p>
         )}
-        {m.customTitle ? (
-          <p className="text-[11px] font-semibold mt-0.5 truncate" style={{ color: aColor }}>{m.customTitle}</p>
+        {m.jobTitle ? (
+          <p className="text-[11px] font-semibold mt-0.5 truncate" style={{ color: aColor }}>{m.jobTitle.name}</p>
         ) : (
           <p className="text-[11px] text-slate-400 mt-0.5">{ROLE_LABEL[m.role]}</p>
         )}
@@ -1176,8 +1180,8 @@ function MembershipRow({ m }: { m: OrgMembershipFull }) {
 function UserDetailPanel({ membership, color, canEdit, onClose }: UserDetailPanelProps) {
   const { user } = membership;
 
-  // Edición customTitle membresía
-  const [localTitle,   setLocalTitle]   = useState(membership.customTitle ?? '');
+  // Edición del cargo de la membresía
+  const [localJobTitleId, setLocalJobTitleId] = useState<number | null>(membership.jobTitle?.id ?? null);
   const [saveStatus,   setSaveStatus]   = useState<'idle' | 'saving' | 'saved'>('idle');
   const updateMembership = useUpdateOrgMembership();
 
@@ -1208,7 +1212,7 @@ function UserDetailPanel({ membership, color, canEdit, onClose }: UserDetailPane
     }
     setSaveStatus('saving');
     try {
-      await updateMembership.mutateAsync({ id: membership.id, data: { customTitle: localTitle.trim() || null } });
+      await updateMembership.mutateAsync({ id: membership.id, data: { jobTitleId: localJobTitleId } });
       if (editingInfo) {
         await updateUser.mutateAsync({ id: user.id, data: {
           firstName: localFirst.trim(),
@@ -1362,14 +1366,14 @@ function UserDetailPanel({ membership, color, canEdit, onClose }: UserDetailPane
               {canEdit ? (
                 <FunctionPicker
                   user={user}
-                  value={localTitle}
-                  onChange={setLocalTitle}
+                  value={localJobTitleId}
+                  onChange={setLocalJobTitleId}
                   color={color}
                   placeholder="Cargo o función en este organigrama…"
                 />
               ) : (
                 <p className="text-[11.5px] text-slate-500">
-                  {membership.customTitle || orgUserJobTitle(user) || '—'}
+                  {membership.jobTitle?.name || orgUserJobTitle(user) || '—'}
                 </p>
               )}
             </div>
@@ -1447,8 +1451,8 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
   // Estado local de miembros — no toca la BD ni el organigrama hasta guardar
   const [localMembers, setLocalMembers] = useState<OrgMembership[]>(team.memberships);
   const [toRemove,     setToRemove]     = useState<number[]>([]);
-  const [toAdd,        setToAdd]        = useState<{ user: OrgUser; tempId: number; title: string }[]>([]);
-  const [titleEdits,   setTitleEdits]   = useState<Record<number, string>>({});
+  const [toAdd,        setToAdd]        = useState<{ user: OrgUser; tempId: number; jobTitleId: number | null }[]>([]);
+  const [titleEdits,   setTitleEdits]   = useState<Record<number, number | null>>({});
 
   const [addQuery,   setAddQuery]   = useState('');
   const [addResults, setAddResults] = useState<OrgUser[]>([]);
@@ -1459,7 +1463,7 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
   const [newFirst,     setNewFirst]     = useState('');
   const [newLast,      setNewLast]      = useState('');
   const [newEmail,     setNewEmail]     = useState('');
-  const [newTitle,     setNewTitle]     = useState('');
+  const [newTitle,     setNewTitle]     = useState<number | null>(null);
   const [newCampusId,  setNewCampusId]  = useState<number | null>(null);
   const [newBirthDate, setNewBirthDate] = useState('');
   const [newPhone,     setNewPhone]     = useState('');
@@ -1474,6 +1478,8 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
   const createUser       = useCreateUser();
   const { data: roles }   = useRoles();
   const { data: campuses } = useActiveCampuses();
+  const { data: allJobTitles = [] } = useAllJobTitles();
+  const jobTitleName = (id: number | null | undefined) => allJobTitles.find((jt) => jt.id === id)?.name ?? null;
 
   async function handleCreateSubteam() {
     if (!subteamName.trim()) return;
@@ -1518,11 +1524,11 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
   }, [addQuery]);
 
   // Agregar persona al estado local (sin tocar la BD)
-  function handleAddMember(user: OrgUser, customTitle?: string) {
+  function handleAddMember(user: OrgUser, jobTitleId?: number | null) {
     const alreadyPending = toAdd.some((a) => a.user.id === user.id);
     const alreadyMember  = visibleMembers.some((m) => m.userId === user.id);
     if (alreadyPending || alreadyMember) return;
-    setToAdd((prev) => [...prev, { user, tempId: -Date.now(), title: customTitle ?? orgUserJobTitle(user) ?? '' }]);
+    setToAdd((prev) => [...prev, { user, tempId: -Date.now(), jobTitleId: jobTitleId ?? user.jobTitles?.[0]?.jobTitle.id ?? null }]);
     setAddQuery('');
     setAddResults([]);
   }
@@ -1530,7 +1536,7 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
   function resetNewUserForm() {
     setCreatingUser(false);
     setNewFirst(''); setNewLast(''); setNewEmail('');
-    setNewTitle(''); setNewCampusId(null); setNewBirthDate('');
+    setNewTitle(null); setNewCampusId(null); setNewBirthDate('');
     setNewPhone(''); setNewCountry(''); setNewUserErr('');
   }
 
@@ -1554,7 +1560,7 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
         country:    newCountry.trim()   || undefined,
         birthDate:  newBirthDate        || undefined,
       });
-      handleAddMember(created as OrgUser, newTitle.trim() || undefined);
+      handleAddMember(created as OrgUser, newTitle);
       resetNewUserForm();
       setTeamToast({ msg: `${newFirst} ${newLast} creado y agregado al equipo.`, kind: 'success' });
     } catch (err: unknown) {
@@ -1585,18 +1591,18 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
 
       // 3. Agregar nuevos miembros
       await Promise.all(
-        toAdd.map((a) => createMembership.mutateAsync({ userId: a.user.id, teamId: team.id, role: 'member', customTitle: a.title.trim() || null })),
+        toAdd.map((a) => createMembership.mutateAsync({ userId: a.user.id, teamId: team.id, role: 'member', jobTitleId: a.jobTitleId })),
       );
 
-      // 4. Guardar ediciones de customTitle
+      // 4. Guardar ediciones de cargo
       await Promise.all(
         Object.entries(titleEdits)
-          .filter(([id, title]) => {
-            const original = localMembers.find((m) => m.id === Number(id))?.customTitle ?? '';
-            return title !== original;
+          .filter(([id, jobTitleId]) => {
+            const original = localMembers.find((m) => m.id === Number(id))?.jobTitle?.id ?? null;
+            return jobTitleId !== original;
           })
-          .map(([id, title]) =>
-            updateMembership.mutateAsync({ id: Number(id), data: { customTitle: title.trim() || null } }),
+          .map(([id, jobTitleId]) =>
+            updateMembership.mutateAsync({ id: Number(id), data: { jobTitleId } }),
           ),
       );
 
@@ -1670,8 +1676,8 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-slate-900 truncate">{fullName(m.user)}</p>
                       <p className="text-[10px] text-slate-400">
-                        {(titleEdits[m.id] !== undefined ? titleEdits[m.id] : m.customTitle)
-                          ? <span className="font-medium" style={{ color }}>{titleEdits[m.id] !== undefined ? titleEdits[m.id] : m.customTitle}</span>
+                        {(titleEdits[m.id] !== undefined ? jobTitleName(titleEdits[m.id]) : m.jobTitle?.name)
+                          ? <span className="font-medium" style={{ color }}>{titleEdits[m.id] !== undefined ? jobTitleName(titleEdits[m.id]) : m.jobTitle?.name}</span>
                           : ROLE_LABEL[m.role]
                         }
                       </p>
@@ -1683,7 +1689,7 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
                   {isEditing && (
                     <FunctionPicker
                       user={m.user}
-                      value={titleEdits[m.id] !== undefined ? titleEdits[m.id] : (m.customTitle ?? '')}
+                      value={titleEdits[m.id] !== undefined ? titleEdits[m.id] : (m.jobTitle?.id ?? null)}
                       onChange={(v) => setTitleEdits((prev) => ({ ...prev, [m.id]: v }))}
                       color={color}
                       placeholder={`Función (ej: ${orgUserJobTitle(m.user) ?? 'Guitarrista, Campus Santiago…'})`}
@@ -1705,8 +1711,8 @@ function TeamDetailPanel({ team, color, canEdit, onClose }: TeamDetailPanelProps
                   </div>
                   <FunctionPicker
                     user={a.user}
-                    value={a.title}
-                    onChange={(v) => setToAdd((prev) => prev.map((x) => x.tempId === a.tempId ? { ...x, title: v } : x))}
+                    value={a.jobTitleId}
+                    onChange={(v) => setToAdd((prev) => prev.map((x) => x.tempId === a.tempId ? { ...x, jobTitleId: v } : x))}
                     color={color}
                     placeholder="Función en este equipo…"
                   />

@@ -45,12 +45,12 @@ export class CreateOrgMembershipDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() areaId?: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() teamId?: number;
   @ApiProperty() @IsEnum(['area_leader', 'team_leader', 'member']) role: 'area_leader' | 'team_leader' | 'member';
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) customTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() jobTitleId?: number | null;
   @ApiPropertyOptional() @IsOptional() @IsInt() sortOrder?: number;
 }
 
 export class UpdateOrgMembershipDto {
   @ApiPropertyOptional() @IsOptional() @IsEnum(['area_leader', 'team_leader', 'member']) role?: 'area_leader' | 'team_leader' | 'member';
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) customTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() jobTitleId?: number | null;
   @ApiPropertyOptional() @IsOptional() @IsInt() sortOrder?: number;
 }

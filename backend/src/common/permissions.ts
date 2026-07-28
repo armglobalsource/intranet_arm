@@ -27,13 +27,13 @@ export const PERMISSION_CATALOG = {
     },
   },
   content: {
-    label: 'Contenido',
-    description: 'Noticias, anuncios y publicaciones internas',
+    label: 'Noticias',
+    description: 'Noticias globales y por campus (texto, imágenes, video e Instagram)',
     actions: {
-      view:    'Leer contenido publicado',
-      create:  'Redactar nuevo contenido',
-      publish: 'Publicar y despublicar contenido',
-      delete:  'Eliminar contenido',
+      view:    'Leer las noticias publicadas',
+      create:  'Redactar nuevas noticias',
+      publish: 'Publicar y despublicar noticias',
+      delete:  'Eliminar noticias',
     },
   },
   documents: {
@@ -95,6 +95,21 @@ export const PERMISSION_CATALOG = {
       edit:    'Editar fichas existentes',
       delete:  'Eliminar fichas',
       admin:   'Administrar configuración de fichas',
+    },
+  },
+  tecnicos: {
+    label: 'Disponibilidad de Técnicos',
+    description: 'Registro de disponibilidad de técnicos para producción',
+    actions: {
+      submit: 'Registrar la propia disponibilidad',
+      view:   'Ver la matriz de disponibilidad de todos los técnicos (coordinador)',
+    },
+  },
+  onboarding: {
+    label: 'Mis Onboardings',
+    description: 'Guías de bienvenida e inducción por equipo, dentro de Mi Perfil',
+    actions: {
+      view: 'Ver la sección de Mis Onboardings en el perfil',
     },
   },
   encuentros: {

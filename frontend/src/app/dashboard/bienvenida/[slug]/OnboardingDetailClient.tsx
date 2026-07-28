@@ -65,7 +65,7 @@ export function OnboardingDetailClient({ slug }: { slug: string }) {
         <p className="text-4xl mb-4">😕</p>
         <h2 className="text-lg font-bold text-gray-800">Onboarding no encontrado</h2>
         <p className="text-sm text-gray-500 mt-2">Este equipo no tiene onboarding configurado aún.</p>
-        <Link href="/dashboard/bienvenida"
+        <Link href="/dashboard/perfil"
           className="inline-block mt-6 px-4 py-2 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all">
           ← Volver
         </Link>
@@ -79,13 +79,13 @@ export function OnboardingDetailClient({ slug }: { slug: string }) {
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       {/* Breadcrumb */}
-      <Link href="/dashboard/bienvenida"
+      <Link href="/dashboard/perfil"
         className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6" />
         </svg>
-        Bienvenida
+        Mi Perfil
       </Link>
 
       {/* Header */}

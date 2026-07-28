@@ -68,7 +68,7 @@ export interface User {
   department?: UserDepartment | null;
   campus?: UserCampus | null;
   role?: UserRole | null;
-  jobTitles: { jobTitle: UserJobTitle }[];
+  jobTitles: { jobTitle: UserJobTitle; source?: 'manual' | 'orgchart' }[];
   createdAt: string;
   updatedAt: string;
 }
