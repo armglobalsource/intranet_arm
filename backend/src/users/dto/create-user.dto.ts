@@ -38,6 +38,8 @@ export class UpdateUserDto {
   @ApiProperty() @IsOptional() @IsEnum(['male', 'female', 'other', 'prefer_not_to_say']) gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null;
   @ApiProperty() @IsOptional() @IsEnum(['active', 'inactive', 'suspended', 'rejected']) status?: UserStatus;
   @ApiProperty() @IsOptional() @IsEnum(['pastor_principal', 'pastor', 'ministro']) ministerialTitle?: MinisterialTitle | null;
+  @ApiProperty({ description: 'Mes y año en que se unió a la organización, formato YYYY-MM' })
+  @IsOptional() @IsString() @MaxLength(7) memberSince?: string | null;
 }
 
 export class ApproveUserDto {

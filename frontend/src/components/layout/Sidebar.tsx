@@ -84,17 +84,6 @@ function FichaIcon({ active }: { active: boolean }) {
   );
 }
 
-function PerfilIcon({ active }: { active: boolean }) {
-  const c = active ? '#fff' : 'rgba(255,255,255,0.35)';
-  return (
-    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-      stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
 function MiFichaIcon({ active }: { active: boolean }) {
   const c = active ? '#fff' : 'rgba(255,255,255,0.35)';
   return (
@@ -222,7 +211,6 @@ const NAV: NavGroup[] = [
     label: 'Inicio',
     icon:  HomeIcon,
     children: [
-      { href: '/dashboard/perfil',     label: 'Mi Perfil',  icon: PerfilIcon  },
       { href: '/dashboard/mis-fichas', label: 'Mis Fichas', icon: MiFichaIcon },
     ],
   },

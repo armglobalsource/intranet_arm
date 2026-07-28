@@ -62,6 +62,8 @@ export interface User {
   birthDate?: string | null;
   gender?: UserGender | null;
   ministerialTitle?: MinisterialTitle | null;
+  /** Mes/año en que se unió a la organización, formato "YYYY-MM" */
+  memberSince?: string | null;
   status: 'pending' | 'active' | 'inactive' | 'suspended' | 'rejected';
   departmentId?: number | null;
   campusId?: number | null;
@@ -87,6 +89,7 @@ export interface UpdateUserDto {
   birthDate?:   string | null;
   gender?:            UserGender | null;
   ministerialTitle?:  MinisterialTitle | null;
+  memberSince?:       string | null;
   status?:            'active' | 'inactive' | 'suspended' | 'rejected';
 }
 

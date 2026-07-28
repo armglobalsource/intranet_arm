@@ -167,6 +167,7 @@ export class UsersService {
     if (dto.gender            !== undefined) data.gender            = dto.gender                   ?? null;
     if (dto.status            !== undefined) data.status            = dto.status;
     if (dto.ministerialTitle  !== undefined) data.ministerialTitle  = dto.ministerialTitle         ?? null;
+    if (dto.memberSince       !== undefined) data.memberSince       = dto.memberSince?.trim()      ?? null;
     if (dto.campusId  !== undefined) {
       data.campusId = dto.campusId;
       if (dto.campusId) {
