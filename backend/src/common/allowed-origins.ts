@@ -12,6 +12,7 @@ export const STATIC_ALLOWED_ORIGINS = [
   'https://intranet-arm-dev.web.app',
   'https://ecosistema-arm.web.app',
   'https://ecosistema-arm-dev.web.app',
+  'https://ecosistema.armglobal.org', // dominio propio (armglobal.org)
   'https://armglobal.web.app',        // PWA móvil ARM (prod, legado)
   'https://armglobal.firebaseapp.com',
   'https://ar-mobile-1.web.app',      // PWA móvil ARM (prod, proyecto Firebase nuevo)
