@@ -7,7 +7,6 @@ import { useSearchParams } from 'next/navigation';
 import {
   useUsers,
   useUpdateUser,
-  useCreateUser,
   useDeleteUser,
   useToggleUserStatus,
   useApproveUser,
@@ -19,10 +18,10 @@ import type { JobTitle }                      from '@/hooks/useJobTitles';
 import { useActiveCampuses, useAllCampuses }  from '@/hooks/useCampus';
 import type { User, UpdateUserDto, MinisterialTitle } from '@/types/user';
 import { MINISTERIAL_LABEL, MINISTERIAL_PREFIX, displayName } from '@/types/user';
-import type { CreateUserDto, Role }           from '@/hooks/useUsers';
+import type { Role }                          from '@/hooks/useUsers';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { userJobTitleNames } from '@/types/user';
-import { useOrgAllTeams, useCreateOrgMembership, useDeleteOrgMembership, useOrgUserProfile } from '@/hooks/useOrgChart';
+import { useCreateOrgMembership, useDeleteOrgMembership, useOrgUserProfile } from '@/hooks/useOrgChart';
 import { apiErrorMessage } from '@/lib/api';
 import CountryPicker from '@/components/CountryPicker';
 import UserPicker, { PickableUser } from '@/components/UserPicker';
@@ -30,6 +29,7 @@ import {
   useMatchReconciliation, useApplyReconciliation,
   ExcelRowInput, MatchResult, ApplyResult,
 } from '@/hooks/useReconciliation';
+import { ROLE_LABELS, MultiJobTitleSelect, CampusSelect, TeamSelect } from './_shared';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -41,217 +41,12 @@ const AVATAR_COLORS = [
   { bg: '#FAECE7', text: '#993C1D' },
   { bg: '#FBEAF0', text: '#993556' },
 ];
-const ROLE_LABELS: Record<string, string>     = { admin: 'Administrador', user: 'Usuario' };
 const ORG_ROLE_LABELS: Record<string, string> = { area_leader: 'Líder de área', team_leader: 'Líder de equipo', member: 'Miembro' };
 
 const PAGE_SIZE = 20;
 
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function userInitials(u: User) { return (u.firstName[0] + (u.lastName?.[0] ?? '')).toUpperCase(); }
-
-// ── MultiJobTitleSelect ───────────────────────────────────────────────────────
-
-interface MultiJobTitleSelectProps {
-  selectedIds:   number[];
-  onChange:      (ids: number[]) => void;
-  allJobTitles:  JobTitle[];
-  onCreateNew:   (name: string) => Promise<JobTitle>;
-  lockedTitles?: { id: number; name: string }[];
-}
-
-function MultiJobTitleSelect({ selectedIds, onChange, allJobTitles, onCreateNew, lockedTitles = [] }: MultiJobTitleSelectProps) {
-  const [open,    setOpen]    = useState(false);
-  const [input,   setInput]   = useState('');
-  const [creating, setCreating] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function h(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, []);
-
-  const filtered = allJobTitles.filter(
-    (jt) => jt.isActive && jt.name.toLowerCase().includes(input.toLowerCase()),
-  );
-  const exactMatch = allJobTitles.some((jt) => jt.name.toLowerCase() === input.trim().toLowerCase());
-  const showCreate = input.trim().length > 1 && !exactMatch;
-
-  function toggle(id: number) {
-    onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]);
-  }
-
-  async function handleCreate() {
-    if (!input.trim() || creating) return;
-    setCreating(true);
-    try {
-      const jt = await onCreateNew(input.trim());
-      onChange([...selectedIds, jt.id]);
-      setInput('');
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  const selectedTitles = allJobTitles.filter((jt) => selectedIds.includes(jt.id));
-
-  return (
-    <div ref={ref} className="relative">
-      {(lockedTitles.length > 0 || selectedTitles.length > 0) && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {lockedTitles.map((jt) => (
-            <span
-              key={`locked-${jt.id}`}
-              title="Este cargo viene del organigrama — se edita desde Organigrama"
-              className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 text-[11px] font-medium px-2 py-1 rounded-full border border-slate-200"
-            >
-              <svg className="w-2.5 h-2.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="5" y="11" width="14" height="9" rx="2" ry="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
-              </svg>
-              {jt.name}
-            </span>
-          ))}
-          {selectedTitles.map((jt) => (
-            <span key={jt.id} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[11px] font-medium px-2 py-1 rounded-full border border-blue-200">
-              {jt.name}
-              <button type="button" onClick={() => toggle(jt.id)} className="w-3 h-3 flex items-center justify-center text-blue-400 hover:text-red-500 transition-colors">×</button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      <input
-        type="text" value={input} autoComplete="off"
-        onChange={(e) => { setInput(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); if (showCreate) handleCreate(); }
-          if (e.key === 'Escape') setOpen(false);
-        }}
-        placeholder={selectedTitles.length > 0 ? 'Agregar otro cargo...' : 'Buscar o crear cargo...'}
-        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
-      />
-
-      {open && (filtered.length > 0 || showCreate) && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
-          {filtered.map((jt) => (
-            <button key={jt.id} type="button"
-              onMouseDown={(e) => { e.preventDefault(); toggle(jt.id); }}
-              className={`w-full text-left px-3 py-2 text-[12.5px] flex items-center gap-2 hover:bg-blue-50 transition-colors ${selectedIds.includes(jt.id) ? 'text-blue-700 font-medium' : 'text-slate-700'}`}
-            >
-              <span className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px] ${selectedIds.includes(jt.id) ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300'}`}>
-                {selectedIds.includes(jt.id) && '✓'}
-              </span>
-              {jt.name}
-            </button>
-          ))}
-          {showCreate && (
-            <button type="button"
-              onMouseDown={(e) => { e.preventDefault(); handleCreate(); }}
-              disabled={creating}
-              className="w-full text-left px-3 py-2 text-[12.5px] font-medium text-violet-600 hover:bg-violet-50 flex items-center gap-2 border-t border-slate-100 disabled:opacity-50"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              {creating ? 'Creando...' : `Crear "${input.trim()}"`}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── CampusSelect ──────────────────────────────────────────────────────────────
-
-interface CampusSelectProps {
-  value:    number | null;
-  onChange: (id: number | null) => void;
-}
-
-function CampusSelect({ value, onChange }: CampusSelectProps) {
-  const { data: campuses = [] } = useActiveCampuses();
-  return (
-    <select
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white"
-    >
-      <option value="">Sin campus asignado</option>
-      {campuses.map((c) => (
-        <option key={c.id} value={c.id}>{c.name}</option>
-      ))}
-    </select>
-  );
-}
-
-// ── TeamSelect (autocomplete) ─────────────────────────────────────────────────
-
-interface TeamSelectProps {
-  value:        number | null;
-  onChange:     (id: number | null) => void;
-  excludeIds?:  Set<number>;
-  placeholder?: string;
-}
-
-function TeamSelect({ value, onChange, excludeIds, placeholder = 'Buscar equipo…' }: TeamSelectProps) {
-  const { data: teams = [] } = useOrgAllTeams();
-  const [input, setInput]   = useState('');
-  const [open,  setOpen]    = useState(false);
-
-  const activeTeams  = teams.filter((t) => t.isActive && (!excludeIds || !excludeIds.has(t.id)));
-  const selectedTeam = activeTeams.find((t) => t.id === value) ?? null;
-
-  const teamLabel = (t: typeof activeTeams[0]) => `${t.icon ? `${t.icon} ` : ''}${t.name}`;
-
-  const filtered = activeTeams
-    .filter((t) => teamLabel(t).toLowerCase().includes(input.toLowerCase()))
-    .slice(0, 8);
-
-  const showDrop = open && filtered.length > 0;
-
-  return (
-    <div className="relative">
-      <div className="relative">
-        <input
-          type="text"
-          value={selectedTeam ? teamLabel(selectedTeam) : input}
-          onChange={(e) => { setInput(e.target.value); onChange(null); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder={placeholder}
-          autoComplete="off"
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition pr-7"
-        />
-        {value && (
-          <button
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); onChange(null); setInput(''); }}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-base leading-none"
-          >×</button>
-        )}
-      </div>
-
-      {showDrop && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-          {filtered.map((team) => (
-            <button
-              key={team.id}
-              type="button"
-              onMouseDown={() => { onChange(team.id); setInput(''); setOpen(false); }}
-              className="w-full text-left px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
-            >
-              {teamLabel(team)}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── EditPersonaModal ──────────────────────────────────────────────────────────
 
@@ -531,235 +326,6 @@ function EditPersonaModal({ user, allJobTitles, onCreateJobTitle, onClose }: Edi
             </button>
           </div>
 
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── CreatePersonaModal ────────────────────────────────────────────────────────
-
-interface CreatePersonaModalProps {
-  allJobTitles:     JobTitle[];
-  onCreateJobTitle: (name: string) => Promise<JobTitle>;
-  onClose:          () => void;
-}
-
-function CreatePersonaModal({ allJobTitles, onCreateJobTitle, onClose }: CreatePersonaModalProps) {
-  const { data: roles = [] } = useRoles();
-  const createUser           = useCreateUser();
-  const createMembership     = useCreateOrgMembership();
-
-  const [email,       setEmail]       = useState('');
-  const [password,    setPassword]    = useState('');
-  const [firstName,   setFirstName]   = useState('');
-  const [lastName,    setLastName]    = useState('');
-  const [roleId,            setRoleId]            = useState(0);
-  const [campusId,          setCampusId]          = useState<number | null>(null);
-  const [teamId,            setTeamId]            = useState<number | null>(null);
-  const [jobTitleIds,       setJobTitleIds]       = useState<number[]>([]);
-  const [phone,             setPhone]             = useState('');
-  const [country,           setCountry]           = useState('');
-  const [bio,               setBio]               = useState('');
-  const [ministerialTitle,  setMinisterialTitle]  = useState<MinisterialTitle | null>(null);
-  const [showPass,          setShowPass]          = useState(false);
-  const [saveState,         setSaveState]         = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [errorMsg,          setErrorMsg]          = useState('');
-
-  // Auto-select "usuario" role when roles load
-  useEffect(() => {
-    if (roles.length > 0 && roleId === 0) {
-      const userRole = roles.find((r) => ['user', 'usuario'].includes(r.name.toLowerCase()));
-      if (userRole) setRoleId(userRole.id);
-    }
-  }, [roles, roleId]);
-
-  const canSubmit = email.trim() && firstName.trim() && lastName.trim() && roleId > 0;
-
-  function handleSubmit() {
-    if (!canSubmit) return;
-    setSaveState('saving');
-    setErrorMsg('');
-    const payload: CreateUserDto = {
-      email: email.trim(), password: password || undefined,
-      firstName: firstName.trim(), lastName: lastName.trim(),
-      roleId,
-      campusId:         campusId    ?? undefined,
-      jobTitleIds:      jobTitleIds.length ? jobTitleIds : undefined,
-      phone:            phone.trim()   || undefined,
-      country:          country.trim() || undefined,
-      bio:              bio.trim()     || undefined,
-      ministerialTitle: ministerialTitle ?? undefined,
-    };
-    createUser.mutate(payload, {
-      onSuccess: (newUser) => {
-        if (teamId) {
-          createMembership.mutate(
-            { userId: newUser.id, teamId, role: 'member' },
-            { onSettled: () => { setSaveState('saved'); setTimeout(onClose, 900); } },
-          );
-        } else {
-          setSaveState('saved');
-          setTimeout(onClose, 900);
-        }
-      },
-      onError: (err: any) => {
-        const msg = err?.response?.data?.message ?? 'Error al crear el usuario';
-        setErrorMsg(Array.isArray(msg) ? msg.join(', ') : msg);
-        setSaveState('error');
-        setTimeout(() => setSaveState('idle'), 2500);
-      },
-    });
-  }
-
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', h);
-    return () => document.removeEventListener('keydown', h);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[500px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50">
-          <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center text-xl flex-shrink-0">🧑‍💼</div>
-          <div className="flex-1">
-            <p className="font-semibold text-slate-900 text-[14px]">Nueva persona</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Crear un nuevo usuario en el sistema</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100 text-sm">✕</button>
-        </div>
-
-        <div className="p-5 flex flex-col gap-3.5 max-h-[75vh] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Nombre <span className="text-red-400">*</span></label>
-              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition" placeholder="Nombre" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Apellido <span className="text-red-400">*</span></label>
-              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition" placeholder="Apellido" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Email <span className="text-red-400">*</span></label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition" placeholder="usuario@iglesia.com" />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Contraseña <span className="text-slate-400 font-normal">(opcional) — mín. 6 caracteres</span></label>
-            <div className="relative">
-              <input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 pr-10 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition" placeholder="••••••••" />
-              <button type="button" onClick={() => setShowPass((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                {showPass
-                  ? <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
-                  : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                }
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Rol del sistema <span className="text-red-400">*</span></label>
-            <select value={roleId || ''} onChange={(e) => setRoleId(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition bg-white">
-              <option value="">Seleccionar rol...</option>
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>{ROLE_LABELS[r.name] ?? r.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-              Nombramiento ministerial <span className="text-slate-300 font-normal">— opcional</span>
-            </label>
-            <select
-              value={ministerialTitle ?? ''}
-              onChange={(e) => setMinisterialTitle((e.target.value as MinisterialTitle) || null)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition bg-white"
-            >
-              <option value="">Sin nombramiento</option>
-              {(Object.entries(MINISTERIAL_LABEL) as [MinisterialTitle, string][]).map(([val, label]) => (
-                <option key={val} value={val}>{label} ({MINISTERIAL_PREFIX[val]})</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="border-t border-slate-100 pt-1" />
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-              Cargos <span className="text-slate-300 font-normal">— puede agregar varios</span>
-            </label>
-            <MultiJobTitleSelect
-              selectedIds={jobTitleIds}
-              onChange={setJobTitleIds}
-              allJobTitles={allJobTitles}
-              onCreateNew={onCreateJobTitle}
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-              Campus <span className="text-slate-300 font-normal">— opcional</span>
-            </label>
-            <CampusSelect value={campusId} onChange={setCampusId} />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-              Equipo <span className="text-slate-300 font-normal">— opcional</span>
-            </label>
-            <TeamSelect value={teamId} onChange={setTeamId} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Teléfono</label>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition" placeholder="+57 300 000 0000" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">País</label>
-              <CountryPicker value={country} onChange={setCountry} placeholder="Chile, Colombia…" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Biografía</label>
-            <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition resize-none" />
-          </div>
-
-          {errorMsg && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-50 border border-red-200">
-              <svg className="w-4 h-4 text-red-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span className="text-[12px] text-red-700">{errorMsg}</span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 pt-1">
-            <button onClick={handleSubmit} disabled={!canSubmit || saveState === 'saving' || saveState === 'saved'}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all disabled:opacity-60"
-              style={{ background: saveState === 'saved' ? '#1D9E75' : saveState === 'error' ? '#DC2626' : '#7C3AED' }}>
-              {saveState === 'idle'   && 'Crear persona'}
-              {saveState === 'saving' && <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Creando...</>}
-              {saveState === 'saved'  && '✓ ¡Creado!'}
-              {saveState === 'error'  && '✕ Error'}
-            </button>
-            <button onClick={onClose} disabled={saveState === 'saving'}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-500 hover:bg-slate-50 transition-colors">
-              Cancelar
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -1466,7 +1032,6 @@ function PersonasPageInner() {
   const rejectUser   = useRejectUser();
 
   const [editing,        setEditing]        = useState<User | null>(null);
-  const [creating,       setCreating]       = useState(false);
   const [importing,      setImporting]      = useState(false);
   const [confirmDelete,  setConfirmDelete]  = useState<User | null>(null);
   const [approving,      setApproving]      = useState<User | null>(null);
@@ -1561,13 +1126,13 @@ function PersonasPageInner() {
             Importar Excel
           </button>
           <CanDo permission="users:create">
-            <button onClick={() => setCreating(true)}
+            <Link href="/dashboard/directorio/personas/nueva"
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12.5px] font-semibold text-white transition-all bg-violet-600 hover:bg-violet-700">
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
               Nueva persona
-            </button>
+            </Link>
           </CanDo>
         </div>
       </div>
@@ -1788,13 +1353,6 @@ function PersonasPageInner() {
           allJobTitles={allJobTitles}
           onCreateJobTitle={handleCreateJobTitle}
           onClose={() => setEditing(null)}
-        />
-      )}
-      {creating && (
-        <CreatePersonaModal
-          allJobTitles={allJobTitles}
-          onCreateJobTitle={handleCreateJobTitle}
-          onClose={() => setCreating(false)}
         />
       )}
       {importing && (
