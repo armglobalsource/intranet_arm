@@ -9,6 +9,7 @@ import { useOnboardingList, type OnboardingTeam } from '@/hooks/useOnboarding';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { UserGender, MinisterialTitle } from '@/types/user';
 import { displayName, MINISTERIAL_LABEL } from '@/types/user';
+import { COUNTRIES } from '@/components/CountryPicker';
 
 // ── Mis Onboardings ─────────────────────────────────────────────────────────────
 
@@ -68,6 +69,11 @@ const GENDER_OPTIONS: { value: UserGender | ''; label: string }[] = [
   { value: '',       label: 'Sin especificar' },
   { value: 'male',   label: 'Masculino' },
   { value: 'female', label: 'Femenino' },
+];
+
+const COUNTRY_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'Sin especificar' },
+  ...COUNTRIES.map((c) => ({ value: c, label: c })),
 ];
 
 const STATUS_LABELS: Record<string, string> = {
@@ -280,6 +286,9 @@ export default function PerfilPage() {
       updateUser({
         firstName: updated.firstName,
         lastName:  updated.lastName,
+        phone:     updated.phone,
+        country:   updated.country,
+        bio:       updated.bio,
         birthDate: updated.birthDate,
         gender:    updated.gender,
       });
@@ -436,9 +445,9 @@ export default function PerfilPage() {
         </div>
 
         <div className="px-8 pb-6">
-          {/* Avatar flotando sobre el banner */}
-          <div className="flex items-end gap-5 -mt-11">
-            <div className="relative group flex-shrink-0">
+          <div className="flex items-start gap-5">
+            {/* Avatar flotando sobre el banner */}
+            <div className="relative group flex-shrink-0 -mt-11">
               <Avatar avatarUrl={user.avatarUrl} initials={initials} size={22} />
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -463,9 +472,10 @@ export default function PerfilPage() {
                 className="hidden" onChange={handleAvatarChange} />
             </div>
 
-            <div className="pb-1 flex-1 min-w-0">
+            {/* Nombre y correo, en flujo normal debajo del banner (sin solaparse con él) */}
+            <div className="pt-3 flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h1 className="text-[22px] font-bold text-white leading-none">
+                <h1 className="text-[22px] font-bold text-white leading-tight">
                   {displayName(user)}
                 </h1>
                 {user.role?.name && <Badge label={user.role.name} color="indigo" />}
@@ -497,7 +507,7 @@ export default function PerfilPage() {
               <FieldInput label="Fecha de nacimiento" value={form.birthDate} onChange={(v) => setForm((f) => ({ ...f, birthDate: v }))} type="date" />
               <div className="grid grid-cols-2 gap-3">
                 <FieldInput label="Teléfono" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} placeholder="+56 9 xxxx xxxx" />
-                <FieldInput label="País" value={form.country} onChange={(v) => setForm((f) => ({ ...f, country: v }))} placeholder="Chile" />
+                <FieldSelect label="País" value={form.country} onChange={(v) => setForm((f) => ({ ...f, country: v }))} options={COUNTRY_OPTIONS} />
               </div>
               <FieldSelect label="Género" value={form.gender as string}
                 onChange={(v) => setForm((f) => ({ ...f, gender: v as UserGender | '' }))}
