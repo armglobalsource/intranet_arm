@@ -34,6 +34,12 @@ export class UsersController {
     return this.service.findAll(user.sub, user.roleId, search, page, limit);
   }
 
+  @Get('birthdays')
+  @ApiOperation({ summary: 'Lista liviana (id, nombre, avatar, fecha de nacimiento) de usuarios activos con cumpleaños registrado, para el calendario' })
+  findBirthdays() {
+    return this.service.findBirthdays();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un usuario por ID' })
   findOne(@Param('id', ParseIntPipe) id: number) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/store/auth.store';
 import {
@@ -12,6 +12,7 @@ import {
   CreateEventPayload,
 } from '@/hooks/useEvents';
 import { useActiveCampuses } from '@/hooks/useCampus';
+import { useBirthdays, type UserBirthday } from '@/hooks/useUsers';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,27 @@ function formatFullDate(dateStr: string) {
   return `${day} de ${MONTH_NAMES[month].toLowerCase()} de ${year}`;
 }
 
+// ── Cumpleaños ────────────────────────────────────────────────────────────────
+// Se derivan en el cliente a partir de birthDate (mes/día, sin año) — no se
+// guarda ningún evento por cumpleaños, así que no hay nada que crear, migrar
+// ni limpiar cuando alguien cambia o borra su fecha de nacimiento.
+
+/** Agrupa cumpleaños por "YYYY-MM-DD" dentro de un año calendario dado. */
+function buildBirthdaysByDay(birthdays: UserBirthday[], year: number): Map<string, UserBirthday[]> {
+  const map = new Map<string, UserBirthday[]>();
+  for (const u of birthdays) {
+    const m = /^\d{4}-(\d{2})-(\d{2})/.exec(u.birthDate);
+    if (!m) continue;
+    const [, month, day] = m;
+    // 29 feb en años no bisiestos: se omite en vez de reventar Date/toDateStr
+    if (month === '02' && day === '29' && new Date(year, 1, 29).getMonth() !== 1) continue;
+    const dateStr = `${year}-${month}-${day}`;
+    if (!map.has(dateStr)) map.set(dateStr, []);
+    map.get(dateStr)!.push(u);
+  }
+  return map;
+}
+
 // ── "Add to calendar" helpers ─────────────────────────────────────────────────
 
 function buildGoogleUrl(ev: ArmEvent) {
@@ -138,15 +160,16 @@ function downloadIcs(ev: ArmEvent) {
 // ── MonthGrid ─────────────────────────────────────────────────────────────────
 
 interface MonthGridProps {
-  year:        number;
-  month:       number; // 0-indexed
-  events:      ArmEvent[];
-  selectedDay: string | null;
-  today:       string;
-  onSelect:    (day: string) => void;
+  year:            number;
+  month:           number; // 0-indexed
+  events:          ArmEvent[];
+  birthdaysByDay:  Map<string, UserBirthday[]>;
+  selectedDay:     string | null;
+  today:           string;
+  onSelect:        (day: string) => void;
 }
 
-function MonthGrid({ year, month, events, selectedDay, today, onSelect }: MonthGridProps) {
+function MonthGrid({ year, month, events, birthdaysByDay, selectedDay, today, onSelect }: MonthGridProps) {
   const firstDow    = new Date(year, month, 1).getDay(); // 0=Dom
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
@@ -197,11 +220,14 @@ function MonthGrid({ year, month, events, selectedDay, today, onSelect }: MonthG
             return <div key={`empty-${i}`} />;
           }
 
-          const dateStr   = toDateStr(year, month, day);
-          const dayEvents = eventsByDay.get(dateStr) ?? [];
-          const isToday   = dateStr === today;
-          const isSelected = dateStr === selectedDay;
-          const hasEvents = dayEvents.length > 0;
+          const dateStr      = toDateStr(year, month, day);
+          const dayEvents    = eventsByDay.get(dateStr) ?? [];
+          const dayBirthdays = birthdaysByDay.get(dateStr) ?? [];
+          const isToday      = dateStr === today;
+          const isSelected   = dateStr === selectedDay;
+          const hasEvents    = dayEvents.length > 0;
+          const hasBirthdays = dayBirthdays.length > 0;
+          const isSelectable = hasEvents || hasBirthdays;
 
           // Colores únicos para los dots (deduplicados por categoría)
           const dotColors = Array.from(new Set(dayEvents.map((e) => CATEGORIES[e.category]?.color ?? 'rgba(255,255,255,0.4)'))).slice(0, 3);
@@ -209,21 +235,26 @@ function MonthGrid({ year, month, events, selectedDay, today, onSelect }: MonthG
           return (
             <button
               key={day}
-              onClick={() => hasEvents && onSelect(dateStr)}
+              onClick={() => isSelectable && onSelect(dateStr)}
               className={[
-                'flex flex-col items-center justify-center rounded-md py-0.5 transition-all',
-                hasEvents ? 'cursor-pointer hover:bg-white/5' : 'cursor-default',
+                'relative flex flex-col items-center justify-center rounded-md py-0.5 transition-all',
+                isSelectable ? 'cursor-pointer hover:bg-white/5' : 'cursor-default',
                 isSelected ? 'bg-indigo-600' : '',
                 isToday && !isSelected ? 'font-bold' : '',
               ].join(' ')}
             >
+              {hasBirthdays && (
+                <span className="absolute -top-0.5 -right-0.5 text-[9px] leading-none" title={`${dayBirthdays.length} cumpleaños`}>
+                  🎂
+                </span>
+              )}
               <span
                 className="text-[11px] leading-none"
                 style={{
-                  color: isSelected ? '#fff'
-                    : isToday   ? '#fff'
-                    : hasEvents ? 'rgba(255,255,255,0.75)'
-                                : 'rgba(255,255,255,0.3)',
+                  color: isSelected   ? '#fff'
+                    : isToday         ? '#fff'
+                    : isSelectable    ? 'rgba(255,255,255,0.75)'
+                                      : 'rgba(255,255,255,0.3)',
                 }}
               >
                 {isToday && !isSelected ? (
@@ -670,6 +701,29 @@ function AddEventModal({ defaultDate, onClose, onCreated }: AddEventModalProps) 
 
 // ── Leyenda de categorías ─────────────────────────────────────────────────────
 
+function BirthdayList({ birthdays }: { birthdays: UserBirthday[] }) {
+  if (birthdays.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1.5 mb-2.5">
+      {birthdays.map((u) => (
+        <div key={u.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg" style={{ background: '#f4b40012', border: '1px solid #f4b40030' }}>
+          {u.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={u.avatarUrl} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+              style={{ background: 'rgba(244,180,0,0.15)', color: '#f4b400' }}>
+              {(u.firstName[0] ?? '') + (u.lastName?.[0] ?? '')}
+            </div>
+          )}
+          <span className="text-[12.5px] font-medium text-white">{u.firstName} {u.lastName}</span>
+          <span className="text-[13px] ml-auto">🎂</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Leyenda() {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4 pt-4" style={{ borderTop: '1px solid #1f1f1f' }}>
@@ -679,6 +733,10 @@ function Leyenda() {
           {cfg.label}
         </span>
       ))}
+      <span className="flex items-center gap-1.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <span className="text-[11px] leading-none flex-shrink-0">🎂</span>
+        Cumpleaños
+      </span>
     </div>
   );
 }
@@ -699,12 +757,16 @@ export function CalendarioAnual() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   const { data: events = [], isLoading } = useEvents(year);
+  const { data: birthdays = [] } = useBirthdays();
   const deleteEvent = useDeleteEvent();
 
-  // Eventos del día seleccionado
+  const birthdaysByDay = useMemo(() => buildBirthdaysByDay(birthdays, year), [birthdays, year]);
+
+  // Eventos y cumpleaños del día seleccionado
   const dayEvents = selectedDay
     ? events.filter((ev) => isInRange(selectedDay, ev.date, ev.endDate))
     : [];
+  const dayBirthdays = selectedDay ? birthdaysByDay.get(selectedDay) ?? [] : [];
 
   function handleSelectDay(day: string) {
     setSelectedDay((prev) => (prev === day ? null : day));
@@ -713,7 +775,7 @@ export function CalendarioAnual() {
   async function handleDelete(ev: ArmEvent) {
     if (!confirm(`¿Eliminar "${ev.title}"?`)) return;
     await deleteEvent.mutateAsync({ id: ev.id, year });
-    if (dayEvents.length <= 1) setSelectedDay(null);
+    if (dayEvents.length <= 1 && dayBirthdays.length === 0) setSelectedDay(null);
   }
 
   return (
@@ -797,6 +859,7 @@ export function CalendarioAnual() {
                 year={year}
                 month={m}
                 events={events}
+                birthdaysByDay={birthdaysByDay}
                 selectedDay={selectedDay}
                 today={today}
                 onSelect={handleSelectDay}
@@ -808,8 +871,8 @@ export function CalendarioAnual() {
         {/* Leyenda */}
         <Leyenda />
 
-        {/* Panel de eventos del día seleccionado */}
-        {selectedDay && dayEvents.length > 0 && (
+        {/* Panel de eventos y cumpleaños del día seleccionado */}
+        {selectedDay && (dayEvents.length > 0 || dayBirthdays.length > 0) && (
           <div className="mt-5 pt-5" style={{ borderTop: '1px solid #1f1f1f' }}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[13px] font-bold text-white">
@@ -826,6 +889,8 @@ export function CalendarioAnual() {
                 </svg>
               </button>
             </div>
+
+            <BirthdayList birthdays={dayBirthdays} />
 
             <div className="space-y-2.5">
               {dayEvents.map((ev) => (
@@ -892,12 +957,16 @@ export function CalendarioResumenMes() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   const { data: events = [], isLoading } = useEvents(currentYear);
+  const { data: birthdays = [] } = useBirthdays();
   const deleteEvent = useDeleteEvent();
+
+  const birthdaysByDay = useMemo(() => buildBirthdaysByDay(birthdays, currentYear), [birthdays, currentYear]);
 
   const monthEvents = events.filter((ev) => eventOverlapsMonth(ev, currentYear, currentMonth));
   const dayEvents = selectedDay
     ? events.filter((ev) => isInRange(selectedDay, ev.date, ev.endDate))
     : [];
+  const dayBirthdays = selectedDay ? birthdaysByDay.get(selectedDay) ?? [] : [];
 
   function handleSelectDay(day: string) {
     setSelectedDay((prev) => (prev === day ? null : day));
@@ -906,7 +975,7 @@ export function CalendarioResumenMes() {
   async function handleDelete(ev: ArmEvent) {
     if (!confirm(`¿Eliminar "${ev.title}"?`)) return;
     await deleteEvent.mutateAsync({ id: ev.id, year: currentYear });
-    if (dayEvents.length <= 1) setSelectedDay(null);
+    if (dayEvents.length <= 1 && dayBirthdays.length === 0) setSelectedDay(null);
   }
 
   return (
@@ -961,6 +1030,7 @@ export function CalendarioResumenMes() {
               year={currentYear}
               month={currentMonth}
               events={events}
+              birthdaysByDay={birthdaysByDay}
               selectedDay={selectedDay}
               today={today}
               onSelect={handleSelectDay}
@@ -971,8 +1041,8 @@ export function CalendarioResumenMes() {
         {/* Leyenda */}
         <Leyenda />
 
-        {/* Panel de eventos del día seleccionado */}
-        {selectedDay && dayEvents.length > 0 && (
+        {/* Panel de eventos y cumpleaños del día seleccionado */}
+        {selectedDay && (dayEvents.length > 0 || dayBirthdays.length > 0) && (
           <div className="mt-5 pt-5" style={{ borderTop: '1px solid #1f1f1f' }}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[13px] font-bold text-white">
@@ -989,6 +1059,8 @@ export function CalendarioResumenMes() {
                 </svg>
               </button>
             </div>
+
+            <BirthdayList birthdays={dayBirthdays} />
 
             <div className="space-y-2.5">
               {dayEvents.map((ev) => (

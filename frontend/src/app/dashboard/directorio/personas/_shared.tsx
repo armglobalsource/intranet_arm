@@ -8,8 +8,22 @@ import { useEffect, useRef, useState } from 'react';
 import { useActiveCampuses } from '@/hooks/useCampus';
 import { useOrgAllTeams } from '@/hooks/useOrgChart';
 import type { JobTitle } from '@/hooks/useJobTitles';
+import type { User } from '@/types/user';
 
 export const ROLE_LABELS: Record<string, string> = { admin: 'Administrador', user: 'Usuario' };
+export const ORG_ROLE_LABELS: Record<string, string> = { area_leader: 'Líder de área', team_leader: 'Líder de equipo', member: 'Miembro' };
+
+export const AVATAR_COLORS = [
+  { bg: '#E1F5EE', text: '#0F6E56' },
+  { bg: '#E6F1FB', text: '#185FA5' },
+  { bg: '#FAEEDA', text: '#854F0B' },
+  { bg: '#EEEDFE', text: '#534AB7' },
+  { bg: '#FAECE7', text: '#993C1D' },
+  { bg: '#FBEAF0', text: '#993556' },
+];
+
+export function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
+export function userInitials(u: User) { return (u.firstName[0] + (u.lastName?.[0] ?? '')).toUpperCase(); }
 
 // ── MultiJobTitleSelect ───────────────────────────────────────────────────────
 

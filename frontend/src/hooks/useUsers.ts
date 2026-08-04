@@ -37,7 +37,30 @@ export const userKeys = {
                ['users', 'list', search ?? '', page ?? 1, limit ?? 50] as const,
   detail:    (id: number) => ['users', 'detail', id] as const,
   roles:     ['users', 'roles'] as const,
+  birthdays: ['users', 'birthdays'] as const,
 };
+
+export interface UserBirthday {
+  id:        number;
+  firstName: string;
+  lastName:  string;
+  avatarUrl: string | null;
+  birthDate: string;
+}
+
+/**
+ * Lista liviana (sin cargos, permisos ni datos de cuenta) de quienes tienen
+ * fecha de nacimiento registrada, para pintar cumpleaños en el calendario.
+ * staleTime largo a propósito: los cumpleaños casi nunca cambian, así que no
+ * hay razón para volver a pedirlos cada vez que se navega el calendario.
+ */
+export function useBirthdays() {
+  return useQuery<UserBirthday[]>({
+    queryKey: userKeys.birthdays,
+    queryFn:  () => api.get<UserBirthday[]>('/users/birthdays').then((r) => r.data),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+}
 
 /** Devuelve solo el array de usuarios (compatibilidad con código existente). */
 export function useUsers(search?: string, options?: { enabled?: boolean }) {
@@ -49,6 +72,16 @@ export function useUsers(search?: string, options?: { enabled?: boolean }) {
         .then((r) => r.data.data),
     staleTime: 2 * 60 * 1000,
     enabled: options?.enabled,
+  });
+}
+
+/** Un solo usuario por id — para la página de edición. */
+export function useUser(id: number | null) {
+  return useQuery<User>({
+    queryKey: userKeys.detail(id ?? 0),
+    queryFn:  () => api.get<User>(`/users/${id}`).then((r) => r.data),
+    enabled:  id != null,
+    staleTime: 60 * 1000,
   });
 }
 

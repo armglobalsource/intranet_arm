@@ -74,6 +74,29 @@ export class UsersService {
     return { data, total, page, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) };
   }
 
+  /**
+   * Lista liviana para el widget de cumpleaños del calendario: una sola lectura
+   * de la colección (igual costo de lecturas que ya paga findAll), pero con
+   * columnas acotadas vía select() para no traer permisos, cargos ni password
+   * hash, y sin el join a job_titles que hace findAll. El cliente cachea esto
+   * por 24h, así que en la práctica se llama como máximo una vez al día por
+   * usuario en vez de en cada navegación del calendario.
+   */
+  async findBirthdays() {
+    const snap = await this.fb.db.collection(COL)
+      .select('id', 'firstName', 'lastName', 'avatarUrl', 'birthDate', 'status')
+      .get();
+    return this.fb.toDocs(snap)
+      .filter((u) => u.status === 'active' && !!u.birthDate)
+      .map((u) => ({
+        id:        u.id,
+        firstName: u.firstName,
+        lastName:  u.lastName,
+        avatarUrl: u.avatarUrl ?? null,
+        birthDate: u.birthDate,
+      }));
+  }
+
   async findOne(id: number) {
     const snap = await this.fb.db.collection(COL).doc(String(id)).get();
     if (!snap.exists) throw new NotFoundException(`User con id ${id} no encontrado`);
