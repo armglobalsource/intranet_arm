@@ -6,9 +6,10 @@ import {
   useSystemRoles, useCreateRole, useUpdateRole, useDeleteRole,
   type SystemRole,
 } from '@/hooks/useRoles';
-import { PERMISSION_CATALOG, PERMISSION_UI_CONFIG } from '@/lib/permissions';
+import { PERMISSION_CATALOG } from '@/lib/permissions';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { CanDo } from '@/components/shared/CanDo';
+import { PermissionsMatrix } from './PermissionsMatrix';
 
 const PAGE_SIZE = 20;
 
@@ -40,179 +41,6 @@ function PermBadges({ permissions }: { permissions: string[] }) {
         <span key={p} className="inline-flex px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10.5px]">{permLabel(p)}</span>
       ))}
       {rest > 0 && <span className="text-[10.5px] text-slate-400 self-center">+{rest} más</span>}
-    </div>
-  );
-}
-
-// ── PermissionsPanel ──────────────────────────────────────────────────────────
-
-interface PermissionsPanelProps {
-  rol:     SystemRole;
-  onClose: () => void;
-}
-
-function PermissionsPanel({ rol, onClose }: PermissionsPanelProps) {
-  const update     = useUpdateRole();
-  const isWildcard = rol.permissions.includes('*');
-
-  const [selected,  setSelected]  = useState<Set<string>>(new Set(rol.permissions));
-  const [wildcard,  setWildcard]  = useState(isWildcard);
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-
-  function isGroupOn(resource: string, actions: string[]): boolean {
-    return actions.length > 0 && actions.every((a) => selected.has(`${resource}:${a}`));
-  }
-
-  function setGroup(resource: string, actions: string[], on: boolean) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      actions.forEach((a) => {
-        const perm = `${resource}:${a}`;
-        if (on) next.add(perm); else next.delete(perm);
-      });
-      return next;
-    });
-  }
-
-  function toggleView(resource: string, viewActions: string[], editActions: string[]) {
-    const on = isGroupOn(resource, viewActions);
-    setGroup(resource, viewActions, !on);
-    // No tiene sentido poder editar sin poder ver — se apaga junto con "ver"
-    if (on) setGroup(resource, editActions, false);
-  }
-
-  function toggleEdit(resource: string, viewActions: string[], editActions: string[]) {
-    const on = isGroupOn(resource, editActions);
-    setGroup(resource, editActions, !on);
-    // Activar "editar" implica poder ver también
-    if (!on) setGroup(resource, viewActions, true);
-  }
-
-  function toggleExtra(resource: string, actions: string[]) {
-    setGroup(resource, actions, !isGroupOn(resource, actions));
-  }
-
-  function toggleWildcard() { setWildcard((w) => !w); setSelected(new Set()); }
-
-  function handleSave() {
-    setSaveState('saving');
-    const permissions = wildcard ? ['*'] : Array.from(selected);
-    update.mutate(
-      { id: rol.id, data: { permissions } },
-      {
-        onSuccess: () => { setSaveState('saved'); setTimeout(onClose, 700); },
-        onError:   () => { setSaveState('error'); setTimeout(() => setSaveState('idle'), 2000); },
-      },
-    );
-  }
-
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', h);
-    return () => document.removeEventListener('keydown', h);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[620px] overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50 flex-shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-lg">🛡️</div>
-          <div className="flex-1">
-            <p className="font-semibold text-slate-900 text-[14px]">Permisos — <span className="font-mono text-indigo-600">{rol.name}</span></p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Configura qué puede hacer este rol en el sistema</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100 text-sm">✕</button>
-        </div>
-
-        <div className="px-5 py-3 border-b border-slate-100 flex-shrink-0">
-          <label className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${wildcard ? 'bg-indigo-50 border border-indigo-200' : 'border border-slate-200 hover:bg-slate-50'}`}>
-            <div
-              className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors ${wildcard ? 'bg-indigo-600' : 'border-2 border-slate-300'}`}
-              onClick={toggleWildcard}
-            >
-              {wildcard && <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-            </div>
-            <div className="flex-1" onClick={toggleWildcard}>
-              <p className="text-[13px] font-semibold text-slate-900">Acceso total <span className="font-mono text-[11px] text-indigo-500 ml-1">*</span></p>
-              <p className="text-[11px] text-slate-400">Este rol puede hacer todo en el sistema sin restricciones</p>
-            </div>
-          </label>
-        </div>
-
-        <div className={`overflow-y-auto flex-1 px-5 py-4 ${wildcard ? 'opacity-40 pointer-events-none' : ''}`}>
-          <div className="flex flex-col gap-4">
-            {Object.entries(PERMISSION_UI_CONFIG).map(([resource, uiCfg]) => {
-              const cfg = (PERMISSION_CATALOG as any)[resource];
-              if (!cfg) return null;
-              const viewOn = isGroupOn(resource, uiCfg.viewActions);
-              const editOn = isGroupOn(resource, uiCfg.editActions);
-              return (
-              <div key={resource}>
-                <div className="mb-2">
-                  <p className="text-[11.5px] font-bold text-slate-700 uppercase tracking-wider">{cfg.label}</p>
-                  {uiCfg.breadcrumb.length > 0 && (
-                    <p className="text-[10.5px] text-slate-400 mt-0.5">{uiCfg.breadcrumb.join(' › ')}</p>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <label onClick={() => toggleView(resource, uiCfg.viewActions, uiCfg.editActions)}
-                    className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer border transition-colors ${
-                      viewOn ? 'bg-indigo-50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'
-                    }`}>
-                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${viewOn ? 'bg-indigo-600' : 'border-2 border-slate-300'}`}>
-                      {viewOn && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                    </div>
-                    <p className="text-[12px] font-medium text-slate-800 leading-tight">Puede ver</p>
-                  </label>
-                  {uiCfg.editActions.length > 0 && (
-                    <label onClick={() => toggleEdit(resource, uiCfg.viewActions, uiCfg.editActions)}
-                      className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer border transition-colors ${
-                        editOn ? 'bg-indigo-50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'
-                      }`}>
-                      <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${editOn ? 'bg-indigo-600' : 'border-2 border-slate-300'}`}>
-                        {editOn && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                      </div>
-                      <p className="text-[12px] font-medium text-slate-800 leading-tight">Puede editar</p>
-                    </label>
-                  )}
-                  {uiCfg.extra?.map((ex) => {
-                    const exOn = isGroupOn(resource, ex.actions);
-                    return (
-                      <label key={ex.key} onClick={() => toggleExtra(resource, ex.actions)}
-                        className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer border transition-colors ${
-                          exOn ? 'bg-indigo-50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'
-                        }`}>
-                        <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${exOn ? 'bg-indigo-600' : 'border-2 border-slate-300'}`}>
-                          {exOn && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                        </div>
-                        <p className="text-[12px] font-medium text-slate-800 leading-tight">{ex.label}</p>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            );})}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 px-5 py-4 border-t border-slate-100 flex-shrink-0 bg-slate-50">
-          <span className="text-[12px] text-slate-400 flex-1">
-            {wildcard ? 'Acceso total activado' : `${selected.size} permiso${selected.size !== 1 ? 's' : ''} seleccionado${selected.size !== 1 ? 's' : ''}`}
-          </span>
-          <button onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-200 text-[13px] text-slate-500 hover:bg-slate-100 transition-colors">
-            Cancelar
-          </button>
-          <button onClick={handleSave} disabled={saveState === 'saving' || saveState === 'saved'}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-white transition-all disabled:opacity-60"
-            style={{ background: saveState === 'saved' ? '#1D9E75' : saveState === 'error' ? '#DC2626' : '#4F46E5' }}>
-            {saveState === 'idle'   && 'Guardar permisos'}
-            {saveState === 'saving' && <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>Guardando...</>}
-            {saveState === 'saved'  && '✓ Guardado'}
-            {saveState === 'error'  && '✕ Error'}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -459,7 +287,7 @@ export default function RolesPage() {
   const remove = useDeleteRole();
 
   const [modal,         setModal]         = useState<'create' | 'edit' | null>(null);
-  const [permsFor,      setPermsFor]      = useState<SystemRole | null>(null);
+  const [view,          setView]          = useState<'lista' | 'matriz'>('lista');
   const [selected,      setSelected]      = useState<SystemRole | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SystemRole | null>(null);
   const [togglingId,    setTogglingId]    = useState<number | null>(null);
@@ -545,15 +373,17 @@ export default function RolesPage() {
             }
           </p>
         </div>
-        <CanDo permission="roles:manage">
-          <button onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all bg-indigo-600 hover:bg-indigo-700">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Nuevo rol
-          </button>
-        </CanDo>
+        <div className="flex items-center gap-2">
+          <CanDo permission="roles:manage">
+            <button onClick={openCreate}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all bg-indigo-600 hover:bg-indigo-700">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Nuevo rol
+            </button>
+          </CanDo>
+        </div>
       </div>
 
       {/* Info banner */}
@@ -568,6 +398,27 @@ export default function RolesPage() {
         </div>
       </div>
 
+      {/* Lista / Matriz de permisos */}
+      <div className="flex gap-1 p-1 rounded-xl bg-slate-100 w-fit">
+        {(['lista', 'matriz'] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={`px-4 py-1.5 rounded-lg text-[12.5px] font-semibold transition-colors ${
+              view === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {v === 'lista' ? 'Lista' : 'Matriz de permisos'}
+          </button>
+        ))}
+      </div>
+
+      {view === 'matriz' && (
+        <PermissionsMatrix roles={roles} />
+      )}
+
+      {view === 'lista' && (
+      <>
       {/* Search + Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -674,16 +525,6 @@ export default function RolesPage() {
                         <div className="flex items-center gap-1">
 
                           <CanDo permission="roles:manage">
-                            {/* Configurar permisos */}
-                            <button onClick={() => setPermsFor(rol)} title="Configurar permisos"
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
-                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                              </svg>
-                            </button>
-                          </CanDo>
-
-                          <CanDo permission="roles:manage">
                             {/* Editar */}
                             <button onClick={() => openEdit(rol)} title="Editar"
                               className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
@@ -764,10 +605,11 @@ export default function RolesPage() {
           )}
         </div>
       )}
+      </>
+      )}
 
       {/* Modales */}
-      {modal    && <RolModal rol={modal === 'edit' ? selected : null} onClose={closeModal}/>}
-      {permsFor && <PermissionsPanel rol={permsFor} onClose={() => setPermsFor(null)}/>}
+      {modal && <RolModal rol={modal === 'edit' ? selected : null} onClose={closeModal}/>}
       {confirmDelete && (
         <DeleteConfirmModal
           rol={confirmDelete}
