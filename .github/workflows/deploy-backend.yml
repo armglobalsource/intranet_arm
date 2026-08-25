@@ -74,6 +74,16 @@ jobs:
           # them with empty GitHub-secret values whenever a secret isn't set,
           # causing Joi validation failures (JWT_SECRET.min(32)) at startup.
 
+      # Blindaje contra tráfico pineado a revisiones viejas:
+      # si en algún momento se hizo un split manual de tráfico, los deploys
+      # siguientes crean revisiones nuevas pero nunca reciben el 100% del
+      # tráfico. Este paso lo fuerza explícitamente.
+      - name: Force 100% traffic to latest revision
+        run: |
+          gcloud run services update-traffic ${{ secrets.CLOUD_RUN_BACKEND }} \
+            --region=${{ env.REGION }} \
+            --to-latest
+
       - name: Verify deployment
         run: |
           URL=$(gcloud run services describe ${{ secrets.CLOUD_RUN_BACKEND }} \

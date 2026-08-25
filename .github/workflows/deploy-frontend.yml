@@ -58,6 +58,16 @@ jobs:
           region: ${{ env.REGION }}
           image: ${{ env.IMAGE }}:${{ github.sha }}
 
+      # Blindaje contra tráfico pineado a revisiones viejas:
+      # si en algún momento se hizo un split manual de tráfico, los deploys
+      # siguientes crean revisiones nuevas pero nunca reciben el 100% del
+      # tráfico. Este paso lo fuerza explícitamente.
+      - name: Force 100% traffic to latest revision
+        run: |
+          gcloud run services update-traffic ${{ secrets.CLOUD_RUN_FRONTEND }} \
+            --region=${{ env.REGION }} \
+            --to-latest
+
       - name: Deploy Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
