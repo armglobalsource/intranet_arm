@@ -217,10 +217,13 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const [transitioningToEdit, setTransitioningToEdit] = useState(false);
 
   const [localHidden, setLocalHidden] = useState<SectionName[]>([]);
-  const hiddenInflight = useRef(false);
+  // Contador de mutaciones en vuelo. Usamos contador (no booleano) para
+  // soportar clicks rápidos encadenados: cada uno dispara su propia mutación
+  // y solo cuando TODAS terminan sincronizamos con el snapshot de Firestore.
+  const hiddenInflight = useRef(0);
 
   useEffect(() => {
-    if (!hiddenInflight.current) {
+    if (hiddenInflight.current === 0) {
       setLocalHidden(ficha?.hiddenSections ?? []);
     }
   }, [ficha?.hiddenSections]);
@@ -237,31 +240,39 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
   function handleToggleModule(name: SectionName) {
     if (!ficha) return;
+    // Toggle contra localHidden (estado optimista), no contra ficha.hiddenSections
+    // — así clicks encadenados componen bien sin esperar el roundtrip.
     const next = localHidden.includes(name)
       ? localHidden.filter((s) => s !== name)
       : [...localHidden, name];
     setLocalHidden(next);
-    hiddenInflight.current = true;
+    hiddenInflight.current += 1;
     setSaveState('saving');
     updateFicha(
       { fichaId: ficha.fichaId, hiddenSections: next },
       {
         onSuccess: () => {
-          hiddenInflight.current = false;
-          setSaveState('saved');
-          setTimeout(() => setSaveState('idle'), 800);
+          hiddenInflight.current = Math.max(0, hiddenInflight.current - 1);
+          if (hiddenInflight.current === 0) {
+            setSaveState('saved');
+            setTimeout(() => setSaveState('idle'), 800);
+          }
         },
         onError: () => {
-          hiddenInflight.current = false;
-          setLocalHidden(ficha.hiddenSections ?? []);
-          setSaveState('error');
-          setTimeout(() => setSaveState('idle'), 3000);
+          hiddenInflight.current = Math.max(0, hiddenInflight.current - 1);
+          // En error, revertimos al estado del servidor solo si ya no hay
+          // otros toggles en vuelo (para no pisar clicks posteriores válidos).
+          if (hiddenInflight.current === 0) {
+            setLocalHidden(ficha.hiddenSections ?? []);
+            setSaveState('error');
+            setTimeout(() => setSaveState('idle'), 3000);
+          }
         },
       },
     );
   }
 
-  function handleUpdateLayout(layout: { left: string[]; right: string[] }) {
+  function handleUpdateLayout(layout: { left: string[]; right: string[]; leftRatio?: number }) {
     if (!ficha) return;
     updateFicha({ fichaId: ficha.fichaId, sectionLayout: layout });
   }
