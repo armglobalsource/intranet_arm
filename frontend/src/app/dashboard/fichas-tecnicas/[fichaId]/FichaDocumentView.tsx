@@ -1693,6 +1693,21 @@ function WorshipSetListCard({
             onSelect={handleSelectPalette}
             loading={paletasLoading && (paletas ?? []).length === 0}
           />
+          {editable && (
+            <div className="ficha-no-print" style={{ marginTop: 8, textAlign: 'right' }}>
+              {outfit.isCompleted ? (
+                <span style={{ fontSize: 10, fontWeight: 600, color: C.green }}>✓ Outfit completado</span>
+              ) : outfit.onComplete ? (
+                <button onClick={outfit.onComplete} style={{
+                  fontSize: 10, fontWeight: 600, color: C.green,
+                  background: 'rgba(29,158,117,0.1)', border: `1px solid rgba(29,158,117,0.25)`,
+                  borderRadius: 6, padding: '3px 8px', cursor: 'pointer',
+                }}>
+                  ✓ Marcar completada
+                </button>
+              ) : null}
+            </div>
+          )}
         </>
       )}
 
