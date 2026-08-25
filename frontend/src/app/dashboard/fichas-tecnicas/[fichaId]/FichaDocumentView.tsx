@@ -2075,7 +2075,7 @@ function ColumnResizeGrid({
         alignItems: 'start',
       }}
     >
-      <div style={{ minWidth: 0, paddingRight: editable ? 8 : 0 }}>{children[0]}</div>
+      <div style={{ minWidth: 0, paddingRight: editable ? 8 : 0, boxSizing: 'border-box' }}>{children[0]}</div>
       {editable && (
         <div
           role="separator"
@@ -2113,7 +2113,7 @@ function ColumnResizeGrid({
           </div>
         </div>
       )}
-      <div style={{ minWidth: 0, paddingLeft: editable ? 8 : 0 }}>{children[1]}</div>
+      <div style={{ minWidth: 0, paddingLeft: editable ? 8 : 0, boxSizing: 'border-box' }}>{children[1]}</div>
     </div>
   );
 }
@@ -2127,19 +2127,26 @@ const DEFAULT_LAYOUT_ORACION: { left: LayoutSlot[]; right: LayoutSlot[] } = {
   right: ['worship', 'media'],
 };
 
-/** Columna droppable (target para soltar desde otra columna) */
+/** Columna droppable (target para soltar desde otra columna).
+ * Importante: usar outline (fuera del box) en vez de box-shadow inset o
+ * border, para que el drop visual NO empuje ni recalcule el layout de las
+ * cards de adentro al empezar/terminar el drag.
+ */
 function DroppableColumn({ id, isDragging, children }: { id: string; isDragging?: boolean; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id });
+  const highlight = !!isDragging && isOver;
   return (
     <div
       ref={setNodeRef}
       style={{
-        minHeight: isDragging ? 120 : 40,
+        minHeight: 80,
+        minWidth: 0,
         borderRadius: 10,
-        transition: 'background 0.15s, box-shadow 0.15s',
-        background: isOver && isDragging ? 'rgba(127,119,221,0.06)' : 'transparent',
-        boxShadow: isOver && isDragging ? 'inset 0 0 0 1px rgba(127,119,221,0.35)' : 'none',
-        padding: isDragging ? 4 : 0,
+        transition: 'background 0.12s, outline-color 0.12s',
+        background: highlight ? 'rgba(127,119,221,0.06)' : 'transparent',
+        outline: '2px dashed transparent',
+        outlineOffset: 2,
+        outlineColor: highlight ? 'rgba(127,119,221,0.55)' : 'transparent',
       }}
     >
       {children}
@@ -2282,6 +2289,9 @@ export function FichaDocumentView({
   };
 
   const [activeSlot, setActiveSlot] = useState<LayoutSlot | null>(null);
+  // Ancho de la card que se está arrastrando, para que el DragOverlay
+  // no aparezca del ancho del viewport y rompa el layout.
+  const [activeWidth, setActiveWidth] = useState<number | null>(null);
 
   const layoutSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -2290,10 +2300,15 @@ export function FichaDocumentView({
 
   function handleLayoutDragStart({ active }: DragStartEvent) {
     setActiveSlot(active.id as LayoutSlot);
+    // Capturar el ancho real de la card original para el overlay.
+    // dnd-kit expone el rect en active.rect.current.initial cuando existe.
+    const rect = active.rect.current.initial ?? active.rect.current.translated;
+    if (rect?.width) setActiveWidth(rect.width);
   }
 
   function handleLayoutDragEnd({ active, over }: DragEndEvent) {
     setActiveSlot(null);
+    setActiveWidth(null);
     if (!over || !onUpdateLayout) return;
 
     const activeId = active.id as LayoutSlot;
@@ -3034,7 +3049,7 @@ export function FichaDocumentView({
                 collisionDetection={detectCollisions}
                 onDragStart={handleLayoutDragStart}
                 onDragEnd={handleLayoutDragEnd}
-                onDragCancel={() => setActiveSlot(null)}
+                onDragCancel={() => { setActiveSlot(null); setActiveWidth(null); }}
               >
                 <ColumnResizeGrid
                   leftRatio={resolvedLayout.leftRatio}
@@ -3064,10 +3079,22 @@ export function FichaDocumentView({
                   </SortableContext>
                 </ColumnResizeGrid>
 
-                {/* Ghost overlay mientras se arrastra */}
-                <DragOverlay>
+                {/* Ghost overlay mientras se arrastra — ancho fijo capturado
+                    del rect original para que no tome el ancho del viewport
+                    y rompa la percepción del layout durante el drag. */}
+                <DragOverlay
+                  dropAnimation={null}
+                  style={activeWidth ? { width: activeWidth } : undefined}
+                >
                   {activeSlot && (
-                    <div style={{ opacity: 0.85, cursor: 'grabbing', pointerEvents: 'none' }}>
+                    <div style={{
+                      opacity: 0.9,
+                      cursor: 'grabbing',
+                      pointerEvents: 'none',
+                      width: activeWidth ?? '100%',
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
+                      borderRadius: 12,
+                    }}>
                       {renderSlot(activeSlot)}
                     </div>
                   )}
