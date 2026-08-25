@@ -30,6 +30,7 @@ import {
   DragOverlay,
   type CollisionDetection,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import {
@@ -2293,68 +2294,112 @@ export function FichaDocumentView({
   // no aparezca del ancho del viewport y rompa el layout.
   const [activeWidth, setActiveWidth] = useState<number | null>(null);
 
+  // Layout local optimista: durante el drag se actualiza en tiempo real
+  // en onDragOver para dar preview visual del cambio. Al soltar (dragEnd)
+  // se commitea al backend. Si el usuario cancela, se resetea desde el prop.
+  const [draftLayout, setDraftLayout] = useState<{ left: LayoutSlot[]; right: LayoutSlot[] } | null>(null);
+
   const layoutSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  // Los IDs que dnd-kit maneja son de dos tipos:
+  //   1. IDs de columna: "left" | "right" (usados por DroppableColumn)
+  //   2. IDs de slot: 'pastoral' | 'produccion' | ... (LayoutSlot)
+  // sideOf() unifica ambos casos y devuelve la columna a la que pertenece,
+  // o null si es un ID desconocido (defensa contra collision detection raro).
+  type Side = 'left' | 'right';
+  function sideOf(id: string, layout: { left: LayoutSlot[]; right: LayoutSlot[] }): Side | null {
+    if (id === 'left'  || layout.left.includes(id as LayoutSlot))  return 'left';
+    if (id === 'right' || layout.right.includes(id as LayoutSlot)) return 'right';
+    return null;
+  }
+
   function handleLayoutDragStart({ active }: DragStartEvent) {
-    setActiveSlot(active.id as LayoutSlot);
-    // Capturar el ancho real de la card original para el overlay.
-    // dnd-kit expone el rect en active.rect.current.initial cuando existe.
+    const id = active.id as string;
+    // Solo aceptar como active un slot válido (defensa por si un item de
+    // otro SortableContext anidado dispara este handler).
+    if (sideOf(id, resolvedLayout) === null) return;
+    setActiveSlot(id as LayoutSlot);
     const rect = active.rect.current.initial ?? active.rect.current.translated;
     if (rect?.width) setActiveWidth(rect.width);
+    // Inicializar el draft con el layout actual (sin ratio; ratio se
+    // maneja aparte y no cambia durante el drag).
+    setDraftLayout({ left: [...resolvedLayout.left], right: [...resolvedLayout.right] });
+  }
+
+  // Recalcula el layout dado un evento de over. Devuelve null si nada cambia.
+  function computeLayout(
+    activeId: LayoutSlot,
+    overId: string,
+    layout: { left: LayoutSlot[]; right: LayoutSlot[] },
+  ): { left: LayoutSlot[]; right: LayoutSlot[] } | null {
+    if (activeId === overId) return null;
+    const activeSide = sideOf(activeId, layout);
+    const overSide   = sideOf(overId,   layout);
+    if (!activeSide || !overSide) return null;
+
+    // — Mismo lado: reordenar dentro de la columna —
+    if (activeSide === overSide) {
+      const col   = activeSide === 'left' ? layout.left : layout.right;
+      const from  = col.indexOf(activeId);
+      const overIsColumnItself = overId === activeSide;
+      const to    = overIsColumnItself ? col.length - 1 : col.indexOf(overId as LayoutSlot);
+      if (from === -1 || to === -1 || from === to) return null;
+      const moved = arrayMove(col, from, to);
+      return activeSide === 'left'
+        ? { left: moved, right: layout.right }
+        : { left: layout.left, right: moved };
+    }
+
+    // — Lados distintos: mover activeId de un lado al otro —
+    const fromCol = activeSide === 'left' ? layout.left : layout.right;
+    const toCol   = overSide   === 'left' ? layout.left : layout.right;
+    const newFrom = fromCol.filter((s) => s !== activeId);
+    const overIsColumnItself = overId === overSide;
+    // Si over es la columna en sí (vacía o zona debajo de todo), insertar al final.
+    // Si over es un slot, insertar en la posición de ese slot (empujándolo hacia abajo).
+    const insertAt = overIsColumnItself
+      ? toCol.length
+      : Math.max(0, toCol.indexOf(overId as LayoutSlot));
+    const newTo = [...toCol];
+    newTo.splice(insertAt, 0, activeId);
+    // overSide indica LA COLUMNA DESTINO. La otra columna es la de origen.
+    return overSide === 'left'
+      ? { left: newTo,  right: newFrom }  // der → izq
+      : { left: newFrom, right: newTo };  // izq → der
+  }
+
+  function handleLayoutDragOver({ active, over }: DragOverEvent) {
+    if (!over || !draftLayout) return;
+    const activeId = active.id as LayoutSlot;
+    const overId   = over.id as string;
+    const next = computeLayout(activeId, overId, draftLayout);
+    if (next) setDraftLayout(next);
   }
 
   function handleLayoutDragEnd({ active, over }: DragEndEvent) {
+    const finalDraft = draftLayout;
     setActiveSlot(null);
     setActiveWidth(null);
-    if (!over || !onUpdateLayout) return;
-
-    const activeId = active.id as LayoutSlot;
-    const overId   = over.id as string;
-
-    if (activeId === overId) return;
+    setDraftLayout(null);
+    if (!over || !onUpdateLayout || !finalDraft) return;
 
     const layout = resolvedLayout;
-    const inLeft  = (id: string) => layout.left.includes(id as LayoutSlot);
+    // Solo commit si algo cambió respecto al estado real actual.
+    const changed =
+      finalDraft.left.join(',')  !== layout.left.join(',') ||
+      finalDraft.right.join(',') !== layout.right.join(',');
+    if (!changed) return;
+    onUpdateLayout({ left: finalDraft.left, right: finalDraft.right, leftRatio: layout.leftRatio });
+  }
 
-    const activeIsLeft = inLeft(activeId);
-    const overIsLeft   = inLeft(overId);
-    const overIsColLeft  = overId === 'left';
-    const overIsColRight = overId === 'right';
-
-    const ratio = layout.leftRatio;
-
-    if (activeIsLeft && (overIsLeft || overIsColLeft)) {
-      // Reordenar dentro de la columna izquierda
-      const from = layout.left.indexOf(activeId);
-      const to   = overIsColLeft ? layout.left.length - 1 : layout.left.indexOf(overId as LayoutSlot);
-      if (from !== -1 && to !== -1 && from !== to) {
-        onUpdateLayout({ left: arrayMove(layout.left, from, to), right: layout.right, leftRatio: ratio });
-      }
-    } else if (!activeIsLeft && (!overIsLeft || overIsColRight)) {
-      // Reordenar dentro de la columna derecha
-      const from = layout.right.indexOf(activeId);
-      const to   = overIsColRight ? layout.right.length - 1 : layout.right.indexOf(overId as LayoutSlot);
-      if (from !== -1 && to !== -1 && from !== to) {
-        onUpdateLayout({ left: layout.left, right: arrayMove(layout.right, from, to), leftRatio: ratio });
-      }
-    } else if (activeIsLeft && (!overIsLeft || overIsColRight)) {
-      // Mover izquierda → derecha
-      const newLeft  = layout.left.filter((s) => s !== activeId);
-      const insertAt = overIsColRight ? layout.right.length : Math.max(0, layout.right.indexOf(overId as LayoutSlot));
-      const newRight = [...layout.right];
-      newRight.splice(insertAt === -1 ? newRight.length : insertAt, 0, activeId);
-      onUpdateLayout({ left: newLeft, right: newRight, leftRatio: ratio });
-    } else {
-      // Mover derecha → izquierda
-      const newRight = layout.right.filter((s) => s !== activeId);
-      const insertAt = overIsColLeft ? layout.left.length : Math.max(0, layout.left.indexOf(overId as LayoutSlot));
-      const newLeft  = [...layout.left];
-      newLeft.splice(insertAt === -1 ? newLeft.length : insertAt, 0, activeId);
-      onUpdateLayout({ left: newLeft, right: newRight, leftRatio: ratio });
-    }
+  function handleLayoutDragCancel() {
+    setActiveSlot(null);
+    setActiveWidth(null);
+    setDraftLayout(null);
   }
 
   const { paletas, loading: paletasLoading } = usePaletas();
@@ -3034,11 +3079,12 @@ export function FichaDocumentView({
               return hidden(slot as SectionName);
             };
 
-            // Filtrar slots ocultos ANTES del map — así no renderizamos
-            // DraggableSectionCard vacíos (que dejarían handles "MOVER"
-            // huérfanos sin card debajo).
-            const visibleLeft  = resolvedLayout.left.filter((s) => !slotIsHidden(s));
-            const visibleRight = resolvedLayout.right.filter((s) => !slotIsHidden(s));
+            // Durante el drag preferimos draftLayout (preview optimista); al
+            // soltar volvemos a resolvedLayout. Filtramos ocultos ANTES del
+            // map para no dejar wrappers "MOVER" huérfanos.
+            const activeLayout = draftLayout ?? { left: resolvedLayout.left, right: resolvedLayout.right };
+            const visibleLeft  = activeLayout.left.filter((s) => !slotIsHidden(s));
+            const visibleRight = activeLayout.right.filter((s) => !slotIsHidden(s));
 
             // Todos los slots de ambas columnas como IDs para los SortableContext
             const allSlots = [...visibleLeft, ...visibleRight];
@@ -3064,8 +3110,9 @@ export function FichaDocumentView({
                 sensors={layoutSensors}
                 collisionDetection={detectCollisions}
                 onDragStart={handleLayoutDragStart}
+                onDragOver={handleLayoutDragOver}
                 onDragEnd={handleLayoutDragEnd}
-                onDragCancel={() => { setActiveSlot(null); setActiveWidth(null); }}
+                onDragCancel={handleLayoutDragCancel}
               >
                 <ColumnResizeGrid
                   leftRatio={resolvedLayout.leftRatio}
