@@ -19,12 +19,16 @@ import { usePaletas, useCreatePaleta, type Paleta, type PaletaColor } from '@/ho
 import {
   DndContext,
   closestCenter,
+  closestCorners,
+  pointerWithin,
+  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   useDroppable,
   DragOverlay,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
@@ -2124,9 +2128,23 @@ const DEFAULT_LAYOUT_ORACION: { left: LayoutSlot[]; right: LayoutSlot[] } = {
 };
 
 /** Columna droppable (target para soltar desde otra columna) */
-function DroppableColumn({ id, children }: { id: string; children: React.ReactNode }) {
-  const { setNodeRef } = useDroppable({ id });
-  return <div ref={setNodeRef} style={{ minHeight: 40 }}>{children}</div>;
+function DroppableColumn({ id, isDragging, children }: { id: string; isDragging?: boolean; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        minHeight: isDragging ? 120 : 40,
+        borderRadius: 10,
+        transition: 'background 0.15s, box-shadow 0.15s',
+        background: isOver && isDragging ? 'rgba(127,119,221,0.06)' : 'transparent',
+        boxShadow: isOver && isDragging ? 'inset 0 0 0 1px rgba(127,119,221,0.35)' : 'none',
+        padding: isDragging ? 4 : 0,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 /** Wrapper draggable alrededor de cada card de sección */
@@ -2994,10 +3012,26 @@ export function FichaDocumentView({
             // Todos los slots de ambas columnas como IDs para los SortableContext
             const allSlots = [...resolvedLayout.left, ...resolvedLayout.right];
 
+            // Collision detection robusta para arrastrar entre SortableContext
+            // distintos (izquierda ↔ derecha).
+            //
+            // Estrategia: primero probamos con el puntero exacto (más preciso),
+            // luego con intersección de rectángulos, y como último recurso con
+            // closestCorners. Si el resultado no está sobre una card ni sobre
+            // el contenedor de columna, forzamos "left" o "right" según qué
+            // lado del contenedor esté más cerca del puntero.
+            const detectCollisions: CollisionDetection = (args) => {
+              const pointer = pointerWithin(args);
+              if (pointer.length > 0) return pointer;
+              const rects = rectIntersection(args);
+              if (rects.length > 0) return rects;
+              return closestCorners(args);
+            };
+
             return (
               <DndContext
                 sensors={layoutSensors}
-                collisionDetection={closestCenter}
+                collisionDetection={detectCollisions}
                 onDragStart={handleLayoutDragStart}
                 onDragEnd={handleLayoutDragEnd}
                 onDragCancel={() => setActiveSlot(null)}
@@ -3009,7 +3043,7 @@ export function FichaDocumentView({
                 >
                   {/* Columna izquierda */}
                   <SortableContext items={resolvedLayout.left} strategy={verticalListSortingStrategy}>
-                    <DroppableColumn id="left">
+                    <DroppableColumn id="left" isDragging={!!activeSlot}>
                       {resolvedLayout.left.map((slot) => (
                         <DraggableSectionCard key={slot} id={slot} editMode={editable && !!onUpdateLayout}>
                           {renderSlot(slot)}
@@ -3020,7 +3054,7 @@ export function FichaDocumentView({
 
                   {/* Columna derecha */}
                   <SortableContext items={resolvedLayout.right} strategy={verticalListSortingStrategy}>
-                    <DroppableColumn id="right">
+                    <DroppableColumn id="right" isDragging={!!activeSlot}>
                       {resolvedLayout.right.map((slot) => (
                         <DraggableSectionCard key={slot} id={slot} editMode={editable && !!onUpdateLayout}>
                           {renderSlot(slot)}
