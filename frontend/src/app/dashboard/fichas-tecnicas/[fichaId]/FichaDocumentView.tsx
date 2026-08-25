@@ -3024,8 +3024,24 @@ export function FichaDocumentView({
               }
             };
 
+            // Un slot está "oculto" cuando todas sus secciones internas están
+            // en hiddenSections. 'worship' es especial porque agrupa 3 secciones
+            // (escena + setList + outfit); los demás mapean 1:1.
+            const slotIsHidden = (slot: LayoutSlot): boolean => {
+              if (slot === 'worship') {
+                return hidden('escena') && hidden('setList') && hidden('outfit');
+              }
+              return hidden(slot as SectionName);
+            };
+
+            // Filtrar slots ocultos ANTES del map — así no renderizamos
+            // DraggableSectionCard vacíos (que dejarían handles "MOVER"
+            // huérfanos sin card debajo).
+            const visibleLeft  = resolvedLayout.left.filter((s) => !slotIsHidden(s));
+            const visibleRight = resolvedLayout.right.filter((s) => !slotIsHidden(s));
+
             // Todos los slots de ambas columnas como IDs para los SortableContext
-            const allSlots = [...resolvedLayout.left, ...resolvedLayout.right];
+            const allSlots = [...visibleLeft, ...visibleRight];
 
             // Collision detection robusta para arrastrar entre SortableContext
             // distintos (izquierda ↔ derecha).
@@ -3057,9 +3073,9 @@ export function FichaDocumentView({
                   onRatioChange={(r) => onUpdateLayout?.({ left: resolvedLayout.left, right: resolvedLayout.right, leftRatio: r })}
                 >
                   {/* Columna izquierda */}
-                  <SortableContext items={resolvedLayout.left} strategy={verticalListSortingStrategy}>
+                  <SortableContext items={visibleLeft} strategy={verticalListSortingStrategy}>
                     <DroppableColumn id="left" isDragging={!!activeSlot}>
-                      {resolvedLayout.left.map((slot) => (
+                      {visibleLeft.map((slot) => (
                         <DraggableSectionCard key={slot} id={slot} editMode={editable && !!onUpdateLayout}>
                           {renderSlot(slot)}
                         </DraggableSectionCard>
@@ -3068,9 +3084,9 @@ export function FichaDocumentView({
                   </SortableContext>
 
                   {/* Columna derecha */}
-                  <SortableContext items={resolvedLayout.right} strategy={verticalListSortingStrategy}>
+                  <SortableContext items={visibleRight} strategy={verticalListSortingStrategy}>
                     <DroppableColumn id="right" isDragging={!!activeSlot}>
-                      {resolvedLayout.right.map((slot) => (
+                      {visibleRight.map((slot) => (
                         <DraggableSectionCard key={slot} id={slot} editMode={editable && !!onUpdateLayout}>
                           {renderSlot(slot)}
                         </DraggableSectionCard>
