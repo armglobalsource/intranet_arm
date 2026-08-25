@@ -1978,6 +1978,127 @@ function EncuentroTabs({
 
 type LayoutSlot = 'pastoral' | 'produccion' | 'media' | 'streaming' | 'horarios' | 'worship' | 'voluntarios' | 'anuncios';
 
+/**
+ * Grid de dos columnas con divisor arrastrable en modo edición.
+ * Guarda el ratio (0.2–0.8) con debounce mientras se arrastra, y hace
+ * commit inmediato al soltar el mouse.
+ */
+function ColumnResizeGrid({
+  leftRatio,
+  editable,
+  onRatioChange,
+  children,
+}: {
+  leftRatio: number;
+  editable: boolean;
+  onRatioChange: (r: number) => void;
+  children: [React.ReactNode, React.ReactNode];
+}) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [localRatio, setLocalRatio] = React.useState(leftRatio);
+  const [dragging, setDragging] = React.useState(false);
+
+  // Sincronizar cuando cambia desde afuera (otro usuario editando)
+  React.useEffect(() => {
+    if (!dragging) setLocalRatio(leftRatio);
+  }, [leftRatio, dragging]);
+
+  React.useEffect(() => {
+    if (!dragging) return;
+
+    function onMove(e: MouseEvent) {
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const raw = (e.clientX - rect.left) / rect.width;
+      const clamped = Math.min(0.8, Math.max(0.2, raw));
+      setLocalRatio(clamped);
+    }
+    function onUp() {
+      setDragging(false);
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [dragging]);
+
+  // Al soltar, commit al backend (solo si cambió)
+  React.useEffect(() => {
+    if (dragging) return;
+    if (Math.abs(localRatio - leftRatio) > 0.005) {
+      onRatioChange(Math.round(localRatio * 100) / 100);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragging]);
+
+  const divider = editable ? 6 : 0;
+  const gap = 16;
+
+  return (
+    <div
+      ref={containerRef}
+      className="ficha-grid"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: editable
+          ? `${localRatio}fr ${divider}px ${1 - localRatio}fr`
+          : `${localRatio}fr ${1 - localRatio}fr`,
+        gap: editable ? `0 ${gap - divider - 4}px` : gap,
+        alignItems: 'start',
+      }}
+    >
+      <div style={{ minWidth: 0, paddingRight: editable ? 8 : 0 }}>{children[0]}</div>
+      {editable && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          title="Arrastra para ajustar el ancho de columnas"
+          onMouseDown={(e) => { e.preventDefault(); setDragging(true); }}
+          onDoubleClick={() => { setLocalRatio(0.5); onRatioChange(0.5); }}
+          className="ficha-no-print"
+          style={{
+            cursor: 'col-resize',
+            width: divider,
+            alignSelf: 'stretch',
+            background: dragging ? 'rgba(127,119,221,0.55)' : 'rgba(127,119,221,0.18)',
+            borderRadius: 3,
+            transition: 'background 0.15s',
+            position: 'relative',
+          }}
+          onMouseEnter={(e) => {
+            if (!dragging) (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.35)';
+          }}
+          onMouseLeave={(e) => {
+            if (!dragging) (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.18)';
+          }}
+        >
+          {/* Grip visual central */}
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            display: 'flex', flexDirection: 'column', gap: 3,
+            pointerEvents: 'none',
+          }}>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} style={{ width: 2, height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.7)' }} />
+            ))}
+          </div>
+        </div>
+      )}
+      <div style={{ minWidth: 0, paddingLeft: editable ? 8 : 0 }}>{children[1]}</div>
+    </div>
+  );
+}
+
 const DEFAULT_LAYOUT: { left: LayoutSlot[]; right: LayoutSlot[] } = {
   left:  ['pastoral', 'produccion', 'streaming', 'horarios'],
   right: ['worship', 'media', 'voluntarios', 'anuncios'],
@@ -2010,7 +2131,7 @@ function DraggableSectionCard({ id, editMode, children }: { id: string; editMode
         position:   'relative',
       }}
     >
-      {/* Handle de arrastre — visible solo en modo edición */}
+      {/* Handle de arrastre — siempre visible en modo edición */}
       {editMode && (
         <div
           {...attributes}
@@ -2018,17 +2139,28 @@ function DraggableSectionCard({ id, editMode, children }: { id: string; editMode
           className="ficha-no-print"
           title="Arrastra para mover este módulo"
           style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            height: 14, cursor: 'grab', opacity: 0, transition: 'opacity 0.15s',
-            marginBottom: -2, borderRadius: '6px 6px 0 0',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            height: 20, cursor: isDragging ? 'grabbing' : 'grab',
+            marginBottom: 2, borderRadius: '6px 6px 0 0',
+            background: 'rgba(127,119,221,0.08)',
+            border: '0.5px solid rgba(127,119,221,0.2)',
+            transition: 'background 0.15s',
+            touchAction: 'none',
           }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0'; }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.18)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.08)'; }}
         >
-          <svg width="28" height="6" viewBox="0 0 28 6" fill="rgba(255,255,255,0.25)">
-            <rect y="0" width="28" height="1.5" rx="1" />
-            <rect y="4" width="28" height="1.5" rx="1" />
+          <svg width="24" height="8" viewBox="0 0 24 8" fill="rgba(127,119,221,0.75)">
+            <rect y="0" width="24" height="1.5" rx="1" />
+            <rect y="3.5" width="24" height="1.5" rx="1" />
+            <rect y="7" width="24" height="1" rx="0.5" opacity="0.6" />
           </svg>
+          <span style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+            color: 'rgba(127,119,221,0.85)', textTransform: 'uppercase',
+          }}>
+            Mover
+          </span>
         </div>
       )}
       {children}
@@ -2062,8 +2194,8 @@ export interface FichaDocumentViewProps {
   saveState?: 'idle' | 'saving' | 'saved' | 'error';
   hiddenSections?: SectionName[];
   onToggleModule?: (name: SectionName) => void;
-  sectionLayout?: { left: string[]; right: string[] };
-  onUpdateLayout?: (layout: { left: string[]; right: string[] }) => void;
+  sectionLayout?: { left: string[]; right: string[]; leftRatio?: number };
+  onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
 }
 
 export function FichaDocumentView({
@@ -2108,11 +2240,13 @@ export function FichaDocumentView({
 
   // ── Layout drag-to-reorder ────────────────────────────────────────────────
   const defaultLayout = ficha.type === 'oracion' ? DEFAULT_LAYOUT_ORACION : DEFAULT_LAYOUT;
-  const storedLayout = (sectionLayoutProp ?? defaultLayout) as { left: LayoutSlot[]; right: LayoutSlot[] };
+  const storedLayout = (sectionLayoutProp ?? defaultLayout) as { left: LayoutSlot[]; right: LayoutSlot[]; leftRatio?: number };
   const layoutHasMedia = [...storedLayout.left, ...storedLayout.right].includes('media');
-  const resolvedLayout: { left: LayoutSlot[]; right: LayoutSlot[] } = layoutHasMedia
-    ? storedLayout
-    : { left: [...storedLayout.left], right: [...storedLayout.right, 'media'] };
+  const resolvedLayout: { left: LayoutSlot[]; right: LayoutSlot[]; leftRatio: number } = {
+    left:  layoutHasMedia ? storedLayout.left  : [...storedLayout.left],
+    right: layoutHasMedia ? storedLayout.right : [...storedLayout.right, 'media'],
+    leftRatio: Math.min(0.8, Math.max(0.2, storedLayout.leftRatio ?? 0.5)),
+  };
 
   const [activeSlot, setActiveSlot] = useState<LayoutSlot | null>(null);
 
@@ -2142,19 +2276,21 @@ export function FichaDocumentView({
     const overIsColLeft  = overId === 'left';
     const overIsColRight = overId === 'right';
 
+    const ratio = layout.leftRatio;
+
     if (activeIsLeft && (overIsLeft || overIsColLeft)) {
       // Reordenar dentro de la columna izquierda
       const from = layout.left.indexOf(activeId);
       const to   = overIsColLeft ? layout.left.length - 1 : layout.left.indexOf(overId as LayoutSlot);
       if (from !== -1 && to !== -1 && from !== to) {
-        onUpdateLayout({ ...layout, left: arrayMove(layout.left, from, to) });
+        onUpdateLayout({ left: arrayMove(layout.left, from, to), right: layout.right, leftRatio: ratio });
       }
     } else if (!activeIsLeft && (!overIsLeft || overIsColRight)) {
       // Reordenar dentro de la columna derecha
       const from = layout.right.indexOf(activeId);
       const to   = overIsColRight ? layout.right.length - 1 : layout.right.indexOf(overId as LayoutSlot);
       if (from !== -1 && to !== -1 && from !== to) {
-        onUpdateLayout({ ...layout, right: arrayMove(layout.right, from, to) });
+        onUpdateLayout({ left: layout.left, right: arrayMove(layout.right, from, to), leftRatio: ratio });
       }
     } else if (activeIsLeft && (!overIsLeft || overIsColRight)) {
       // Mover izquierda → derecha
@@ -2162,14 +2298,14 @@ export function FichaDocumentView({
       const insertAt = overIsColRight ? layout.right.length : Math.max(0, layout.right.indexOf(overId as LayoutSlot));
       const newRight = [...layout.right];
       newRight.splice(insertAt === -1 ? newRight.length : insertAt, 0, activeId);
-      onUpdateLayout({ left: newLeft, right: newRight });
+      onUpdateLayout({ left: newLeft, right: newRight, leftRatio: ratio });
     } else {
       // Mover derecha → izquierda
       const newRight = layout.right.filter((s) => s !== activeId);
       const insertAt = overIsColLeft ? layout.left.length : Math.max(0, layout.left.indexOf(overId as LayoutSlot));
       const newLeft  = [...layout.left];
       newLeft.splice(insertAt === -1 ? newLeft.length : insertAt, 0, activeId);
-      onUpdateLayout({ left: newLeft, right: newRight });
+      onUpdateLayout({ left: newLeft, right: newRight, leftRatio: ratio });
     }
   }
 
@@ -2851,7 +2987,11 @@ export function FichaDocumentView({
                 onDragEnd={handleLayoutDragEnd}
                 onDragCancel={() => setActiveSlot(null)}
               >
-                <div className="ficha-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <ColumnResizeGrid
+                  leftRatio={resolvedLayout.leftRatio}
+                  editable={!!editable && !!onUpdateLayout}
+                  onRatioChange={(r) => onUpdateLayout?.({ left: resolvedLayout.left, right: resolvedLayout.right, leftRatio: r })}
+                >
                   {/* Columna izquierda */}
                   <SortableContext items={resolvedLayout.left} strategy={verticalListSortingStrategy}>
                     <DroppableColumn id="left">
@@ -2873,7 +3013,7 @@ export function FichaDocumentView({
                       ))}
                     </DroppableColumn>
                   </SortableContext>
-                </div>
+                </ColumnResizeGrid>
 
                 {/* Ghost overlay mientras se arrastra */}
                 <DragOverlay>

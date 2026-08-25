@@ -82,7 +82,7 @@ export interface Ficha {
   publishedByName?:   string | null;
   publishedAt?:       any | null;
   hiddenSections?:    SectionName[];
-  sectionLayout?:     { left: string[]; right: string[] };
+  sectionLayout?:     { left: string[]; right: string[]; leftRatio?: number };
 }
 
 export interface FichaListItem {

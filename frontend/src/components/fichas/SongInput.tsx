@@ -4,6 +4,15 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useCanciones, useUpsertCancion } from '@/hooks/useCanciones';
 import type { Cancion } from '@/types/ficha';
 
+// Tokens del tema oscuro de la ficha (ver FichaDocumentView)
+const D = {
+  cardBorder:  'rgba(255,255,255,0.07)',
+  textPrimary: '#f0efec',
+  textSecond:  '#888580',
+  textMuted:   '#555350',
+  inputBorder: 'rgba(255,255,255,0.18)',
+} as const;
+
 interface SongInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -73,8 +82,8 @@ export function SongInput({ value, onChange, onSongSelect, readOnly = false, pla
 
   if (readOnly) {
     return (
-      <div className="input text-xs py-1.5 bg-gray-50 cursor-default text-gray-700">
-        {value || <span className="text-gray-300 italic">—</span>}
+      <div style={{ fontSize: 13, fontWeight: 500, color: value ? D.textPrimary : D.textMuted }}>
+        {value || '—'}
       </div>
     );
   }
@@ -86,7 +95,18 @@ export function SongInput({ value, onChange, onSongSelect, readOnly = false, pla
         type="text"
         value={query}
         placeholder={placeholder}
-        className="input text-xs py-1.5 w-full pr-6"
+        style={{
+          width: '100%',
+          border: 'none',
+          borderBottom: `1px dashed ${D.inputBorder}`,
+          outline: 'none',
+          background: 'transparent',
+          padding: '1px 18px 1px 2px',
+          fontSize: 13,
+          fontWeight: 500,
+          color: D.textPrimary,
+          caretColor: '#7F77DD',
+        }}
         onFocus={() => { setFocused(true); setOpen(true); }}
         onBlur={() => {
           setFocused(false);
@@ -115,8 +135,8 @@ export function SongInput({ value, onChange, onSongSelect, readOnly = false, pla
       />
 
       {/* Icono de nota musical */}
-      <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-        <svg className="w-3 h-3 text-gray-300" viewBox="0 0 24 24" fill="none"
+      <span className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: D.textMuted }}>
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 18V5l12-2v13" />
           <circle cx="6" cy="18" r="3" />
@@ -128,7 +148,13 @@ export function SongInput({ value, onChange, onSongSelect, readOnly = false, pla
       {open && filtered.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+          className="absolute z-50 left-0 right-0 top-full mt-1 overflow-hidden"
+          style={{
+            background: '#1a1a1a',
+            border: `0.5px solid rgba(255,255,255,0.12)`,
+            borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}
         >
           {filtered.map((cancion) => (
             <button
@@ -138,31 +164,34 @@ export function SongInput({ value, onChange, onSongSelect, readOnly = false, pla
                 e.preventDefault(); // evita blur antes de confirmar
                 confirm(cancion.titulo, cancion);
               }}
-              className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors"
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              <span className="text-xs font-medium text-gray-800 truncate">
+              <span className="text-xs font-medium truncate" style={{ color: D.textPrimary }}>
                 {cancion.titulo}
               </span>
               <span className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                 {cancion.tipo && (
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
                     style={{
-                      background: cancion.tipo.startsWith('Rápid') ? 'rgba(249,115,22,0.1)' : 'rgba(99,102,241,0.1)',
+                      background: cancion.tipo.startsWith('Rápid') ? 'rgba(249,115,22,0.12)' : 'rgba(99,102,241,0.12)',
                       color:      cancion.tipo.startsWith('Rápid') ? '#f97316' : '#6366f1',
                     }}>
                     {cancion.tipo.startsWith('Rápid') ? '⚡' : '✨'}
                   </span>
                 )}
                 {cancion.bpm && (
-                  <span className="text-[10px] text-gray-400 font-medium">{cancion.bpm} BPM</span>
+                  <span className="text-[10px] font-medium" style={{ color: D.textSecond }}>{cancion.bpm} BPM</span>
                 )}
                 {cancion.tonalidad && (
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                    style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1' }}>
+                    style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
                     {cancion.tonalidad}
                   </span>
                 )}
-                <span className="text-[10px] text-gray-400">
+                <span className="text-[10px]" style={{ color: D.textMuted }}>
                   ×{cancion.usageCount}
                 </span>
               </span>
@@ -176,15 +205,23 @@ export function SongInput({ value, onChange, onSongSelect, readOnly = false, pla
                 e.preventDefault();
                 confirm(query.trim());
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-indigo-50 transition-colors border-t border-gray-100"
+              className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderTop: `0.5px solid ${D.cardBorder}`,
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.1)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              <svg className="w-3 h-3 text-indigo-400" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none"
+                stroke="#7F77DD" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span className="text-xs text-indigo-600">
-                Agregar "<strong>{query.trim()}</strong>"
+              <span className="text-xs" style={{ color: '#7F77DD' }}>
+                Agregar &ldquo;<strong>{query.trim()}</strong>&rdquo;
               </span>
             </button>
           )}

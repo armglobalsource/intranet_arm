@@ -1,6 +1,7 @@
 import {
   ArrayMaxSize, IsString, IsOptional, IsIn, IsArray, ValidateNested,
   IsBoolean, IsNumber, IsObject, IsDateString, IsNotEmpty, MaxLength,
+  Min, Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -36,6 +37,10 @@ export class SectionLayoutDto {
 
   @IsArray() @ArrayMaxSize(7) @IsIn(LAYOUT_SLOTS, { each: true })
   right: string[];
+
+  // Proporción del ancho de la columna izquierda (0.2–0.8). Default: 0.5 (50/50)
+  @IsOptional() @IsNumber() @Min(0.2) @Max(0.8)
+  leftRatio?: number;
 }
 
 export class UpdateFichaDto {
