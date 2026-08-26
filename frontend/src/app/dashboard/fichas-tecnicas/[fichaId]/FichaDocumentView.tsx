@@ -3262,25 +3262,22 @@ export function FichaDocumentView({
         )}
 
         {/* ── Vista alternativa: Layout Visual ──
-            Se renderiza SIEMPRE en el DOM cuando hay onUpdateLayoutVisual
-            (para que print pueda mostrarla en segunda página), pero visible
-            en pantalla solo cuando la píldora "Layout Visual" está activa.
-            En pantalla, cuando no está activa, se oculta con display:none
-            para no afectar el layout. En print, ambas vistas quedan visibles
-            con page-break entre ellas (CSS más abajo en @media print). */}
-        {(onUpdateLayoutVisual || ficha.layoutVisual) && (
-          <div
-            className={`layout-visual-page ${isLayoutView ? 'ficha-view-active' : 'ficha-view-hidden'}`}
-            style={{ display: isLayoutView ? 'block' : 'none' }}
-          >
-            <LayoutVisualView
-              ficha={ficha}
-              editable={!!editable}
-              localSetListRows={editable ? localSections?.setList : undefined}
-              onSave={onUpdateLayoutVisual}
-            />
-          </div>
-        )}
+            Se renderiza SIEMPRE en el DOM para que print pueda mostrarla
+            en segunda página, pero visible en pantalla solo cuando la
+            píldora "Layout Visual" está activa. En pantalla, cuando no
+            está activa, se oculta con display:none. En print (Fase 3)
+            ambas vistas quedan visibles con page-break entre ellas. */}
+        <div
+          className={`layout-visual-page ${isLayoutView ? 'ficha-view-active' : 'ficha-view-hidden'}`}
+          style={{ display: isLayoutView ? 'block' : 'none' }}
+        >
+          <LayoutVisualView
+            ficha={ficha}
+            editable={!!editable && !!onUpdateLayoutVisual}
+            localSetListRows={editable ? localSections?.setList : undefined}
+            onSave={onUpdateLayoutVisual}
+          />
+        </div>
 
         {/* ── Cuerpo (vista clásica por encuentro) ── */}
         <div
