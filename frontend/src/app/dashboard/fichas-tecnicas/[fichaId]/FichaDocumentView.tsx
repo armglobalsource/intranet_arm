@@ -2106,11 +2106,21 @@ function VoluntariosCard({
 function EncuentroTabs({
   encuentros, selected, onChange, showLayoutTab,
 }: { encuentros: Encuentro[]; selected: string; onChange: (id: string) => void; showLayoutTab?: boolean }) {
-  const showEncuentroPills = encuentros.length > 1;
-  // Si no hay ni multi-encuentro ni layout tab, no renderizar nada.
+  const hasMultipleEncuentros = encuentros.length > 1;
+  // Cuando showLayoutTab está activo, SIEMPRE mostramos al menos una píldora
+  // de encuentro (aunque haya solo uno) para que el usuario pueda volver
+  // a la vista principal desde Layout Visual sin salir de la ficha.
+  const showEncuentroPills = hasMultipleEncuentros || (!!showLayoutTab && encuentros.length >= 1);
   if (!showEncuentroPills && !showLayoutTab) return null;
 
   const LAYOUT_COLOR = '#0D9488'; // teal — mismo que HubCard y catálogo
+
+  // Label para la píldora del único encuentro: si viene con label propio, se
+  // usa tal cual; si no, "Ficha" es más natural para el toggle de vuelta.
+  function pillLabel(e: Encuentro): string {
+    if (hasMultipleEncuentros) return e.label;
+    return e.label && e.label.trim() ? e.label : 'Ficha';
+  }
 
   return (
     <div className="ficha-no-print" style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2126,7 +2136,7 @@ function EncuentroTabs({
               : { background: 'rgba(255,255,255,0.05)', color: D.textSecond, borderColor: D.cardBorder }),
           }}
         >
-          {e.label}
+          {pillLabel(e)}
         </button>
       ))}
 
