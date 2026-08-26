@@ -405,6 +405,21 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     [scheduleSave],
   );
 
+  // ── Renombrar label de una fila ─────────────────────────────────────────────
+  const handleLabelChange = useCallback(
+    (sectionName: SectionName, rowId: string, newLabel: string) => {
+      setLocalSections((prev) => {
+        const rows = prev[sectionName] ?? [];
+        const updated = rows.map((r) =>
+          r.id === rowId ? { ...r, label: newLabel } : r,
+        );
+        scheduleSave(sectionName, updated);
+        return { ...prev, [sectionName]: updated };
+      });
+    },
+    [scheduleSave],
+  );
+
   // ── Reordenar fila (drag & drop) ───────────────────────────────────────────
   const handleReorderRow = useCallback(
     (sectionName: SectionName, fromIndex: number, toIndex: number) => {
@@ -664,6 +679,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             onCellChange={handleCellChange}
             onAddRow={handleAddRow}
             onDeleteRow={handleDeleteRow}
+            onLabelChange={handleLabelChange}
             onReorderRow={handleReorderRow}
             onSectionComplete={handleSectionComplete}
             sectionStatus={sectionStatus}

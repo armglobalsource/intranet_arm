@@ -504,6 +504,99 @@ function AddRowInline({ sectionName, onAdd }: {
   );
 }
 
+// ── EditableLabel ─────────────────────────────────────────────────────────────
+
+/**
+ * Label editable inline. Muestra el valor como texto y al hacer click (o
+ * doble-click) se convierte en input. Guarda en blur o Enter. Escape
+ * cancela.
+ *
+ * En modo NO editable renderiza como span estático (mismo texto, sin
+ * caja de input). Útil para vista de solo lectura y para impresión.
+ */
+function EditableLabel({
+  value,
+  editable,
+  onChange,
+  style,
+  placeholder = 'Nombre…',
+}: {
+  value: string;
+  editable?: boolean;
+  onChange?: (v: string) => void;
+  style?: React.CSSProperties;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setDraft(value); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.select(); }, [editing]);
+
+  function commit() {
+    const trimmed = draft.trim();
+    setEditing(false);
+    if (!trimmed || trimmed === value) { setDraft(value); return; }
+    onChange?.(trimmed);
+  }
+
+  if (!editable || !onChange) {
+    return <span style={style}>{value}</span>;
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { setDraft(value); setEditing(false); }
+        }}
+        placeholder={placeholder}
+        style={{
+          ...style,
+          background: 'rgba(127,119,221,0.08)',
+          border: '1px solid rgba(127,119,221,0.45)',
+          borderRadius: 4,
+          padding: '1px 4px',
+          outline: 'none',
+          color: D.textPrimary,
+          font: 'inherit',
+          minWidth: 60,
+          caretColor: C.purple,
+        }}
+      />
+    );
+  }
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={() => setEditing(true)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }}
+      title="Click para renombrar"
+      className="ficha-editable-label"
+      style={{
+        ...style,
+        cursor: 'text',
+        borderRadius: 3,
+        padding: '1px 3px',
+        margin: '-1px -3px',
+        transition: 'background 0.12s',
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.10)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+    >
+      {value || <span style={{ opacity: 0.5, fontStyle: 'italic' }}>{placeholder}</span>}
+    </span>
+  );
+}
+
 // ── SectionFooter ─────────────────────────────────────────────────────────────
 
 function SectionFooter({ sectionName, editable, isCompleted, onAddRow, onComplete }: {
@@ -549,6 +642,8 @@ interface EditProps {
   onCellChange?: (rowId: string, colId: string, value: string) => void;
   onDeleteRow?: (rowId: string) => void;
   onAddRow?: (label: string, type: Row['type'], shared: boolean) => void;
+  /** Renombra el label (título) de una fila. */
+  onLabelChange?: (rowId: string, newLabel: string) => void;
   /** Reordena filas: fromIndex y toIndex son posiciones en el array ordenado (allRows) */
   onReorderRow?: (fromIndex: number, toIndex: number) => void;
   isCompleted?: boolean;
@@ -559,7 +654,7 @@ interface EditProps {
 
 function RoleCard({
   title, rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onLabelChange, onReorderRow, isCompleted, onComplete,
 }: { title: string; rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   if (!displayed.length && !editable) return null;
@@ -576,7 +671,12 @@ function RoleCard({
                 ...(i === displayed.length - 1 ? { borderBottom: 'none', paddingBottom: 0 } : {}),
               }}>
                 {handle}
-                <span style={S.roleLabel}>{row.label}</span>
+                <EditableLabel
+                  value={row.label}
+                  editable={editable}
+                  onChange={onLabelChange ? (v) => onLabelChange(row.id, v) : undefined}
+                  style={S.roleLabel}
+                />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                   {editable ? (
                     <PersonCellInput
@@ -603,7 +703,7 @@ function RoleCard({
 
 function StreamingCard({
   rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onLabelChange, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   const director  = displayed.filter((r) => /director|wirecast/i.test(r.label));
@@ -625,7 +725,12 @@ function StreamingCard({
                 ...(!cameras.length && i === roleRows.length - 1 ? { borderBottom: 'none' } : {}),
               }}>
                 {handle}
-                <span style={S.roleLabel}>{row.label}</span>
+                <EditableLabel
+                  value={row.label}
+                  editable={editable}
+                  onChange={onLabelChange ? (v) => onLabelChange(row.id, v) : undefined}
+                  style={S.roleLabel}
+                />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                   {editable ? (
                     <PersonCellInput
@@ -651,9 +756,12 @@ function StreamingCard({
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         {handle}
-                        <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                          {row.label}
-                        </div>
+                        <EditableLabel
+                          value={row.label}
+                          editable={editable}
+                          onChange={onLabelChange ? (v) => onLabelChange(row.id, v) : undefined}
+                          style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.07em' }}
+                        />
                       </div>
                       {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                     </div>
@@ -684,7 +792,7 @@ function StreamingCard({
 
 function EscenaCard({
   rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onLabelChange, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed  = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   const vio        = displayed.find((r) => r.label === 'VIO');
@@ -770,7 +878,12 @@ function EscenaCard({
                     borderBottom: `0.5px solid ${D.divider}`,
                   }}>
                     {handle}
-                    <span style={{ fontSize: 11, color: D.textSecond, flexShrink: 0 }}>{row.label}</span>
+                    <EditableLabel
+                      value={row.label}
+                      editable={editable}
+                      onChange={onLabelChange ? (v) => onLabelChange(row.id, v) : undefined}
+                      style={{ fontSize: 11, color: D.textSecond, flexShrink: 0 }}
+                    />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                       {editable ? (
                         <PersonCellInput
@@ -1619,7 +1732,12 @@ function WorshipSetListCard({
                   {(handle) => (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', gap: 8, borderBottom: `0.5px solid ${D.divider}` }}>
                       {handle}
-                      <span style={{ fontSize: 11, color: D.textSecond, flexShrink: 0, minWidth: 120 }}>{row.label}</span>
+                      <EditableLabel
+                        value={row.label}
+                        editable={editable}
+                        onChange={escena.onLabelChange ? (v) => escena.onLabelChange!(row.id, v) : undefined}
+                        style={{ fontSize: 11, color: D.textSecond, flexShrink: 0, minWidth: 120 }}
+                      />
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                         {editable ? (
                           <PersonCellInput
@@ -1758,7 +1876,7 @@ function WorshipSetListCard({
 
 function HorariosCard({
   rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onLabelChange, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   if (!displayed.length && !editable) return null;
@@ -1824,14 +1942,17 @@ function HorariosCard({
                   }} />
 
                   {/* Etiqueta */}
-                  <span style={{
-                    fontSize: 12, flex: 1, padding: '8px 0',
-                    fontWeight: isBold ? 600 : 400,
-                    color: isBold ? D.textPrimary : D.textSecond,
-                    letterSpacing: isBold ? '-0.01em' : 'normal',
-                  }}>
-                    {row.label}
-                  </span>
+                  <EditableLabel
+                    value={row.label}
+                    editable={editable}
+                    onChange={onLabelChange ? (v) => onLabelChange(row.id, v) : undefined}
+                    style={{
+                      fontSize: 12, flex: 1, padding: '8px 0',
+                      fontWeight: isBold ? 600 : 400,
+                      color: isBold ? D.textPrimary : D.textSecond,
+                      letterSpacing: isBold ? '-0.01em' : 'normal',
+                    }}
+                  />
 
                   {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                 </div>
@@ -1849,7 +1970,7 @@ function HorariosCard({
 
 function AnunciosCard({
   rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onLabelChange, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   if (!displayed.length && !editable) return null;
@@ -1870,12 +1991,18 @@ function AnunciosCard({
                     borderBottom: i < displayed.length - 1 ? `0.5px solid ${D.divider}` : 'none',
                   }}>
                     {handle}
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, color: D.textSecond,
-                      flexShrink: 0, whiteSpace: 'nowrap' as const,
-                    }}>
-                      {row.label}:
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, flexShrink: 0 }}>
+                      <EditableLabel
+                        value={row.label}
+                        editable={editable}
+                        onChange={onLabelChange ? (v) => onLabelChange(row.id, v) : undefined}
+                        style={{
+                          fontSize: 11, fontWeight: 600, color: D.textSecond,
+                          whiteSpace: 'nowrap' as const,
+                        }}
+                      />
+                      <span style={{ fontSize: 11, fontWeight: 600, color: D.textSecond }}>:</span>
+                    </div>
                     {editable ? (
                       <>
                         <textarea
@@ -1927,7 +2054,7 @@ function AnunciosCard({
 
 function VoluntariosCard({
   rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onReorderRow, isCompleted, onComplete,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onLabelChange, onReorderRow, isCompleted, onComplete,
 }: { rows: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
   if (!displayed.length && !editable) return null;
@@ -1944,7 +2071,12 @@ function VoluntariosCard({
                 ...(i === displayed.length - 1 ? { borderBottom: 'none' } : {}),
               }}>
                 {handle}
-                <span style={S.roleLabel}>{row.label}</span>
+                <EditableLabel
+                  value={row.label}
+                  editable={editable}
+                  onChange={onLabelChange ? (v) => onLabelChange(row.id, v) : undefined}
+                  style={S.roleLabel}
+                />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                   {editable ? (
                     <PersonCellInput
@@ -2229,6 +2361,7 @@ export interface FichaDocumentViewProps {
   onCellChange?: (section: SectionName, rowId: string, colId: string, value: string) => void;
   onAddRow?: (section: SectionName, label: string, type: Row['type'], shared: boolean) => void;
   onDeleteRow?: (section: SectionName, rowId: string) => void;
+  onLabelChange?: (section: SectionName, rowId: string, newLabel: string) => void;
   onReorderRow?: (section: SectionName, fromIndex: number, toIndex: number) => void;
   onSectionComplete?: (section: SectionName) => void;
   sectionStatus?: Partial<Record<SectionName, boolean>>;
@@ -2242,7 +2375,7 @@ export interface FichaDocumentViewProps {
 export function FichaDocumentView({
   ficha, onEdit, onSave, onArchive, onUnarchive, canArchive,
   onPublish, onUnpublish, canPublish, isPublishing,
-  editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onReorderRow, onSectionComplete,
+  editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onSectionComplete,
   sectionStatus, saveState, hiddenSections, onToggleModule,
   sectionLayout: sectionLayoutProp, onUpdateLayout,
 }: FichaDocumentViewProps) {
@@ -2266,6 +2399,7 @@ export function FichaDocumentView({
     onCellChange:  onCellChange  ? (rowId, cId, value) => onCellChange(name, rowId, cId, value)      : undefined,
     onDeleteRow:   onDeleteRow   ? (rowId) => onDeleteRow(name, rowId)                                : undefined,
     onAddRow:      onAddRow      ? (label, type, shared) => onAddRow(name, label, type, shared)       : undefined,
+    onLabelChange: onLabelChange ? (rowId, newLabel) => onLabelChange(name, rowId, newLabel)          : undefined,
     onReorderRow:  onReorderRow  ? (from, to) => onReorderRow(name, from, to)                        : undefined,
     isCompleted:   sectionStatus?.[name] ?? sections?.[name]?.isCompleted,
     onComplete:    onSectionComplete ? () => onSectionComplete(name)                                  : undefined,
