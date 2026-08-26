@@ -2031,9 +2031,11 @@ function AnunciosCard({
                       </>
                     ) : (
                       <span style={{
+                        flex: 1, minWidth: 0,
                         fontSize: 12, color: content ? D.textPrimary : D.textMuted,
                         lineHeight: 1.45, whiteSpace: 'pre-wrap' as const,
                         wordBreak: 'break-word' as const,
+                        overflowWrap: 'anywhere' as const,
                       }}>
                         {content || '—'}
                       </span>
