@@ -879,10 +879,11 @@ export class FichasService {
     await ref.update({
       layoutVisual: {
         songs: dto.songs.map((s) => ({
-          songRowId:         s.songRowId,
-          iluminacion:       s.iluminacion ?? '',
-          visualDescription: s.visualDescription ?? '',
-          referenceIds:      s.referenceIds ?? [],
+          songRowId:          s.songRowId,
+          iluminacion:        s.iluminacion ?? '',
+          illuminationColors: s.illuminationColors ?? [],
+          visualDescription:  s.visualDescription ?? '',
+          referenceIds:       s.referenceIds ?? [],
         })),
         updatedAt: this.fb.now(),
         updatedBy: user.sub,

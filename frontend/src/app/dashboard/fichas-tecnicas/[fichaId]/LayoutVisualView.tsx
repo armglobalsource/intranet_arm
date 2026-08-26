@@ -47,11 +47,141 @@ function reconcile(
   const currentById = new Map(currentSongs.map((s) => [s.songRowId, s]));
   const sorted = [...setListRows].sort((a, b) => a.order - b.order);
   return sorted.map((row) => currentById.get(row.id) ?? {
-    songRowId:         row.id,
-    iluminacion:       '',
-    visualDescription: '',
-    referenceIds:      [],
+    songRowId:          row.id,
+    iluminacion:        '',
+    illuminationColors: [],
+    visualDescription:  '',
+    referenceIds:       [],
   });
+}
+
+// ── IlluminationColorSwatches ─────────────────────────────────────────────────
+
+/**
+ * Fila de swatches de color con color picker nativo. Cada swatch es
+ * clickeable para editar (input type=color oculto) y tiene una X para
+ * quitar en hover. Botón "+" para agregar un color nuevo (default #7F77DD).
+ * En modo readonly solo muestra los swatches sin controles.
+ */
+function IlluminationColorSwatches({
+  colors, editable, onChange, max = 10,
+}: {
+  colors: string[];
+  editable: boolean;
+  onChange?: (next: string[]) => void;
+  max?: number;
+}) {
+  function updateColor(index: number, hex: string) {
+    if (!onChange) return;
+    onChange(colors.map((c, i) => (i === index ? hex : c)));
+  }
+  function removeColor(index: number) {
+    if (!onChange) return;
+    onChange(colors.filter((_, i) => i !== index));
+  }
+  function addColor() {
+    if (!onChange || colors.length >= max) return;
+    onChange([...colors, '#7F77DD']);
+  }
+
+  if (!editable) {
+    if (colors.length === 0) return null;
+    return (
+      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 6 }}>
+        {colors.map((c, i) => (
+          <div
+            key={i}
+            title={c}
+            style={{
+              width: 20, height: 20, borderRadius: 4,
+              background: c,
+              border: '0.5px solid rgba(255,255,255,0.18)',
+              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+      {colors.map((c, i) => (
+        <label
+          key={i}
+          className="ficha-no-print"
+          title={`${c} — click para cambiar`}
+          style={{
+            position: 'relative', cursor: 'pointer', flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              width: 22, height: 22, borderRadius: 4,
+              background: c,
+              border: '1px solid rgba(255,255,255,0.22)',
+              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.25)',
+            }}
+          />
+          <input
+            type="color"
+            value={c}
+            onChange={(e) => updateColor(i, e.target.value)}
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+          />
+          {onChange && (
+            <button
+              onMouseDown={(e) => { e.preventDefault(); removeColor(i); }}
+              title="Quitar"
+              style={{
+                position: 'absolute', top: -5, right: -5,
+                width: 14, height: 14, borderRadius: '50%',
+                background: '#DC2626', color: '#fff',
+                border: '1.5px solid #1a1a1a',
+                fontSize: 9, lineHeight: 1, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 0, opacity: 0,
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0'; }}
+            >
+              ×
+            </button>
+          )}
+        </label>
+      ))}
+
+      {/* Versión estática visible en print */}
+      {colors.length > 0 && (
+        <div className="ficha-print-only" style={{ display: 'none', gap: 3, flexWrap: 'wrap' }}>
+          {colors.map((c, i) => (
+            <div key={i} style={{ width: 18, height: 18, borderRadius: 3, background: c, border: '0.5px solid #666' }} />
+          ))}
+        </div>
+      )}
+
+      {colors.length < max && onChange && (
+        <button
+          onClick={addColor}
+          className="ficha-no-print"
+          title="Agregar color"
+          style={{
+            width: 22, height: 22, borderRadius: 4,
+            border: `1px dashed rgba(127,119,221,0.5)`,
+            background: 'rgba(127,119,221,0.08)',
+            color: '#7F77DD',
+            cursor: 'pointer',
+            fontSize: 13, lineHeight: 1, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, padding: 0,
+          }}
+        >
+          +
+        </button>
+      )}
+    </div>
+  );
 }
 
 // ── LayoutVisualView ──────────────────────────────────────────────────────────
@@ -249,9 +379,15 @@ export function LayoutVisualView({
                     />
                   ) : (
                     <span style={{ fontSize: 12, color: song.iluminacion ? D.textPrimary : D.textMuted, whiteSpace: 'pre-wrap' }}>
-                      {song.iluminacion || '—'}
+                      {song.iluminacion || (song.illuminationColors && song.illuminationColors.length > 0 ? '' : '—')}
                     </span>
                   )}
+                  {/* Paleta cromática de referencia (swatches) */}
+                  <IlluminationColorSwatches
+                    colors={song.illuminationColors ?? []}
+                    editable={editable}
+                    onChange={editable ? (next) => updateSong(song.songRowId, { illuminationColors: next }) : undefined}
+                  />
                 </div>
 
                 {/* Columna Visuales */}

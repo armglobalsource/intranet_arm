@@ -1,7 +1,7 @@
 import {
   ArrayMaxSize, IsString, IsOptional, IsIn, IsArray, ValidateNested,
   IsBoolean, IsNumber, IsObject, IsDateString, IsNotEmpty, MaxLength,
-  Min, Max,
+  Min, Max, Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -93,6 +93,16 @@ export class LayoutVisualSongDto {
   /** Texto libre: "AZUL", "LILA + NARANJO + BLANCO", etc. */
   @IsOptional() @IsString() @MaxLength(500)
   iluminacion?: string;
+
+  /**
+   * Swatches de color (hex #RRGGBB) que representan la paleta de luces
+   * de la canción. Se muestran al lado del texto de iluminación como
+   * referencia visual rápida para el iluminador.
+   */
+  @IsOptional() @IsArray() @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @Matches(/^#[0-9A-Fa-f]{6}$/, { each: true, message: 'Cada color debe ser un hex #RRGGBB' })
+  illuminationColors?: string[];
 
   /** Descripción de qué visuales usar. Puede incluir URL de Drive. */
   @IsOptional() @IsString() @MaxLength(2000)

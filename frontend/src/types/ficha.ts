@@ -63,11 +63,13 @@ export type CompletionStatus = Record<SectionName, boolean>;
  */
 export interface LayoutVisualSong {
   /** Coincide con el row.id de sections.setList.rows para auto-sync. */
-  songRowId:         string;
-  iluminacion:       string;
-  visualDescription: string;
+  songRowId:          string;
+  iluminacion:        string;
+  /** Swatches hex (#RRGGBB) que representan la paleta de luces. */
+  illuminationColors?: string[];
+  visualDescription:  string;
   /** IDs de refs del catálogo (visual_references). */
-  referenceIds:      number[];
+  referenceIds:       number[];
 }
 
 export interface LayoutVisual {
