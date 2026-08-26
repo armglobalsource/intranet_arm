@@ -175,6 +175,14 @@ export const PERMISSION_CATALOG = {
       manage: 'Crear, modificar y eliminar entradas de catálogo',
     },
   },
+  'visual-references': {
+    label: 'Referencias visuales',
+    description: 'Catálogo de imágenes usadas en el layout visual de fichas técnicas',
+    actions: {
+      view:   'Ver el catálogo de referencias visuales',
+      manage: 'Subir, editar y eliminar referencias visuales',
+    },
+  },
 } as const;
 
 export type PermissionResource = keyof typeof PERMISSION_CATALOG;

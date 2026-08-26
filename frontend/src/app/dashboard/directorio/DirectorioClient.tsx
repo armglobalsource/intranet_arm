@@ -196,6 +196,16 @@ export function DirectorioClient() {
           />
         )}
 
+        {can('visual-references:view') && (
+          <HubRow
+            href="/dashboard/directorio/visual-references"
+            icon="🖼️"
+            title="Referencias visuales"
+            description="Biblioteca de imágenes reutilizables para el layout visual de las fichas técnicas."
+            accentColor="#0D9488"
+          />
+        )}
+
         {can('roles:view') && (
           <HubRow
             href="/dashboard/directorio/roles"
