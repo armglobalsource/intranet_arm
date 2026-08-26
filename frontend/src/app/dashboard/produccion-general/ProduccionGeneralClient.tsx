@@ -95,8 +95,9 @@ function MetricCard({ label, value, detail, color, loading }: {
 
 export function ProduccionGeneralClient() {
   const { can, isAdmin } = usePermissions();
-  const canDisponibilidad = isAdmin || can('disponibilidad:submit') || can('disponibilidad:view');
-  const canTecnicos       = isAdmin || can('tecnicos:submit')       || can('tecnicos:view');
+  const canDisponibilidad     = isAdmin || can('disponibilidad:submit') || can('disponibilidad:view');
+  const canTecnicos           = isAdmin || can('tecnicos:submit')       || can('tecnicos:view');
+  const canVisualReferences   = isAdmin || can('visual-references:view');
 
   const { data: fichas, isLoading } = useFichas();
 
@@ -110,7 +111,7 @@ export function ProduccionGeneralClient() {
     ? `${completas}/${total} completas`
     : 'Sin fichas';
 
-  const modulosDisponibles = 1 + Number(canDisponibilidad) + Number(canTecnicos);
+  const modulosDisponibles = 1 + Number(canDisponibilidad) + Number(canTecnicos) + Number(canVisualReferences);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -230,6 +231,24 @@ export function ProduccionGeneralClient() {
             title="Disponibilidad Técnicos"
             description="Disponibilidad semanal del equipo técnico (sonido, streaming, iluminación, stage y visuales)."
             accentColor="#2563eb"
+          />
+        )}
+
+        {canVisualReferences && (
+          <HubCard
+            href="/dashboard/produccion-general/visual-references"
+            icon={
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"
+                stroke="#0D9488" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            }
+            eyebrow="Layout visual"
+            title="Referencias visuales"
+            description="Biblioteca de imágenes reutilizables para el layout visual de las fichas técnicas."
+            accentColor="#0D9488"
           />
         )}
         </div>
