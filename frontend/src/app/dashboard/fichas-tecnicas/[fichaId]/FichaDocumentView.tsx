@@ -3201,6 +3201,13 @@ export function FichaDocumentView({
               return hidden(slot as SectionName);
             };
 
+            // Etiqueta legible del slot, usada por el ghost del DragOverlay.
+            const slotLabel = (slot: LayoutSlot): string => {
+              if (slot === 'worship') return 'AR Worship';
+              if (slot === 'media')   return 'Media';
+              return SECTION_LABELS[slot as SectionName] ?? slot;
+            };
+
             // Filtramos ocultos ANTES del map para no dejar wrappers
             // "MOVER" huérfanos. NO usamos preview optimista aquí: mover
             // items entre SortableContext distintos durante un drag activo
@@ -3264,23 +3271,38 @@ export function FichaDocumentView({
                   </SortableContext>
                 </ColumnResizeGrid>
 
-                {/* Ghost overlay mientras se arrastra — ancho fijo capturado
-                    del rect original para que no tome el ancho del viewport
-                    y rompa la percepción del layout durante el drag. */}
-                <DragOverlay
-                  dropAnimation={null}
-                  style={activeWidth ? { width: activeWidth } : undefined}
-                >
+                {/* Ghost overlay mientras se arrastra — versión estática
+                    minimal (título + pill), no la card completa. Renderizar
+                    la card completa dentro de DragOverlay dispara los hooks
+                    y DndContext anidados de esa card (SortableSection para
+                    reordenar filas), lo cual colisiona con el DndContext
+                    padre y crashea dnd-kit ("Error al cargar la sección").
+                */}
+                <DragOverlay dropAnimation={null}>
                   {activeSlot && (
                     <div style={{
-                      opacity: 0.9,
                       cursor: 'grabbing',
                       pointerEvents: 'none',
-                      width: activeWidth ?? '100%',
-                      boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
+                      width: activeWidth ?? 320,
+                      background: 'rgba(30, 27, 60, 0.98)',
+                      border: '1px solid rgba(127,119,221,0.5)',
                       borderRadius: 12,
+                      padding: '12px 16px',
+                      boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
+                      display: 'flex', alignItems: 'center', gap: 10,
                     }}>
-                      {renderSlot(activeSlot)}
+                      <svg width="18" height="6" viewBox="0 0 24 8" fill="rgba(127,119,221,0.85)">
+                        <rect y="0" width="24" height="1.5" rx="1" />
+                        <rect y="3.5" width="24" height="1.5" rx="1" />
+                        <rect y="7" width="24" height="1" rx="0.5" opacity="0.6" />
+                      </svg>
+                      <span style={{
+                        fontSize: 12, fontWeight: 700,
+                        letterSpacing: '0.08em', textTransform: 'uppercase',
+                        color: '#f0efec',
+                      }}>
+                        {slotLabel(activeSlot)}
+                      </span>
                     </div>
                   )}
                 </DragOverlay>
