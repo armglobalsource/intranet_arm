@@ -2411,6 +2411,45 @@ export function FichaDocumentView({
   const [confirmingPublish, setConfirmingPublish] = useState(false);
   const isPublished = ficha.published ?? false;
   const modulesRef = useRef<HTMLDivElement>(null);
+  const docRef     = useRef<HTMLDivElement>(null);
+
+  // ── Auto-scale para PDF/impresión ──────────────────────────────────────────
+  // Antes de imprimir, medimos el alto real del documento (en pantalla, con
+  // los estilos actuales) y calculamos qué scale se necesita para que quepa
+  // en una A4 portrait. Aplicamos ese scale como CSS variable que se usa
+  // en @media print vía transform: scale().
+  useEffect(() => {
+    // A4 portrait usable ~= 297mm - 12mm de margen = 285mm de alto.
+    // A 96dpi, 1mm ≈ 3.78px → 285mm ≈ 1077px.
+    // El CSS de print reduce fonts/paddings, así que el alto real de print
+    // es aproximadamente 62% del alto en pantalla. Este ratio se afina con
+    // los estilos actuales — si cambian, ajustar aquí.
+    const PRINT_TO_SCREEN_RATIO = 0.62;
+    const A4_USABLE_HEIGHT_PX   = 1077;
+    const MIN_SCALE             = 0.55; // no bajar de 55%, pierde legibilidad
+
+    function computeScale() {
+      const el = docRef.current;
+      if (!el) return;
+      const screenHeight = el.scrollHeight;
+      const estimatedPrintHeight = screenHeight * PRINT_TO_SCREEN_RATIO;
+      const rawScale = estimatedPrintHeight > A4_USABLE_HEIGHT_PX
+        ? A4_USABLE_HEIGHT_PX / estimatedPrintHeight
+        : 1;
+      const scale = Math.max(MIN_SCALE, Math.min(1, rawScale));
+      el.style.setProperty('--ficha-print-scale', String(scale));
+    }
+    function resetScale() {
+      docRef.current?.style.removeProperty('--ficha-print-scale');
+    }
+
+    window.addEventListener('beforeprint', computeScale);
+    window.addEventListener('afterprint', resetScale);
+    return () => {
+      window.removeEventListener('beforeprint', computeScale);
+      window.removeEventListener('afterprint', resetScale);
+    };
+  }, []);
 
   const hidden = (n: SectionName) => (hiddenSections ?? []).includes(n);
 
@@ -2643,12 +2682,19 @@ export function FichaDocumentView({
           /* Contenedor raíz */
           .ficha-doc-root { max-width: 100% !important; margin: 0 !important; }
 
-          /* Documento → fondo blanco, sin borde redondeado */
+          /* Documento → fondo blanco, sin borde redondeado.
+             transform: scale() con var --ficha-print-scale controlado por
+             JS en beforeprint para hacer que quepa en una sola página A4
+             cuando hay muchos módulos. width compensa el scale para que el
+             contenido siga usando todo el ancho de página. */
           .ficha-doc {
             background: #ffffff !important;
             border: none !important;
             border-radius: 0 !important;
             overflow: visible !important;
+            transform: scale(var(--ficha-print-scale, 1));
+            transform-origin: top left;
+            width: calc(100% / var(--ficha-print-scale, 1)) !important;
           }
 
           /* Textos → oscuros */
@@ -2680,8 +2726,20 @@ export function FichaDocumentView({
           /* Cuerpo muy compacto */
           .ficha-body { padding: 6px 8px !important; }
 
-          /* Grilla: gap mínimo */
+          /* Grilla: gap mínimo. Anulamos padding de wrappers y outline/
+             minHeight de DroppableColumn (drag&drop UI que solo tiene
+             sentido en pantalla). */
           .ficha-grid { gap: 5px !important; }
+          .ficha-grid > div {
+            padding: 0 !important;
+            min-height: 0 !important;
+          }
+          .ficha-grid > div > div {
+            min-height: 0 !important;
+            outline: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+          }
 
           /* Tarjetas: sin fondo, borde fino, padding mínimo, no cortar */
           .ficha-card {
@@ -2738,6 +2796,7 @@ export function FichaDocumentView({
 
       {/* Documento */}
       <div
+        ref={docRef}
         className="ficha-doc"
         style={{
           background: D.bg,
