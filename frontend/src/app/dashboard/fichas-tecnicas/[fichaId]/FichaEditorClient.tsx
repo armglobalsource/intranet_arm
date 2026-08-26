@@ -223,9 +223,21 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const hiddenInflight = useRef(0);
 
   useEffect(() => {
-    if (hiddenInflight.current === 0) {
-      setLocalHidden(ficha?.hiddenSections ?? []);
+    if (hiddenInflight.current !== 0) return;
+    const serverHidden = ficha?.hiddenSections ?? [];
+    // Comparación por contenido (no por referencia). Firestore snapshots
+    // devuelven arrays con nueva referencia aunque el contenido sea el
+    // mismo — si no comparamos por contenido, setLocalHidden dispara un
+    // re-render innecesario en cada snapshot, y eso puede causar flicker
+    // visible del checkbox y (peor) pisar el estado optimista si otro
+    // click justo cae en la misma micro-ventana.
+    if (
+      serverHidden.length !== localHidden.length ||
+      serverHidden.some((s, i) => s !== localHidden[i])
+    ) {
+      setLocalHidden(serverHidden);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ficha?.hiddenSections]);
 
   const { mutateAsync: updateSectionAsync } = useUpdateSection();
