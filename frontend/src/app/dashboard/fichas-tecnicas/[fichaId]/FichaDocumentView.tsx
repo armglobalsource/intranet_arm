@@ -30,7 +30,6 @@ import {
   DragOverlay,
   type CollisionDetection,
   type DragEndEvent,
-  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import {
@@ -2430,11 +2429,6 @@ export function FichaDocumentView({
   // no aparezca del ancho del viewport y rompa el layout.
   const [activeWidth, setActiveWidth] = useState<number | null>(null);
 
-  // Layout local optimista: durante el drag se actualiza en tiempo real
-  // en onDragOver para dar preview visual del cambio. Al soltar (dragEnd)
-  // se commitea al backend. Si el usuario cancela, se resetea desde el prop.
-  const [draftLayout, setDraftLayout] = useState<{ left: LayoutSlot[]; right: LayoutSlot[] } | null>(null);
-
   const layoutSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -2461,9 +2455,6 @@ export function FichaDocumentView({
     setActiveSlot(id as LayoutSlot);
     const rect = active.rect.current.initial ?? active.rect.current.translated;
     if (rect?.width) setActiveWidth(rect.width);
-    // Inicializar el draft con el layout actual (sin ratio; ratio se
-    // maneja aparte y no cambia durante el drag).
-    setDraftLayout({ left: [...resolvedLayout.left], right: [...resolvedLayout.right] });
   }
 
   // Recalcula el layout dado un evento de over. Devuelve null si nada cambia.
@@ -2508,34 +2499,29 @@ export function FichaDocumentView({
       : { left: newFrom, right: newTo };  // izq → der
   }
 
-  function handleLayoutDragOver({ active, over }: DragOverEvent) {
-    if (!over || !draftLayout) return;
-    const activeId = active.id as LayoutSlot;
-    const overId   = over.id as string;
-    const next = computeLayout(activeId, overId, draftLayout);
-    if (next) setDraftLayout(next);
-  }
-
   function handleLayoutDragEnd({ active, over }: DragEndEvent) {
-    const finalDraft = draftLayout;
     setActiveSlot(null);
     setActiveWidth(null);
-    setDraftLayout(null);
-    if (!over || !onUpdateLayout || !finalDraft) return;
+    if (!over || !onUpdateLayout) return;
 
-    const layout = resolvedLayout;
-    // Solo commit si algo cambió respecto al estado real actual.
-    const changed =
-      finalDraft.left.join(',')  !== layout.left.join(',') ||
-      finalDraft.right.join(',') !== layout.right.join(',');
-    if (!changed) return;
-    onUpdateLayout({ left: finalDraft.left, right: finalDraft.right, leftRatio: layout.leftRatio });
+    const activeId = active.id as string;
+    const overId   = over.id as string;
+    if (sideOf(activeId, resolvedLayout) === null) return;
+
+    // computeLayout es pura: dado el layout actual + evento, devuelve el
+    // layout resultante o null si no hay cambio. Evitamos el preview
+    // optimista (draftLayout) porque desmontar/remontar DraggableSectionCard
+    // entre SortableContext distintos durante un drag activo hace crash a
+    // useSortable de dnd-kit. En su lugar, el DragOverlay muestra el ghost
+    // siguiendo el cursor y solo aplicamos el cambio al soltar.
+    const next = computeLayout(activeId as LayoutSlot, overId, resolvedLayout);
+    if (!next) return;
+    onUpdateLayout({ left: next.left, right: next.right, leftRatio: resolvedLayout.leftRatio });
   }
 
   function handleLayoutDragCancel() {
     setActiveSlot(null);
     setActiveWidth(null);
-    setDraftLayout(null);
   }
 
   const { paletas, loading: paletasLoading } = usePaletas();
@@ -3215,12 +3201,13 @@ export function FichaDocumentView({
               return hidden(slot as SectionName);
             };
 
-            // Durante el drag preferimos draftLayout (preview optimista); al
-            // soltar volvemos a resolvedLayout. Filtramos ocultos ANTES del
-            // map para no dejar wrappers "MOVER" huérfanos.
-            const activeLayout = draftLayout ?? { left: resolvedLayout.left, right: resolvedLayout.right };
-            const visibleLeft  = activeLayout.left.filter((s) => !slotIsHidden(s));
-            const visibleRight = activeLayout.right.filter((s) => !slotIsHidden(s));
+            // Filtramos ocultos ANTES del map para no dejar wrappers
+            // "MOVER" huérfanos. NO usamos preview optimista aquí: mover
+            // items entre SortableContext distintos durante un drag activo
+            // causa que useSortable crashee (el nodo se desmonta y remonta).
+            // El DragOverlay ya muestra el ghost siguiendo el cursor.
+            const visibleLeft  = resolvedLayout.left.filter((s) => !slotIsHidden(s));
+            const visibleRight = resolvedLayout.right.filter((s) => !slotIsHidden(s));
 
             // Todos los slots de ambas columnas como IDs para los SortableContext
             const allSlots = [...visibleLeft, ...visibleRight];
@@ -3246,7 +3233,6 @@ export function FichaDocumentView({
                 sensors={layoutSensors}
                 collisionDetection={detectCollisions}
                 onDragStart={handleLayoutDragStart}
-                onDragOver={handleLayoutDragOver}
                 onDragEnd={handleLayoutDragEnd}
                 onDragCancel={handleLayoutDragCancel}
               >
