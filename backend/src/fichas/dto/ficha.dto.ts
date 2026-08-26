@@ -79,3 +79,32 @@ export class UpdateSectionDto {
   @IsOptional() @IsArray() @ArrayMaxSize(100) @ValidateNested({ each: true }) @Type(() => RowDto)
   rows?: RowDto[];
 }
+
+// ── Layout Visual ────────────────────────────────────────────────────────────
+// Vista alternativa de la ficha (píldora "Layout Visual" en la barra de tabs).
+// Una fila por canción del Set List. Se persiste como campo top-level
+// ficha.layoutVisual (NO es una Section, no participa en hiddenSections).
+
+export class LayoutVisualSongDto {
+  /** Debe coincidir con el row.id de sections.setList.rows para el sync. */
+  @IsString() @IsNotEmpty() @MaxLength(80)
+  songRowId: string;
+
+  /** Texto libre: "AZUL", "LILA + NARANJO + BLANCO", etc. */
+  @IsOptional() @IsString() @MaxLength(500)
+  iluminacion?: string;
+
+  /** Descripción de qué visuales usar. Puede incluir URL de Drive. */
+  @IsOptional() @IsString() @MaxLength(2000)
+  visualDescription?: string;
+
+  /** IDs de referencias visuales del catálogo global (visual_references). */
+  @IsOptional() @IsArray() @ArrayMaxSize(50)
+  @IsNumber({}, { each: true })
+  referenceIds?: number[];
+}
+
+export class UpdateLayoutVisualDto {
+  @IsArray() @ArrayMaxSize(30) @ValidateNested({ each: true }) @Type(() => LayoutVisualSongDto)
+  songs: LayoutVisualSongDto[];
+}

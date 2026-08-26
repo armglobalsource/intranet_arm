@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import Link from 'next/link';
-import { useFichaRealtime, useUpdateSection, useCompleteSection, useReopenSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, usePublishFicha, useUnpublishFicha, useSplitPrayerGlobal } from '@/hooks/useFichas';
+import { useFichaRealtime, useUpdateSection, useCompleteSection, useReopenSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, useUpdateLayoutVisual, usePublishFicha, useUnpublishFicha, useSplitPrayerGlobal } from '@/hooks/useFichas';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -246,6 +246,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { mutate: archiveFicha } = useArchiveFicha();
   const { mutate: unarchiveFicha } = useUnarchiveFicha();
   const { mutate: updateFicha } = useUpdateFicha();
+  const { mutate: updateLayoutVisual } = useUpdateLayoutVisual();
   const { mutate: publishFicha,   isPending: isPublishing  } = usePublishFicha();
   const { mutate: unpublishFicha, isPending: isUnpublishing } = useUnpublishFicha();
   const { mutateAsync: splitPrayerGlobal, isPending: isSplitting } = useSplitPrayerGlobal();
@@ -287,6 +288,11 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   function handleUpdateLayout(layout: { left: string[]; right: string[]; leftRatio?: number }) {
     if (!ficha) return;
     updateFicha({ fichaId: ficha.fichaId, sectionLayout: layout });
+  }
+
+  function handleUpdateLayoutVisual(songs: any[]) {
+    if (!ficha) return;
+    updateLayoutVisual({ fichaId: ficha.fichaId, songs });
   }
 
   // ── Sincronizar filas desde la versión más reciente de la API ─────────────
@@ -700,6 +706,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             onToggleModule={canEdit ? handleToggleModule : undefined}
             sectionLayout={ficha.sectionLayout}
             onUpdateLayout={canEdit ? handleUpdateLayout : undefined}
+            onUpdateLayoutVisual={canEdit ? handleUpdateLayoutVisual : undefined}
           />
         </div>
 

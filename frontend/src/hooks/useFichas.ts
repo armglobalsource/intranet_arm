@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '@/lib/api';
-import type { Ficha, FichaListItem, CreateFichaPayload, SectionName } from '@/types/ficha';
+import type { Ficha, FichaListItem, CreateFichaPayload, SectionName, LayoutVisualSong } from '@/types/ficha';
 
 const KEYS = {
   all:    ['fichas'] as const,
@@ -169,6 +169,23 @@ export function useUnpublishFicha() {
       qc.invalidateQueries({ queryKey: KEYS.detail(fichaId) });
       qc.invalidateQueries({ queryKey: KEYS.all });
       qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
+  });
+}
+
+/**
+ * Actualiza el bloque layoutVisual completo de la ficha (vista alternativa
+ * accesible desde la píldora "Layout Visual"). El backend hace replace del
+ * array de songs, así que el frontend siempre envía el estado completo.
+ */
+export function useUpdateLayoutVisual() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fichaId, songs }: { fichaId: string; songs: LayoutVisualSong[] }) =>
+      api.patch(`/fichas/${fichaId}/layout-visual`, { songs }).then(r => r.data),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(variables.fichaId) });
+      qc.invalidateQueries({ queryKey: KEYS.all });
     },
   });
 }

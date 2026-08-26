@@ -7,7 +7,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { FichasService } from './fichas.service';
-import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto } from './dto/ficha.dto';
+import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto } from './dto/ficha.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('fichas')
@@ -104,6 +104,16 @@ export class FichasController {
   @RequirePermission('fichas:edit')
   unarchive(@Param('fichaId') fichaId: string, @CurrentUser() user: any) {
     return this.fichasService.unarchive(fichaId, user);
+  }
+
+  @Patch(':fichaId/layout-visual')
+  @RequirePermission('fichas:edit')
+  updateLayoutVisual(
+    @Param('fichaId') fichaId: string,
+    @Body()           dto: UpdateLayoutVisualDto,
+    @CurrentUser()    user: any,
+  ) {
+    return this.fichasService.updateLayoutVisual(fichaId, dto, user);
   }
 
   @Patch(':fichaId/sections/:sectionName')

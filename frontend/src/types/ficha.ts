@@ -56,6 +56,26 @@ export interface Section {
 
 export type CompletionStatus = Record<SectionName, boolean>;
 
+/**
+ * Vista alternativa de la ficha: una tabla por canción con iluminación,
+ * descripción de visuales y referencias visuales (imágenes del catálogo).
+ * Se persiste como campo top-level de la ficha, NO como Section.
+ */
+export interface LayoutVisualSong {
+  /** Coincide con el row.id de sections.setList.rows para auto-sync. */
+  songRowId:         string;
+  iluminacion:       string;
+  visualDescription: string;
+  /** IDs de refs del catálogo (visual_references). */
+  referenceIds:      number[];
+}
+
+export interface LayoutVisual {
+  songs:      LayoutVisualSong[];
+  updatedAt?: any;
+  updatedBy?: number;
+}
+
 export interface Ficha {
   fichaId:          string;
   campusId:         string;
@@ -83,6 +103,7 @@ export interface Ficha {
   publishedAt?:       any | null;
   hiddenSections?:    SectionName[];
   sectionLayout?:     { left: string[]; right: string[]; leftRatio?: number };
+  layoutVisual?:      LayoutVisual;
 }
 
 export interface FichaListItem {

@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import type { Ficha, Row, SectionName, Encuentro } from '@/types/ficha';
+import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSong } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
 import { SongInput } from '@/components/fichas/SongInput';
+import { LayoutVisualView } from './LayoutVisualView';
 import { useUsers } from '@/hooks/useUsers';
 import { displayName } from '@/types/user';
 
@@ -2103,12 +2104,17 @@ function VoluntariosCard({
 // ── EncuentroTabs ─────────────────────────────────────────────────────────────
 
 function EncuentroTabs({
-  encuentros, selected, onChange,
-}: { encuentros: Encuentro[]; selected: string; onChange: (id: string) => void }) {
-  if (encuentros.length <= 1) return null;
+  encuentros, selected, onChange, showLayoutTab,
+}: { encuentros: Encuentro[]; selected: string; onChange: (id: string) => void; showLayoutTab?: boolean }) {
+  const showEncuentroPills = encuentros.length > 1;
+  // Si no hay ni multi-encuentro ni layout tab, no renderizar nada.
+  if (!showEncuentroPills && !showLayoutTab) return null;
+
+  const LAYOUT_COLOR = '#0D9488'; // teal — mismo que HubCard y catálogo
+
   return (
-    <div className="ficha-no-print" style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-      {encuentros.map((e) => (
+    <div className="ficha-no-print" style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+      {showEncuentroPills && encuentros.map((e) => (
         <button
           key={e.id}
           onClick={() => onChange(e.id)}
@@ -2123,6 +2129,33 @@ function EncuentroTabs({
           {e.label}
         </button>
       ))}
+
+      {showLayoutTab && (
+        <>
+          {showEncuentroPills && (
+            <div style={{ width: 1, height: 20, background: D.cardBorder, margin: '0 4px' }} />
+          )}
+          <button
+            onClick={() => onChange('layout')}
+            title="Ver / editar layout visual (iluminación + visuales por canción)"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+              border: '1px solid', cursor: 'pointer', transition: 'all 0.15s',
+              ...(selected === 'layout'
+                ? { background: LAYOUT_COLOR, color: '#fff', borderColor: LAYOUT_COLOR }
+                : { background: `${LAYOUT_COLOR}12`, color: LAYOUT_COLOR, borderColor: `${LAYOUT_COLOR}55` }),
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+            Layout Visual
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -2371,6 +2404,8 @@ export interface FichaDocumentViewProps {
   onToggleModule?: (name: SectionName) => void;
   sectionLayout?: { left: string[]; right: string[]; leftRatio?: number };
   onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
+  /** Persistir el bloque layoutVisual completo (vista alternativa por canción). */
+  onUpdateLayoutVisual?: (songs: LayoutVisualSong[]) => void;
 }
 
 export function FichaDocumentView({
@@ -2378,16 +2413,21 @@ export function FichaDocumentView({
   onPublish, onUnpublish, canPublish, isPublishing,
   editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onSectionComplete,
   sectionStatus, saveState, hiddenSections, onToggleModule,
-  sectionLayout: sectionLayoutProp, onUpdateLayout,
+  sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
 
+  // selectedId puede ser el id de un encuentro ('unico', 'e1', 'e2', ...) o
+  // el sentinel 'layout' para la vista alternativa de Layout Visual.
   const [selectedId, setSelectedId] = useState<string>(
     encuentros?.[0]?.id ?? 'unico',
   );
 
+  const isLayoutView = selectedId === 'layout';
   const selectedEncuentro = encuentros?.find((e) => e.id === selectedId) ?? null;
-  const colId = selectedId;
+  // Cuando estamos en Layout Visual, usamos el primer encuentro como fallback
+  // para colId (necesario porque las cards internas siguen recibiendo colId).
+  const colId = isLayoutView ? (encuentros?.[0]?.id ?? 'unico') : selectedId;
 
   const sec = (name: SectionName): Row[] =>
     (editable && localSections ? localSections[name] : null)
@@ -2774,7 +2814,12 @@ export function FichaDocumentView({
         }
       `}</style>
 
-      <EncuentroTabs encuentros={encuentros ?? []} selected={selectedId} onChange={setSelectedId} />
+      <EncuentroTabs
+        encuentros={encuentros ?? []}
+        selected={selectedId}
+        onChange={setSelectedId}
+        showLayoutTab
+      />
 
       {/* Banner ficha archivada */}
       {ficha.archived && (
@@ -3216,8 +3261,32 @@ export function FichaDocumentView({
           </div>
         )}
 
-        {/* ── Cuerpo ── */}
-        <div className="ficha-body" style={{ padding: '1.5rem 2rem' }}>
+        {/* ── Vista alternativa: Layout Visual ──
+            Se renderiza SIEMPRE en el DOM cuando hay onUpdateLayoutVisual
+            (para que print pueda mostrarla en segunda página), pero visible
+            en pantalla solo cuando la píldora "Layout Visual" está activa.
+            En pantalla, cuando no está activa, se oculta con display:none
+            para no afectar el layout. En print, ambas vistas quedan visibles
+            con page-break entre ellas (CSS más abajo en @media print). */}
+        {(onUpdateLayoutVisual || ficha.layoutVisual) && (
+          <div
+            className={`layout-visual-page ${isLayoutView ? 'ficha-view-active' : 'ficha-view-hidden'}`}
+            style={{ display: isLayoutView ? 'block' : 'none' }}
+          >
+            <LayoutVisualView
+              ficha={ficha}
+              editable={!!editable}
+              localSetListRows={editable ? localSections?.setList : undefined}
+              onSave={onUpdateLayoutVisual}
+            />
+          </div>
+        )}
+
+        {/* ── Cuerpo (vista clásica por encuentro) ── */}
+        <div
+          className={`ficha-body ficha-view-body ${isLayoutView ? 'ficha-view-hidden' : 'ficha-view-active'}`}
+          style={{ padding: '1.5rem 2rem', display: isLayoutView ? 'none' : 'block' }}
+        >
           {(() => {
             // Función que renderiza una slot de sección
             const renderSlot = (slot: LayoutSlot) => {

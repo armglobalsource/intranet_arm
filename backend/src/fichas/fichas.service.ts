@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { hasPermission } from '../common/permissions';
-import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto } from './dto/ficha.dto';
+import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto } from './dto/ficha.dto';
 import {
   ALL_FICHA_SECTIONS,
   activeSectionsForType,
@@ -857,6 +857,42 @@ export class FichasService {
       prayerFicha: await this.findOne(fichaId),
       globalFicha: await this.findOne(globalRef.id),
     };
+  }
+
+  /**
+   * Actualiza el bloque layoutVisual de la ficha (vista alternativa
+   * accesible desde la píldora "Layout Visual"). No es una Section —
+   * se guarda como campo top-level ficha.layoutVisual.
+   *
+   * Se sobrescribe completo con el array de songs recibido (patrón
+   * "replace" simple: el frontend siempre manda el estado completo).
+   */
+  async updateLayoutVisual(
+    fichaId: string,
+    dto: UpdateLayoutVisualDto,
+    user: FichaAuthUser,
+  ) {
+    const ref = this.fb.db.collection(COL).doc(fichaId);
+    const snap = await ref.get();
+    if (!snap.exists) throw new NotFoundException('Ficha no encontrada');
+
+    await ref.update({
+      layoutVisual: {
+        songs: dto.songs.map((s) => ({
+          songRowId:         s.songRowId,
+          iluminacion:       s.iluminacion ?? '',
+          visualDescription: s.visualDescription ?? '',
+          referenceIds:      s.referenceIds ?? [],
+        })),
+        updatedAt: this.fb.now(),
+        updatedBy: user.sub,
+      },
+      lastModifiedBy:     user.sub,
+      lastModifiedByName: user.email,
+      lastModifiedAt:     this.fb.now(),
+    });
+
+    return this.findOne(fichaId);
   }
 
   async updateSection(
