@@ -2462,35 +2462,54 @@ export function FichaDocumentView({
   const isPublished = ficha.published ?? false;
   const modulesRef = useRef<HTMLDivElement>(null);
   const docRef     = useRef<HTMLDivElement>(null);
+  const bodyRef    = useRef<HTMLDivElement>(null);       // vista clásica (encuentro)
+  const layoutRef  = useRef<HTMLDivElement>(null);       // vista Layout Visual
 
   // ── Auto-scale para PDF/impresión ──────────────────────────────────────────
-  // Antes de imprimir, medimos el alto real del documento (en pantalla, con
-  // los estilos actuales) y calculamos qué scale se necesita para que quepa
-  // en una A4 portrait. Aplicamos ese scale como CSS variable que se usa
-  // en @media print vía transform: scale().
+  // Antes de imprimir, medimos el alto real de CADA vista (clásica y Layout
+  // Visual) por separado y aplicamos scale independiente a cada una. Así:
+  //   página 1 = vista clásica del encuentro seleccionado
+  //   página 2 = Layout Visual (si tiene canciones)
+  // Cada página cabe en una A4 portrait sin afectar a la otra.
   useEffect(() => {
     // A4 portrait usable ~= 297mm - 12mm de margen = 285mm de alto.
     // A 96dpi, 1mm ≈ 3.78px → 285mm ≈ 1077px.
-    // El CSS de print reduce fonts/paddings, así que el alto real de print
-    // es aproximadamente 62% del alto en pantalla. Este ratio se afina con
-    // los estilos actuales — si cambian, ajustar aquí.
-    const PRINT_TO_SCREEN_RATIO = 0.62;
-    const A4_USABLE_HEIGHT_PX   = 1077;
-    const MIN_SCALE             = 0.55; // no bajar de 55%, pierde legibilidad
+    const A4_USABLE_HEIGHT_PX = 1077;
+    const MIN_SCALE           = 0.55;
+    // Ratio empírico print/screen para cada vista.
+    const RATIO_BODY   = 0.62; // vista clásica (denso en print)
+    const RATIO_LAYOUT = 0.85; // Layout Visual (menos denso, tabla ya compacta)
 
-    function computeScale() {
-      const el = docRef.current;
-      if (!el) return;
+    function scaleFor(el: HTMLDivElement | null, ratio: number): string {
+      if (!el) return '1';
+      // scrollHeight puede ser 0 si el elemento está oculto con display:none.
+      // En ese caso lo medimos temporalmente forzando visibilidad.
+      let restoreDisplay: string | null = null;
+      if (el.offsetParent === null) {
+        restoreDisplay = el.style.display;
+        el.style.display = 'block';
+      }
       const screenHeight = el.scrollHeight;
-      const estimatedPrintHeight = screenHeight * PRINT_TO_SCREEN_RATIO;
+      if (restoreDisplay !== null) el.style.display = restoreDisplay;
+      if (screenHeight <= 0) return '1';
+      const estimatedPrintHeight = screenHeight * ratio;
       const rawScale = estimatedPrintHeight > A4_USABLE_HEIGHT_PX
         ? A4_USABLE_HEIGHT_PX / estimatedPrintHeight
         : 1;
-      const scale = Math.max(MIN_SCALE, Math.min(1, rawScale));
-      el.style.setProperty('--ficha-print-scale', String(scale));
+      return String(Math.max(MIN_SCALE, Math.min(1, rawScale)));
+    }
+
+    function computeScale() {
+      const doc = docRef.current;
+      if (!doc) return;
+      doc.style.setProperty('--ficha-print-scale',        scaleFor(bodyRef.current,   RATIO_BODY));
+      doc.style.setProperty('--ficha-layout-print-scale', scaleFor(layoutRef.current, RATIO_LAYOUT));
     }
     function resetScale() {
-      docRef.current?.style.removeProperty('--ficha-print-scale');
+      const doc = docRef.current;
+      if (!doc) return;
+      doc.style.removeProperty('--ficha-print-scale');
+      doc.style.removeProperty('--ficha-layout-print-scale');
     }
 
     window.addEventListener('beforeprint', computeScale);
@@ -2732,19 +2751,42 @@ export function FichaDocumentView({
           /* Contenedor raíz */
           .ficha-doc-root { max-width: 100% !important; margin: 0 !important; }
 
-          /* Documento → fondo blanco, sin borde redondeado.
-             transform: scale() con var --ficha-print-scale controlado por
-             JS en beforeprint para hacer que quepa en una sola página A4
-             cuando hay muchos módulos. width compensa el scale para que el
-             contenido siga usando todo el ancho de página. */
+          /* Documento → fondo blanco, sin borde redondeado. Ya no aplica
+             transform aquí: el scale se aplica por-vista más abajo, así
+             cada vista (clásica y Layout Visual) cabe en su propia página
+             de forma independiente. */
           .ficha-doc {
             background: #ffffff !important;
             border: none !important;
             border-radius: 0 !important;
             overflow: visible !important;
+          }
+
+          /* Ambas vistas visibles en print (en pantalla, la inactiva está
+             display:none inline). Cada una se escala con su propio scale. */
+          .ficha-view-hidden { display: block !important; }
+          .ficha-view-active { display: block !important; }
+
+          /* Scale de la vista clásica */
+          .ficha-view-body {
             transform: scale(var(--ficha-print-scale, 1));
             transform-origin: top left;
             width: calc(100% / var(--ficha-print-scale, 1)) !important;
+          }
+
+          /* Layout Visual → segunda página. Scale independiente. */
+          .layout-visual-page {
+            page-break-before: always !important;
+            break-before: page !important;
+            transform: scale(var(--ficha-layout-print-scale, 1));
+            transform-origin: top left;
+            width: calc(100% / var(--ficha-layout-print-scale, 1)) !important;
+          }
+          /* Layout vacío (ninguna canción con datos) → no ocupa página. */
+          .layout-visual-page.layout-visual-empty {
+            display: none !important;
+            page-break-before: auto !important;
+            break-before: auto !important;
           }
 
           /* Textos → oscuros */
@@ -2821,6 +2863,43 @@ export function FichaDocumentView({
             border-bottom: 0.5px solid #aaa !important;
             background: transparent !important;
           }
+
+          /* ── Layout Visual (segunda página) ────────────────────────── */
+
+          /* Muestra la versión estática de swatches/thumbs que en pantalla
+             está oculta. Los controles editables (input, textarea, botones
+             +, X, etc.) están marcados con ficha-no-print y se ocultan. */
+          .ficha-print-only { display: flex !important; }
+
+          /* Toda la tabla en fondo blanco con bordes finos y texto negro */
+          .layout-visual-page,
+          .layout-visual-page > div,
+          .layout-visual-page div,
+          .layout-visual-page span {
+            color: #111 !important;
+            background: transparent !important;
+          }
+          .layout-visual-table {
+            background: #ffffff !important;
+            border: 0.5px solid #999 !important;
+            border-radius: 3px !important;
+          }
+          .layout-visual-table > div {
+            border-bottom: 0.5px solid #ccc !important;
+            padding: 6px 8px !important;
+          }
+          .layout-visual-table > div:first-child {
+            background: #f2f2f2 !important;
+          }
+          .layout-visual-page textarea {
+            display: none !important;
+          }
+          /* Reemplazar textareas por su valor de texto en print (via ::after
+             no funciona bien con form controls). En su lugar, mostramos el
+             texto plano guardado en un data-attribute — este truco no es
+             confiable así que renderizamos también un <span print-only>
+             desde el componente. Por seguridad, si algún textarea llegara
+             a ser visible, lo hacemos borderless. */
         }
       `}</style>
 
@@ -3272,13 +3351,25 @@ export function FichaDocumentView({
         )}
 
         {/* ── Vista alternativa: Layout Visual ──
-            Se renderiza SIEMPRE en el DOM para que print pueda mostrarla
-            en segunda página, pero visible en pantalla solo cuando la
-            píldora "Layout Visual" está activa. En pantalla, cuando no
-            está activa, se oculta con display:none. En print (Fase 3)
-            ambas vistas quedan visibles con page-break entre ellas. */}
+            Se renderiza SIEMPRE en el DOM. En pantalla, visible solo cuando
+            la píldora "Layout Visual" está activa (display: none en la otra).
+            En print, ambas vistas quedan visibles y el CSS @media print
+            aplica page-break-before al layout-visual-page para que salga
+            como segunda página — EXCEPTO cuando el layout está vacío
+            (layout-visual-empty), en cuyo caso se oculta para no dejar
+            página en blanco al imprimir. */}
+        {(() => {
+          const layoutSongs = ficha.layoutVisual?.songs ?? [];
+          const hasLayoutContent = layoutSongs.some((s) =>
+            (s.iluminacion?.trim()?.length ?? 0) > 0 ||
+            (s.illuminationColors?.length ?? 0) > 0 ||
+            (s.visualDescription?.trim()?.length ?? 0) > 0 ||
+            (s.referenceIds?.length ?? 0) > 0,
+          );
+          return (
         <div
-          className={`layout-visual-page ${isLayoutView ? 'ficha-view-active' : 'ficha-view-hidden'}`}
+          ref={layoutRef}
+          className={`layout-visual-page ${isLayoutView ? 'ficha-view-active' : 'ficha-view-hidden'} ${hasLayoutContent ? '' : 'layout-visual-empty'}`}
           style={{ display: isLayoutView ? 'block' : 'none' }}
         >
           <LayoutVisualView
@@ -3288,9 +3379,12 @@ export function FichaDocumentView({
             onSave={onUpdateLayoutVisual}
           />
         </div>
+          );
+        })()}
 
         {/* ── Cuerpo (vista clásica por encuentro) ── */}
         <div
+          ref={bodyRef}
           className={`ficha-body ficha-view-body ${isLayoutView ? 'ficha-view-hidden' : 'ficha-view-active'}`}
           style={{ padding: '1.5rem 2rem', display: isLayoutView ? 'none' : 'block' }}
         >

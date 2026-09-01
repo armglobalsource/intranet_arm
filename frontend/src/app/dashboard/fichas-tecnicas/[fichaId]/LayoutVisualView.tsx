@@ -358,25 +358,32 @@ export function LayoutVisualView({
                 {/* Columna Iluminación */}
                 <div style={{ minWidth: 0 }}>
                   {editable ? (
-                    <textarea
-                      value={song.iluminacion}
-                      onChange={(e) => updateSong(song.songRowId, { iluminacion: e.target.value })}
-                      placeholder="AZUL, LILA + NARANJO…"
-                      rows={2}
-                      style={{
-                        width: '100%', boxSizing: 'border-box',
-                        background: 'rgba(255,255,255,0.03)',
-                        border: `0.5px solid ${D.inputBorder}`,
-                        borderRadius: 6,
-                        color: D.textPrimary,
-                        fontSize: 12, fontFamily: 'inherit',
-                        padding: '6px 8px',
-                        resize: 'vertical',
-                        outline: 'none',
-                        lineHeight: 1.4,
-                        colorScheme: 'dark' as any,
-                      }}
-                    />
+                    <>
+                      <textarea
+                        value={song.iluminacion}
+                        onChange={(e) => updateSong(song.songRowId, { iluminacion: e.target.value })}
+                        placeholder="AZUL, LILA + NARANJO…"
+                        rows={2}
+                        className="ficha-no-print"
+                        style={{
+                          width: '100%', boxSizing: 'border-box',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: `0.5px solid ${D.inputBorder}`,
+                          borderRadius: 6,
+                          color: D.textPrimary,
+                          fontSize: 12, fontFamily: 'inherit',
+                          padding: '6px 8px',
+                          resize: 'vertical',
+                          outline: 'none',
+                          lineHeight: 1.4,
+                          colorScheme: 'dark' as any,
+                        }}
+                      />
+                      {/* Print-only mirror: el textarea se oculta en print. */}
+                      <span className="ficha-print-only" style={{ display: 'none', fontSize: 11, whiteSpace: 'pre-wrap' }}>
+                        {song.iluminacion || ''}
+                      </span>
+                    </>
                   ) : (
                     <span style={{ fontSize: 12, color: song.iluminacion ? D.textPrimary : D.textMuted, whiteSpace: 'pre-wrap' }}>
                       {song.iluminacion || (song.illuminationColors && song.illuminationColors.length > 0 ? '' : '—')}
@@ -393,25 +400,34 @@ export function LayoutVisualView({
                 {/* Columna Visuales */}
                 <div style={{ minWidth: 0 }}>
                   {editable ? (
-                    <textarea
-                      value={song.visualDescription}
-                      onChange={(e) => updateSong(song.songRowId, { visualDescription: e.target.value })}
-                      placeholder="VISUALES LISTAS GLOBAL / 2026 / …"
-                      rows={2}
-                      style={{
-                        width: '100%', boxSizing: 'border-box',
-                        background: 'rgba(255,255,255,0.03)',
-                        border: `0.5px solid ${D.inputBorder}`,
-                        borderRadius: 6,
-                        color: D.textPrimary,
-                        fontSize: 12, fontFamily: 'inherit',
-                        padding: '6px 8px',
-                        resize: 'vertical',
-                        outline: 'none',
-                        lineHeight: 1.4,
-                        colorScheme: 'dark' as any,
-                      }}
-                    />
+                    <>
+                      <textarea
+                        value={song.visualDescription}
+                        onChange={(e) => updateSong(song.songRowId, { visualDescription: e.target.value })}
+                        placeholder="VISUALES LISTAS GLOBAL / 2026 / …"
+                        rows={2}
+                        className="ficha-no-print"
+                        style={{
+                          width: '100%', boxSizing: 'border-box',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: `0.5px solid ${D.inputBorder}`,
+                          borderRadius: 6,
+                          color: D.textPrimary,
+                          fontSize: 12, fontFamily: 'inherit',
+                          padding: '6px 8px',
+                          resize: 'vertical',
+                          outline: 'none',
+                          lineHeight: 1.4,
+                          colorScheme: 'dark' as any,
+                        }}
+                      />
+                      <span className="ficha-print-only" style={{
+                        display: 'none', fontSize: 11, whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word', overflowWrap: 'anywhere' as const,
+                      }}>
+                        {song.visualDescription || ''}
+                      </span>
+                    </>
                   ) : (
                     <span style={{ fontSize: 12, color: song.visualDescription ? D.textPrimary : D.textMuted, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' as const }}>
                       {song.visualDescription || '—'}
