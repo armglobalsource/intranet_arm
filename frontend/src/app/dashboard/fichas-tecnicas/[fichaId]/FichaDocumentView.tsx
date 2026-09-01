@@ -20,18 +20,11 @@ import { usePaletas, useCreatePaleta, type Paleta, type PaletaColor } from '@/ho
 import {
   DndContext,
   closestCenter,
-  closestCorners,
-  pointerWithin,
-  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  useDroppable,
-  DragOverlay,
-  type CollisionDetection,
   type DragEndEvent,
-  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -2309,79 +2302,89 @@ const DEFAULT_LAYOUT_ORACION: { left: LayoutSlot[]; right: LayoutSlot[] } = {
  * border, para que el drop visual NO empuje ni recalcule el layout de las
  * cards de adentro al empezar/terminar el drag.
  */
-function DroppableColumn({ id, isDragging, children }: { id: string; isDragging?: boolean; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  const highlight = !!isDragging && isOver;
+/**
+ * Wrapper con botones de flecha para reordenar una card de sección.
+ * Reemplaza el drag&drop anterior — más confiable y sin librería.
+ *
+ * En modo edición muestra 4 botones arriba: ↑ (subir) · ↓ (bajar) ·
+ * ← (mover a columna izquierda) · → (mover a columna derecha).
+ * Cada botón se oculta cuando no aplica (ej. ↑ en la primera card).
+ */
+function ReorderableSectionCard({
+  editMode, canUp, canDown, canLeft, canRight, onMove, children,
+}: {
+  editMode?:  boolean;
+  canUp?:     boolean;
+  canDown?:   boolean;
+  canLeft?:   boolean;
+  canRight?:  boolean;
+  onMove?:    (dir: 'up' | 'down' | 'left' | 'right') => void;
+  children:   React.ReactNode;
+}) {
   return (
-    <div
-      ref={setNodeRef}
-      style={{
-        minHeight: 80,
-        minWidth: 0,
-        borderRadius: 10,
-        transition: 'background 0.12s, outline-color 0.12s',
-        background: highlight ? 'rgba(127,119,221,0.06)' : 'transparent',
-        outline: '2px dashed transparent',
-        outlineOffset: 2,
-        outlineColor: highlight ? 'rgba(127,119,221,0.55)' : 'transparent',
-      }}
-    >
+    <div style={{ position: 'relative', minWidth: 0 }}>
+      {editMode && onMove && (
+        <div
+          className="ficha-no-print"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+            padding: '3px 6px', marginBottom: 3,
+            borderRadius: '6px 6px 0 0',
+            background: 'rgba(127,119,221,0.08)',
+            border: '0.5px solid rgba(127,119,221,0.18)',
+          }}
+        >
+          <MoveBtn dir="up"    disabled={!canUp}    onClick={() => onMove('up')} />
+          <MoveBtn dir="down"  disabled={!canDown}  onClick={() => onMove('down')} />
+          <div style={{ width: 1, height: 14, background: 'rgba(127,119,221,0.25)', margin: '0 3px' }} />
+          <MoveBtn dir="left"  disabled={!canLeft}  onClick={() => onMove('left')} />
+          <MoveBtn dir="right" disabled={!canRight} onClick={() => onMove('right')} />
+        </div>
+      )}
       {children}
     </div>
   );
 }
 
-/** Wrapper draggable alrededor de cada card de sección */
-function DraggableSectionCard({ id, editMode, children }: { id: string; editMode?: boolean; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id,
-    disabled: !editMode,
-  });
+function MoveBtn({ dir, disabled, onClick }: {
+  dir: 'up' | 'down' | 'left' | 'right';
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const paths: Record<typeof dir, string> = {
+    up:    'M6 3 L2 8 M6 3 L10 8 M6 3 L6 12',
+    down:  'M6 12 L2 7 M6 12 L10 7 M6 12 L6 3',
+    left:  'M3 6 L8 2 M3 6 L8 10 M3 6 L12 6',
+    right: 'M12 6 L7 2 M12 6 L7 10 M12 6 L3 6',
+  };
+  const titles: Record<typeof dir, string> = {
+    up:    'Subir dentro de la columna',
+    down:  'Bajar dentro de la columna',
+    left:  'Mover a la columna izquierda',
+    right: 'Mover a la columna derecha',
+  };
   return (
-    <div
-      ref={setNodeRef}
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={disabled ? '' : titles[dir]}
       style={{
-        transform:  CSS.Transform.toString(transform),
-        transition,
-        opacity:    isDragging ? 0.45 : 1,
-        zIndex:     isDragging ? 100  : 'auto',
-        position:   'relative',
+        width: 22, height: 22, borderRadius: 4,
+        border: 'none',
+        background: disabled ? 'transparent' : 'rgba(127,119,221,0.15)',
+        color: disabled ? 'rgba(127,119,221,0.2)' : 'rgba(127,119,221,0.9)',
+        cursor: disabled ? 'default' : 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 0,
+        transition: 'background 0.12s',
       }}
+      onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.35)'; }}
+      onMouseLeave={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.15)'; }}
     >
-      {/* Handle de arrastre — siempre visible en modo edición */}
-      {editMode && (
-        <div
-          {...attributes}
-          {...listeners}
-          className="ficha-no-print"
-          title="Arrastra para mover este módulo"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            height: 20, cursor: isDragging ? 'grabbing' : 'grab',
-            marginBottom: 2, borderRadius: '6px 6px 0 0',
-            background: 'rgba(127,119,221,0.08)',
-            border: '0.5px solid rgba(127,119,221,0.2)',
-            transition: 'background 0.15s',
-            touchAction: 'none',
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.18)'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.08)'; }}
-        >
-          <svg width="24" height="8" viewBox="0 0 24 8" fill="rgba(127,119,221,0.75)">
-            <rect y="0" width="24" height="1.5" rx="1" />
-            <rect y="3.5" width="24" height="1.5" rx="1" />
-            <rect y="7" width="24" height="1" rx="0.5" opacity="0.6" />
-          </svg>
-          <span style={{
-            fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
-            color: 'rgba(127,119,221,0.85)', textTransform: 'uppercase',
-          }}>
-            Mover
-          </span>
-        </div>
-      )}
-      {children}
-    </div>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d={paths[dir]} />
+      </svg>
+    </button>
   );
 }
 
@@ -2532,104 +2535,59 @@ export function FichaDocumentView({
     leftRatio: Math.min(0.8, Math.max(0.2, storedLayout.leftRatio ?? 0.5)),
   };
 
-  const [activeSlot, setActiveSlot] = useState<LayoutSlot | null>(null);
-  // Ancho de la card que se está arrastrando, para que el DragOverlay
-  // no aparezca del ancho del viewport y rompa el layout.
-  const [activeWidth, setActiveWidth] = useState<number | null>(null);
+  // ── Reordenamiento de módulos vía botones ↑↓←→ ─────────────────────────────
+  // Reemplaza el drag&drop anterior (dnd-kit) por clicks explícitos. Más
+  // confiable, sin librería, y sin conflictos con SortableSection interno
+  // de las cards (que sigue usando dnd-kit para reordenar filas dentro).
 
-  const layoutSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  // Los IDs que dnd-kit maneja son de dos tipos:
-  //   1. IDs de columna: "left" | "right" (usados por DroppableColumn)
-  //   2. IDs de slot: 'pastoral' | 'produccion' | ... (LayoutSlot)
-  // sideOf() unifica ambos casos y devuelve la columna a la que pertenece,
-  // o null si es un ID desconocido (defensa contra collision detection raro).
-  type Side = 'left' | 'right';
-  function sideOf(id: string, layout: { left: LayoutSlot[]; right: LayoutSlot[] }): Side | null {
-    if (id === 'left'  || layout.left.includes(id as LayoutSlot))  return 'left';
-    if (id === 'right' || layout.right.includes(id as LayoutSlot)) return 'right';
-    return null;
-  }
-
-  function handleLayoutDragStart({ active }: DragStartEvent) {
-    const id = active.id as string;
-    // Solo aceptar como active un slot válido (defensa por si un item de
-    // otro SortableContext anidado dispara este handler).
-    if (sideOf(id, resolvedLayout) === null) return;
-    setActiveSlot(id as LayoutSlot);
-    const rect = active.rect.current.initial ?? active.rect.current.translated;
-    if (rect?.width) setActiveWidth(rect.width);
-  }
-
-  // Recalcula el layout dado un evento de over. Devuelve null si nada cambia.
-  function computeLayout(
-    activeId: LayoutSlot,
-    overId: string,
+  /**
+   * Mueve un slot en la dirección dada dentro del layout actual. Retorna
+   * el nuevo layout o null si el movimiento no es posible (ej. subir en
+   * la primera posición). Función pura, testeable.
+   */
+  function moveSlot(
+    slot: LayoutSlot,
+    dir: 'up' | 'down' | 'left' | 'right',
     layout: { left: LayoutSlot[]; right: LayoutSlot[] },
   ): { left: LayoutSlot[]; right: LayoutSlot[] } | null {
-    if (activeId === overId) return null;
-    const activeSide = sideOf(activeId, layout);
-    const overSide   = sideOf(overId,   layout);
-    if (!activeSide || !overSide) return null;
+    const inLeft  = layout.left.includes(slot);
+    const inRight = layout.right.includes(slot);
+    if (!inLeft && !inRight) return null;
 
-    // — Mismo lado: reordenar dentro de la columna —
-    if (activeSide === overSide) {
-      const col   = activeSide === 'left' ? layout.left : layout.right;
-      const from  = col.indexOf(activeId);
-      const overIsColumnItself = overId === activeSide;
-      const to    = overIsColumnItself ? col.length - 1 : col.indexOf(overId as LayoutSlot);
-      if (from === -1 || to === -1 || from === to) return null;
-      const moved = arrayMove(col, from, to);
-      return activeSide === 'left'
-        ? { left: moved, right: layout.right }
-        : { left: layout.left, right: moved };
+    const col      = inLeft ? layout.left : layout.right;
+    const otherCol = inLeft ? layout.right : layout.left;
+    const idx      = col.indexOf(slot);
+
+    if (dir === 'up' || dir === 'down') {
+      const target = dir === 'up' ? idx - 1 : idx + 1;
+      if (target < 0 || target >= col.length) return null;
+      const newCol = [...col];
+      [newCol[idx], newCol[target]] = [newCol[target], newCol[idx]];
+      return inLeft
+        ? { left: newCol, right: layout.right }
+        : { left: layout.left, right: newCol };
     }
 
-    // — Lados distintos: mover activeId de un lado al otro —
-    const fromCol = activeSide === 'left' ? layout.left : layout.right;
-    const toCol   = overSide   === 'left' ? layout.left : layout.right;
-    const newFrom = fromCol.filter((s) => s !== activeId);
-    const overIsColumnItself = overId === overSide;
-    // Si over es la columna en sí (vacía o zona debajo de todo), insertar al final.
-    // Si over es un slot, insertar en la posición de ese slot (empujándolo hacia abajo).
-    const insertAt = overIsColumnItself
-      ? toCol.length
-      : Math.max(0, toCol.indexOf(overId as LayoutSlot));
-    const newTo = [...toCol];
-    newTo.splice(insertAt, 0, activeId);
-    // overSide indica LA COLUMNA DESTINO. La otra columna es la de origen.
-    return overSide === 'left'
-      ? { left: newTo,  right: newFrom }  // der → izq
-      : { left: newFrom, right: newTo };  // izq → der
+    // dir === 'left' → mover a la izquierda; 'right' → mover a la derecha.
+    const wantLeft = dir === 'left';
+    if ((wantLeft && inLeft) || (!wantLeft && inRight)) return null; // ya está ahí
+
+    const newSourceCol = col.filter((s) => s !== slot);
+    // Insertar en la misma posición del índice si cabe, o al final.
+    const newTargetCol = [...otherCol];
+    const insertAt = Math.min(idx, newTargetCol.length);
+    newTargetCol.splice(insertAt, 0, slot);
+
+    return wantLeft
+      ? { left: newTargetCol, right: newSourceCol }
+      : { left: newSourceCol, right: newTargetCol };
   }
 
-  function handleLayoutDragEnd({ active, over }: DragEndEvent) {
-    setActiveSlot(null);
-    setActiveWidth(null);
-    if (!over || !onUpdateLayout) return;
-
-    const activeId = active.id as string;
-    const overId   = over.id as string;
-    if (sideOf(activeId, resolvedLayout) === null) return;
-
-    // computeLayout es pura: dado el layout actual + evento, devuelve el
-    // layout resultante o null si no hay cambio. Evitamos el preview
-    // optimista (draftLayout) porque desmontar/remontar DraggableSectionCard
-    // entre SortableContext distintos durante un drag activo hace crash a
-    // useSortable de dnd-kit. En su lugar, el DragOverlay muestra el ghost
-    // siguiendo el cursor y solo aplicamos el cambio al soltar.
-    const next = computeLayout(activeId as LayoutSlot, overId, resolvedLayout);
+  function handleMoveSlot(slot: LayoutSlot, dir: 'up' | 'down' | 'left' | 'right') {
+    if (!onUpdateLayout) return;
+    const next = moveSlot(slot, dir, resolvedLayout);
     if (!next) return;
     onUpdateLayout({ left: next.left, right: next.right, leftRatio: resolvedLayout.leftRatio });
-  }
-
-  function handleLayoutDragCancel() {
-    setActiveSlot(null);
-    setActiveWidth(null);
   }
 
   const { paletas, loading: paletasLoading } = usePaletas();
@@ -3437,105 +3395,41 @@ export function FichaDocumentView({
               return SECTION_LABELS[slot as SectionName] ?? slot;
             };
 
-            // Filtramos ocultos ANTES del map para no dejar wrappers
-            // "MOVER" huérfanos. NO usamos preview optimista aquí: mover
-            // items entre SortableContext distintos durante un drag activo
-            // causa que useSortable crashee (el nodo se desmonta y remonta).
-            // El DragOverlay ya muestra el ghost siguiendo el cursor.
+            // Filtramos ocultos ANTES del map para no dejar wrappers vacíos.
             const visibleLeft  = resolvedLayout.left.filter((s) => !slotIsHidden(s));
             const visibleRight = resolvedLayout.right.filter((s) => !slotIsHidden(s));
 
-            // Todos los slots de ambas columnas como IDs para los SortableContext
-            const allSlots = [...visibleLeft, ...visibleRight];
+            const canReorder = !!editable && !!onUpdateLayout;
 
-            // Collision detection robusta para arrastrar entre SortableContext
-            // distintos (izquierda ↔ derecha).
-            //
-            // Estrategia: primero probamos con el puntero exacto (más preciso),
-            // luego con intersección de rectángulos, y como último recurso con
-            // closestCorners. Si el resultado no está sobre una card ni sobre
-            // el contenedor de columna, forzamos "left" o "right" según qué
-            // lado del contenedor esté más cerca del puntero.
-            const detectCollisions: CollisionDetection = (args) => {
-              const pointer = pointerWithin(args);
-              if (pointer.length > 0) return pointer;
-              const rects = rectIntersection(args);
-              if (rects.length > 0) return rects;
-              return closestCorners(args);
-            };
+            function renderColumn(col: LayoutSlot[], side: 'left' | 'right') {
+              return col.map((slot, i) => (
+                <ReorderableSectionCard
+                  key={slot}
+                  editMode={canReorder}
+                  canUp={i > 0}
+                  canDown={i < col.length - 1}
+                  canLeft={side === 'right'}
+                  canRight={side === 'left'}
+                  onMove={(dir) => handleMoveSlot(slot, dir)}
+                >
+                  {renderSlot(slot)}
+                </ReorderableSectionCard>
+              ));
+            }
 
             return (
-              <DndContext
-                sensors={layoutSensors}
-                collisionDetection={detectCollisions}
-                onDragStart={handleLayoutDragStart}
-                onDragEnd={handleLayoutDragEnd}
-                onDragCancel={handleLayoutDragCancel}
+              <ColumnResizeGrid
+                leftRatio={resolvedLayout.leftRatio}
+                editable={canReorder}
+                onRatioChange={(r) => onUpdateLayout?.({ left: resolvedLayout.left, right: resolvedLayout.right, leftRatio: r })}
               >
-                <ColumnResizeGrid
-                  leftRatio={resolvedLayout.leftRatio}
-                  editable={!!editable && !!onUpdateLayout}
-                  onRatioChange={(r) => onUpdateLayout?.({ left: resolvedLayout.left, right: resolvedLayout.right, leftRatio: r })}
-                >
-                  {/* Columna izquierda */}
-                  <SortableContext items={visibleLeft} strategy={verticalListSortingStrategy}>
-                    <DroppableColumn id="left" isDragging={!!activeSlot}>
-                      {visibleLeft.map((slot) => (
-                        <DraggableSectionCard key={slot} id={slot} editMode={editable && !!onUpdateLayout}>
-                          {renderSlot(slot)}
-                        </DraggableSectionCard>
-                      ))}
-                    </DroppableColumn>
-                  </SortableContext>
-
-                  {/* Columna derecha */}
-                  <SortableContext items={visibleRight} strategy={verticalListSortingStrategy}>
-                    <DroppableColumn id="right" isDragging={!!activeSlot}>
-                      {visibleRight.map((slot) => (
-                        <DraggableSectionCard key={slot} id={slot} editMode={editable && !!onUpdateLayout}>
-                          {renderSlot(slot)}
-                        </DraggableSectionCard>
-                      ))}
-                    </DroppableColumn>
-                  </SortableContext>
-                </ColumnResizeGrid>
-
-                {/* Ghost overlay mientras se arrastra — versión estática
-                    minimal (título + pill), no la card completa. Renderizar
-                    la card completa dentro de DragOverlay dispara los hooks
-                    y DndContext anidados de esa card (SortableSection para
-                    reordenar filas), lo cual colisiona con el DndContext
-                    padre y crashea dnd-kit ("Error al cargar la sección").
-                */}
-                <DragOverlay dropAnimation={null}>
-                  {activeSlot && (
-                    <div style={{
-                      cursor: 'grabbing',
-                      pointerEvents: 'none',
-                      width: activeWidth ?? 320,
-                      background: 'rgba(30, 27, 60, 0.98)',
-                      border: '1px solid rgba(127,119,221,0.5)',
-                      borderRadius: 12,
-                      padding: '12px 16px',
-                      boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
-                      display: 'flex', alignItems: 'center', gap: 10,
-                    }}>
-                      <svg width="18" height="6" viewBox="0 0 24 8" fill="rgba(127,119,221,0.85)">
-                        <rect y="0" width="24" height="1.5" rx="1" />
-                        <rect y="3.5" width="24" height="1.5" rx="1" />
-                        <rect y="7" width="24" height="1" rx="0.5" opacity="0.6" />
-                      </svg>
-                      <span style={{
-                        fontSize: 12, fontWeight: 700,
-                        letterSpacing: '0.08em', textTransform: 'uppercase',
-                        color: '#f0efec',
-                      }}>
-                        {slotLabel(activeSlot)}
-                      </span>
-                    </div>
-                  )}
-                </DragOverlay>
-              </DndContext>
+                <div style={{ minWidth: 0 }}>
+                  {renderColumn(visibleLeft, 'left')}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  {renderColumn(visibleRight, 'right')}
+                </div>
+              </ColumnResizeGrid>
             );
           })()}
         </div>
