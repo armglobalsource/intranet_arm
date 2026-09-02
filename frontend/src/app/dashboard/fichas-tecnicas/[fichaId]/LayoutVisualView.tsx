@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Ficha, LayoutVisualSong, Row } from '@/types/ficha';
 import { VisualReferencePicker } from '@/components/fichas/VisualReferencePicker';
+import { RichTextEditor } from '@/components/fichas/RichTextEditor';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -192,7 +193,7 @@ interface LayoutVisualViewProps {
   /** Filas locales del setList (para reflejar edición en vivo, no solo el snapshot). */
   localSetListRows?: Row[];
   /** Guardado optimista con debounce; el editor decide cómo persistir. */
-  onSave?: (songs: LayoutVisualSong[]) => void;
+  onSave?: (patch: { songs: LayoutVisualSong[]; producerNotes: string }) => void;
 }
 
 const D = {
@@ -217,7 +218,17 @@ export function LayoutVisualView({
   const [songs, setSongs] = useState<LayoutVisualSong[]>(() =>
     reconcile(setListRows, ficha.layoutVisual?.songs ?? [])
   );
+  // Notas del productor (HTML del rich text editor).
+  const [producerNotes, setProducerNotes] = useState<string>(
+    ficha.layoutVisual?.producerNotes ?? ''
+  );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync producerNotes desde el snapshot cuando cambia desde afuera.
+  useEffect(() => {
+    setProducerNotes(ficha.layoutVisual?.producerNotes ?? '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ficha.layoutVisual?.updatedAt]);
 
   // Cuando cambia el setList (agregada/borrada una canción), reconciliar.
   // Cuando cambia layoutVisual desde afuera (otro usuario), también reconciliar.
@@ -235,10 +246,10 @@ export function LayoutVisualView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setListRows.map((r) => r.id).join(','), ficha.layoutVisual?.updatedAt]);
 
-  function scheduleSave(next: LayoutVisualSong[]) {
+  function scheduleSave(nextSongs: LayoutVisualSong[], nextNotes: string) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      onSave?.(next);
+      onSave?.({ songs: nextSongs, producerNotes: nextNotes });
       debounceRef.current = null;
     }, 800);
   }
@@ -246,9 +257,14 @@ export function LayoutVisualView({
   function updateSong(songRowId: string, patch: Partial<LayoutVisualSong>) {
     setSongs((prev) => {
       const next = prev.map((s) => s.songRowId === songRowId ? { ...s, ...patch } : s);
-      scheduleSave(next);
+      scheduleSave(next, producerNotes);
       return next;
     });
+  }
+
+  function updateNotes(nextHtml: string) {
+    setProducerNotes(nextHtml);
+    scheduleSave(songs, nextHtml);
   }
 
   const hasSongs = songs.length > 0;
@@ -446,6 +462,40 @@ export function LayoutVisualView({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Notas del productor — rich text abajo de la tabla */}
+      {(editable || producerNotes) && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            marginBottom: 10, paddingBottom: 8,
+            borderBottom: `0.5px solid ${D.divider}`,
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke={TEAL} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: TEAL, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                Notas del productor
+              </div>
+              <div style={{ fontSize: 11, color: D.textSecond, marginTop: 2 }}>
+                Espacio libre para instrucciones, versos bíblicos, anuncios de despedida, referencias, etc. Usá la barra de herramientas para formatear.
+              </div>
+            </div>
+          </div>
+          <RichTextEditor
+            value={producerNotes}
+            editable={editable}
+            onChange={updateNotes}
+            placeholder="Escribí acá las instrucciones, títulos, versos, anuncios…"
+          />
         </div>
       )}
     </div>

@@ -181,8 +181,8 @@ export function useUnpublishFicha() {
 export function useUpdateLayoutVisual() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ fichaId, songs }: { fichaId: string; songs: LayoutVisualSong[] }) =>
-      api.patch(`/fichas/${fichaId}/layout-visual`, { songs }).then(r => r.data),
+    mutationFn: ({ fichaId, songs, producerNotes }: { fichaId: string; songs: LayoutVisualSong[]; producerNotes?: string }) =>
+      api.patch(`/fichas/${fichaId}/layout-visual`, { songs, ...(producerNotes !== undefined ? { producerNotes } : {}) }).then(r => r.data),
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(variables.fichaId) });
       qc.invalidateQueries({ queryKey: KEYS.all });

@@ -73,9 +73,11 @@ export interface LayoutVisualSong {
 }
 
 export interface LayoutVisual {
-  songs:      LayoutVisualSong[];
-  updatedAt?: any;
-  updatedBy?: number;
+  songs:          LayoutVisualSong[];
+  /** Notas del productor en HTML (TipTap). Vacío o ausente si no editó. */
+  producerNotes?: string;
+  updatedAt?:     any;
+  updatedBy?:     number;
 }
 
 export interface Ficha {

@@ -2105,7 +2105,7 @@ export interface FichaDocumentViewProps {
   sectionLayout?: { left: string[]; right: string[]; leftRatio?: number };
   onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
   /** Persistir el bloque layoutVisual completo (vista alternativa por canción). */
-  onUpdateLayoutVisual?: (songs: LayoutVisualSong[]) => void;
+  onUpdateLayoutVisual?: (patch: { songs: LayoutVisualSong[]; producerNotes: string }) => void;
 }
 
 export function FichaDocumentView({
@@ -2951,12 +2951,14 @@ export function FichaDocumentView({
             página en blanco al imprimir. */}
         {(() => {
           const layoutSongs = ficha.layoutVisual?.songs ?? [];
-          const hasLayoutContent = layoutSongs.some((s) =>
+          const hasSongContent = layoutSongs.some((s) =>
             (s.iluminacion?.trim()?.length ?? 0) > 0 ||
             (s.illuminationColors?.length ?? 0) > 0 ||
             (s.visualDescription?.trim()?.length ?? 0) > 0 ||
             (s.referenceIds?.length ?? 0) > 0,
           );
+          const hasNotes = (ficha.layoutVisual?.producerNotes?.trim()?.length ?? 0) > 0;
+          const hasLayoutContent = hasSongContent || hasNotes;
           return (
         <div
           ref={layoutRef}

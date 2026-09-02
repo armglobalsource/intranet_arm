@@ -291,9 +291,13 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   // handleUpdateLayout eliminado: el reordenamiento y resize de columnas
   // se retiró (nunca funcionó de forma confiable en producción).
 
-  function handleUpdateLayoutVisual(songs: any[]) {
+  function handleUpdateLayoutVisual(patch: { songs: any[]; producerNotes: string }) {
     if (!ficha) return;
-    updateLayoutVisual({ fichaId: ficha.fichaId, songs });
+    updateLayoutVisual({
+      fichaId:       ficha.fichaId,
+      songs:         patch.songs,
+      producerNotes: patch.producerNotes,
+    });
   }
 
   // ── Sincronizar filas desde la versión más reciente de la API ─────────────

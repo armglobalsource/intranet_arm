@@ -117,4 +117,12 @@ export class LayoutVisualSongDto {
 export class UpdateLayoutVisualDto {
   @IsArray() @ArrayMaxSize(30) @ValidateNested({ each: true }) @Type(() => LayoutVisualSongDto)
   songs: LayoutVisualSongDto[];
+
+  /**
+   * Notas del productor en HTML (rich text). Escrito con TipTap desde el
+   * frontend. Límite generoso — típicamente 5–10KB por ficha, pero puede
+   * incluir contenido bíblico y anuncios largos.
+   */
+  @IsOptional() @IsString() @MaxLength(50000)
+  producerNotes?: string;
 }
