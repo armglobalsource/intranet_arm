@@ -75,7 +75,7 @@ export function VisualReferencePicker({
             alt={r.name}
             title={r.name}
             style={{
-              height: '100%', width: 'auto', objectFit: 'cover',
+              height: '100%', width: 'auto',
               display: 'block', flexShrink: 0,
             }}
           />
@@ -113,7 +113,7 @@ export function VisualReferencePicker({
                   alt={r.name}
                   title={r.name}
                   style={{
-                    height: '100%', width: 'auto', objectFit: 'cover',
+                    height: '100%', width: 'auto',
                     display: 'block',
                   }}
                 />
@@ -152,7 +152,7 @@ export function VisualReferencePicker({
             {selected.map((r) => (
               <img key={r.id} src={r.imageUrl} alt={r.name}
                 style={{
-                  height: '100%', width: 'auto', objectFit: 'cover',
+                  height: '100%', width: 'auto',
                   display: 'block', flexShrink: 0,
                 }} />
             ))}
