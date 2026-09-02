@@ -483,7 +483,7 @@ export function LayoutVisualView({
             </svg>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: TEAL, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                Notas del productor
+                Notas del layout
               </div>
               <div style={{ fontSize: 11, color: D.textSecond, marginTop: 2 }}>
                 Espacio libre para instrucciones, versos bíblicos, anuncios de despedida, referencias, etc. Usá la barra de herramientas para formatear.
