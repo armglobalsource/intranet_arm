@@ -213,7 +213,10 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const sectionRevisionRefs =
     useRef<Partial<Record<SectionName, number>>>({});
 
-  const [isEditing, setIsEditing]             = useState(true);
+  // La ficha abre en modo Vista por default. El usuario hace click en
+  // "Editar" para entrar en edición, y "Guardar" para volver a Vista.
+  // (Antes abría en Edición por default y el botón "Editar" nunca se veía.)
+  const [isEditing, setIsEditing]             = useState(false);
   const [transitioningToEdit, setTransitioningToEdit] = useState(false);
 
   const [localHidden, setLocalHidden] = useState<SectionName[]>([]);
