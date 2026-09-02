@@ -285,24 +285,8 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     );
   }
 
-  function handleUpdateLayout(layout: { left: string[]; right: string[]; leftRatio?: number }) {
-    if (!ficha) return;
-    setSaveState('saving');
-    updateFicha(
-      { fichaId: ficha.fichaId, sectionLayout: layout },
-      {
-        onSuccess: () => {
-          setSaveState('saved');
-          setTimeout(() => setSaveState('idle'), 800);
-        },
-        onError: (err: any) => {
-          setSaveState('error');
-          setActionError(apiErrorMessage(err, 'No se pudo mover el módulo. Reintentá.'));
-          setTimeout(() => setSaveState('idle'), 3000);
-        },
-      },
-    );
-  }
+  // handleUpdateLayout eliminado: el reordenamiento y resize de columnas
+  // se retiró (nunca funcionó de forma confiable en producción).
 
   function handleUpdateLayoutVisual(songs: any[]) {
     if (!ficha) return;
@@ -452,21 +436,8 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     [scheduleSave],
   );
 
-  // ── Reordenar fila (drag & drop) ───────────────────────────────────────────
-  const handleReorderRow = useCallback(
-    (sectionName: SectionName, fromIndex: number, toIndex: number) => {
-      setLocalSections((prev) => {
-        const sorted = [...(prev[sectionName] ?? [])].sort((a, b) => a.order - b.order);
-        const [moved] = sorted.splice(fromIndex, 1);
-        sorted.splice(toIndex, 0, moved);
-        // Reasignar campo order para reflejar el nuevo orden
-        const updated = sorted.map((r, i) => ({ ...r, order: i }));
-        scheduleSave(sectionName, updated, true);
-        return { ...prev, [sectionName]: updated };
-      });
-    },
-    [scheduleSave],
-  );
+  // handleReorderRow eliminado: el drag&drop de filas se retiró junto con
+  // el resto del sistema de reordenamiento manual.
 
   // ── Guardar todo de inmediato ──────────────────────────────────────────────
   const handleSaveAll = useCallback(() => {
@@ -712,14 +683,11 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             onAddRow={handleAddRow}
             onDeleteRow={handleDeleteRow}
             onLabelChange={handleLabelChange}
-            onReorderRow={handleReorderRow}
             onSectionComplete={handleSectionComplete}
             sectionStatus={sectionStatus}
             saveState={saveState}
             hiddenSections={localHidden}
             onToggleModule={canEdit ? handleToggleModule : undefined}
-            sectionLayout={ficha.sectionLayout}
-            onUpdateLayout={canEdit ? handleUpdateLayout : undefined}
             onUpdateLayoutVisual={canEdit ? handleUpdateLayoutVisual : undefined}
           />
         </div>

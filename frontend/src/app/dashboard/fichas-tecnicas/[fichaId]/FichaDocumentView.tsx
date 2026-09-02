@@ -17,23 +17,8 @@ const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
 import { useUpdateFicha } from '@/hooks/useFichas';
 import { parseFichaDate as parseLocalDate, toFichaInputDate } from '@/lib/ficha-date';
 import { usePaletas, useCreatePaleta, type Paleta, type PaletaColor } from '@/hooks/usePaletas';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-  arrayMove,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+// dnd-kit eliminado: el reordenamiento manual de módulos y filas se retiró
+// porque nunca fue lo bastante confiable en producción.
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
 
@@ -308,112 +293,26 @@ function DeleteBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
-// ── Drag & Drop ───────────────────────────────────────────────────────────────
+// ── Stubs para reemplazar el drag&drop de filas (eliminado) ───────────────────
+// Se mantiene la misma API que tenían SortableSection/SortableRow para no
+// tocar los 25+ callsites que ya los usan. Ahora simplemente renderean sin
+// funcionalidad de arrastre. El "handle" que se pasa por render-prop es null,
+// así que los grip visuales tampoco aparecen.
 
-function GripIcon() {
-  return (
-    <svg width="9" height="13" viewBox="0 0 9 13" fill="currentColor" aria-hidden="true">
-      <circle cx="2.5" cy="2"   r="1.3" />
-      <circle cx="6.5" cy="2"   r="1.3" />
-      <circle cx="2.5" cy="6.5" r="1.3" />
-      <circle cx="6.5" cy="6.5" r="1.3" />
-      <circle cx="2.5" cy="11"  r="1.3" />
-      <circle cx="6.5" cy="11"  r="1.3" />
-    </svg>
-  );
-}
-
-/** Wrapper DnD para una lista sortable. Cuando `onReorder` es undefined, renderiza sin contexto DnD. */
-function SortableSection({
-  items,
-  onReorder,
-  children,
-}: {
-  items: { id: string }[];
+function SortableSection({ children }: {
+  items?: { id: string }[];
   onReorder?: (fromIndex: number, toIndex: number) => void;
   children: React.ReactNode;
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id || !onReorder) return;
-    const fromIndex = items.findIndex((r) => r.id === String(active.id));
-    const toIndex   = items.findIndex((r) => r.id === String(over.id));
-    if (fromIndex !== -1 && toIndex !== -1) onReorder(fromIndex, toIndex);
-  }
-
-  if (!onReorder) return <>{children}</>;
-
-  return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={items.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-        {children}
-      </SortableContext>
-    </DndContext>
-  );
+  return <>{children}</>;
 }
 
-/**
- * Wrapper para una fila individual sortable.
- * `children` es un render-prop que recibe el elemento handle para insertarlo donde corresponda.
- */
-function SortableRow({
-  id,
-  editable,
-  children,
-}: {
+function SortableRow({ children }: {
   id: string;
   editable?: boolean;
   children: (handle: React.ReactNode) => React.ReactNode;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id,
-    disabled: !editable,
-  });
-
-  const handle = editable ? (
-    <button
-      {...attributes}
-      {...listeners}
-      className="ficha-no-print"
-      title="Arrastrar para reordenar"
-      style={{
-        flexShrink: 0,
-        cursor: isDragging ? 'grabbing' : 'grab',
-        color: 'rgba(255,255,255,0.18)',
-        background: 'none',
-        border: 'none',
-        padding: '0 5px 0 0',
-        display: 'flex',
-        alignItems: 'center',
-        touchAction: 'none',
-        transition: 'color 0.15s',
-      }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.18)'; }}
-    >
-      <GripIcon />
-    </button>
-  ) : null;
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-        position: 'relative',
-        zIndex: isDragging ? 10 : undefined,
-      }}
-    >
-      {children(handle)}
-    </div>
-  );
+  return <>{children(null)}</>;
 }
 
 // ── AddRowInline ──────────────────────────────────────────────────────────────
@@ -2167,127 +2066,6 @@ function EncuentroTabs({
 
 type LayoutSlot = 'pastoral' | 'produccion' | 'media' | 'streaming' | 'horarios' | 'worship' | 'voluntarios' | 'anuncios';
 
-/**
- * Grid de dos columnas con divisor arrastrable en modo edición.
- * Guarda el ratio (0.2–0.8) con debounce mientras se arrastra, y hace
- * commit inmediato al soltar el mouse.
- */
-function ColumnResizeGrid({
-  leftRatio,
-  editable,
-  onRatioChange,
-  children,
-}: {
-  leftRatio: number;
-  editable: boolean;
-  onRatioChange: (r: number) => void;
-  children: [React.ReactNode, React.ReactNode];
-}) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const [localRatio, setLocalRatio] = React.useState(leftRatio);
-  const [dragging, setDragging] = React.useState(false);
-
-  // Sincronizar cuando cambia desde afuera (otro usuario editando)
-  React.useEffect(() => {
-    if (!dragging) setLocalRatio(leftRatio);
-  }, [leftRatio, dragging]);
-
-  React.useEffect(() => {
-    if (!dragging) return;
-
-    function onMove(e: MouseEvent) {
-      const el = containerRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const raw = (e.clientX - rect.left) / rect.width;
-      const clamped = Math.min(0.8, Math.max(0.2, raw));
-      setLocalRatio(clamped);
-    }
-    function onUp() {
-      setDragging(false);
-    }
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    return () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [dragging]);
-
-  // Al soltar, commit al backend (solo si cambió)
-  React.useEffect(() => {
-    if (dragging) return;
-    if (Math.abs(localRatio - leftRatio) > 0.005) {
-      onRatioChange(Math.round(localRatio * 100) / 100);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragging]);
-
-  const divider = editable ? 6 : 0;
-  const gap = 16;
-
-  return (
-    <div
-      ref={containerRef}
-      className="ficha-grid"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: editable
-          ? `${localRatio}fr ${divider}px ${1 - localRatio}fr`
-          : `${localRatio}fr ${1 - localRatio}fr`,
-        gap: editable ? `0 ${gap - divider - 4}px` : gap,
-        alignItems: 'start',
-      }}
-    >
-      <div style={{ minWidth: 0, paddingRight: editable ? 8 : 0, boxSizing: 'border-box' }}>{children[0]}</div>
-      {editable && (
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          title="Arrastra para ajustar el ancho de columnas"
-          onMouseDown={(e) => { e.preventDefault(); setDragging(true); }}
-          onDoubleClick={() => { setLocalRatio(0.5); onRatioChange(0.5); }}
-          className="ficha-no-print"
-          style={{
-            cursor: 'col-resize',
-            width: divider,
-            alignSelf: 'stretch',
-            background: dragging ? 'rgba(127,119,221,0.55)' : 'rgba(127,119,221,0.18)',
-            borderRadius: 3,
-            transition: 'background 0.15s',
-            position: 'relative',
-          }}
-          onMouseEnter={(e) => {
-            if (!dragging) (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.35)';
-          }}
-          onMouseLeave={(e) => {
-            if (!dragging) (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.18)';
-          }}
-        >
-          {/* Grip visual central */}
-          <div style={{
-            position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)',
-            display: 'flex', flexDirection: 'column', gap: 3,
-            pointerEvents: 'none',
-          }}>
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} style={{ width: 2, height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.7)' }} />
-            ))}
-          </div>
-        </div>
-      )}
-      <div style={{ minWidth: 0, paddingLeft: editable ? 8 : 0, boxSizing: 'border-box' }}>{children[1]}</div>
-    </div>
-  );
-}
-
 const DEFAULT_LAYOUT: { left: LayoutSlot[]; right: LayoutSlot[] } = {
   left:  ['pastoral', 'produccion', 'streaming', 'horarios'],
   right: ['worship', 'media', 'voluntarios', 'anuncios'],
@@ -2296,97 +2074,6 @@ const DEFAULT_LAYOUT_ORACION: { left: LayoutSlot[]; right: LayoutSlot[] } = {
   left:  ['pastoral', 'produccion', 'streaming', 'horarios'],
   right: ['worship', 'media'],
 };
-
-/** Columna droppable (target para soltar desde otra columna).
- * Importante: usar outline (fuera del box) en vez de box-shadow inset o
- * border, para que el drop visual NO empuje ni recalcule el layout de las
- * cards de adentro al empezar/terminar el drag.
- */
-/**
- * Wrapper con botones de flecha para reordenar una card de sección.
- * Reemplaza el drag&drop anterior — más confiable y sin librería.
- *
- * En modo edición muestra 4 botones arriba: ↑ (subir) · ↓ (bajar) ·
- * ← (mover a columna izquierda) · → (mover a columna derecha).
- * Cada botón se oculta cuando no aplica (ej. ↑ en la primera card).
- */
-function ReorderableSectionCard({
-  editMode, canUp, canDown, canLeft, canRight, onMove, children,
-}: {
-  editMode?:  boolean;
-  canUp?:     boolean;
-  canDown?:   boolean;
-  canLeft?:   boolean;
-  canRight?:  boolean;
-  onMove?:    (dir: 'up' | 'down' | 'left' | 'right') => void;
-  children:   React.ReactNode;
-}) {
-  return (
-    <div style={{ position: 'relative', minWidth: 0 }}>
-      {editMode && onMove && (
-        <div
-          className="ficha-no-print"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
-            padding: '3px 6px', marginBottom: 3,
-            borderRadius: '6px 6px 0 0',
-            background: 'rgba(127,119,221,0.08)',
-            border: '0.5px solid rgba(127,119,221,0.18)',
-          }}
-        >
-          <MoveBtn dir="up"    disabled={!canUp}    onClick={() => onMove('up')} />
-          <MoveBtn dir="down"  disabled={!canDown}  onClick={() => onMove('down')} />
-          <div style={{ width: 1, height: 14, background: 'rgba(127,119,221,0.25)', margin: '0 3px' }} />
-          <MoveBtn dir="left"  disabled={!canLeft}  onClick={() => onMove('left')} />
-          <MoveBtn dir="right" disabled={!canRight} onClick={() => onMove('right')} />
-        </div>
-      )}
-      {children}
-    </div>
-  );
-}
-
-function MoveBtn({ dir, disabled, onClick }: {
-  dir: 'up' | 'down' | 'left' | 'right';
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  const paths: Record<typeof dir, string> = {
-    up:    'M6 3 L2 8 M6 3 L10 8 M6 3 L6 12',
-    down:  'M6 12 L2 7 M6 12 L10 7 M6 12 L6 3',
-    left:  'M3 6 L8 2 M3 6 L8 10 M3 6 L12 6',
-    right: 'M12 6 L7 2 M12 6 L7 10 M12 6 L3 6',
-  };
-  const titles: Record<typeof dir, string> = {
-    up:    'Subir dentro de la columna',
-    down:  'Bajar dentro de la columna',
-    left:  'Mover a la columna izquierda',
-    right: 'Mover a la columna derecha',
-  };
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={disabled ? '' : titles[dir]}
-      style={{
-        width: 22, height: 22, borderRadius: 4,
-        border: 'none',
-        background: disabled ? 'transparent' : 'rgba(127,119,221,0.15)',
-        color: disabled ? 'rgba(127,119,221,0.2)' : 'rgba(127,119,221,0.9)',
-        cursor: disabled ? 'default' : 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 0,
-        transition: 'background 0.12s',
-      }}
-      onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.35)'; }}
-      onMouseLeave={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.background = 'rgba(127,119,221,0.15)'; }}
-    >
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d={paths[dir]} />
-      </svg>
-    </button>
-  );
-}
 
 // ── FichaDocumentView — componente principal ──────────────────────────────────
 
@@ -2535,83 +2222,6 @@ export function FichaDocumentView({
     leftRatio: Math.min(0.8, Math.max(0.2, storedLayout.leftRatio ?? 0.5)),
   };
 
-  // ── Reordenamiento de módulos vía botones ↑↓←→ ─────────────────────────────
-  // Reemplaza el drag&drop anterior (dnd-kit) por clicks explícitos. Más
-  // confiable, sin librería, y sin conflictos con SortableSection interno
-  // de las cards (que sigue usando dnd-kit para reordenar filas dentro).
-
-  /**
-   * Mueve un slot dentro del layout, operando sobre los visibles (los
-   * ocultos van al final de cada columna sin participar del reordenamiento).
-   * Retorna el nuevo layout o null si el movimiento no aplica.
-   *
-   * Recibe la fn isHidden para saber cuáles slots están ocultos por el
-   * menú Módulos.
-   */
-  function moveSlot(
-    slot: LayoutSlot,
-    dir: 'up' | 'down' | 'left' | 'right',
-    layout: { left: LayoutSlot[]; right: LayoutSlot[] },
-    isHidden: (s: LayoutSlot) => boolean,
-  ): { left: LayoutSlot[]; right: LayoutSlot[] } | null {
-    const visLeft  = layout.left.filter((s) => !isHidden(s));
-    const visRight = layout.right.filter((s) => !isHidden(s));
-    const hidLeft  = layout.left.filter((s) => isHidden(s));
-    const hidRight = layout.right.filter((s) => isHidden(s));
-
-    const inLeft  = visLeft.includes(slot);
-    const inRight = visRight.includes(slot);
-    if (!inLeft && !inRight) return null;
-
-    const col      = inLeft ? visLeft : visRight;
-    const otherCol = inLeft ? visRight : visLeft;
-    const idx      = col.indexOf(slot);
-
-    let newVisLeft: LayoutSlot[];
-    let newVisRight: LayoutSlot[];
-
-    if (dir === 'up' || dir === 'down') {
-      const target = dir === 'up' ? idx - 1 : idx + 1;
-      if (target < 0 || target >= col.length) return null;
-      const newCol = [...col];
-      [newCol[idx], newCol[target]] = [newCol[target], newCol[idx]];
-      newVisLeft  = inLeft ? newCol : visLeft;
-      newVisRight = inLeft ? visRight : newCol;
-    } else {
-      // dir 'left' o 'right'
-      const wantLeft = dir === 'left';
-      if ((wantLeft && inLeft) || (!wantLeft && inRight)) return null;
-
-      const newSourceCol = col.filter((s) => s !== slot);
-      const newTargetCol = [...otherCol];
-      const insertAt = Math.min(idx, newTargetCol.length);
-      newTargetCol.splice(insertAt, 0, slot);
-
-      newVisLeft  = wantLeft ? newTargetCol : newSourceCol;
-      newVisRight = wantLeft ? newSourceCol : newTargetCol;
-    }
-
-    // Reconstruir el layout: visibles en el orden nuevo + ocultos al final.
-    return {
-      left:  [...newVisLeft,  ...hidLeft],
-      right: [...newVisRight, ...hidRight],
-    };
-  }
-
-  // Wrapper que llama moveSlot con el layout actual + isHidden helper y
-  // dispara la mutación. Incluye onError para feedback visual.
-  function handleMoveSlot(slot: LayoutSlot, dir: 'up' | 'down' | 'left' | 'right') {
-    if (!onUpdateLayout) return;
-    const isHiddenFn = (s: LayoutSlot): boolean => {
-      if (s === 'worship') {
-        return hidden('escena') && hidden('setList') && hidden('outfit');
-      }
-      return hidden(s as SectionName);
-    };
-    const next = moveSlot(slot, dir, resolvedLayout, isHiddenFn);
-    if (!next) return;
-    onUpdateLayout({ left: next.left, right: next.right, leftRatio: resolvedLayout.leftRatio });
-  }
 
   const { paletas, loading: paletasLoading } = usePaletas();
 
@@ -3418,41 +3028,28 @@ export function FichaDocumentView({
               return SECTION_LABELS[slot as SectionName] ?? slot;
             };
 
-            // Filtramos ocultos ANTES del map para no dejar wrappers vacíos.
+            // Filtramos ocultos ANTES del map para no renderear cards vacías.
             const visibleLeft  = resolvedLayout.left.filter((s) => !slotIsHidden(s));
             const visibleRight = resolvedLayout.right.filter((s) => !slotIsHidden(s));
 
-            const canReorder = !!editable && !!onUpdateLayout;
-
-            function renderColumn(col: LayoutSlot[], side: 'left' | 'right') {
-              return col.map((slot, i) => (
-                <ReorderableSectionCard
-                  key={slot}
-                  editMode={canReorder}
-                  canUp={i > 0}
-                  canDown={i < col.length - 1}
-                  canLeft={side === 'right'}
-                  canRight={side === 'left'}
-                  onMove={(dir) => handleMoveSlot(slot, dir)}
-                >
-                  {renderSlot(slot)}
-                </ReorderableSectionCard>
-              ));
-            }
-
             return (
-              <ColumnResizeGrid
-                leftRatio={resolvedLayout.leftRatio}
-                editable={canReorder}
-                onRatioChange={(r) => onUpdateLayout?.({ left: resolvedLayout.left, right: resolvedLayout.right, leftRatio: r })}
-              >
+              <div className="ficha-grid" style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 16,
+                alignItems: 'start',
+              }}>
                 <div style={{ minWidth: 0 }}>
-                  {renderColumn(visibleLeft, 'left')}
+                  {visibleLeft.map((slot) => (
+                    <React.Fragment key={slot}>{renderSlot(slot)}</React.Fragment>
+                  ))}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  {renderColumn(visibleRight, 'right')}
+                  {visibleRight.map((slot) => (
+                    <React.Fragment key={slot}>{renderSlot(slot)}</React.Fragment>
+                  ))}
                 </div>
-              </ColumnResizeGrid>
+              </div>
             );
           })()}
         </div>
