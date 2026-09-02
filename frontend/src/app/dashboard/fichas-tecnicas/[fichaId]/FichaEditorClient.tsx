@@ -287,7 +287,21 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
   function handleUpdateLayout(layout: { left: string[]; right: string[]; leftRatio?: number }) {
     if (!ficha) return;
-    updateFicha({ fichaId: ficha.fichaId, sectionLayout: layout });
+    setSaveState('saving');
+    updateFicha(
+      { fichaId: ficha.fichaId, sectionLayout: layout },
+      {
+        onSuccess: () => {
+          setSaveState('saved');
+          setTimeout(() => setSaveState('idle'), 800);
+        },
+        onError: (err: any) => {
+          setSaveState('error');
+          setActionError(apiErrorMessage(err, 'No se pudo mover el módulo. Reintentá.'));
+          setTimeout(() => setSaveState('idle'), 3000);
+        },
+      },
+    );
   }
 
   function handleUpdateLayoutVisual(songs: any[]) {

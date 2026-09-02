@@ -2541,51 +2541,74 @@ export function FichaDocumentView({
   // de las cards (que sigue usando dnd-kit para reordenar filas dentro).
 
   /**
-   * Mueve un slot en la dirección dada dentro del layout actual. Retorna
-   * el nuevo layout o null si el movimiento no es posible (ej. subir en
-   * la primera posición). Función pura, testeable.
+   * Mueve un slot dentro del layout, operando sobre los visibles (los
+   * ocultos van al final de cada columna sin participar del reordenamiento).
+   * Retorna el nuevo layout o null si el movimiento no aplica.
+   *
+   * Recibe la fn isHidden para saber cuáles slots están ocultos por el
+   * menú Módulos.
    */
   function moveSlot(
     slot: LayoutSlot,
     dir: 'up' | 'down' | 'left' | 'right',
     layout: { left: LayoutSlot[]; right: LayoutSlot[] },
+    isHidden: (s: LayoutSlot) => boolean,
   ): { left: LayoutSlot[]; right: LayoutSlot[] } | null {
-    const inLeft  = layout.left.includes(slot);
-    const inRight = layout.right.includes(slot);
+    const visLeft  = layout.left.filter((s) => !isHidden(s));
+    const visRight = layout.right.filter((s) => !isHidden(s));
+    const hidLeft  = layout.left.filter((s) => isHidden(s));
+    const hidRight = layout.right.filter((s) => isHidden(s));
+
+    const inLeft  = visLeft.includes(slot);
+    const inRight = visRight.includes(slot);
     if (!inLeft && !inRight) return null;
 
-    const col      = inLeft ? layout.left : layout.right;
-    const otherCol = inLeft ? layout.right : layout.left;
+    const col      = inLeft ? visLeft : visRight;
+    const otherCol = inLeft ? visRight : visLeft;
     const idx      = col.indexOf(slot);
+
+    let newVisLeft: LayoutSlot[];
+    let newVisRight: LayoutSlot[];
 
     if (dir === 'up' || dir === 'down') {
       const target = dir === 'up' ? idx - 1 : idx + 1;
       if (target < 0 || target >= col.length) return null;
       const newCol = [...col];
       [newCol[idx], newCol[target]] = [newCol[target], newCol[idx]];
-      return inLeft
-        ? { left: newCol, right: layout.right }
-        : { left: layout.left, right: newCol };
+      newVisLeft  = inLeft ? newCol : visLeft;
+      newVisRight = inLeft ? visRight : newCol;
+    } else {
+      // dir 'left' o 'right'
+      const wantLeft = dir === 'left';
+      if ((wantLeft && inLeft) || (!wantLeft && inRight)) return null;
+
+      const newSourceCol = col.filter((s) => s !== slot);
+      const newTargetCol = [...otherCol];
+      const insertAt = Math.min(idx, newTargetCol.length);
+      newTargetCol.splice(insertAt, 0, slot);
+
+      newVisLeft  = wantLeft ? newTargetCol : newSourceCol;
+      newVisRight = wantLeft ? newSourceCol : newTargetCol;
     }
 
-    // dir === 'left' → mover a la izquierda; 'right' → mover a la derecha.
-    const wantLeft = dir === 'left';
-    if ((wantLeft && inLeft) || (!wantLeft && inRight)) return null; // ya está ahí
-
-    const newSourceCol = col.filter((s) => s !== slot);
-    // Insertar en la misma posición del índice si cabe, o al final.
-    const newTargetCol = [...otherCol];
-    const insertAt = Math.min(idx, newTargetCol.length);
-    newTargetCol.splice(insertAt, 0, slot);
-
-    return wantLeft
-      ? { left: newTargetCol, right: newSourceCol }
-      : { left: newSourceCol, right: newTargetCol };
+    // Reconstruir el layout: visibles en el orden nuevo + ocultos al final.
+    return {
+      left:  [...newVisLeft,  ...hidLeft],
+      right: [...newVisRight, ...hidRight],
+    };
   }
 
+  // Wrapper que llama moveSlot con el layout actual + isHidden helper y
+  // dispara la mutación. Incluye onError para feedback visual.
   function handleMoveSlot(slot: LayoutSlot, dir: 'up' | 'down' | 'left' | 'right') {
     if (!onUpdateLayout) return;
-    const next = moveSlot(slot, dir, resolvedLayout);
+    const isHiddenFn = (s: LayoutSlot): boolean => {
+      if (s === 'worship') {
+        return hidden('escena') && hidden('setList') && hidden('outfit');
+      }
+      return hidden(s as SectionName);
+    };
+    const next = moveSlot(slot, dir, resolvedLayout, isHiddenFn);
     if (!next) return;
     onUpdateLayout({ left: next.left, right: next.right, leftRatio: resolvedLayout.leftRatio });
   }
