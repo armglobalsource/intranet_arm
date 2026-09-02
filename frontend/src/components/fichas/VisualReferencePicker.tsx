@@ -50,13 +50,24 @@ export function VisualReferencePicker({
     setModalOpen(false);
   }
 
-  // ── Vista NO editable ─────────────────────────────────────────────────────
+  const STRIP_HEIGHT = 64; // altura fija de la tira (en px)
+
+  // ── Vista NO editable — tira horizontal continua ──────────────────────────
   if (!editable) {
     if (selected.length === 0) {
       return <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>—</span>;
     }
     return (
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{
+        display: 'flex',
+        gap: 0,
+        borderRadius: 4,
+        overflow: 'hidden',
+        border: '0.5px solid rgba(255,255,255,0.12)',
+        width: 'fit-content',
+        maxWidth: '100%',
+        height: STRIP_HEIGHT,
+      }}>
         {selected.map((r) => (
           <img
             key={r.id}
@@ -64,8 +75,8 @@ export function VisualReferencePicker({
             alt={r.name}
             title={r.name}
             style={{
-              width: 36, height: 36, objectFit: 'cover',
-              borderRadius: 4, border: '0.5px solid rgba(255,255,255,0.12)',
+              height: '100%', width: 'auto', objectFit: 'cover',
+              display: 'block', flexShrink: 0,
             }}
           />
         ))}
@@ -73,46 +84,77 @@ export function VisualReferencePicker({
     );
   }
 
-  // ── Modo edición ──────────────────────────────────────────────────────────
+  // ── Modo edición — mismo look de tira + X en hover + botón "+" al lado ────
   return (
     <>
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-        {selected.map((r) => (
-          <div key={r.id} className="ficha-no-print" style={{ position: 'relative', flexShrink: 0 }}>
-            <img
-              src={r.imageUrl}
-              alt={r.name}
-              title={r.name}
-              style={{
-                width: 40, height: 40, objectFit: 'cover',
-                borderRadius: 5, border: '0.5px solid rgba(127,119,221,0.35)',
-                display: 'block',
-              }}
-            />
-            <button
-              onClick={() => removeOne(r.id)}
-              title="Quitar"
-              style={{
-                position: 'absolute', top: -5, right: -5,
-                width: 16, height: 16, borderRadius: '50%',
-                background: '#DC2626', color: '#fff',
-                border: '1.5px solid #1a1a1a',
-                fontSize: 10, lineHeight: 1, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: 0,
-              }}
-            >
-              ×
-            </button>
-          </div>
-        ))}
-
-        {/* Versión estática visible en print — sin los botones de quitar */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'stretch', flexWrap: 'wrap' }}>
         {selected.length > 0 && (
-          <div className="ficha-print-only" style={{ display: 'none', gap: 3, flexWrap: 'wrap' }}>
+          <div
+            className="ficha-no-print"
+            style={{
+              display: 'flex',
+              gap: 0,
+              borderRadius: 4,
+              overflow: 'hidden',
+              border: '0.5px solid rgba(127,119,221,0.35)',
+              height: STRIP_HEIGHT,
+              maxWidth: '100%',
+              flexWrap: 'nowrap',
+            }}
+          >
+            {selected.map((r) => (
+              <div
+                key={r.id}
+                className="ref-img-wrap"
+                style={{ position: 'relative', flexShrink: 0, height: '100%' }}
+              >
+                <img
+                  src={r.imageUrl}
+                  alt={r.name}
+                  title={r.name}
+                  style={{
+                    height: '100%', width: 'auto', objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+                <button
+                  onClick={() => removeOne(r.id)}
+                  title="Quitar"
+                  className="ref-img-remove"
+                  style={{
+                    position: 'absolute', top: 4, right: 4,
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: 'rgba(220,38,38,0.95)', color: '#fff',
+                    border: '1px solid rgba(0,0,0,0.4)',
+                    fontSize: 11, lineHeight: 1, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: 0, opacity: 0,
+                    transition: 'opacity 0.15s',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Versión estática visible en print — misma tira sin botones */}
+        {selected.length > 0 && (
+          <div className="ficha-print-only" style={{
+            display: 'none', gap: 0, flexWrap: 'nowrap',
+            borderRadius: 3, overflow: 'hidden',
+            border: '0.5px solid #ccc',
+            height: STRIP_HEIGHT,
+            maxWidth: '100%',
+          }}>
             {selected.map((r) => (
               <img key={r.id} src={r.imageUrl} alt={r.name}
-                style={{ width: 34, height: 34, objectFit: 'cover', borderRadius: 3, border: '0.5px solid #ccc' }} />
+                style={{
+                  height: '100%', width: 'auto', objectFit: 'cover',
+                  display: 'block', flexShrink: 0,
+                }} />
             ))}
           </div>
         )}
@@ -123,12 +165,13 @@ export function VisualReferencePicker({
             className="ficha-no-print"
             title="Agregar referencia visual"
             style={{
-              width: 40, height: 40, borderRadius: 5,
+              height: STRIP_HEIGHT, minWidth: STRIP_HEIGHT, padding: '0 12px',
+              borderRadius: 4,
               border: `1px dashed ${ACCENT}88`,
               background: `${ACCENT}12`,
               color: ACCENT,
               cursor: 'pointer',
-              fontSize: 18, lineHeight: 1, fontWeight: 600,
+              fontSize: 20, lineHeight: 1, fontWeight: 600,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
             }}
@@ -137,6 +180,11 @@ export function VisualReferencePicker({
           </button>
         )}
       </div>
+
+      {/* Estilo global: muestra la X al hover en cada imagen de la tira. */}
+      <style>{`
+        .ref-img-wrap:hover .ref-img-remove { opacity: 1 !important; }
+      `}</style>
 
       {modalOpen && (
         <PickerModal
