@@ -62,9 +62,9 @@ export function VisualReferencePicker({
         display: 'flex',
         gap: 0,
         borderRadius: 4,
-        overflow: 'hidden',
+        overflowX: 'auto',
+        overflowY: 'hidden',
         border: '0.5px solid rgba(255,255,255,0.12)',
-        width: 'fit-content',
         maxWidth: '100%',
         height: STRIP_HEIGHT,
       }}>
@@ -75,7 +75,8 @@ export function VisualReferencePicker({
             alt={r.name}
             title={r.name}
             style={{
-              height: '100%', width: 'auto',
+              height: STRIP_HEIGHT, width: 'auto', maxWidth: 'none',
+              objectFit: 'contain',
               display: 'block', flexShrink: 0,
             }}
           />
@@ -95,7 +96,8 @@ export function VisualReferencePicker({
               display: 'flex',
               gap: 0,
               borderRadius: 4,
-              overflow: 'hidden',
+              overflowX: 'auto',
+              overflowY: 'hidden',
               border: '0.5px solid rgba(127,119,221,0.35)',
               height: STRIP_HEIGHT,
               maxWidth: '100%',
@@ -113,8 +115,9 @@ export function VisualReferencePicker({
                   alt={r.name}
                   title={r.name}
                   style={{
-                    height: '100%', width: 'auto',
-                    display: 'block',
+                    height: STRIP_HEIGHT, width: 'auto', maxWidth: 'none',
+                    objectFit: 'contain',
+                    display: 'block', flexShrink: 0,
                   }}
                 />
                 <button
