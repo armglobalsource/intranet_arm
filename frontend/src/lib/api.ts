@@ -63,6 +63,14 @@ api.interceptors.response.use(
           { refreshToken },
         );
         useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
+        // El endpoint /auth/refresh también devuelve el user con permisos
+        // frescos leídos de Firestore (por si el admin cambió el rol o
+        // los permisos del rol desde el último login). Actualizamos el
+        // store para que la UI refleje los permisos actuales sin requerir
+        // logout+login manual.
+        if (data.user) {
+          useAuthStore.getState().updateUser(data.user);
+        }
         original.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(original);
       } catch (refreshErr) {

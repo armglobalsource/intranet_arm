@@ -80,7 +80,15 @@ export class AuthService {
 
     const user = await this.users.findOne(stored.userId);
     const roleId = user.roleId ?? user.role?.id ?? 0;
-    return this.generateTokens(stored.userId, user.email, user.role?.name ?? 'user', roleId);
+    const { permissions, ...tokens } = await this.generateTokens(
+      stored.userId, user.email, user.role?.name ?? 'user', roleId,
+    );
+    // Incluir user con permisos frescos para que el frontend actualice el
+    // store — sin esto, después de un refresh el user.permissions del
+    // cliente queda con los valores del login anterior aunque el JWT nuevo
+    // ya traiga los permisos actualizados desde Firestore.
+    const { passwordHash, ...safeUser } = user;
+    return { user: { ...safeUser, permissions }, ...tokens };
   }
 
   async logout(userId: number, rawRefreshToken: string, accessJti: string, accessExp: number) {
