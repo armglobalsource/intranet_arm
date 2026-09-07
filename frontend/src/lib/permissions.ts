@@ -274,4 +274,12 @@ export const PERMISSION_UI_CONFIG: Record<string, PermissionUiSection> = {
     ],
   },
   onboarding: { breadcrumb: ['Mi Perfil', 'Mis Onboardings'], viewActions: ['view'], editActions: [] },
+  'arm-catalogos': {
+    breadcrumb: ['Configuración', 'Configuración APP Web'],
+    viewActions: ['view'], editActions: ['manage'],
+  },
+  'visual-references': {
+    breadcrumb: ['Producción General', 'Referencias visuales'],
+    viewActions: ['view'], editActions: ['manage'],
+  },
 };
