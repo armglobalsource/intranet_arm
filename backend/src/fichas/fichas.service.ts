@@ -598,7 +598,69 @@ export class FichasService {
         return [name, publicSection];
       }),
     );
+
+    // Enriquecer con paletas y visual references usadas por esta ficha, así
+    // el cliente público (que no puede autenticarse) puede resolver los IDs
+    // sin llamar endpoints privados de /paletas y /visual-references.
+    publicFicha.publicMeta = await this.buildPublicMeta(ficha);
+
     return publicFicha;
+  }
+
+  /**
+   * Junta las paletas y visual references usadas por la ficha. Solo carga
+   * los docs específicos referenciados (no la colección entera). Best-effort:
+   * si falla algún lookup individual, devuelve arrays parciales sin error.
+   */
+  private async buildPublicMeta(ficha: any): Promise<{
+    paletas: any[];
+    visualRefs: any[];
+  }> {
+    // 1. Recolectar IDs de paletas — están en sections.outfit.rows[].values.<colId>
+    const paletaIds = new Set<string>();
+    const outfitRows = ficha.sections?.outfit?.rows ?? [];
+    for (const row of outfitRows) {
+      const values = row.values ?? {};
+      for (const v of Object.values(values)) {
+        if (typeof v === 'string' && v.trim()) paletaIds.add(String(v).trim());
+      }
+    }
+
+    // 2. Recolectar IDs de visual references — están en layoutVisual.songs[].referenceIds
+    const visualRefIds = new Set<number>();
+    const layoutSongs = ficha.layoutVisual?.songs ?? [];
+    for (const s of layoutSongs) {
+      for (const id of s.referenceIds ?? []) {
+        if (typeof id === 'number') visualRefIds.add(id);
+      }
+    }
+
+    const [paletas, visualRefs] = await Promise.all([
+      this.fetchPaletasByIds(Array.from(paletaIds)),
+      this.fetchVisualRefsByIds(Array.from(visualRefIds)),
+    ]);
+
+    return { paletas, visualRefs };
+  }
+
+  private async fetchPaletasByIds(ids: string[]): Promise<any[]> {
+    if (ids.length === 0) return [];
+    const docs = await Promise.all(
+      ids.map((id) => this.fb.db.collection('paletas').doc(id).get().catch(() => null)),
+    );
+    return docs
+      .filter((d): d is FirebaseFirestore.DocumentSnapshot => !!d && d.exists)
+      .map((d) => this.fb.toObj(d));
+  }
+
+  private async fetchVisualRefsByIds(ids: number[]): Promise<any[]> {
+    if (ids.length === 0) return [];
+    const docs = await Promise.all(
+      ids.map((id) => this.fb.db.collection('visual_references').doc(String(id)).get().catch(() => null)),
+    );
+    return docs
+      .filter((d): d is FirebaseFirestore.DocumentSnapshot => !!d && d.exists)
+      .map((d) => this.fb.toObj(d));
   }
 
   async create(dto: CreateFichaDto, user: FichaAuthUser) {

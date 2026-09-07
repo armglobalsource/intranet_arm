@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { FichaDocumentView } from '@/app/dashboard/fichas-tecnicas/[fichaId]/FichaDocumentView';
 import type { Ficha } from '@/types/ficha';
 
@@ -14,6 +15,7 @@ export function PublicFichaClient({ fichaId }: { fichaId: string }) {
   const [ficha, setFicha]     = useState<Ficha | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
+  const queryClient           = useQueryClient();
 
   useEffect(() => {
     if (!fichaId) { setError('ID de ficha inválido'); setLoading(false); return; }
@@ -26,9 +28,27 @@ export function PublicFichaClient({ fichaId }: { fichaId: string }) {
         }
         return r.json();
       })
-      .then((data) => { setFicha(data); setLoading(false); })
+      .then((data: Ficha) => {
+        // Prepopular el cache de React Query con las paletas y visual refs
+        // que vienen enriquecidas desde el endpoint público. Así los hooks
+        // usePaletas() y useVisualReferences() encuentran datos en cache y
+        // no disparan fetch a endpoints privados (que requerirían auth y
+        // redirigirían a login).
+        //
+        // Usamos setQueryDefaults con staleTime infinito para estas queries
+        // solo en modo público, garantizando que no refetch bajo ninguna
+        // circunstancia.
+        if (data.publicMeta) {
+          queryClient.setQueryDefaults(['paletas'], { staleTime: Infinity, gcTime: Infinity });
+          queryClient.setQueryDefaults(['visual-references'], { staleTime: Infinity, gcTime: Infinity });
+          queryClient.setQueryData(['paletas'], data.publicMeta.paletas ?? []);
+          queryClient.setQueryData(['visual-references', 'list', ''], data.publicMeta.visualRefs ?? []);
+        }
+        setFicha(data);
+        setLoading(false);
+      })
       .catch((e) => { setError(e.message); setLoading(false); });
-  }, [fichaId]);
+  }, [fichaId, queryClient]);
 
   if (loading) {
     return (

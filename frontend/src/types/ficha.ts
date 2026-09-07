@@ -108,6 +108,13 @@ export interface Ficha {
   hiddenSections?:    SectionName[];
   sectionLayout?:     { left: string[]; right: string[]; leftRatio?: number };
   layoutVisual?:      LayoutVisual;
+  /** Solo presente en respuestas de /fichas/public/:id — permite al cliente
+   *  público resolver IDs de paletas y visual references sin llamar
+   *  endpoints privados. */
+  publicMeta?: {
+    paletas:    any[];
+    visualRefs: any[];
+  };
 }
 
 export interface FichaListItem {
