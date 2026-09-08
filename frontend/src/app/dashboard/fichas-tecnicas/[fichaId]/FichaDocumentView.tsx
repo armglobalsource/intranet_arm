@@ -2329,36 +2329,38 @@ export function FichaDocumentView({
         }
 
         @media print {
-          /* Colores exactos */
+          /* Preservar colores exactos del theme oscuro tal cual pantalla */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-            line-height: 1.3 !important;
           }
 
-          /* Ocultar controles */
+          /* Fondo del papel = mismo negro del ficha-doc, para que no
+             haya franjas blancas alrededor por márgenes ni por scale. */
+          html, body {
+            background: ${D.bg} !important;
+          }
+
+          /* Ocultar controles que solo tienen sentido en pantalla */
           .ficha-no-print { display: none !important; }
 
           /* Contenedor raíz */
           .ficha-doc-root { max-width: 100% !important; margin: 0 !important; }
 
-          /* Documento → fondo blanco, sin borde redondeado. Ya no aplica
-             transform aquí: el scale se aplica por-vista más abajo, así
-             cada vista (clásica y Layout Visual) cabe en su propia página
-             de forma independiente. */
+          /* El wrapper del documento se estira al ancho de la página */
           .ficha-doc {
-            background: #ffffff !important;
             border: none !important;
             border-radius: 0 !important;
             overflow: visible !important;
           }
 
           /* Ambas vistas visibles en print (en pantalla, la inactiva está
-             display:none inline). Cada una se escala con su propio scale. */
+             display:none via inline style). Cada una se escala con su
+             propio scale y aparecen en páginas separadas. */
           .ficha-view-hidden { display: block !important; }
           .ficha-view-active { display: block !important; }
 
-          /* Scale de la vista clásica */
+          /* Scale de la vista clásica (ficha) */
           .ficha-view-body {
             transform: scale(var(--ficha-print-scale, 1));
             transform-origin: top left;
@@ -2380,117 +2382,15 @@ export function FichaDocumentView({
             break-before: auto !important;
           }
 
-          /* Textos → oscuros */
-          .ficha-doc, .ficha-doc div, .ficha-doc span,
-          .ficha-doc p, .ficha-doc strong, .ficha-doc input {
-            color: #111 !important;
-          }
+          /* Muestra versión estática de swatches/thumbs (los controles
+             interactivos están ocultos via .ficha-no-print). */
+          .ficha-print-only { display: flex !important; }
 
-          /* Header compacto */
-          .ficha-hdr {
-            background: #f2f2f2 !important;
-            border-bottom: 1px solid #ddd !important;
-          }
-          .ficha-hdr-top {
-            padding: 6px 12px !important;
-            border-bottom: 1px solid #e8e8e8 !important;
-          }
-          .ficha-hdr-top img { height: 22px !important; }
-          .ficha-hdr-top div[style] { font-size: 9px !important; }
-
-          /* Fila campus + título */
-          .ficha-hdr > div:last-child {
-            padding: 5px 12px 6px !important;
-          }
-
-          /* Logo blanco → negro */
-          .ficha-logo { filter: brightness(0) !important; }
-
-          /* Cuerpo muy compacto */
-          .ficha-body { padding: 6px 8px !important; }
-
-          /* Grilla: gap mínimo. Anulamos padding de wrappers y outline/
-             minHeight de DroppableColumn (drag&drop UI que solo tiene
-             sentido en pantalla). */
-          .ficha-grid { gap: 5px !important; }
-          .ficha-grid > div {
-            padding: 0 !important;
-            min-height: 0 !important;
-          }
-          .ficha-grid > div > div {
-            min-height: 0 !important;
-            outline: none !important;
-            background: transparent !important;
-            padding: 0 !important;
-          }
-
-          /* Tarjetas: sin fondo, borde fino, padding mínimo, no cortar */
+          /* Cards no se cortan entre páginas */
           .ficha-card {
-            background: #ffffff !important;
-            border: 0.5px solid #ccc !important;
-            border-radius: 4px !important;
-            padding: 5px 7px !important;
-            margin-bottom: 5px !important;
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
-
-          /* Título de sección más pequeño */
-          .ficha-card > div:first-child {
-            font-size: 7px !important;
-            margin-bottom: 4px !important;
-          }
-
-          /* Filas de roles: menos padding */
-          .ficha-card div[style*="padding: 6px"] {
-            padding: 2px 0 !important;
-          }
-
-          /* Fuentes globales reducidas */
-          .ficha-doc { font-size: 9px !important; }
-
-          /* Inputs: línea tenue */
-          .ficha-cell-input {
-            border-bottom: 0.5px solid #aaa !important;
-            background: transparent !important;
-          }
-
-          /* ── Layout Visual (segunda página) ────────────────────────── */
-
-          /* Muestra la versión estática de swatches/thumbs que en pantalla
-             está oculta. Los controles editables (input, textarea, botones
-             +, X, etc.) están marcados con ficha-no-print y se ocultan. */
-          .ficha-print-only { display: flex !important; }
-
-          /* Toda la tabla en fondo blanco con bordes finos y texto negro */
-          .layout-visual-page,
-          .layout-visual-page > div,
-          .layout-visual-page div,
-          .layout-visual-page span {
-            color: #111 !important;
-            background: transparent !important;
-          }
-          .layout-visual-table {
-            background: #ffffff !important;
-            border: 0.5px solid #999 !important;
-            border-radius: 3px !important;
-          }
-          .layout-visual-table > div {
-            border-bottom: 0.5px solid #ccc !important;
-            padding: 6px 8px !important;
-          }
-          .layout-visual-table > div:first-child {
-            background: #f2f2f2 !important;
-          }
-          .layout-visual-page textarea {
-            display: none !important;
-          }
-          /* Reemplazar textareas por su valor de texto en print (via ::after
-             no funciona bien con form controls). En su lugar, mostramos el
-             texto plano guardado en un data-attribute — este truco no es
-             confiable así que renderizamos también un <span print-only>
-             desde el componente. Por seguridad, si algún textarea llegara
-             a ser visible, lo hacemos borderless. */
         }
       `}</style>
 
@@ -2941,41 +2841,9 @@ export function FichaDocumentView({
           </div>
         )}
 
-        {/* ── Vista alternativa: Layout Visual ──
-            Se renderiza SIEMPRE en el DOM. En pantalla, visible solo cuando
-            la píldora "Layout Visual" está activa (display: none en la otra).
-            En print, ambas vistas quedan visibles y el CSS @media print
-            aplica page-break-before al layout-visual-page para que salga
-            como segunda página — EXCEPTO cuando el layout está vacío
-            (layout-visual-empty), en cuyo caso se oculta para no dejar
-            página en blanco al imprimir. */}
-        {(() => {
-          const layoutSongs = ficha.layoutVisual?.songs ?? [];
-          const hasSongContent = layoutSongs.some((s) =>
-            (s.iluminacion?.trim()?.length ?? 0) > 0 ||
-            (s.illuminationColors?.length ?? 0) > 0 ||
-            (s.visualDescription?.trim()?.length ?? 0) > 0 ||
-            (s.referenceIds?.length ?? 0) > 0,
-          );
-          const hasNotes = (ficha.layoutVisual?.producerNotes?.trim()?.length ?? 0) > 0;
-          const hasLayoutContent = hasSongContent || hasNotes;
-          return (
-        <div
-          ref={layoutRef}
-          className={`layout-visual-page ${isLayoutView ? 'ficha-view-active' : 'ficha-view-hidden'} ${hasLayoutContent ? '' : 'layout-visual-empty'}`}
-          style={{ display: isLayoutView ? 'block' : 'none' }}
-        >
-          <LayoutVisualView
-            ficha={ficha}
-            editable={!!editable && !!onUpdateLayoutVisual}
-            localSetListRows={editable ? localSections?.setList : undefined}
-            onSave={onUpdateLayoutVisual}
-          />
-        </div>
-          );
-        })()}
-
-        {/* ── Cuerpo (vista clásica por encuentro) ── */}
+        {/* ── Cuerpo (vista clásica por encuentro) ──
+            Va PRIMERO en el DOM para que en print salga como página 1.
+            El Layout Visual viene después con page-break-before: always. */}
         <div
           ref={bodyRef}
           className={`ficha-body ficha-view-body ${isLayoutView ? 'ficha-view-hidden' : 'ficha-view-active'}`}
@@ -3055,6 +2923,40 @@ export function FichaDocumentView({
             );
           })()}
         </div>
+
+        {/* ── Vista alternativa: Layout Visual ──
+            Se renderiza SIEMPRE en el DOM. En pantalla, visible solo cuando
+            la píldora "Layout Visual" está activa (display: none en la otra).
+            En print, ambas vistas quedan visibles y el CSS @media print
+            aplica page-break-before al layout-visual-page para que salga
+            como segunda página — EXCEPTO cuando el layout está vacío
+            (layout-visual-empty), en cuyo caso se oculta para no dejar
+            página en blanco al imprimir. */}
+        {(() => {
+          const layoutSongs = ficha.layoutVisual?.songs ?? [];
+          const hasSongContent = layoutSongs.some((s) =>
+            (s.iluminacion?.trim()?.length ?? 0) > 0 ||
+            (s.illuminationColors?.length ?? 0) > 0 ||
+            (s.visualDescription?.trim()?.length ?? 0) > 0 ||
+            (s.referenceIds?.length ?? 0) > 0,
+          );
+          const hasNotes = (ficha.layoutVisual?.producerNotes?.trim()?.length ?? 0) > 0;
+          const hasLayoutContent = hasSongContent || hasNotes;
+          return (
+            <div
+              ref={layoutRef}
+              className={`layout-visual-page ${isLayoutView ? 'ficha-view-active' : 'ficha-view-hidden'} ${hasLayoutContent ? '' : 'layout-visual-empty'}`}
+              style={{ display: isLayoutView ? 'block' : 'none' }}
+            >
+              <LayoutVisualView
+                ficha={ficha}
+                editable={!!editable && !!onUpdateLayoutVisual}
+                localSetListRows={editable ? localSections?.setList : undefined}
+                onSave={onUpdateLayoutVisual}
+              />
+            </div>
+          );
+        })()}
 
         {/* ── Footer de auditoría ── */}
         <div
