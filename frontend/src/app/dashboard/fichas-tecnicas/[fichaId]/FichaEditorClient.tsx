@@ -199,6 +199,19 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { can, isAdmin } = usePermissions();
   const { user } = useAuthStore();
   const { ficha, loading, error } = useFichaRealtime(fichaId);
+
+  // Setear document.title con el nombre de la ficha para que, cuando el
+  // usuario descargue como PDF (window.print → Guardar como PDF), Chrome
+  // sugiera un nombre útil en lugar de "document.pdf". Restauramos al
+  // desmontar para no pegar ese título en otras vistas.
+  useEffect(() => {
+    if (!ficha?.title) return;
+    const prev = document.title;
+    const clean = ficha.title.replace(/[/\\:*?"<>|]/g, ' ').trim();
+    document.title = clean || prev;
+    return () => { document.title = prev; };
+  }, [ficha?.title]);
+
   const [saveState, setSaveState]       = useState<SaveState>('idle');
   const [actionError, setActionError]   = useState<string | null>(null);
   const [splitGlobalFichaId, setSplitGlobalFichaId] = useState<string | null>(null);
