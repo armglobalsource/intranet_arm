@@ -202,7 +202,7 @@ const D = {
   divider:     'rgba(255,255,255,0.06)',
   headerBg:    'rgba(255,255,255,0.03)',
   textPrimary: '#f0efec',
-  textSecond:  '#888580',
+  textSecond:  '#c4c1bc',
   textMuted:   '#555350',
   inputBorder: 'rgba(255,255,255,0.18)',
 };

@@ -41,7 +41,7 @@ const D = {
   headerBg:    'rgba(255,255,255,0.03)',
   badgeBg:     'rgba(255,255,255,0.07)',
   textPrimary: '#f0efec',
-  textSecond:  '#888580',
+  textSecond:  '#c4c1bc',
   textMuted:   '#555350',
   inputBorder: 'rgba(255,255,255,0.18)',
 } as const;
