@@ -547,6 +547,62 @@ export class FichasService {
       });
   }
 
+  /**
+   * Fichas publicadas (y no archivadas) cuya fecha cae en la semana en curso
+   * en horario de Chile (América/Santiago), lunes 00:00 → domingo 23:59.
+   *
+   * Las fechas de ficha se almacenan como Timestamp con la hora fijada a
+   * 12:00 UTC del día calendario (ver parseFichaDate). Por eso el rango
+   * `lunes 12:00 UTC` … `domingo 12:00 UTC` incluye cualquier ficha cuya
+   * fecha calendario caiga dentro de la semana chilena — con un pequeño
+   * margen extra para captar diferencias por DST.
+   */
+  async findPublicWeek() {
+    const TZ = 'America/Santiago';
+    const todayInTz = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date()); // "YYYY-MM-DD" en horario Chile
+
+    const [y, m, d] = todayInTz.split('-').map(Number);
+    const todayUTC = new Date(Date.UTC(y, m - 1, d));
+    const dow = todayUTC.getUTCDay();               // 0=Dom, 1=Lun...6=Sáb
+    const daysFromMonday = (dow + 6) % 7;           // Lun=0, Mar=1...Dom=6
+
+    const monday = new Date(todayUTC);
+    monday.setUTCDate(todayUTC.getUTCDate() - daysFromMonday);
+    monday.setUTCHours(0, 0, 0, 0);
+
+    const sundayEnd = new Date(monday);
+    sundayEnd.setUTCDate(monday.getUTCDate() + 6);
+    sundayEnd.setUTCHours(23, 59, 59, 999);
+
+    const snap = await this.fb.db
+      .collection(COL)
+      .where('date', '>=', this.fb.ts(monday))
+      .where('date', '<=', this.fb.ts(sundayEnd))
+      .get();
+
+    return this.fb.toDocs(snap)
+      .filter((f: any) => f.published === true && f.archived !== true)
+      .map((f: any) => ({
+        fichaId: f.fichaId,
+        campusId: f.campusId,
+        campusName: f.campusName ?? null,
+        type: f.type,
+        title: f.title,
+        date: f.date,
+        encuentros: f.encuentros ?? [],
+      }))
+      .sort((a: any, b: any) => {
+        const ad = a.date?.toDate?.()?.getTime?.() ?? 0;
+        const bd = b.date?.toDate?.()?.getTime?.() ?? 0;
+        return ad - bd;
+      });
+  }
+
   async findOne(fichaId: string) {
     const ref = this.fb.db.collection(COL).doc(fichaId);
     const snap = await ref.get();

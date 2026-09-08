@@ -36,6 +36,12 @@ export class FichasController {
   }
 
   @Public()
+  @Get('public/week')
+  findPublicWeek() {
+    return this.fichasService.findPublicWeek();
+  }
+
+  @Public()
   @Get('public/:fichaId')
   findOnePublic(@Param('fichaId') fichaId: string) {
     return this.fichasService.findPublic(fichaId);
