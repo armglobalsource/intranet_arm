@@ -2155,61 +2155,6 @@ export function FichaDocumentView({
   const bodyRef    = useRef<HTMLDivElement>(null);       // vista clásica (encuentro)
   const layoutRef  = useRef<HTMLDivElement>(null);       // vista Layout Visual
 
-  // ── Auto-scale para PDF/impresión ──────────────────────────────────────────
-  // Antes de imprimir, medimos el alto real de CADA vista (clásica y Layout
-  // Visual) por separado y aplicamos scale independiente a cada una. Así:
-  //   página 1 = vista clásica del encuentro seleccionado
-  //   página 2 = Layout Visual (si tiene canciones)
-  // Cada página cabe en una A4 portrait sin afectar a la otra.
-  useEffect(() => {
-    // A4 portrait usable ~= 297mm - 12mm de margen = 285mm de alto.
-    // A 96dpi, 1mm ≈ 3.78px → 285mm ≈ 1077px.
-    const A4_USABLE_HEIGHT_PX = 1077;
-    const MIN_SCALE           = 0.55;
-    // Ratio empírico print/screen para cada vista.
-    const RATIO_BODY   = 0.62; // vista clásica (denso en print)
-    const RATIO_LAYOUT = 0.85; // Layout Visual (menos denso, tabla ya compacta)
-
-    function scaleFor(el: HTMLDivElement | null, ratio: number): string {
-      if (!el) return '1';
-      // scrollHeight puede ser 0 si el elemento está oculto con display:none.
-      // En ese caso lo medimos temporalmente forzando visibilidad.
-      let restoreDisplay: string | null = null;
-      if (el.offsetParent === null) {
-        restoreDisplay = el.style.display;
-        el.style.display = 'block';
-      }
-      const screenHeight = el.scrollHeight;
-      if (restoreDisplay !== null) el.style.display = restoreDisplay;
-      if (screenHeight <= 0) return '1';
-      const estimatedPrintHeight = screenHeight * ratio;
-      const rawScale = estimatedPrintHeight > A4_USABLE_HEIGHT_PX
-        ? A4_USABLE_HEIGHT_PX / estimatedPrintHeight
-        : 1;
-      return String(Math.max(MIN_SCALE, Math.min(1, rawScale)));
-    }
-
-    function computeScale() {
-      const doc = docRef.current;
-      if (!doc) return;
-      doc.style.setProperty('--ficha-print-scale',        scaleFor(bodyRef.current,   RATIO_BODY));
-      doc.style.setProperty('--ficha-layout-print-scale', scaleFor(layoutRef.current, RATIO_LAYOUT));
-    }
-    function resetScale() {
-      const doc = docRef.current;
-      if (!doc) return;
-      doc.style.removeProperty('--ficha-print-scale');
-      doc.style.removeProperty('--ficha-layout-print-scale');
-    }
-
-    window.addEventListener('beforeprint', computeScale);
-    window.addEventListener('afterprint', resetScale);
-    return () => {
-      window.removeEventListener('beforeprint', computeScale);
-      window.removeEventListener('afterprint', resetScale);
-    };
-  }, []);
-
   const hidden = (n: SectionName) => (hiddenSections ?? []).includes(n);
 
   // ── Layout drag-to-reorder ────────────────────────────────────────────────
@@ -2335,19 +2280,19 @@ export function FichaDocumentView({
             print-color-adjust: exact !important;
           }
 
-          /* Fondo del papel = mismo negro del ficha-doc, para que no
-             haya franjas blancas alrededor por márgenes ni por scale. */
+          /* Fondo del papel = mismo negro del ficha-doc para evitar franjas
+             blancas por márgenes de página. */
           html, body {
             background: ${D.bg} !important;
           }
 
-          /* Ocultar controles que solo tienen sentido en pantalla */
+          /* Ocultar controles */
           .ficha-no-print { display: none !important; }
 
           /* Contenedor raíz */
           .ficha-doc-root { max-width: 100% !important; margin: 0 !important; }
 
-          /* El wrapper del documento se estira al ancho de la página */
+          /* Wrapper del documento sin borde/radius, ocupa el ancho de página */
           .ficha-doc {
             border: none !important;
             border-radius: 0 !important;
@@ -2355,42 +2300,70 @@ export function FichaDocumentView({
           }
 
           /* Ambas vistas visibles en print (en pantalla, la inactiva está
-             display:none via inline style). Cada una se escala con su
-             propio scale y aparecen en páginas separadas. */
+             display:none via inline style). page-break-before pone el
+             layout en la segunda página. */
           .ficha-view-hidden { display: block !important; }
           .ficha-view-active { display: block !important; }
 
-          /* Scale de la vista clásica (ficha) */
-          .ficha-view-body {
-            transform: scale(var(--ficha-print-scale, 1));
-            transform-origin: top left;
-            width: calc(100% / var(--ficha-print-scale, 1)) !important;
-          }
-
-          /* Layout Visual → segunda página. Scale independiente. */
           .layout-visual-page {
             page-break-before: always !important;
             break-before: page !important;
-            transform: scale(var(--ficha-layout-print-scale, 1));
-            transform-origin: top left;
-            width: calc(100% / var(--ficha-layout-print-scale, 1)) !important;
           }
-          /* Layout vacío (ninguna canción con datos) → no ocupa página. */
           .layout-visual-page.layout-visual-empty {
             display: none !important;
             page-break-before: auto !important;
             break-before: auto !important;
           }
 
-          /* Muestra versión estática de swatches/thumbs (los controles
-             interactivos están ocultos via .ficha-no-print). */
+          /* Muestra versión estática de swatches/thumbs */
           .ficha-print-only { display: flex !important; }
 
-          /* Cards no se cortan entre páginas */
+          /* ── Compactación para que la ficha quepa en 1 hoja A4 ──
+             Solo se reduce padding/margen/tamaño de fuente — los colores
+             del tema oscuro NO se tocan (siguen como en pantalla). */
+
+          /* Header: menos padding, logo más chico, fuente reducida */
+          .ficha-hdr-top {
+            padding: 8px 14px !important;
+          }
+          .ficha-hdr-top img { height: 26px !important; }
+          .ficha-hdr > div:last-child {
+            padding: 6px 14px 8px !important;
+          }
+          .ficha-hdr > div:last-child div[style*="fontSize: 22"],
+          .ficha-hdr h1 {
+            font-size: 14px !important;
+          }
+
+          /* Cuerpo: padding compacto */
+          .ficha-body { padding: 8px 12px !important; }
+
+          /* Grilla: gap chico */
+          .ficha-grid { gap: 6px !important; }
+
+          /* Cards: padding reducido, no se cortan entre páginas */
           .ficha-card {
+            padding: 6px 9px !important;
+            margin-bottom: 6px !important;
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
+
+          /* Título de cada card más chico */
+          .ficha-card > div:first-child {
+            font-size: 8px !important;
+            margin-bottom: 4px !important;
+          }
+
+          /* Filas de roles: menos padding vertical */
+          .ficha-card div[style*="padding: 6px"] {
+            padding: 2px 0 !important;
+          }
+
+          /* Reducir font-size global del documento (los valores en px de
+             inline styles no se ven afectados, así que también compactamos
+             elementos específicos). */
+          .ficha-doc { font-size: 10px !important; }
         }
       `}</style>
 
