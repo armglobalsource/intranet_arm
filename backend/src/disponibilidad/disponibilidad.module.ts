@@ -7,5 +7,6 @@ import { DisponibilidadService } from './disponibilidad.service';
   imports:     [CampusModule],
   controllers: [DisponibilidadController],
   providers:   [DisponibilidadService],
+  exports:     [DisponibilidadService],
 })
 export class DisponibilidadModule {}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { useFichaRealtime, useUpdateSection, useCompleteSection, useReopenSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, useUpdateLayoutVisual, usePublishFicha, useUnpublishFicha, useSplitPrayerGlobal } from '@/hooks/useFichas';
@@ -11,8 +11,11 @@ import { apiErrorMessage } from '@/lib/api';
 import { useUsers } from '@/hooks/useUsers';
 import { displayName } from '@/types/user';
 import { FichaDocumentView } from './FichaDocumentView';
-import { DisponibilidadSideCard } from '@/components/fichas/DisponibilidadSideCard';
-import { TecnicosDisponibilidadSideCard } from '@/components/fichas/TecnicosDisponibilidadSideCard';
+import { EquipoRosterSideCard } from '@/components/fichas/EquipoRosterSideCard';
+import { RosterStatusContext } from '@/components/fichas/RosterStatusContext';
+import { useEquipoRoster } from '@/hooks/useEquipoRoster';
+import { toWeekLabel } from '@/types/disponibilidad';
+import { parseFichaDate } from '@/lib/ficha-date';
 import { SECTION_LABELS } from '@/types/ficha';
 import type { Ficha, Row, SectionName, Section } from '@/types/ficha';
 
@@ -199,6 +202,22 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { can, isAdmin } = usePermissions();
   const { user } = useAuthStore();
   const { ficha, loading, error } = useFichaRealtime(fichaId);
+
+  // Roster de equipo (worship / técnico / ningún equipo) con estado de
+  // disponibilidad para la semana de la ficha — alimenta el sidebar y los
+  // puntos de color del autocomplete de personas.
+  const rosterCampusId = ficha && Number.isFinite(Number(ficha.campusId)) ? Number(ficha.campusId) : null;
+  const rosterWeekLabel = ficha ? toWeekLabel(parseFichaDate(ficha.date)) : '';
+  const { data: roster, isLoading: rosterLoading } = useEquipoRoster(rosterCampusId, rosterWeekLabel);
+  const rosterStatusByUserId = useMemo(() => {
+    const map: Record<number, 'disponible' | 'no_disponible' | 'sin_responder'> = {};
+    if (roster) {
+      for (const cat of ['worship', 'tecnico', 'ninguno'] as const) {
+        for (const p of roster[cat]) map[p.userId] = p.status;
+      }
+    }
+    return map;
+  }, [roster]);
 
   // Setear document.title con el nombre de la ficha para que, cuando el
   // usuario descargue como PDF (window.print → Guardar como PDF), Chrome
@@ -541,10 +560,12 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     );
   }
 
-  const canViewDisponibilidad = isAdmin || can('disponibilidad:view');
-  const canViewTecnicos       = isAdmin || can('tecnicos:view');
-  const showSidePanel = editable && (canViewDisponibilidad || canViewTecnicos);
-  const fichaCampusId = Number.isFinite(Number(ficha.campusId)) ? Number(ficha.campusId) : null;
+  // El roster de equipo se muestra a cualquiera con acceso de edición a la
+  // ficha (fichas:view ya se validó vía `allowed` arriba) — antes dependía de
+  // permisos separados (disponibilidad:view / tecnicos:view) que la mayoría
+  // de los roles productores no tenían, dejando el panel siempre oculto.
+  const showSidePanel = editable;
+  const fichaCampusId = rosterCampusId;
 
   function handleAssignSection(sectionName: SectionName, userId: number | null, userName: string | null) {
     setActionError(null);
@@ -675,6 +696,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
       )}
 
       {/* Layout: ficha + panel lateral cuando está en edición */}
+      <RosterStatusContext.Provider value={rosterStatusByUserId}>
       <div className={showSidePanel ? 'flex gap-5 items-start' : ''}>
         <div className={showSidePanel ? 'flex-1 min-w-0' : ''}>
           <FichaDocumentView
@@ -714,11 +736,16 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
         {showSidePanel && (
           <div className="w-56 flex-shrink-0 sticky top-4 flex flex-col gap-3">
-            {canViewDisponibilidad && <DisponibilidadSideCard fichaDate={ficha.date} campusId={fichaCampusId} />}
-            {canViewTecnicos       && <TecnicosDisponibilidadSideCard fichaDate={ficha.date} campusId={fichaCampusId} />}
+            <EquipoRosterSideCard
+              roster={roster}
+              isLoading={rosterLoading}
+              weekLabel={rosterWeekLabel}
+              campusId={fichaCampusId}
+            />
           </div>
         )}
       </div>
+      </RosterStatusContext.Provider>
     </div>
   );
 }
