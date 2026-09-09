@@ -60,8 +60,9 @@ export class AuthService {
     const roleId   = user.roleId ?? user.role?.id ?? 0;
     const { permissions, ...tokens } = await this.generateTokens(user.id, user.email, roleName, roleId, ipAddress, userAgent);
 
+    const needsProfileCompletion = !user.onboardingCompletedAt;
     const { passwordHash, ...safeUser } = user;
-    return { user: { ...safeUser, permissions }, ...tokens };
+    return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion };
   }
 
   async refresh(rawRefreshToken: string) {
@@ -166,7 +167,7 @@ export class AuthService {
     const roleId   = user.roleId ?? 2;
     const { permissions, ...tokens } = await this.generateTokens(user.id, user.email, roleName, roleId, ipAddress, userAgent);
 
-    const needsProfileCompletion = !user.gender || !user.avatarUrl;
+    const needsProfileCompletion = !user.onboardingCompletedAt;
     const { passwordHash, ...safeUser } = user;
     return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion };
   }
@@ -246,7 +247,7 @@ export class AuthService {
     const roleId   = user.roleId ?? 2;
     const { permissions, ...tokens } = await this.generateTokens(user.id, user.email, roleName, roleId, ipAddress, userAgent);
 
-    const needsProfileCompletion = !user.gender;
+    const needsProfileCompletion = !user.onboardingCompletedAt;
     const { passwordHash, ...safeUser } = user;
     return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion };
   }
@@ -267,14 +268,24 @@ export class AuthService {
 
   async completeProfile(userId: number, dto: CompleteProfileDto) {
     const update: UpdateUserDto = {};
-    if (dto.firstName !== undefined) update.firstName = dto.firstName;
-    if (dto.lastName  !== undefined) update.lastName  = dto.lastName;
-    if (dto.gender    !== undefined) update.gender    = dto.gender;
-    if (dto.phone     !== undefined) update.phone     = dto.phone;
-    if (dto.birthDate !== undefined) update.birthDate = dto.birthDate;
-    if (dto.password)                update.password  = dto.password;
+    if (dto.firstName        !== undefined) update.firstName        = dto.firstName;
+    if (dto.lastName         !== undefined) update.lastName         = dto.lastName;
+    if (dto.gender           !== undefined) update.gender           = dto.gender;
+    if (dto.phone            !== undefined) update.phone            = dto.phone;
+    if (dto.birthDate        !== undefined) update.birthDate        = dto.birthDate;
+    if (dto.password)                       update.password         = dto.password;
+    if (dto.preferredName    !== undefined) update.preferredName    = dto.preferredName;
+    if (dto.phoneCountryCode !== undefined) update.phoneCountryCode = dto.phoneCountryCode;
+    if (dto.campusId         !== undefined) update.campusId         = dto.campusId;
+    if (dto.referralChannel  !== undefined) update.referralChannel  = dto.referralChannel;
+    if (dto.referredByName   !== undefined) update.referredByName   = dto.referredByName;
+    if (dto.servingStatus    !== undefined) update.servingStatus    = dto.servingStatus;
+    if (dto.memberSince      !== undefined) update.memberSince      = dto.memberSince;
+    if (dto.interestAreas    !== undefined) update.interestAreas    = dto.interestAreas;
+    if (dto.otherAreaText    !== undefined) update.otherAreaText    = dto.otherAreaText;
 
-    const user = await this.users.update(userId, update);
+    await this.users.update(userId, update);
+    const user = await this.users.markOnboardingComplete(userId, !!dto.consentAccepted);
     return { user };
   }
 

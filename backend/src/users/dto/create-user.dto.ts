@@ -23,6 +23,8 @@ export class CreateUserDto {
   @ApiProperty() @IsOptional() @IsEnum(['pastor_principal', 'pastor', 'ministro']) ministerialTitle?: MinisterialTitle | null;
 }
 
+export type ServingStatus = 'yes' | 'not-now' | 'interested' | 'no';
+
 export class UpdateUserDto {
   @ApiProperty() @IsOptional() @IsString() @MaxLength(100)   firstName?:          string;
   @ApiProperty() @IsOptional() @IsString() @MaxLength(100)   lastName?:           string;
@@ -40,6 +42,15 @@ export class UpdateUserDto {
   @ApiProperty() @IsOptional() @IsEnum(['pastor_principal', 'pastor', 'ministro']) ministerialTitle?: MinisterialTitle | null;
   @ApiProperty({ description: 'Mes y año en que se unió a la organización, formato YYYY-MM' })
   @IsOptional() @IsString() @MaxLength(7) memberSince?: string | null;
+
+  // ── Wizard de bienvenida ──────────────────────────────────────────────────
+  @ApiProperty() @IsOptional() @IsString() @MaxLength(100)   preferredName?:      string | null;
+  @ApiProperty() @IsOptional() @IsString() @MaxLength(6)     phoneCountryCode?:   string | null;
+  @ApiProperty() @IsOptional() @IsString() @MaxLength(100)   referralChannel?:    string | null;
+  @ApiProperty() @IsOptional() @IsString() @MaxLength(150)   referredByName?:     string | null;
+  @ApiProperty() @IsOptional() @IsEnum(['yes', 'not-now', 'interested', 'no'])    servingStatus?: ServingStatus | null;
+  @ApiProperty() @IsOptional() @IsArray() @IsString({ each: true })              interestAreas?: string[];
+  @ApiProperty() @IsOptional() @IsString() @MaxLength(150)   otherAreaText?:      string | null;
 }
 
 export class ApproveUserDto {
