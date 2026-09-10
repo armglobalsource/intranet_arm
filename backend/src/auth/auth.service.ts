@@ -135,13 +135,12 @@ export class AuthService {
         firstName: dto.firstName,
         lastName:  dto.lastName,
       });
-      this.notifications.create({
-        userId:  0,
+      this.notifications.createForPermission('users:edit', {
         title:   `Nuevo usuario registrado: ${dto.firstName} ${dto.lastName}`,
         body:    `${dto.email} se registró y está pendiente de tu aprobación.`,
         link:    '/dashboard/directorio/personas?status=pending',
         channel: 'in_app',
-      }, 0).catch((e) => this.logger.warn('No se pudo crear notificación de registro', e));
+      }).catch((e) => this.logger.warn('No se pudo crear notificación de registro', e));
     }
 
     if (user.status === 'rejected') {
@@ -201,13 +200,12 @@ export class AuthService {
         lastName:  googleUser.lastName,
         avatarUrl: googleUser.avatarUrl,
       });
-      this.notifications.create({
-        userId:  0,
+      this.notifications.createForPermission('users:edit', {
         title:   `Nuevo usuario registrado: ${googleUser.firstName} ${googleUser.lastName}`,
         body:    `${googleUser.email} se registró con Google y está pendiente de tu aprobación.`,
         link:    '/dashboard/directorio/personas?status=pending',
         channel: 'in_app',
-      }, 0).catch((e) => this.logger.warn('No se pudo crear notificación de registro Google', e));
+      }).catch((e) => this.logger.warn('No se pudo crear notificación de registro Google', e));
     } else {
       // Sincronizar datos de Google: foto siempre, nombre solo si estaba vacío
       const patch: Record<string, string> = {};
