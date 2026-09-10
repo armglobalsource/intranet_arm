@@ -7,6 +7,8 @@ import { SongInput } from '@/components/fichas/SongInput';
 import { LayoutVisualView } from './LayoutVisualView';
 import { useUsers } from '@/hooks/useUsers';
 import { displayName } from '@/types/user';
+import { useRosterStatus } from '@/components/fichas/RosterStatusContext';
+import type { RosterStatus } from '@/types/disponibilidad';
 
 // Secciones disponibles por tipo de ficha (para el panel de módulos)
 const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
@@ -192,6 +194,31 @@ function CellInput({ value, onChange, placeholder, style }: {
 
 const PERSON_SEARCH_MIN_CHARS = 3;
 
+const ROSTER_DOT_COLOR: Record<RosterStatus, string> = {
+  disponible:     '#1D9E75',
+  no_disponible:  '#D14343',
+  sin_responder:  '#6b6b6b',
+};
+
+const ROSTER_DOT_TITLE: Record<RosterStatus, string> = {
+  disponible:    'Disponible esta semana',
+  no_disponible: 'No disponible esta semana',
+  sin_responder: 'Sin respuesta esta semana',
+};
+
+function RosterDot({ status }: { status?: RosterStatus }) {
+  if (!status) return null;
+  return (
+    <span
+      title={ROSTER_DOT_TITLE[status]}
+      style={{
+        display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+        background: ROSTER_DOT_COLOR[status], flexShrink: 0,
+      }}
+    />
+  );
+}
+
 function PersonCellInput({ value, onChange, placeholder, style, multiline, rows }: {
   value: string;
   onChange: (v: string) => void;
@@ -201,6 +228,7 @@ function PersonCellInput({ value, onChange, placeholder, style, multiline, rows 
   rows?: number;
 }) {
   const { data: users = [] } = useUsers();
+  const rosterStatus = useRosterStatus();
   const [open, setOpen] = useState(false);
 
   const suggestions = useMemo(() => {
@@ -251,21 +279,36 @@ function PersonCellInput({ value, onChange, placeholder, style, multiline, rows 
             boxShadow: '0 8px 20px rgba(0,0,0,0.35)', maxHeight: 180, overflowY: 'auto', textAlign: 'left',
           }}
         >
-          {suggestions.map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              onMouseDown={() => { onChange(displayName(u)); setOpen(false); }}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '6px 10px', background: 'transparent', border: 'none', cursor: 'pointer',
-                borderBottom: `1px solid ${D.divider}`,
-              }}
-            >
-              <div style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary }}>{displayName(u)}</div>
-              {u.email && <div style={{ fontSize: 10, color: D.textMuted }}>{u.email}</div>}
-            </button>
-          ))}
+          {suggestions.map((u) => {
+            const blocked = rosterStatus[u.id] === 'no_disponible';
+            return (
+              <button
+                key={u.id}
+                type="button"
+                disabled={blocked}
+                title={blocked ? 'No disponible esta semana — no se puede seleccionar' : undefined}
+                onMouseDown={(e) => {
+                  if (blocked) { e.preventDefault(); return; }
+                  onChange(displayName(u)); setOpen(false);
+                }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '6px 10px', background: 'transparent', border: 'none',
+                  cursor: blocked ? 'not-allowed' : 'pointer',
+                  opacity: blocked ? 0.45 : 1,
+                  borderBottom: `1px solid ${D.divider}`,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <RosterDot status={rosterStatus[u.id]} />
+                  <div style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, textDecoration: blocked ? 'line-through' : 'none' }}>
+                    {displayName(u)}
+                  </div>
+                </div>
+                {u.email && <div style={{ fontSize: 10, color: D.textMuted, marginLeft: 13 }}>{u.email}</div>}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

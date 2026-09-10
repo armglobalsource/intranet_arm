@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, UseGua
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { AllowPending } from '../common/decorators/allow-pending.decorator';
 import { CampusService } from './campus.service';
 import { CreateCampusDto, UpdateCampusDto } from './dto/campus.dto';
 
@@ -13,6 +14,7 @@ export class CampusController {
   @Get()
   findAll() { return this.campusService.findAll(); }
 
+  @AllowPending()
   @Get('active')
   findActive() { return this.campusService.findActive(); }
 

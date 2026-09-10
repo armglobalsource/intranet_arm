@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { PendingAccountGuard } from '../common/guards/pending-account.guard';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -32,6 +33,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     JwtStrategy,
     GoogleStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: PendingAccountGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
   exports: [AuthService, JwtModule],

@@ -191,6 +191,13 @@ export class UsersService {
     if (dto.status            !== undefined) data.status            = dto.status;
     if (dto.ministerialTitle  !== undefined) data.ministerialTitle  = dto.ministerialTitle         ?? null;
     if (dto.memberSince       !== undefined) data.memberSince       = dto.memberSince?.trim()      ?? null;
+    if (dto.preferredName     !== undefined) data.preferredName     = dto.preferredName?.trim()    ?? null;
+    if (dto.phoneCountryCode  !== undefined) data.phoneCountryCode  = dto.phoneCountryCode          ?? null;
+    if (dto.referralChannel   !== undefined) data.referralChannel   = dto.referralChannel           ?? null;
+    if (dto.referredByName    !== undefined) data.referredByName    = dto.referredByName?.trim()    ?? null;
+    if (dto.servingStatus     !== undefined) data.servingStatus     = dto.servingStatus             ?? null;
+    if (dto.interestAreas     !== undefined) data.interestAreas     = dto.interestAreas             ?? [];
+    if (dto.otherAreaText     !== undefined) data.otherAreaText     = dto.otherAreaText?.trim()     ?? null;
     if (dto.campusId  !== undefined) {
       data.campusId = dto.campusId;
       if (dto.campusId) {
@@ -211,6 +218,14 @@ export class UsersService {
       data.jobTitles = await this.resolveJobTitles(dto.jobTitleIds);
     }
 
+    await this.fb.db.collection(COL).doc(String(id)).update(data);
+    return this.findOne(id);
+  }
+
+  /** Marca el wizard de bienvenida como completado (y el consentimiento, si se dio) */
+  async markOnboardingComplete(id: number, consentAccepted: boolean) {
+    const data: Record<string, any> = { onboardingCompletedAt: this.fb.now(), updatedAt: this.fb.now() };
+    if (consentAccepted) data.consentAcceptedAt = this.fb.now();
     await this.fb.db.collection(COL).doc(String(id)).update(data);
     return this.findOne(id);
   }

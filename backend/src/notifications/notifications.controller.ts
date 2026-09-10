@@ -13,16 +13,15 @@ export class NotificationsController {
   constructor(private readonly service: NotificationsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar todos los registros' })
+  @ApiOperation({ summary: 'Listar mis notificaciones' })
   findAll(@CurrentUser() user: any) {
-    const isAdmin = (user.permissions ?? []).includes('*');
-    return this.service.findAll(user.sub, isAdmin);
+    return this.service.findAll(user.sub);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un registro por ID' })
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.service.findOneForUser(id, user.sub, this.isAdmin(user));
+    return this.service.findOneForUser(id, user.sub);
   }
 
   @Post()
@@ -46,7 +45,7 @@ export class NotificationsController {
   @Patch(':id/read')
   @ApiOperation({ summary: 'Marcar notificación como leída' })
   markRead(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.service.markRead(id, user.sub, this.isAdmin(user));
+    return this.service.markRead(id, user.sub);
   }
 
   @Delete(':id')

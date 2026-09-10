@@ -5,6 +5,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { AllowPending } from '../common/decorators/allow-pending.decorator';
 import { ArmCatalogosService } from './arm-catalogos.service';
 import {
   ARM_CATALOGO_TIPOS, ArmCatalogoTipo, CreateArmCatalogoDto, UpdateArmCatalogoDto,
@@ -30,6 +31,7 @@ export class ArmCatalogosController {
     return this.service.findAll(parseTipo(tipo));
   }
 
+  @AllowPending()
   @Get('active')
   @ApiOperation({ summary: 'Listar entradas activas de un catálogo (para pickers)' })
   findActive(@Query('tipo') tipo: string) {

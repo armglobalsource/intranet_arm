@@ -23,12 +23,17 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const hasHydrated     = useAuthStore((s) => s._hasHydrated);
 
-  // If already logged in, skip the login page
+  // Si ya había una sesión antes de entrar a esta página, saltarla — pero solo
+  // se evalúa cuando termina de hidratar el store, no en cada cambio de
+  // isAuthenticated: si no, el login recién hecho en onSubmit (que también
+  // deja isAuthenticated=true) dispara este efecto y pisa el redirect a
+  // /auth/complete-profile con uno genérico a /dashboard.
   useEffect(() => {
     if (hasHydrated && isAuthenticated) {
       router.replace('/dashboard');
     }
-  }, [hasHydrated, isAuthenticated, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasHydrated]);
 
   const {
     register,
@@ -40,8 +45,11 @@ export default function LoginPage() {
   const onSubmit = async (data: FormData) => {
     try {
       const res = await api.post('/auth/login', data);
-      setSession(res.data.user, res.data.accessToken, res.data.refreshToken);
-      router.replace('/dashboard');
+      setSession(res.data.user, res.data.accessToken, res.data.refreshToken, res.data.needsProfileCompletion);
+      // Una cuenta 'pending' siempre pasa por el wizard — ahí ve la pantalla de
+      // "espera aprobación" en vez del dashboard, aunque ya lo haya llenado antes.
+      const goToWizard = res.data.user.status === 'pending' || res.data.needsProfileCompletion;
+      router.replace(goToWizard ? '/auth/complete-profile' : '/dashboard');
     } catch (err: any) {
       setError('root', {
         message: apiErrorMessage(err, 'Email o contraseña incorrectos'),

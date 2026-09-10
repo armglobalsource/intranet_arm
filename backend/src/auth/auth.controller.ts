@@ -12,6 +12,7 @@ import { LogoutDto } from './dto/logout.dto';
 import { RegisterDto } from './dto/register.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { Public } from '../common/decorators/public.decorator';
+import { AllowPending } from '../common/decorators/allow-pending.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { resolveReturnOrigin } from '../common/allowed-origins';
@@ -77,10 +78,6 @@ export class AuthController {
         req.ip,
         req.headers['user-agent'],
       );
-      if ('status' in result && result.status === 'pending') {
-        res.redirect(`${frontendUrl}/auth/pending?email=${encodeURIComponent(result.email)}`);
-        return;
-      }
       const params = new URLSearchParams({
         access:           result.accessToken,
         refresh:          result.refreshToken,
@@ -97,6 +94,7 @@ export class AuthController {
 
   // ── Perfil ─────────────────────────────────────────────────────────────
 
+  @AllowPending()
   @Post('complete-profile')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
@@ -124,6 +122,7 @@ export class AuthController {
     return this.authService.impersonateRole(user.sub, user.email, body.roleId);
   }
 
+  @AllowPending()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
@@ -132,6 +131,7 @@ export class AuthController {
     return this.authService.logout(user.sub, dto.refreshToken, user.jti, user.exp);
   }
 
+  @AllowPending()
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener datos del usuario autenticado' })
