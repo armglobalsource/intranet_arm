@@ -45,8 +45,8 @@ export default function PoliticasPage() {
             ARM Global (&quot;nosotros&quot;, &quot;la organización&quot;) es responsable del tratamiento de
             los datos personales que recopila a través de esta Plataforma. Puedes contactarnos
             para cualquier consulta relacionada con esta política escribiendo a{' '}
-            <a href="mailto:privacidad@armglobal.org" className="text-white/80 underline underline-offset-2 hover:text-white">
-              privacidad@armglobal.org
+            <a href="mailto:informatica@armglobal.org" className="text-white/80 underline underline-offset-2 hover:text-white">
+              informatica@armglobal.org
             </a>.
           </p>
         </Section>
@@ -130,8 +130,8 @@ export default function PoliticasPage() {
           </ul>
           <p>
             Puedes ejercer estos derechos, sin costo, escribiendo a{' '}
-            <a href="mailto:privacidad@armglobal.org" className="text-white/80 underline underline-offset-2 hover:text-white">
-              privacidad@armglobal.org
+            <a href="mailto:informatica@armglobal.org" className="text-white/80 underline underline-offset-2 hover:text-white">
+              informatica@armglobal.org
             </a>{' '}
             . Muchos de estos datos también puedes verlos y corregirlos tú mismo directamente
             desde tu perfil dentro de la Plataforma.
@@ -170,8 +170,8 @@ export default function PoliticasPage() {
         <Section title="12. Contacto">
           <p>
             Si tienes preguntas sobre esta política o sobre cómo tratamos tus datos, escríbenos a{' '}
-            <a href="mailto:privacidad@armglobal.org" className="text-white/80 underline underline-offset-2 hover:text-white">
-              privacidad@armglobal.org
+            <a href="mailto:informatica@armglobal.org" className="text-white/80 underline underline-offset-2 hover:text-white">
+              informatica@armglobal.org
             </a>.
           </p>
         </Section>
