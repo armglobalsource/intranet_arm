@@ -42,48 +42,49 @@ const OTHER_AREA_VALUE = 'Otros';
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-type StepKey = 'name' | 'gender' | 'birthday' | 'phone' | 'password' | 'channel' | 'inviter' | 'campus' | 'serving' | 'service-date' | 'areas' | 'consent';
+type StepKey = 'name' | 'gender' | 'birthday' | 'phone' | 'password' | 'channel' | 'inviter' | 'member-since' | 'campus' | 'serving' | 'areas' | 'consent';
 
 interface Answers {
-  preferredName:    string;
-  gender:           'male' | 'female' | '';
-  birthDay:         string;
-  birthMonth:       string;
-  birthYear:        string;
-  phoneCountryCode: string;
-  phone:            string;
-  password:         string;
-  referralChannel:  string;
-  referredByName:   string;
-  campusId:         string;
-  servingStatus:    ServingStatus | '';
-  serviceMonth:     string;
-  serviceYear:      string;
-  interestAreas:    string[];
-  otherAreaText:    string;
-  consentAccepted:  boolean;
+  preferredName:     string;
+  gender:            'male' | 'female' | '';
+  birthDay:          string;
+  birthMonth:        string;
+  birthYear:         string;
+  phoneCountryCode:  string;
+  phone:             string;
+  password:          string;
+  referralChannel:   string;
+  referredByName:    string;
+  memberSinceMonth:  string;
+  memberSinceYear:   string;
+  campusId:          string;
+  servingStatus:     ServingStatus | '';
+  interestAreas:     string[];
+  otherAreaText:     string;
+  consentAccepted:   boolean;
 }
 
 const EMPTY_ANSWERS: Answers = {
   preferredName: '', gender: '', birthDay: '', birthMonth: '', birthYear: '',
   phoneCountryCode: '+56', phone: '', password: '',
-  referralChannel: '', referredByName: '', campusId: '',
-  servingStatus: '', serviceMonth: '', serviceYear: '',
+  referralChannel: '', referredByName: '',
+  memberSinceMonth: '', memberSinceYear: '', campusId: '',
+  servingStatus: '',
   interestAreas: [], otherAreaText: '', consentAccepted: false,
 };
 
 function pad2(v: string) { return v.padStart(2, '0'); }
 
-/** Rellena las respuestas necesarias para calcular la categoría de voluntario
- * a partir de un usuario ya guardado — para cuando una cuenta pending vuelve
- * a esta página (ya llenó el wizard antes, solo falta que la aprueben). */
+/** Rellena las respuestas necesarias para calcular la categoría a partir de
+ * un usuario ya guardado — para cuando una cuenta pending vuelve a esta
+ * página (ya llenó el wizard antes, solo falta que la aprueben). */
 function seedFromUser(u: any): Partial<Answers> {
   const patch: Partial<Answers> = {};
   if (u?.preferredName || u?.firstName) patch.preferredName = u.preferredName || u.firstName;
   if (u?.servingStatus) patch.servingStatus = u.servingStatus;
   if (u?.memberSince) {
     const [y, m] = String(u.memberSince).split('-');
-    if (y && m) { patch.serviceYear = y; patch.serviceMonth = String(Number(m)); }
+    if (y && m) { patch.memberSinceYear = y; patch.memberSinceMonth = String(Number(m)); }
   }
   return patch;
 }
@@ -93,9 +94,7 @@ function activeSteps(a: Answers, hasPassword: boolean): StepKey[] {
   if (!hasPassword) keys.push('password');
   keys.push('channel');
   if (a.referralChannel === INVITED_VALUE) keys.push('inviter');
-  keys.push('campus', 'serving');
-  if (a.servingStatus === 'yes' || a.servingStatus === 'not-now') keys.push('service-date');
-  keys.push('areas', 'consent');
+  keys.push('member-since', 'campus', 'serving', 'areas', 'consent');
   return keys;
 }
 
@@ -118,18 +117,18 @@ function validateStep(key: StepKey, a: Answers): string | null {
       return a.password.length >= 6 ? null : 'Mínimo 6 caracteres.';
     case 'channel':
       return a.referralChannel ? null : 'Selecciona cómo llegaste a ARM Global.';
+    case 'member-since': {
+      if (!a.memberSinceMonth || !a.memberSinceYear) return 'Indica aproximadamente hace cuánto eres parte de ARM Global.';
+      const today = new Date();
+      const sel = Number(a.memberSinceYear) * 12 + Number(a.memberSinceMonth);
+      const cur = today.getFullYear() * 12 + today.getMonth() + 1;
+      if (sel > cur) return 'Esa fecha no puede estar en el futuro.';
+      return null;
+    }
     case 'campus':
       return a.campusId ? null : 'Selecciona tu campus principal.';
     case 'serving':
       return a.servingStatus ? null : 'Selecciona tu situación actual de servicio.';
-    case 'service-date': {
-      if (!a.serviceMonth || !a.serviceYear) return 'Indica aproximadamente cuándo comenzaste a servir.';
-      const today = new Date();
-      const sel = Number(a.serviceYear) * 12 + Number(a.serviceMonth);
-      const cur = today.getFullYear() * 12 + today.getMonth() + 1;
-      if (sel > cur) return 'La fecha de inicio no puede estar en el futuro.';
-      return null;
-    }
     case 'areas': {
       if (!a.interestAreas.length) return 'Selecciona al menos un área.';
       if (a.interestAreas.includes(OTHER_AREA_VALUE) && !a.otherAreaText.trim()) return 'Escribe el nombre de la otra área.';
@@ -149,20 +148,19 @@ interface ServiceLevel {
   detail: string;
 }
 
+/** Calcula la categoría según antigüedad como parte de la iglesia (memberSince),
+ * no según servingStatus — alguien puede llevar años en ARM Global sin servir. */
 function computeServiceLevel(a: Answers): ServiceLevel {
-  const hasHistory = a.servingStatus === 'yes' || a.servingStatus === 'not-now';
-  if (!hasHistory || !a.serviceMonth || !a.serviceYear) {
-    return a.servingStatus === 'interested'
-      ? { name: 'Descubriendo', stars: 0, material: 'none', detail: 'Tu camino está comenzando. Queremos acompañarte a descubrir dónde puedes servir.' }
-      : { name: 'Conectando', stars: 0, material: 'none', detail: 'Cada historia comienza conectando con la comunidad.' };
+  if (!a.memberSinceMonth || !a.memberSinceYear) {
+    return { name: 'Conectando', stars: 0, material: 'none', detail: 'Cada historia comienza conectando con la comunidad.' };
   }
-  const year = Number(a.serviceYear);
-  const month = Number(a.serviceMonth);
+  const year = Number(a.memberSinceYear);
+  const month = Number(a.memberSinceMonth);
   const today = new Date();
   const months = (today.getFullYear() - year) * 12 + (today.getMonth() + 1 - month);
-  if (months < 6)  return { name: 'Primer paso', stars: 1, material: 'silver', detail: 'Tus primeros meses de servicio son el comienzo de una gran historia.' };
-  if (months < 18) return { name: 'En marcha',   stars: 2, material: 'silver', detail: 'Tu disposición ya está dejando una huella en tu comunidad.' };
-  if (months < 36) return { name: 'Constante',   stars: 3, material: 'gold',   detail: 'Tu constancia fortalece a tu equipo y a todo el campus.' };
+  if (months < 6)  return { name: 'Primer paso', stars: 1, material: 'silver', detail: 'Tus primeros meses en ARM Global son el comienzo de una gran historia.' };
+  if (months < 18) return { name: 'En marcha',   stars: 2, material: 'silver', detail: 'Ya eres parte activa de esta comunidad.' };
+  if (months < 36) return { name: 'Constante',   stars: 3, material: 'gold',   detail: 'Tu presencia constante fortalece a tu equipo y a todo el campus.' };
   if (months < 60) return { name: 'Inspirando',  stars: 4, material: 'gold',   detail: 'Gracias por inspirar a otros con tu constancia.' };
   return { name: 'Legado', stars: 5, material: 'diamond', detail: 'Tu trayectoria es parte viva de la historia de ARM Global.' };
 }
@@ -321,8 +319,8 @@ function CompleteProfileInner() {
       }
       if (answers.campusId) payload.campusId = Number(answers.campusId);
       if (answers.servingStatus) payload.servingStatus = answers.servingStatus;
-      if ((answers.servingStatus === 'yes' || answers.servingStatus === 'not-now') && answers.serviceMonth && answers.serviceYear) {
-        payload.memberSince = `${answers.serviceYear}-${pad2(answers.serviceMonth)}`;
+      if (answers.memberSinceMonth && answers.memberSinceYear) {
+        payload.memberSince = `${answers.memberSinceYear}-${pad2(answers.memberSinceMonth)}`;
       }
       payload.interestAreas = answers.interestAreas;
       if (answers.interestAreas.includes(OTHER_AREA_VALUE) && answers.otherAreaText.trim()) {
@@ -554,6 +552,32 @@ function CompleteProfileInner() {
           )}
 
           {/* ── Campus ── */}
+          {/* ── Member since ── */}
+          {currentKey === 'member-since' && (
+            <div>
+              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Tu comunidad</p>
+              <h2 className="text-xl font-semibold text-white mb-2">¿Hace cuánto tiempo eres parte de ARM Global?</h2>
+              <p className="text-sm text-white/50 mb-6">Una fecha aproximada de cuándo llegaste a la iglesia es suficiente.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <FieldLabel>Mes</FieldLabel>
+                  <select value={answers.memberSinceMonth} onChange={(e) => patch({ memberSinceMonth: e.target.value })} style={inputStyle} className={inputClass}>
+                    <option value="">Mes</option>
+                    {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>Año</FieldLabel>
+                  <select value={answers.memberSinceYear} onChange={(e) => patch({ memberSinceYear: e.target.value })} style={inputStyle} className={inputClass}>
+                    <option value="">Año</option>
+                    {Array.from({ length: today.getFullYear() - 1949 }, (_, i) => today.getFullYear() - i).map((y) => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Campus ── */}
           {currentKey === 'campus' && (
             <div>
               <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Tu comunidad</p>
@@ -577,31 +601,6 @@ function CompleteProfileInner() {
                 {SERVING_OPTIONS.map((o) => (
                   <OptionCard key={o.value} selected={answers.servingStatus === o.value} onClick={() => patch({ servingStatus: o.value })}>{o.label}</OptionCard>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── Service date ── */}
-          {currentKey === 'service-date' && (
-            <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Ruta del servicio</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿Cuándo comenzaste a servir?</h2>
-              <p className="text-sm text-white/50 mb-6">Una fecha aproximada es suficiente.</p>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <FieldLabel>Mes</FieldLabel>
-                  <select value={answers.serviceMonth} onChange={(e) => patch({ serviceMonth: e.target.value })} style={inputStyle} className={inputClass}>
-                    <option value="">Mes</option>
-                    {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>Año</FieldLabel>
-                  <select value={answers.serviceYear} onChange={(e) => patch({ serviceYear: e.target.value })} style={inputStyle} className={inputClass}>
-                    <option value="">Año</option>
-                    {Array.from({ length: today.getFullYear() - 1949 }, (_, i) => today.getFullYear() - i).map((y) => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                </div>
               </div>
             </div>
           )}
