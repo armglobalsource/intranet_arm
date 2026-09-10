@@ -881,32 +881,34 @@ export default function PerfilPage() {
                   onChange={(v) => setHistoryForm((f) => ({ ...f, referredByName: v }))} placeholder="Escribe su nombre" />
               )}
               <FieldSelect label="¿Sirves actualmente?" value={historyForm.servingStatus}
-                onChange={(v) => setHistoryForm((f) => ({ ...f, servingStatus: v as ServingStatus | '' }))}
+                onChange={(v) => setHistoryForm((f) => ({ ...f, servingStatus: v as ServingStatus | '', interestAreas: v === 'yes' ? f.interestAreas : [] }))}
                 options={[{ value: '', label: 'Sin especificar' }, ...SERVING_OPTIONS]} />
-              <div>
-                <label className="block text-[11px] font-medium mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Áreas de interés</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {[...areaOptions.map((o) => o.label), OTHER_AREA_VALUE].map((label) => {
-                    const selected = historyForm.interestAreas.includes(label);
-                    return (
-                      <button key={label} type="button" onClick={() => toggleHistoryArea(label)}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                        style={{
-                          background: selected ? 'rgba(37,99,235,0.18)' : '#1a1a1a',
-                          border: `1px solid ${selected ? 'rgba(37,99,235,0.5)' : '#2a2a2a'}`,
-                          color: selected ? '#93c5fd' : 'rgba(255,255,255,0.5)',
-                        }}>
-                        {label}
-                      </button>
-                    );
-                  })}
+              {historyForm.servingStatus === 'yes' && (
+                <div>
+                  <label className="block text-[11px] font-medium mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>En qué área sirves</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...areaOptions.map((o) => o.label), OTHER_AREA_VALUE].map((label) => {
+                      const selected = historyForm.interestAreas.includes(label);
+                      return (
+                        <button key={label} type="button" onClick={() => toggleHistoryArea(label)}
+                          className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
+                          style={{
+                            background: selected ? 'rgba(37,99,235,0.18)' : '#1a1a1a',
+                            border: `1px solid ${selected ? 'rgba(37,99,235,0.5)' : '#2a2a2a'}`,
+                            color: selected ? '#93c5fd' : 'rgba(255,255,255,0.5)',
+                          }}>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {historyForm.interestAreas.includes(OTHER_AREA_VALUE) && (
+                    <input value={historyForm.otherAreaText} onChange={(e) => setHistoryForm((f) => ({ ...f, otherAreaText: e.target.value }))}
+                      placeholder="Escribe el área" className="w-full mt-2 px-3 py-2 rounded-lg text-[13px] text-white outline-none"
+                      style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }} />
+                  )}
                 </div>
-                {historyForm.interestAreas.includes(OTHER_AREA_VALUE) && (
-                  <input value={historyForm.otherAreaText} onChange={(e) => setHistoryForm((f) => ({ ...f, otherAreaText: e.target.value }))}
-                    placeholder="Escribe el área" className="w-full mt-2 px-3 py-2 rounded-lg text-[13px] text-white outline-none"
-                    style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }} />
-                )}
-              </div>
+              )}
               <div className="flex gap-2 pt-1">
                 <button onClick={handleSaveHistory} disabled={savingHistory}
                   className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-all disabled:opacity-50"
@@ -930,18 +932,20 @@ export default function PerfilPage() {
                 )}
                 <Row label="¿Sirve actualmente?"
                   value={SERVING_OPTIONS.find((o) => o.value === user.servingStatus)?.label ?? '—'} />
-                <div className="py-3">
-                  <p className="text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Áreas de interés</p>
-                  {user.interestAreas && user.interestAreas.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {user.interestAreas.map((a) => (
-                        <Badge key={a} label={a === OTHER_AREA_VALUE && user.otherAreaText ? user.otherAreaText : a} color="teal" />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[13px] text-white/65">—</p>
-                  )}
-                </div>
+                {user.servingStatus === 'yes' && (
+                  <div className="py-3">
+                    <p className="text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>En qué área sirve</p>
+                    {user.interestAreas && user.interestAreas.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {user.interestAreas.map((a) => (
+                          <Badge key={a} label={a === OTHER_AREA_VALUE && user.otherAreaText ? user.otherAreaText : a} color="teal" />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[13px] text-white/65">—</p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="pt-4">
                 <button onClick={startEditHistory}

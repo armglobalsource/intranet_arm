@@ -76,7 +76,9 @@ function activeSteps(a: Answers, hasPassword: boolean): StepKey[] {
   if (!hasPassword) keys.push('password');
   keys.push('channel');
   if (a.referralChannel === INVITED_VALUE) keys.push('inviter');
-  keys.push('member-since', 'campus', 'serving', 'areas', 'consent');
+  keys.push('member-since', 'campus', 'serving');
+  if (a.servingStatus === 'yes') keys.push('areas');
+  keys.push('consent');
   return keys;
 }
 
@@ -591,7 +593,7 @@ function CompleteProfileInner() {
           {currentKey === 'areas' && (
             <div>
               <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Participación</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿En qué áreas participas o te gustaría participar?</h2>
+              <h2 className="text-xl font-semibold text-white mb-2">¿En qué área sirves?</h2>
               <p className="text-sm text-white/50 mb-6">Puedes seleccionar más de una.</p>
               <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
                 {areaOptions.map((o) => (
@@ -661,7 +663,7 @@ function CompleteProfileInner() {
                     style={{ border: '1px solid #2a2a2a' }}
                     className="w-full py-2.5 rounded-lg text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/20 transition-all active:scale-[0.98]"
                   >
-                    Cerrar sesión
+                    Ir al Login
                   </button>
                 </div>
               ) : (
