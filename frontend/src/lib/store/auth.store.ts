@@ -15,7 +15,11 @@ interface User {
   ministerialTitle?: string | null;
   memberSince?: string | null;
   preferredName?: string | null;
+  referralChannel?: string | null;
+  referredByName?: string | null;
   servingStatus?: string | null;
+  interestAreas?: string[];
+  otherAreaText?: string | null;
   onboardingCompletedAt?: string | null;
   campusId?: number | null;
   campus?: { id: number; name: string; address?: string | null } | null;

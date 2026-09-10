@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { api, apiErrorMessage } from '@/lib/api';
 import type { ServingStatus } from '@/types/user';
+import { INVITED_VALUE, CHANNEL_OPTIONS, SERVING_OPTIONS, OTHER_AREA_VALUE } from '@/types/onboarding';
 
 // ── Datos estáticos del wizard ─────────────────────────────────────────────
 
@@ -20,25 +21,6 @@ const COUNTRY_CODES = [
   { code: '+52',  flag: '🇲🇽', name: 'México',           example: '55 1234 5678'  },
   { code: '+34',  flag: '🇪🇸', name: 'España',           example: '612 345 678'   },
 ];
-
-const INVITED_VALUE = 'Invitación de una persona';
-const CHANNEL_OPTIONS = [
-  { value: INVITED_VALUE,          label: 'Me invitó una persona'          },
-  { value: 'Redes sociales',       label: 'Redes sociales'                 },
-  { value: 'YouTube',              label: 'Canal de YouTube'               },
-  { value: 'Página web',           label: 'Página web'                     },
-  { value: 'Evento o actividad',   label: 'Evento o actividad'             },
-  { value: 'Otro',                 label: 'Otro medio'                     },
-];
-
-const SERVING_OPTIONS: { value: ServingStatus; label: string }[] = [
-  { value: 'yes',         label: 'Sí, actualmente sirvo'                 },
-  { value: 'not-now',     label: 'Serví anteriormente'                   },
-  { value: 'interested',  label: 'Todavía no, pero me interesa'          },
-  { value: 'no',          label: 'Por ahora no'                          },
-];
-
-const OTHER_AREA_VALUE = 'Otros';
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 

@@ -6,9 +6,11 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { useUpdateUser, useUploadUserAvatar } from '@/hooks/useUsers';
 import { useActiveCampuses } from '@/hooks/useCampus';
 import { useOnboardingList, type OnboardingTeam } from '@/hooks/useOnboarding';
+import { useActiveArmCatalogos } from '@/hooks/useArmCatalogos';
 import { usePermissions } from '@/hooks/usePermissions';
-import type { UserGender, MinisterialTitle } from '@/types/user';
+import type { UserGender, MinisterialTitle, ServingStatus } from '@/types/user';
 import { displayName, MINISTERIAL_LABEL } from '@/types/user';
+import { CHANNEL_OPTIONS, SERVING_OPTIONS, INVITED_VALUE, OTHER_AREA_VALUE } from '@/types/onboarding';
 import { COUNTRIES } from '@/components/CountryPicker';
 
 // ── Mis Onboardings ─────────────────────────────────────────────────────────────
@@ -216,14 +218,29 @@ export default function PerfilPage() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    firstName: '',
-    lastName:  '',
-    phone:     '',
-    country:   '',
-    bio:       '',
-    birthDate: '',
-    gender:    '' as UserGender | '',
+    firstName:     '',
+    lastName:      '',
+    preferredName: '',
+    phone:         '',
+    country:       '',
+    bio:           '',
+    birthDate:     '',
+    gender:        '' as UserGender | '',
   });
+
+  // Historia y participación (cómo llegó, quién lo invitó, si sirve, áreas
+  // de interés) — mismos datos que pide el wizard de bienvenida, editables
+  // acá después. Se editan como grupo, igual que el Panel 1.
+  const [editingHistory, setEditingHistory] = useState(false);
+  const [savingHistory,  setSavingHistory]  = useState(false);
+  const [historyForm, setHistoryForm] = useState({
+    referralChannel: '',
+    referredByName:  '',
+    servingStatus:   '' as ServingStatus | '',
+    interestAreas:   [] as string[],
+    otherAreaText:   '',
+  });
+  const { data: areaOptions = [] } = useActiveArmCatalogos('voluntarios');
 
   // Campus (panel organizacional) — edición independiente
   const [editingCampus, setEditingCampus] = useState(false);
@@ -256,13 +273,14 @@ export default function PerfilPage() {
 
   function startEdit() {
     setForm({
-      firstName: user?.firstName ?? '',
-      lastName:  user?.lastName  ?? '',
-      phone:     user?.phone     ?? '',
-      country:   user?.country   ?? '',
-      bio:       user?.bio       ?? '',
-      birthDate: user?.birthDate ?? '',
-      gender:    (user?.gender   ?? '') as UserGender | '',
+      firstName:     user?.firstName     ?? '',
+      lastName:      user?.lastName      ?? '',
+      preferredName: user?.preferredName ?? '',
+      phone:         user?.phone         ?? '',
+      country:       user?.country       ?? '',
+      bio:           user?.bio           ?? '',
+      birthDate:     user?.birthDate     ?? '',
+      gender:        (user?.gender       ?? '') as UserGender | '',
     });
     setEditing(true);
   }
@@ -274,27 +292,75 @@ export default function PerfilPage() {
       const updated = await updateMutation.mutateAsync({
         id: user.id,
         data: {
-          firstName: form.firstName,
-          lastName:  form.lastName,
-          phone:     form.phone    || undefined,
-          country:   form.country  || undefined,
-          bio:       form.bio      || undefined,
-          birthDate: form.birthDate || null,
-          gender:    (form.gender as UserGender) || null,
+          firstName:     form.firstName,
+          lastName:      form.lastName,
+          preferredName: form.preferredName || undefined,
+          phone:         form.phone    || undefined,
+          country:       form.country  || undefined,
+          bio:           form.bio      || undefined,
+          birthDate:     form.birthDate || null,
+          gender:        (form.gender as UserGender) || null,
         },
       });
       updateUser({
-        firstName: updated.firstName,
-        lastName:  updated.lastName,
-        phone:     updated.phone,
-        country:   updated.country,
-        bio:       updated.bio,
-        birthDate: updated.birthDate,
-        gender:    updated.gender,
+        firstName:     updated.firstName,
+        lastName:      updated.lastName,
+        preferredName: updated.preferredName,
+        phone:         updated.phone,
+        country:       updated.country,
+        bio:           updated.bio,
+        birthDate:     updated.birthDate,
+        gender:        updated.gender,
       });
       setEditing(false);
     } finally {
       setSaving(false);
+    }
+  }
+
+  function startEditHistory() {
+    setHistoryForm({
+      referralChannel: user?.referralChannel ?? '',
+      referredByName:  user?.referredByName  ?? '',
+      servingStatus:   (user?.servingStatus  ?? '') as ServingStatus | '',
+      interestAreas:   user?.interestAreas   ?? [],
+      otherAreaText:   user?.otherAreaText   ?? '',
+    });
+    setEditingHistory(true);
+  }
+
+  function toggleHistoryArea(value: string) {
+    setHistoryForm((f) => {
+      const has = f.interestAreas.includes(value);
+      const interestAreas = has ? f.interestAreas.filter((v) => v !== value) : [...f.interestAreas, value];
+      return { ...f, interestAreas, otherAreaText: value === OTHER_AREA_VALUE && has ? '' : f.otherAreaText };
+    });
+  }
+
+  async function handleSaveHistory() {
+    if (!user) return;
+    setSavingHistory(true);
+    try {
+      const updated = await updateMutation.mutateAsync({
+        id: user.id,
+        data: {
+          referralChannel: historyForm.referralChannel || undefined,
+          referredByName:  historyForm.referralChannel === INVITED_VALUE ? (historyForm.referredByName || undefined) : undefined,
+          servingStatus:   (historyForm.servingStatus as ServingStatus) || undefined,
+          interestAreas:   historyForm.interestAreas,
+          otherAreaText:   historyForm.interestAreas.includes(OTHER_AREA_VALUE) ? (historyForm.otherAreaText || undefined) : undefined,
+        },
+      });
+      updateUser({
+        referralChannel: updated.referralChannel,
+        referredByName:  updated.referredByName,
+        servingStatus:   updated.servingStatus,
+        interestAreas:   updated.interestAreas,
+        otherAreaText:   updated.otherAreaText,
+      });
+      setEditingHistory(false);
+    } finally {
+      setSavingHistory(false);
     }
   }
 
@@ -504,6 +570,7 @@ export default function PerfilPage() {
                 <FieldInput label="Nombre" value={form.firstName} onChange={(v) => setForm((f) => ({ ...f, firstName: v }))} />
                 <FieldInput label="Apellido" value={form.lastName} onChange={(v) => setForm((f) => ({ ...f, lastName: v }))} />
               </div>
+              <FieldInput label="Nombre preferido" value={form.preferredName} onChange={(v) => setForm((f) => ({ ...f, preferredName: v }))} placeholder="Cómo quieres que te llamemos en la app" />
               <FieldInput label="Fecha de nacimiento" value={form.birthDate} onChange={(v) => setForm((f) => ({ ...f, birthDate: v }))} type="date" />
               <div className="grid grid-cols-2 gap-3">
                 <FieldInput label="Teléfono" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} placeholder="+56 9 xxxx xxxx" />
@@ -536,6 +603,7 @@ export default function PerfilPage() {
             <div>
               <div className="space-y-0 divide-y divide-[#1a1a1a]">
                 <Row label="Nombre completo" value={displayName(user)} />
+                <Row label="Nombre preferido" value={user.preferredName || '—'} />
                 <Row label="Nacimiento"
                   value={user.birthDate ? `${formatDate(user.birthDate)}${age !== null ? ` (${age} años)` : ''}` : '—'} />
                 <Row label="Teléfono" value={user.phone || '—'} />
@@ -795,6 +863,99 @@ export default function PerfilPage() {
               )}
             </div>
           </div>
+        </SectionCard>
+
+        {/* Panel 4 — Historia y participación */}
+        <SectionCard title="Historia y participación" icon={
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+        }>
+          {editingHistory ? (
+            <div className="space-y-3.5">
+              <FieldSelect label="Cómo llegaste a ARM Global" value={historyForm.referralChannel}
+                onChange={(v) => setHistoryForm((f) => ({ ...f, referralChannel: v }))}
+                options={[{ value: '', label: 'Sin especificar' }, ...CHANNEL_OPTIONS]} />
+              {historyForm.referralChannel === INVITED_VALUE && (
+                <FieldInput label="Quién te invitó" value={historyForm.referredByName}
+                  onChange={(v) => setHistoryForm((f) => ({ ...f, referredByName: v }))} placeholder="Escribe su nombre" />
+              )}
+              <FieldSelect label="¿Sirves actualmente?" value={historyForm.servingStatus}
+                onChange={(v) => setHistoryForm((f) => ({ ...f, servingStatus: v as ServingStatus | '' }))}
+                options={[{ value: '', label: 'Sin especificar' }, ...SERVING_OPTIONS]} />
+              <div>
+                <label className="block text-[11px] font-medium mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Áreas de interés</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[...areaOptions.map((o) => o.label), OTHER_AREA_VALUE].map((label) => {
+                    const selected = historyForm.interestAreas.includes(label);
+                    return (
+                      <button key={label} type="button" onClick={() => toggleHistoryArea(label)}
+                        className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
+                        style={{
+                          background: selected ? 'rgba(37,99,235,0.18)' : '#1a1a1a',
+                          border: `1px solid ${selected ? 'rgba(37,99,235,0.5)' : '#2a2a2a'}`,
+                          color: selected ? '#93c5fd' : 'rgba(255,255,255,0.5)',
+                        }}>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {historyForm.interestAreas.includes(OTHER_AREA_VALUE) && (
+                  <input value={historyForm.otherAreaText} onChange={(e) => setHistoryForm((f) => ({ ...f, otherAreaText: e.target.value }))}
+                    placeholder="Escribe el área" className="w-full mt-2 px-3 py-2 rounded-lg text-[13px] text-white outline-none"
+                    style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }} />
+                )}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={handleSaveHistory} disabled={savingHistory}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-all disabled:opacity-50"
+                  style={{ background: '#2563eb' }}>
+                  {savingHistory ? 'Guardando…' : 'Guardar cambios'}
+                </button>
+                <button onClick={() => setEditingHistory(false)} disabled={savingHistory}
+                  className="px-4 py-1.5 rounded-lg text-[12px] text-white/40 hover:text-white/70 transition-all"
+                  style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="space-y-0 divide-y divide-[#1a1a1a]">
+                <Row label="Cómo llegaste"
+                  value={CHANNEL_OPTIONS.find((o) => o.value === user.referralChannel)?.label ?? '—'} />
+                {user.referralChannel === INVITED_VALUE && (
+                  <Row label="Quién lo invitó" value={user.referredByName || '—'} />
+                )}
+                <Row label="¿Sirve actualmente?"
+                  value={SERVING_OPTIONS.find((o) => o.value === user.servingStatus)?.label ?? '—'} />
+                <div className="py-3">
+                  <p className="text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Áreas de interés</p>
+                  {user.interestAreas && user.interestAreas.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.interestAreas.map((a) => (
+                        <Badge key={a} label={a === OTHER_AREA_VALUE && user.otherAreaText ? user.otherAreaText : a} color="teal" />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[13px] text-white/65">—</p>
+                  )}
+                </div>
+              </div>
+              <div className="pt-4">
+                <button onClick={startEditHistory}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-medium text-white/50 hover:text-white transition-all"
+                  style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }}>
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Editar
+                </button>
+              </div>
+            </div>
+          )}
         </SectionCard>
 
         {/* Mis Onboardings */}
