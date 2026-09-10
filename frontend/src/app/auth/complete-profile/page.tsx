@@ -627,7 +627,18 @@ function CompleteProfileInner() {
                   onChange={(e) => patch({ consentAccepted: e.target.checked })}
                   className="mt-0.5"
                 />
-                <span className="text-sm text-white/70">He leído y acepto las políticas de ARM Global.</span>
+                <span className="text-sm text-white/70">
+                  He leído y acepto las{' '}
+                  <a
+                    href="/politicas"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-white underline underline-offset-2 hover:text-white/80"
+                  >
+                    políticas de ARM Global
+                  </a>.
+                </span>
               </label>
             </div>
           )}
