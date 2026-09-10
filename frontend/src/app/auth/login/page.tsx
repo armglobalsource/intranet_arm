@@ -46,7 +46,10 @@ export default function LoginPage() {
     try {
       const res = await api.post('/auth/login', data);
       setSession(res.data.user, res.data.accessToken, res.data.refreshToken, res.data.needsProfileCompletion);
-      router.replace(res.data.needsProfileCompletion ? '/auth/complete-profile' : '/dashboard');
+      // Una cuenta 'pending' siempre pasa por el wizard — ahí ve la pantalla de
+      // "espera aprobación" en vez del dashboard, aunque ya lo haya llenado antes.
+      const goToWizard = res.data.user.status === 'pending' || res.data.needsProfileCompletion;
+      router.replace(goToWizard ? '/auth/complete-profile' : '/dashboard');
     } catch (err: any) {
       setError('root', {
         message: apiErrorMessage(err, 'Email o contraseña incorrectos'),

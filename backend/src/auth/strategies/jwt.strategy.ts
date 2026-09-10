@@ -25,11 +25,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Token revocado');
     }
     // Verificar status actual (no solo en login) para cortar acceso de inmediato
-    // si el usuario queda pending/suspended/inactive/rejected después de emitir el token
+    // si el usuario queda suspended/inactive/rejected después de emitir el token.
+    // 'pending' sí pasa — PendingAccountGuard restringe qué puede tocar mientras
+    // espera aprobación (solo el wizard de bienvenida).
     const user = await this.usersService.findOne(payload.sub);
-    if (user.status !== 'active') {
+    if (user.status !== 'active' && user.status !== 'pending') {
       throw new UnauthorizedException('Cuenta no activa');
     }
-    return payload;  // se inyecta en req.user
+    return { ...payload, status: user.status };  // se inyecta en req.user
   }
 }

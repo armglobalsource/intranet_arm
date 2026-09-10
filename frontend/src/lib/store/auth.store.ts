@@ -14,6 +14,9 @@ interface User {
   gender?: string | null;
   ministerialTitle?: string | null;
   memberSince?: string | null;
+  preferredName?: string | null;
+  servingStatus?: string | null;
+  onboardingCompletedAt?: string | null;
   campusId?: number | null;
   campus?: { id: number; name: string; address?: string | null } | null;
   role: { name: string };

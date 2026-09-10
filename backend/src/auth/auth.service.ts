@@ -44,13 +44,12 @@ export class AuthService {
     if (!user || !user.passwordHash || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
-    if (user.status === 'pending') {
-      throw new ForbiddenException('Tu cuenta aún no ha sido aprobada.');
-    }
     if (user.status === 'rejected') {
       throw new ForbiddenException('Tu solicitud de registro fue rechazada.');
     }
-    if (user.status !== 'active') {
+    // 'pending' sí puede loguearse — solo podrá llenar el wizard de bienvenida
+    // (PendingAccountGuard restringe el resto de la API hasta que lo aprueben).
+    if (user.status !== 'active' && user.status !== 'pending') {
       throw new UnauthorizedException('Cuenta suspendida o inactiva');
     }
 
@@ -143,22 +142,14 @@ export class AuthService {
         link:    '/dashboard/directorio/personas?status=pending',
         channel: 'in_app',
       }, 0).catch((e) => this.logger.warn('No se pudo crear notificación de registro', e));
-
-      if (user.status === 'pending') {
-        return {
-          status:  'pending',
-          message: 'Tu registro fue recibido. Un administrador debe aprobarlo antes de que puedas iniciar sesión.',
-        };
-      }
     }
 
-    if (user.status === 'pending') {
-      throw new ForbiddenException('Tu cuenta aún no ha sido aprobada.');
-    }
     if (user.status === 'rejected') {
       throw new ForbiddenException('Tu solicitud de registro fue rechazada.');
     }
-    if (user.status !== 'active') {
+    // 'pending' sigue de largo — recibe token igual que 'active' para poder
+    // llenar el wizard de bienvenida mientras espera aprobación.
+    if (user.status !== 'active' && user.status !== 'pending') {
       throw new UnauthorizedException('Cuenta suspendida o inactiva');
     }
 
@@ -217,10 +208,6 @@ export class AuthService {
         link:    '/dashboard/directorio/personas?status=pending',
         channel: 'in_app',
       }, 0).catch((e) => this.logger.warn('No se pudo crear notificación de registro Google', e));
-
-      if (user.status === 'pending') {
-        return { status: 'pending' as const, email: user.email };
-      }
     } else {
       // Sincronizar datos de Google: foto siempre, nombre solo si estaba vacío
       const patch: Record<string, string> = {};
@@ -232,13 +219,10 @@ export class AuthService {
       }
     }
 
-    if (user.status === 'pending') {
-      throw new ForbiddenException('Tu cuenta aún no ha sido aprobada.');
-    }
     if (user.status === 'rejected') {
       throw new ForbiddenException('Tu solicitud de registro fue rechazada.');
     }
-    if (user.status !== 'active') {
+    if (user.status !== 'active' && user.status !== 'pending') {
       throw new UnauthorizedException('Cuenta suspendida o inactiva');
     }
 

@@ -74,6 +74,20 @@ const EMPTY_ANSWERS: Answers = {
 
 function pad2(v: string) { return v.padStart(2, '0'); }
 
+/** Rellena las respuestas necesarias para calcular la categoría de voluntario
+ * a partir de un usuario ya guardado — para cuando una cuenta pending vuelve
+ * a esta página (ya llenó el wizard antes, solo falta que la aprueben). */
+function seedFromUser(u: any): Partial<Answers> {
+  const patch: Partial<Answers> = {};
+  if (u?.preferredName || u?.firstName) patch.preferredName = u.preferredName || u.firstName;
+  if (u?.servingStatus) patch.servingStatus = u.servingStatus;
+  if (u?.memberSince) {
+    const [y, m] = String(u.memberSince).split('-');
+    if (y && m) { patch.serviceYear = y; patch.serviceMonth = String(Number(m)); }
+  }
+  return patch;
+}
+
 function activeSteps(a: Answers, hasPassword: boolean): StepKey[] {
   const keys: StepKey[] = ['name', 'gender', 'birthday', 'phone'];
   if (!hasPassword) keys.push('password');
@@ -209,6 +223,7 @@ function CompleteProfileInner() {
   const router                 = useRouter();
   const params                 = useSearchParams();
   const setSession             = useAuthStore((s) => s.setSession);
+  const logout                 = useAuthStore((s) => s.logout);
   const setTokens              = useAuthStore((s) => s.setTokens);
   const updateUser             = useAuthStore((s) => s.updateUser);
   const clearProfileCompletion = useAuthStore((s) => s.clearProfileCompletion);
@@ -242,12 +257,16 @@ function CompleteProfileInner() {
         .then((res) => {
           setSession(res.data, access, refresh, true);
           setHasPassword(!!res.data.passwordHash);
-          setAnswers((a) => ({ ...a, preferredName: res.data.firstName ?? a.preferredName }));
+          setAnswers((a) => ({ ...a, ...seedFromUser(res.data) }));
+          // Cuenta pending que ya llenó el wizard antes: saltar directo al
+          // resultado con el mensaje de "espera aprobación", no repetir todo.
+          if (res.data.status === 'pending' && res.data.onboardingCompletedAt) setCurrentKey('result');
           setLoading(false);
         })
         .catch(() => router.replace('/auth/login?error=oauth_failed'));
     } else {
-      setAnswers((a) => ({ ...a, preferredName: storeUser?.firstName ?? a.preferredName }));
+      setAnswers((a) => ({ ...a, ...seedFromUser(storeUser) }));
+      if (storeUser?.status === 'pending' && storeUser?.onboardingCompletedAt) setCurrentKey('result');
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -644,14 +663,36 @@ function CompleteProfileInner() {
                 {MATERIAL_LABEL[level.material] ? `${MATERIAL_LABEL[level.material]} · ${level.name}` : level.name}
               </p>
               <p className="text-sm text-white/50 mb-8 leading-relaxed">{level.detail}</p>
-              <button
-                type="button"
-                onClick={() => router.replace('/dashboard')}
-                style={{ background: '#fff' }}
-                className="w-full py-2.5 rounded-lg text-sm font-semibold text-gray-900 transition-all hover:bg-gray-100 active:scale-[0.98]"
-              >
-                Ir a la app
-              </button>
+
+              {storeUser?.status === 'pending' ? (
+                <div>
+                  <div style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)' }}
+                    className="rounded-lg px-3.5 py-3 mb-4">
+                    <p className="text-sm text-amber-300 font-medium mb-1">Tu cuenta está pendiente de aprobación</p>
+                    <p className="text-xs text-white/50 leading-relaxed">
+                      Ya guardamos tus datos. Un administrador debe aprobar tu registro antes de que puedas
+                      entrar a la app — te avisaremos por correo apenas esté lista.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { logout(); router.replace('/auth/login'); }}
+                    style={{ border: '1px solid #2a2a2a' }}
+                    className="w-full py-2.5 rounded-lg text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/20 transition-all active:scale-[0.98]"
+                  >
+                    Cerrar sesión
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => router.replace('/dashboard')}
+                  style={{ background: '#fff' }}
+                  className="w-full py-2.5 rounded-lg text-sm font-semibold text-gray-900 transition-all hover:bg-gray-100 active:scale-[0.98]"
+                >
+                  Ir a la app
+                </button>
+              )}
             </div>
           )}
 
