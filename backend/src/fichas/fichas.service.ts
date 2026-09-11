@@ -994,18 +994,44 @@ export class FichasService {
     const snap = await ref.get();
     if (!snap.exists) throw new NotFoundException('Ficha no encontrada');
 
+    // Normaliza: acepta forma nueva (slots[]) o legacy (songs + producerNotes).
+    // Persiste siempre como slots[] (única fuente de verdad).
+    const normalizeSong = (s: any) => ({
+      songRowId:          s.songRowId,
+      iluminacion:        s.iluminacion ?? '',
+      illuminationColors: s.illuminationColors ?? [],
+      visualDescription:  s.visualDescription ?? '',
+      referenceIds:       s.referenceIds ?? [],
+    });
+
+    let slots: Array<{
+      id: string; label: string; encuentroIds: string[];
+      songs: any[]; producerNotes: string;
+    }>;
+
+    if (dto.slots && dto.slots.length > 0) {
+      slots = dto.slots.map((s) => ({
+        id:            s.id,
+        label:         s.label ?? '',
+        encuentroIds:  s.encuentroIds ?? [],
+        songs:         (s.songs ?? []).map(normalizeSong),
+        producerNotes: s.producerNotes ?? '',
+      }));
+    } else {
+      slots = [{
+        id:            'default',
+        label:         '',
+        encuentroIds:  [],
+        songs:         (dto.songs ?? []).map(normalizeSong),
+        producerNotes: dto.producerNotes ?? '',
+      }];
+    }
+
     await ref.update({
       layoutVisual: {
-        songs: dto.songs.map((s) => ({
-          songRowId:          s.songRowId,
-          iluminacion:        s.iluminacion ?? '',
-          illuminationColors: s.illuminationColors ?? [],
-          visualDescription:  s.visualDescription ?? '',
-          referenceIds:       s.referenceIds ?? [],
-        })),
-        producerNotes: dto.producerNotes ?? '',
-        updatedAt:     this.fb.now(),
-        updatedBy:     user.sub,
+        slots,
+        updatedAt: this.fb.now(),
+        updatedBy: user.sub,
       },
       lastModifiedBy:     user.sub,
       lastModifiedByName: user.email,

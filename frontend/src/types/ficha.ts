@@ -72,9 +72,33 @@ export interface LayoutVisualSong {
   referenceIds:       number[];
 }
 
-export interface LayoutVisual {
+/**
+ * Un "slot" del layout visual. Para fichas de 1 encuentro (unico/oracion)
+ * hay un único slot con id='default'. Para fichas multi-encuentro se
+ * derivan 2 slots por hora: 'am' (encuentros con time < 15:00) y 'pm'
+ * (encuentros con time >= 15:00). Cada slot tiene su propia tabla de
+ * canciones y sus notas.
+ */
+export interface LayoutVisualSlot {
+  /** 'default' | 'am' | 'pm' — identificador del slot. */
+  id:             string;
+  /** Etiqueta legible ('' | 'AM' | 'PM'). */
+  label:          string;
+  /** IDs de encuentros que este slot cubre. */
+  encuentroIds:   string[];
   songs:          LayoutVisualSong[];
   /** Notas del productor en HTML (TipTap). Vacío o ausente si no editó. */
+  producerNotes?: string;
+}
+
+export interface LayoutVisual {
+  /** Forma actual: arreglo de slots. Los readers deben usar `slots` cuando
+   *  esté disponible. Los writers backend normalizan la forma antigua a
+   *  slots automáticamente. */
+  slots?:         LayoutVisualSlot[];
+  /** Forma legacy (fichas creadas antes del split AM/PM). Solo se usa
+   *  como fallback cuando `slots` no existe. */
+  songs?:         LayoutVisualSong[];
   producerNotes?: string;
   updatedAt?:     any;
   updatedBy?:     number;

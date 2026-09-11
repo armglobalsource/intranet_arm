@@ -114,14 +114,52 @@ export class LayoutVisualSongDto {
   referenceIds?: number[];
 }
 
-export class UpdateLayoutVisualDto {
+/**
+ * Un "slot" del layout visual: para fichas multi-encuentro se separan en
+ * AM y PM (por hora del encuentro); para fichas de 1 encuentro (unico /
+ * oracion) hay un solo slot con id='default'.
+ */
+export class LayoutVisualSlotDto {
+  /** 'default' | 'am' | 'pm' */
+  @IsString() @IsNotEmpty() @MaxLength(20)
+  id: string;
+
+  /** '' | 'AM' | 'PM' — etiqueta legible */
+  @IsOptional() @IsString() @MaxLength(20)
+  label?: string;
+
+  /** IDs de encuentros que este slot cubre. */
+  @IsArray() @ArrayMaxSize(20)
+  @IsString({ each: true }) @MaxLength(50, { each: true })
+  encuentroIds: string[];
+
   @IsArray() @ArrayMaxSize(30) @ValidateNested({ each: true }) @Type(() => LayoutVisualSongDto)
   songs: LayoutVisualSongDto[];
 
+  @IsOptional() @IsString() @MaxLength(50000)
+  producerNotes?: string;
+}
+
+/**
+ * Update del layout visual. Acepta la nueva forma con `slots[]` (fichas
+ * multi-encuentro pueden mandar 2 slots: am/pm). También acepta la forma
+ * legacy con `songs[]` + `producerNotes` a nivel raíz — el service la
+ * normaliza a un solo slot 'default'.
+ */
+export class UpdateLayoutVisualDto {
+  /** Nueva forma: arreglo de slots. */
+  @IsOptional() @IsArray() @ArrayMaxSize(5)
+  @ValidateNested({ each: true }) @Type(() => LayoutVisualSlotDto)
+  slots?: LayoutVisualSlotDto[];
+
+  /** Legacy: canciones a nivel raíz (equivalente a slot 'default'). */
+  @IsOptional() @IsArray() @ArrayMaxSize(30)
+  @ValidateNested({ each: true }) @Type(() => LayoutVisualSongDto)
+  songs?: LayoutVisualSongDto[];
+
   /**
-   * Notas del productor en HTML (rich text). Escrito con TipTap desde el
-   * frontend. Límite generoso — típicamente 5–10KB por ficha, pero puede
-   * incluir contenido bíblico y anuncios largos.
+   * Notas del productor en HTML (rich text). Solo aplica en modo legacy;
+   * en el modo slots, cada slot tiene sus propias notas.
    */
   @IsOptional() @IsString() @MaxLength(50000)
   producerNotes?: string;

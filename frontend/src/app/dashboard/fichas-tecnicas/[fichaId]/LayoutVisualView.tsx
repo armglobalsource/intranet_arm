@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Ficha, LayoutVisualSong, Row } from '@/types/ficha';
+import type { Ficha, LayoutVisual, LayoutVisualSlot, LayoutVisualSong, Row } from '@/types/ficha';
 import { VisualReferencePicker } from '@/components/fichas/VisualReferencePicker';
 import { RichTextEditor } from '@/components/fichas/RichTextEditor';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Corte AM/PM: encuentros con hora < 15:00 van a AM; ≥ 15:00 van a PM. */
+const AM_PM_HOUR_CUTOFF = 15;
 
 interface ParsedSong {
   titulo:    string;
@@ -34,12 +37,64 @@ function songTitleOf(row: Row): { titulo: string; tonalidad: string } {
   return parseSongData(raw);
 }
 
+function isAmTime(time?: string): boolean {
+  if (!time) return true;
+  const h = Number(time.split(':')[0]);
+  return Number.isFinite(h) && h < AM_PM_HOUR_CUTOFF;
+}
+
 /**
- * Reconcilia el layoutVisual con las canciones actuales del setList:
- * - agrega filas vacías para canciones nuevas (mismo songRowId)
- * - descarta filas huérfanas (cuya canción ya no existe)
- * - respeta el orden actual del setList
- * - preserva el contenido editado de las filas que aún existen
+ * Deriva los "slots" del layout visual según la ficha:
+ *   - 1 encuentro (unico/oracion) → 1 slot 'default'
+ *   - 2+ encuentros:
+ *       - Si hay AM (< 15:00) y PM (≥ 15:00): 2 slots.
+ *       - Si todos son del mismo horario: 1 slot con label correspondiente.
+ */
+function deriveSlotDefs(ficha: Ficha): Array<{ id: string; label: string; encuentroIds: string[] }> {
+  const encs = ficha.encuentros ?? [];
+  if (encs.length <= 1) {
+    return [{ id: 'default', label: '', encuentroIds: encs.map((e) => e.id) }];
+  }
+  const am = encs.filter((e) => isAmTime(e.time)).map((e) => e.id);
+  const pm = encs.filter((e) => !isAmTime(e.time)).map((e) => e.id);
+  if (am.length && pm.length) {
+    return [
+      { id: 'am', label: 'AM', encuentroIds: am },
+      { id: 'pm', label: 'PM', encuentroIds: pm },
+    ];
+  }
+  return [{
+    id:           am.length ? 'am' : 'pm',
+    label:        am.length ? 'AM' : 'PM',
+    encuentroIds: encs.map((e) => e.id),
+  }];
+}
+
+/**
+ * Filtra las filas del setList para un slot dado: una canción aparece en el
+ * slot si es shared (aplica a todos los encuentros) O si alguno de los
+ * encuentros del slot tiene un título no vacío para esa fila.
+ */
+function filterRowsForSlot(rows: Row[], encuentroIds: string[]): Row[] {
+  // Slot 'default' (o sin encuentroIds) = todas las filas.
+  if (!encuentroIds || encuentroIds.length === 0) return rows;
+  return rows.filter((row) => {
+    if (row.shared) return true;
+    return encuentroIds.some((eId) => {
+      const raw = row.values?.[eId];
+      if (!raw) return false;
+      const parsed = parseSongData(raw);
+      return !!parsed.titulo;
+    });
+  });
+}
+
+/**
+ * Reconcilia las canciones de un slot con las filas del setList filtradas:
+ * - agrega filas vacías para canciones nuevas
+ * - descarta huérfanas (fila ya no existe en el slot)
+ * - respeta el orden del setList
+ * - preserva contenido editado
  */
 function reconcile(
   setListRows: Row[],
@@ -54,6 +109,41 @@ function reconcile(
     visualDescription:  '',
     referenceIds:       [],
   });
+}
+
+/**
+ * Extrae el estado inicial de cada slot desde ficha.layoutVisual:
+ *   - Si trae `slots[]` (forma nueva) → usa esos slots por id.
+ *   - Si trae `songs[]` (legacy) → distribuye las mismas canciones a
+ *     todos los slots derivados (cada slot filtrará las que apliquen).
+ */
+function loadSlotStates(
+  layout: LayoutVisual | undefined,
+  slotDefs: Array<{ id: string; label: string; encuentroIds: string[] }>,
+): Record<string, { songs: LayoutVisualSong[]; producerNotes: string }> {
+  const state: Record<string, { songs: LayoutVisualSong[]; producerNotes: string }> = {};
+  const persistedSlots = layout?.slots ?? [];
+  const legacySongs    = layout?.songs ?? [];
+  const legacyNotes    = layout?.producerNotes ?? '';
+
+  slotDefs.forEach((def, idx) => {
+    const found = persistedSlots.find((s) => s.id === def.id);
+    if (found) {
+      state[def.id] = {
+        songs:         found.songs ?? [],
+        producerNotes: found.producerNotes ?? '',
+      };
+    } else {
+      // Fallback legacy: primer slot hereda las notas y canciones,
+      // los demás arrancan vacíos.
+      state[def.id] = {
+        songs:         idx === 0 ? legacySongs : [],
+        producerNotes: idx === 0 ? legacyNotes : '',
+      };
+    }
+  });
+
+  return state;
 }
 
 // ── IlluminationColorSwatches ─────────────────────────────────────────────────
@@ -193,7 +283,7 @@ interface LayoutVisualViewProps {
   /** Filas locales del setList (para reflejar edición en vivo, no solo el snapshot). */
   localSetListRows?: Row[];
   /** Guardado optimista con debounce; el editor decide cómo persistir. */
-  onSave?: (patch: { songs: LayoutVisualSong[]; producerNotes: string }) => void;
+  onSave?: (patch: { slots: LayoutVisualSlot[] }) => void;
 }
 
 const D = {
@@ -208,72 +298,115 @@ const D = {
 };
 const TEAL = '#0D9488';
 
+type SlotState = { songs: LayoutVisualSong[]; producerNotes: string };
+
 export function LayoutVisualView({
   ficha, editable, localSetListRows, onSave,
 }: LayoutVisualViewProps) {
   // Fuente de canciones: prioriza local (editando en vivo) sobre el snapshot
   const setListRows = localSetListRows ?? ficha.sections?.setList?.rows ?? [];
 
-  // State local con debounce. Se inicializa reconciliando con setList.
-  const [songs, setSongs] = useState<LayoutVisualSong[]>(() =>
-    reconcile(setListRows, ficha.layoutVisual?.songs ?? [])
+  // Slots derivados según ficha (1 para unico/oracion, 1-2 para multi por hora)
+  const slotDefs = useMemo(() => deriveSlotDefs(ficha), [ficha]);
+
+  // Estado por slot: { [slotId]: { songs, producerNotes } }
+  const [slotStates, setSlotStates] = useState<Record<string, SlotState>>(() =>
+    loadSlotStates(ficha.layoutVisual, slotDefs)
   );
-  // Notas del productor (HTML del rich text editor).
-  const [producerNotes, setProducerNotes] = useState<string>(
-    ficha.layoutVisual?.producerNotes ?? ''
-  );
+  const [activeSlotId, setActiveSlotId] = useState<string>(slotDefs[0]?.id ?? 'default');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync producerNotes desde el snapshot cuando cambia desde afuera.
+  // Sync desde afuera: cuando ficha.layoutVisual cambia (otro usuario guardó)
+  // o cuando cambia el setList, mergea con estado local sin perder ediciones.
   useEffect(() => {
-    setProducerNotes(ficha.layoutVisual?.producerNotes ?? '');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ficha.layoutVisual?.updatedAt]);
-
-  // Cuando cambia el setList (agregada/borrada una canción), reconciliar.
-  // Cuando cambia layoutVisual desde afuera (otro usuario), también reconciliar.
-  useEffect(() => {
-    setSongs((prev) => {
-      // Si prev tenía ediciones locales que aún no se guardaron, preservarlas.
-      // reconcile hace merge por songRowId — así las ediciones se mantienen.
-      const merged = new Map(prev.map((s) => [s.songRowId, s]));
-      const fromServer = ficha.layoutVisual?.songs ?? [];
-      fromServer.forEach((s) => {
-        if (!merged.has(s.songRowId)) merged.set(s.songRowId, s);
+    setSlotStates((prev) => {
+      const persistedSlots = ficha.layoutVisual?.slots ?? [];
+      const legacySongs    = ficha.layoutVisual?.songs ?? [];
+      const legacyNotes    = ficha.layoutVisual?.producerNotes ?? '';
+      const next: Record<string, SlotState> = {};
+      slotDefs.forEach((def, idx) => {
+        const local     = prev[def.id];
+        const persisted = persistedSlots.find((s) => s.id === def.id);
+        const localSongs  = local?.songs ?? [];
+        const remoteSongs = persisted?.songs ?? (idx === 0 ? legacySongs : []);
+        const merged = new Map(localSongs.map((s) => [s.songRowId, s]));
+        remoteSongs.forEach((s) => { if (!merged.has(s.songRowId)) merged.set(s.songRowId, s); });
+        next[def.id] = {
+          songs:         Array.from(merged.values()),
+          producerNotes:
+            local?.producerNotes
+            ?? persisted?.producerNotes
+            ?? (idx === 0 ? legacyNotes : ''),
+        };
       });
-      return reconcile(setListRows, Array.from(merged.values()));
+      return next;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setListRows.map((r) => r.id).join(','), ficha.layoutVisual?.updatedAt]);
+  }, [setListRows.map((r) => r.id).join(','), ficha.layoutVisual?.updatedAt, slotDefs.map((s) => s.id).join(',')]);
 
-  function scheduleSave(nextSongs: LayoutVisualSong[], nextNotes: string) {
+  // Si el slot activo dejó de existir (cambió el tipo de ficha), resetear al primero.
+  useEffect(() => {
+    if (!slotDefs.find((s) => s.id === activeSlotId)) {
+      setActiveSlotId(slotDefs[0]?.id ?? 'default');
+    }
+  }, [slotDefs, activeSlotId]);
+
+  function scheduleSave(nextStates: Record<string, SlotState>) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      onSave?.({ songs: nextSongs, producerNotes: nextNotes });
+      const slots: LayoutVisualSlot[] = slotDefs.map((def) => ({
+        id:            def.id,
+        label:         def.label,
+        encuentroIds:  def.encuentroIds,
+        songs:         nextStates[def.id]?.songs ?? [],
+        producerNotes: nextStates[def.id]?.producerNotes ?? '',
+      }));
+      onSave?.({ slots });
       debounceRef.current = null;
     }, 800);
   }
 
-  function updateSong(songRowId: string, patch: Partial<LayoutVisualSong>) {
-    setSongs((prev) => {
-      const next = prev.map((s) => s.songRowId === songRowId ? { ...s, ...patch } : s);
-      scheduleSave(next, producerNotes);
+  function updateSongInSlot(slotId: string, songRowId: string, patch: Partial<LayoutVisualSong>) {
+    setSlotStates((prev) => {
+      const current = prev[slotId] ?? { songs: [], producerNotes: '' };
+      let nextSongs: LayoutVisualSong[];
+      if (current.songs.find((s) => s.songRowId === songRowId)) {
+        nextSongs = current.songs.map((s) =>
+          s.songRowId === songRowId ? { ...s, ...patch } : s
+        );
+      } else {
+        // Fila derivada por reconcile que aún no estaba en state: crearla.
+        nextSongs = [...current.songs, {
+          songRowId,
+          iluminacion:        '',
+          illuminationColors: [],
+          visualDescription:  '',
+          referenceIds:       [],
+          ...patch,
+        }];
+      }
+      const next = { ...prev, [slotId]: { ...current, songs: nextSongs } };
+      scheduleSave(next);
       return next;
     });
   }
 
-  function updateNotes(nextHtml: string) {
-    setProducerNotes(nextHtml);
-    scheduleSave(songs, nextHtml);
+  function updateNotesInSlot(slotId: string, nextHtml: string) {
+    setSlotStates((prev) => {
+      const current = prev[slotId] ?? { songs: [], producerNotes: '' };
+      const next = { ...prev, [slotId]: { ...current, producerNotes: nextHtml } };
+      scheduleSave(next);
+      return next;
+    });
   }
-
-  const hasSongs = songs.length > 0;
 
   const titlesById = useMemo(() => {
     const m = new Map<string, { titulo: string; tonalidad: string }>();
     setListRows.forEach((r) => m.set(r.id, songTitleOf(r)));
     return m;
   }, [setListRows]);
+
+  const isMulti = slotDefs.length > 1;
 
   return (
     <div style={{ padding: '1.5rem 2rem' }}>
@@ -293,11 +426,96 @@ export function LayoutVisualView({
             Layout Visual
           </div>
           <div style={{ fontSize: 11, color: D.textSecond, marginTop: 2 }}>
-            Iluminación y visuales por canción del Set List. Se sincroniza automáticamente cuando editás el Set List.
+            {isMulti
+              ? 'Ficha multi-encuentro: layouts separados AM y PM (por hora del encuentro). Cada canción aparece solo en el layout de los horarios donde se toca.'
+              : 'Iluminación y visuales por canción del Set List. Se sincroniza automáticamente cuando editás el Set List.'}
           </div>
         </div>
       </div>
 
+      {/* Tabs AM/PM — solo cuando hay 2+ slots. Ocultas en print. */}
+      {isMulti && (
+        <div className="ficha-no-print" style={{
+          display: 'flex', gap: 6, marginBottom: 16,
+        }}>
+          {slotDefs.map((def) => {
+            const active = def.id === activeSlotId;
+            return (
+              <button
+                key={def.id}
+                onClick={() => setActiveSlotId(def.id)}
+                style={{
+                  padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  background: active ? 'rgba(13,148,136,0.18)' : 'rgba(255,255,255,0.04)',
+                  color: active ? TEAL : D.textSecond,
+                  border: `0.5px solid ${active ? 'rgba(13,148,136,0.4)' : D.cardBorder}`,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                {def.label}
+                <span style={{ marginLeft: 6, opacity: 0.7, fontWeight: 400 }}>
+                  · {def.encuentroIds.length}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Slots (todos renderizados; solo el activo visible en pantalla).
+          En print CSS hace visibles ambos con page-break entre ellos. */}
+      {slotDefs.map((def, idx) => {
+        const state = slotStates[def.id] ?? { songs: [], producerNotes: '' };
+        const filteredRows = filterRowsForSlot(setListRows, def.encuentroIds);
+        const reconciledSongs = reconcile(filteredRows, state.songs);
+        return (
+          <div
+            key={def.id}
+            className={`layout-slot ${idx > 0 ? 'layout-slot-break' : ''}`}
+            style={{ display: def.id === activeSlotId ? 'block' : 'none' }}
+          >
+            {/* Etiqueta de slot (solo en print, para diferenciar AM/PM) */}
+            {isMulti && (
+              <div className="ficha-print-only" style={{
+                display: 'none', fontSize: 13, fontWeight: 700, letterSpacing: '0.1em',
+                color: TEAL, marginBottom: 10, textTransform: 'uppercase',
+              }}>
+                Layout {def.label}
+              </div>
+            )}
+            <LayoutSlotBody
+              songs={reconciledSongs}
+              producerNotes={state.producerNotes}
+              titlesById={titlesById}
+              editable={editable}
+              onUpdateSong={(rowId, patch) => updateSongInSlot(def.id, rowId, patch)}
+              onUpdateNotes={(html) => updateNotesInSlot(def.id, html)}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── LayoutSlotBody ────────────────────────────────────────────────────────────
+
+interface LayoutSlotBodyProps {
+  songs:          LayoutVisualSong[];
+  producerNotes:  string;
+  titlesById:     Map<string, { titulo: string; tonalidad: string }>;
+  editable:       boolean;
+  onUpdateSong:   (rowId: string, patch: Partial<LayoutVisualSong>) => void;
+  onUpdateNotes:  (html: string) => void;
+}
+
+function LayoutSlotBody({
+  songs, producerNotes, titlesById, editable, onUpdateSong, onUpdateNotes,
+}: LayoutSlotBodyProps) {
+  const hasSongs = songs.length > 0;
+  return (
+    <>
       {!hasSongs ? (
         <div style={{
           textAlign: 'center', padding: '3rem 1rem',
@@ -377,7 +595,7 @@ export function LayoutVisualView({
                     <>
                       <textarea
                         value={song.iluminacion}
-                        onChange={(e) => updateSong(song.songRowId, { iluminacion: e.target.value })}
+                        onChange={(e) => onUpdateSong(song.songRowId, { iluminacion: e.target.value })}
                         placeholder="AZUL, LILA + NARANJO…"
                         rows={2}
                         className="ficha-no-print"
@@ -409,7 +627,7 @@ export function LayoutVisualView({
                   <IlluminationColorSwatches
                     colors={song.illuminationColors ?? []}
                     editable={editable}
-                    onChange={editable ? (next) => updateSong(song.songRowId, { illuminationColors: next }) : undefined}
+                    onChange={editable ? (next) => onUpdateSong(song.songRowId, { illuminationColors: next }) : undefined}
                   />
                 </div>
 
@@ -419,7 +637,7 @@ export function LayoutVisualView({
                     <>
                       <textarea
                         value={song.visualDescription}
-                        onChange={(e) => updateSong(song.songRowId, { visualDescription: e.target.value })}
+                        onChange={(e) => onUpdateSong(song.songRowId, { visualDescription: e.target.value })}
                         placeholder="VISUALES LISTAS GLOBAL / 2026 / …"
                         rows={2}
                         className="ficha-no-print"
@@ -455,7 +673,7 @@ export function LayoutVisualView({
                 <div style={{ minWidth: 0 }}>
                   <VisualReferencePicker
                     value={song.referenceIds}
-                    onChange={(next) => updateSong(song.songRowId, { referenceIds: next })}
+                    onChange={(next) => onUpdateSong(song.songRowId, { referenceIds: next })}
                     editable={editable}
                   />
                 </div>
@@ -493,11 +711,11 @@ export function LayoutVisualView({
           <RichTextEditor
             value={producerNotes}
             editable={editable}
-            onChange={updateNotes}
+            onChange={onUpdateNotes}
             placeholder="Escribí acá las instrucciones, títulos, versos, anuncios…"
           />
         </div>
       )}
-    </div>
+    </>
   );
 }

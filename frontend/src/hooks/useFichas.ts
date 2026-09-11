@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '@/lib/api';
-import type { Ficha, FichaListItem, CreateFichaPayload, SectionName, LayoutVisualSong } from '@/types/ficha';
+import type { Ficha, FichaListItem, CreateFichaPayload, SectionName, LayoutVisualSlot } from '@/types/ficha';
 
 const KEYS = {
   all:    ['fichas'] as const,
@@ -181,8 +181,8 @@ export function useUnpublishFicha() {
 export function useUpdateLayoutVisual() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ fichaId, songs, producerNotes }: { fichaId: string; songs: LayoutVisualSong[]; producerNotes?: string }) =>
-      api.patch(`/fichas/${fichaId}/layout-visual`, { songs, ...(producerNotes !== undefined ? { producerNotes } : {}) }).then(r => r.data),
+    mutationFn: ({ fichaId, slots }: { fichaId: string; slots: LayoutVisualSlot[] }) =>
+      api.patch(`/fichas/${fichaId}/layout-visual`, { slots }).then(r => r.data),
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(variables.fichaId) });
       qc.invalidateQueries({ queryKey: KEYS.all });

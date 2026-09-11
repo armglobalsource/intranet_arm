@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSong } from '@/types/ficha';
+import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSlot } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
 import { SongInput } from '@/components/fichas/SongInput';
 import { LayoutVisualView } from './LayoutVisualView';
@@ -2105,7 +2105,7 @@ export interface FichaDocumentViewProps {
   sectionLayout?: { left: string[]; right: string[]; leftRatio?: number };
   onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
   /** Persistir el bloque layoutVisual completo (vista alternativa por canción). */
-  onUpdateLayoutVisual?: (patch: { songs: LayoutVisualSong[]; producerNotes: string }) => void;
+  onUpdateLayoutVisual?: (patch: { slots: LayoutVisualSlot[] }) => void;
 }
 
 export function FichaDocumentView({
@@ -2313,6 +2313,13 @@ export function FichaDocumentView({
             display: none !important;
             page-break-before: auto !important;
             break-before: auto !important;
+          }
+          /* Multi-encuentro: cada slot (AM/PM) siempre visible en print
+             y cada slot posterior al primero arranca en su propia hoja. */
+          .layout-slot { display: block !important; }
+          .layout-slot-break {
+            page-break-before: always !important;
+            break-before: page !important;
           }
 
           /* Muestra versión estática de swatches/thumbs */
@@ -2906,15 +2913,24 @@ export function FichaDocumentView({
             (layout-visual-empty), en cuyo caso se oculta para no dejar
             página en blanco al imprimir. */}
         {(() => {
-          const layoutSongs = ficha.layoutVisual?.songs ?? [];
-          const hasSongContent = layoutSongs.some((s) =>
+          // Detecta si el layout tiene contenido en cualquiera de sus slots
+          // (nueva forma con slots[]) o en la forma legacy (songs a nivel raíz).
+          const slots = ficha.layoutVisual?.slots ?? [];
+          const legacySongs = ficha.layoutVisual?.songs ?? [];
+          const legacyNotes = ficha.layoutVisual?.producerNotes ?? '';
+          const songHasContent = (s: any) =>
             (s.iluminacion?.trim()?.length ?? 0) > 0 ||
             (s.illuminationColors?.length ?? 0) > 0 ||
             (s.visualDescription?.trim()?.length ?? 0) > 0 ||
-            (s.referenceIds?.length ?? 0) > 0,
+            (s.referenceIds?.length ?? 0) > 0;
+          const hasSlotContent = slots.some((sl) =>
+            (sl.songs ?? []).some(songHasContent)
+            || (sl.producerNotes?.trim()?.length ?? 0) > 0,
           );
-          const hasNotes = (ficha.layoutVisual?.producerNotes?.trim()?.length ?? 0) > 0;
-          const hasLayoutContent = hasSongContent || hasNotes;
+          const hasLegacyContent =
+            legacySongs.some(songHasContent)
+            || (legacyNotes.trim().length > 0);
+          const hasLayoutContent = hasSlotContent || hasLegacyContent;
           return (
             <div
               ref={layoutRef}

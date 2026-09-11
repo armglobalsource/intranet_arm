@@ -14,7 +14,7 @@ import { FichaDocumentView } from './FichaDocumentView';
 import { DisponibilidadSideCard } from '@/components/fichas/DisponibilidadSideCard';
 import { TecnicosDisponibilidadSideCard } from '@/components/fichas/TecnicosDisponibilidadSideCard';
 import { SECTION_LABELS } from '@/types/ficha';
-import type { Ficha, Row, SectionName, Section } from '@/types/ficha';
+import type { Ficha, Row, SectionName, Section, LayoutVisualSlot } from '@/types/ficha';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -304,12 +304,11 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   // handleUpdateLayout eliminado: el reordenamiento y resize de columnas
   // se retiró (nunca funcionó de forma confiable en producción).
 
-  function handleUpdateLayoutVisual(patch: { songs: any[]; producerNotes: string }) {
+  function handleUpdateLayoutVisual(patch: { slots: LayoutVisualSlot[] }) {
     if (!ficha) return;
     updateLayoutVisual({
-      fichaId:       ficha.fichaId,
-      songs:         patch.songs,
-      producerNotes: patch.producerNotes,
+      fichaId: ficha.fichaId,
+      slots:   patch.slots,
     });
   }
 
