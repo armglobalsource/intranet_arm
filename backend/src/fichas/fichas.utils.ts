@@ -5,6 +5,19 @@ export const ALL_FICHA_SECTIONS = [
 
 export type FichaSectionName = typeof ALL_FICHA_SECTIONS[number];
 
+export const FICHA_SECTION_LABELS: Record<FichaSectionName, string> = {
+  pastoral:    'Equipo Pastoral',
+  produccion:  'Producción',
+  media:       'Media',
+  streaming:   'Streaming',
+  escena:      'AR Worship',
+  setList:     'Set List',
+  horarios:    'Horarios',
+  anuncios:    'Info Encuentro',
+  voluntarios: 'Voluntarios de Servicio',
+  outfit:      'Outfit / Paleta',
+};
+
 const ORACION_SECTIONS: FichaSectionName[] = [
   'pastoral', 'escena', 'produccion', 'media', 'streaming',
   'setList', 'horarios', 'outfit',

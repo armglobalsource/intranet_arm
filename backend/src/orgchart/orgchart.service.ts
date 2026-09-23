@@ -332,6 +332,47 @@ export class OrgChartService {
     return { ...user, orgMemberships };
   }
 
+  /**
+   * Categoriza a cada usuario con membresía en el organigrama según el área
+   * de su equipo (o de su membresía directa si es líder de área): 'worship'
+   * para el área con slug 'worship', 'tecnico' para el área con slug
+   * 'produccion'. Si un usuario pertenece a ambas, gana 'worship'. Los
+   * usuarios que no aparecen en el mapa no tienen ninguna de las dos áreas
+   * (el llamador los trata como "ningún equipo").
+   */
+  async getUserAreaCategoryMap(): Promise<Record<number, 'worship' | 'tecnico'>> {
+    const [membSnap, teamsSnap, areasSnap] = await Promise.all([
+      this.fb.db.collection(MEMBERSHIPS).get(),
+      this.fb.db.collection(TEAMS).get(),
+      this.fb.db.collection(AREAS).get(),
+    ]);
+
+    const areas = this.fb.toDocs(areasSnap);
+    const worshipAreaId    = areas.find((a) => a.slug === 'worship')?.id    ?? null;
+    const produccionAreaId = areas.find((a) => a.slug === 'produccion')?.id ?? null;
+
+    const teamAreaMap = new Map<number, number>();
+    this.fb.toDocs(teamsSnap).forEach((t) => teamAreaMap.set(t.id, t.areaId));
+
+    const areaIdsByUser = new Map<number, Set<number>>();
+    for (const m of this.fb.toDocs(membSnap)) {
+      const areaId = m.areaId ?? (m.teamId != null ? teamAreaMap.get(m.teamId) : undefined);
+      if (areaId == null) continue;
+      if (!areaIdsByUser.has(m.userId)) areaIdsByUser.set(m.userId, new Set());
+      areaIdsByUser.get(m.userId)!.add(areaId);
+    }
+
+    const result: Record<number, 'worship' | 'tecnico'> = {};
+    for (const [userId, areaIds] of areaIdsByUser) {
+      if (worshipAreaId != null && areaIds.has(worshipAreaId)) {
+        result[userId] = 'worship';
+      } else if (produccionAreaId != null && areaIds.has(produccionAreaId)) {
+        result[userId] = 'tecnico';
+      }
+    }
+    return result;
+  }
+
   async search(q: string) {
     if (!q || q.trim().length < 2) return [];
     const term = q.trim().toLowerCase();

@@ -34,6 +34,7 @@ import { CampusTurnosModule } from './campus-turnos/campus-turnos.module';
 import { EstadisticasModule } from './estadisticas/estadisticas.module';
 import { TipoCambioModule } from './tipo-cambio/tipo-cambio.module';
 import { VisualReferencesModule } from './visual-references/visual-references.module';
+import { EquipoRosterModule } from './equipo-roster/equipo-roster.module';
 
 const envSchema = Joi.object({
   NODE_ENV:             Joi.string().valid('development', 'production', 'test').default('development'),
@@ -97,6 +98,7 @@ const envSchema = Joi.object({
     EstadisticasModule,
     TipoCambioModule,
     VisualReferencesModule,
+    EquipoRosterModule,
   ],
 })
 export class AppModule {}

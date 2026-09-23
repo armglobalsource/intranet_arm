@@ -44,13 +44,12 @@ export class AuthService {
     if (!user || !user.passwordHash || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
-    if (user.status === 'pending') {
-      throw new ForbiddenException('Tu cuenta aún no ha sido aprobada.');
-    }
     if (user.status === 'rejected') {
       throw new ForbiddenException('Tu solicitud de registro fue rechazada.');
     }
-    if (user.status !== 'active') {
+    // 'pending' sí puede loguearse — solo podrá llenar el wizard de bienvenida
+    // (PendingAccountGuard restringe el resto de la API hasta que lo aprueben).
+    if (user.status !== 'active' && user.status !== 'pending') {
       throw new UnauthorizedException('Cuenta suspendida o inactiva');
     }
 
@@ -60,8 +59,9 @@ export class AuthService {
     const roleId   = user.roleId ?? user.role?.id ?? 0;
     const { permissions, ...tokens } = await this.generateTokens(user.id, user.email, roleName, roleId, ipAddress, userAgent);
 
+    const needsProfileCompletion = !user.onboardingCompletedAt;
     const { passwordHash, ...safeUser } = user;
-    return { user: { ...safeUser, permissions }, ...tokens };
+    return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion };
   }
 
   async refresh(rawRefreshToken: string) {
@@ -135,29 +135,20 @@ export class AuthService {
         firstName: dto.firstName,
         lastName:  dto.lastName,
       });
-      this.notifications.create({
-        userId:  0,
+      this.notifications.createForPermission('users:edit', {
         title:   `Nuevo usuario registrado: ${dto.firstName} ${dto.lastName}`,
         body:    `${dto.email} se registró y está pendiente de tu aprobación.`,
         link:    '/dashboard/directorio/personas?status=pending',
         channel: 'in_app',
-      }, 0).catch((e) => this.logger.warn('No se pudo crear notificación de registro', e));
-
-      if (user.status === 'pending') {
-        return {
-          status:  'pending',
-          message: 'Tu registro fue recibido. Un administrador debe aprobarlo antes de que puedas iniciar sesión.',
-        };
-      }
+      }).catch((e) => this.logger.warn('No se pudo crear notificación de registro', e));
     }
 
-    if (user.status === 'pending') {
-      throw new ForbiddenException('Tu cuenta aún no ha sido aprobada.');
-    }
     if (user.status === 'rejected') {
       throw new ForbiddenException('Tu solicitud de registro fue rechazada.');
     }
-    if (user.status !== 'active') {
+    // 'pending' sigue de largo — recibe token igual que 'active' para poder
+    // llenar el wizard de bienvenida mientras espera aprobación.
+    if (user.status !== 'active' && user.status !== 'pending') {
       throw new UnauthorizedException('Cuenta suspendida o inactiva');
     }
 
@@ -166,7 +157,7 @@ export class AuthService {
     const roleId   = user.roleId ?? 2;
     const { permissions, ...tokens } = await this.generateTokens(user.id, user.email, roleName, roleId, ipAddress, userAgent);
 
-    const needsProfileCompletion = !user.gender || !user.avatarUrl;
+    const needsProfileCompletion = !user.onboardingCompletedAt;
     const { passwordHash, ...safeUser } = user;
     return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion };
   }
@@ -209,17 +200,12 @@ export class AuthService {
         lastName:  googleUser.lastName,
         avatarUrl: googleUser.avatarUrl,
       });
-      this.notifications.create({
-        userId:  0,
+      this.notifications.createForPermission('users:edit', {
         title:   `Nuevo usuario registrado: ${googleUser.firstName} ${googleUser.lastName}`,
         body:    `${googleUser.email} se registró con Google y está pendiente de tu aprobación.`,
         link:    '/dashboard/directorio/personas?status=pending',
         channel: 'in_app',
-      }, 0).catch((e) => this.logger.warn('No se pudo crear notificación de registro Google', e));
-
-      if (user.status === 'pending') {
-        return { status: 'pending' as const, email: user.email };
-      }
+      }).catch((e) => this.logger.warn('No se pudo crear notificación de registro Google', e));
     } else {
       // Sincronizar datos de Google: foto siempre, nombre solo si estaba vacío
       const patch: Record<string, string> = {};
@@ -231,13 +217,10 @@ export class AuthService {
       }
     }
 
-    if (user.status === 'pending') {
-      throw new ForbiddenException('Tu cuenta aún no ha sido aprobada.');
-    }
     if (user.status === 'rejected') {
       throw new ForbiddenException('Tu solicitud de registro fue rechazada.');
     }
-    if (user.status !== 'active') {
+    if (user.status !== 'active' && user.status !== 'pending') {
       throw new UnauthorizedException('Cuenta suspendida o inactiva');
     }
 
@@ -246,7 +229,7 @@ export class AuthService {
     const roleId   = user.roleId ?? 2;
     const { permissions, ...tokens } = await this.generateTokens(user.id, user.email, roleName, roleId, ipAddress, userAgent);
 
-    const needsProfileCompletion = !user.gender;
+    const needsProfileCompletion = !user.onboardingCompletedAt;
     const { passwordHash, ...safeUser } = user;
     return { user: { ...safeUser, permissions }, ...tokens, needsProfileCompletion };
   }
@@ -267,14 +250,24 @@ export class AuthService {
 
   async completeProfile(userId: number, dto: CompleteProfileDto) {
     const update: UpdateUserDto = {};
-    if (dto.firstName !== undefined) update.firstName = dto.firstName;
-    if (dto.lastName  !== undefined) update.lastName  = dto.lastName;
-    if (dto.gender    !== undefined) update.gender    = dto.gender;
-    if (dto.phone     !== undefined) update.phone     = dto.phone;
-    if (dto.birthDate !== undefined) update.birthDate = dto.birthDate;
-    if (dto.password)                update.password  = dto.password;
+    if (dto.firstName        !== undefined) update.firstName        = dto.firstName;
+    if (dto.lastName         !== undefined) update.lastName         = dto.lastName;
+    if (dto.gender           !== undefined) update.gender           = dto.gender;
+    if (dto.phone            !== undefined) update.phone            = dto.phone;
+    if (dto.birthDate        !== undefined) update.birthDate        = dto.birthDate;
+    if (dto.password)                       update.password         = dto.password;
+    if (dto.preferredName    !== undefined) update.preferredName    = dto.preferredName;
+    if (dto.phoneCountryCode !== undefined) update.phoneCountryCode = dto.phoneCountryCode;
+    if (dto.campusId         !== undefined) update.campusId         = dto.campusId;
+    if (dto.referralChannel  !== undefined) update.referralChannel  = dto.referralChannel;
+    if (dto.referredByName   !== undefined) update.referredByName   = dto.referredByName;
+    if (dto.servingStatus    !== undefined) update.servingStatus    = dto.servingStatus;
+    if (dto.memberSince      !== undefined) update.memberSince      = dto.memberSince;
+    if (dto.interestAreas    !== undefined) update.interestAreas    = dto.interestAreas;
+    if (dto.otherAreaText    !== undefined) update.otherAreaText    = dto.otherAreaText;
 
-    const user = await this.users.update(userId, update);
+    await this.users.update(userId, update);
+    const user = await this.users.markOnboardingComplete(userId, !!dto.consentAccepted);
     return { user };
   }
 

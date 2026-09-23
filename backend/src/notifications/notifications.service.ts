@@ -1,16 +1,16 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
+import { hasPermission } from '../common/permissions';
 
 @Injectable()
 export class NotificationsService {
   constructor(private fb: FirebaseService) {}
 
-  async findAll(userId: number, isAdmin: boolean) {
-    const col = this.fb.db.collection('notifications');
-    const snap = isAdmin
-      ? await col.limit(200).get()
-      : await col.where('userId', '==', userId).limit(100).get();
+  // Sin bypass de admin: ver createForPermission para el reparto por destinatario.
+  async findAll(userId: number) {
+    const snap = await this.fb.db.collection('notifications')
+      .where('userId', '==', userId).limit(100).get();
     return this.fb.toDocs(snap).sort((a, b) => {
       const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -24,9 +24,9 @@ export class NotificationsService {
     return this.fb.toObj(snap);
   }
 
-  async findOneForUser(id: number, userId: number, isAdmin: boolean) {
+  async findOneForUser(id: number, userId: number) {
     const notification: any = await this.findOne(id);
-    if (!isAdmin && notification.userId !== userId) {
+    if (notification.userId !== userId) {
       throw new ForbiddenException('No puedes acceder a esta notificación');
     }
     return notification;
@@ -49,6 +49,27 @@ export class NotificationsService {
     return { ...data, id };
   }
 
+  // Un documento propio por destinatario, para cada usuario activo cuyo rol tenga el permiso.
+  async createForPermission(permission: string, dto: Omit<CreateNotificationDto, 'userId'>) {
+    const userIds = await this.resolveUserIdsByPermission(permission);
+    return Promise.all(userIds.map((userId) => this.create({ ...dto, userId }, userId)));
+  }
+
+  private async resolveUserIdsByPermission(permission: string): Promise<number[]> {
+    const [rolesSnap, usersSnap] = await Promise.all([
+      this.fb.db.collection('roles').get(),
+      this.fb.db.collection('users').select('id', 'roleId', 'status').get(),
+    ]);
+    const matchingRoleIds = new Set(
+      this.fb.toDocs(rolesSnap)
+        .filter((r: any) => hasPermission(r.permissions ?? [], permission))
+        .map((r: any) => r.id),
+    );
+    return this.fb.toDocs(usersSnap)
+      .filter((u: any) => u.status === 'active' && matchingRoleIds.has(u.roleId))
+      .map((u: any) => u.id);
+  }
+
   async update(id: number, dto: Partial<CreateNotificationDto>) {
     await this.findOne(id);
     const data: Record<string, any> = { updatedAt: this.fb.now() };
@@ -60,8 +81,8 @@ export class NotificationsService {
     return this.findOne(id);
   }
 
-  async markRead(id: number, userId: number, isAdmin: boolean) {
-    await this.findOneForUser(id, userId, isAdmin);
+  async markRead(id: number, userId: number) {
+    await this.findOneForUser(id, userId);
     await this.fb.db.collection('notifications').doc(String(id)).update({
       read: true,
       readAt: this.fb.now(),

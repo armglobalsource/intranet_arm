@@ -54,13 +54,12 @@ export class FeedbackService {
     await this.fb.db.collection(COL).doc(String(id)).set(data);
 
     const typeLabel = dto.type === 'bug' ? 'Problema reportado' : 'Sugerencia recibida';
-    this.notifications.create({
-      userId:  0,
+    this.notifications.createForPermission('feedback:manage', {
       title:   `${typeLabel}: ${userName}`,
       body:    dto.message.slice(0, 80) + (dto.message.length > 80 ? '…' : ''),
       link:    '/dashboard/soporte',
       channel: 'in_app',
-    }, 0).catch(() => {});
+    }).catch(() => {});
 
     this.notifications.create({
       userId,

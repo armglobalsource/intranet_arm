@@ -21,6 +21,8 @@ export interface UserJobTitle {
 
 export type UserGender = 'male' | 'female' | 'other' | 'prefer_not_to_say';
 
+export type ServingStatus = 'yes' | 'not-now' | 'interested' | 'no';
+
 // ── Nombramiento ministerial ──────────────────────────────────────────────────
 
 export type MinisterialTitle = 'pastor_principal' | 'pastor' | 'ministro';
@@ -64,6 +66,15 @@ export interface User {
   ministerialTitle?: MinisterialTitle | null;
   /** Mes/año en que se unió a la organización, formato "YYYY-MM" */
   memberSince?: string | null;
+  preferredName?: string | null;
+  phoneCountryCode?: string | null;
+  referralChannel?: string | null;
+  referredByName?: string | null;
+  servingStatus?: ServingStatus | null;
+  interestAreas?: string[];
+  otherAreaText?: string | null;
+  consentAcceptedAt?: string | null;
+  onboardingCompletedAt?: string | null;
   status: 'pending' | 'active' | 'inactive' | 'suspended' | 'rejected';
   departmentId?: number | null;
   campusId?: number | null;
@@ -91,6 +102,13 @@ export interface UpdateUserDto {
   ministerialTitle?:  MinisterialTitle | null;
   memberSince?:       string | null;
   status?:            'active' | 'inactive' | 'suspended' | 'rejected';
+  preferredName?:     string | null;
+  phoneCountryCode?:  string | null;
+  referralChannel?:   string | null;
+  referredByName?:    string | null;
+  servingStatus?:     ServingStatus | null;
+  interestAreas?:     string[];
+  otherAreaText?:     string | null;
 }
 
 /** Extrae los nombres de cargos de un usuario */

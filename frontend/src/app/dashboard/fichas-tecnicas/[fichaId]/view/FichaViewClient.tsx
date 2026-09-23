@@ -65,6 +65,8 @@ export function FichaViewClient({ fichaId }: { fichaId: string }) {
       {/* Vista documento (read-only) */}
       <FichaDocumentView
         ficha={ficha}
+        hiddenSections={ficha.hiddenSections ?? []}
+        sectionLayout={ficha.sectionLayout}
         onEdit={canEdit ? () => { window.location.href = `/dashboard/fichas-tecnicas/${fichaId}`; } : undefined}
       />
     </div>

@@ -46,6 +46,22 @@ export interface BulkSubmitPayload {
   slots:     SlotSubmit[];
 }
 
+export type RosterStatus   = 'disponible' | 'no_disponible' | 'sin_responder';
+export type RosterCategory = 'worship' | 'tecnico' | 'ninguno';
+
+export interface RosterPerson {
+  userId:    number;
+  userName:  string;
+  avatarUrl: string | null;
+  status:    RosterStatus;
+}
+
+export interface RosterResult {
+  worship: RosterPerson[];
+  tecnico: RosterPerson[];
+  ninguno: RosterPerson[];
+}
+
 /** Devuelve el label ISO "YYYY-Www" de la semana que contiene la fecha dada */
 export function toWeekLabel(date: Date): string {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
