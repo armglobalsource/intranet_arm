@@ -292,7 +292,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
           </Link>
         ) : (
           <Link
-            href={`/dashboard/fichas-tecnicas/${ficha.fichaId}`}
+            href={`/dashboard/fichas-tecnicas/${ficha.fichaId}?edit=1`}
             className="flex-1 text-center text-xs font-medium py-1.5 rounded-lg transition-colors"
             style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)' }}
           >
