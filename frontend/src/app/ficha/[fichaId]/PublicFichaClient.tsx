@@ -151,7 +151,11 @@ export function PublicFichaClient({ fichaId }: { fichaId: string }) {
       </div>
 
       {/* Ficha (read-only, sin botón editar) */}
-      <FichaDocumentView ficha={ficha} hiddenSections={ficha.hiddenSections ?? []} />
+      <FichaDocumentView
+        ficha={ficha}
+        hiddenSections={ficha.hiddenSections ?? []}
+        sectionLayout={ficha.sectionLayout}
+      />
     </div>
   );
 }

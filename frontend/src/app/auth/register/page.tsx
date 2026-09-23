@@ -30,9 +30,13 @@ export default function RegisterPage() {
   const [showPwd, setShowPwd]         = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // Solo se evalúa al hidratar, no en cada cambio de isAuthenticated — si no,
+  // el registro recién hecho en onSubmit (que también deja isAuthenticated=true)
+  // dispara este efecto y pisa el redirect a /auth/complete-profile.
   useEffect(() => {
     if (hasHydrated && isAuthenticated) router.replace('/dashboard/orgchart');
-  }, [hasHydrated, isAuthenticated, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasHydrated]);
 
   const {
     register,
@@ -45,12 +49,11 @@ export default function RegisterPage() {
     try {
       const { confirmPassword: _, ...payload } = data;
       const res = await api.post('/auth/register', payload);
-      if (res.data.status === 'pending') {
-        router.replace('/auth/pending');
-        return;
-      }
       setSession(res.data.user, res.data.accessToken, res.data.refreshToken, res.data.needsProfileCompletion);
-      router.replace(res.data.needsProfileCompletion ? '/auth/complete-profile' : '/dashboard/orgchart');
+      // Una cuenta 'pending' siempre pasa por el wizard primero — ahí ve la
+      // pantalla de "espera aprobación" en vez del dashboard.
+      const goToWizard = res.data.user.status === 'pending' || res.data.needsProfileCompletion;
+      router.replace(goToWizard ? '/auth/complete-profile' : '/dashboard/orgchart');
     } catch (err: any) {
       if (err.response?.status === 409) {
         setError('email', { message: apiErrorMessage(err, 'Este email ya tiene una cuenta. Usa "Iniciar sesión".') });

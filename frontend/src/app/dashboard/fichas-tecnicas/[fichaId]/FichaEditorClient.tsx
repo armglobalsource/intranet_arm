@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { useFichaRealtime, useUpdateSection, useCompleteSection, useReopenSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, useUpdateLayoutVisual, usePublishFicha, useUnpublishFicha, useSplitPrayerGlobal } from '@/hooks/useFichas';
@@ -10,9 +10,12 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { apiErrorMessage } from '@/lib/api';
 import { useUsers } from '@/hooks/useUsers';
 import { displayName } from '@/types/user';
-import { FichaDocumentView } from './FichaDocumentView';
-import { DisponibilidadSideCard } from '@/components/fichas/DisponibilidadSideCard';
-import { TecnicosDisponibilidadSideCard } from '@/components/fichas/TecnicosDisponibilidadSideCard';
+import { FichaDocumentView, ModulesEditPanel } from './FichaDocumentView';
+import { EquipoRosterSideCard } from '@/components/fichas/EquipoRosterSideCard';
+import { RosterStatusContext } from '@/components/fichas/RosterStatusContext';
+import { useEquipoRoster } from '@/hooks/useEquipoRoster';
+import { toWeekLabel } from '@/types/disponibilidad';
+import { parseFichaDate } from '@/lib/ficha-date';
 import { SECTION_LABELS } from '@/types/ficha';
 import type { Ficha, Row, SectionName, Section, LayoutVisualSlot } from '@/types/ficha';
 
@@ -200,6 +203,22 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { user } = useAuthStore();
   const { ficha, loading, error } = useFichaRealtime(fichaId);
 
+  // Roster de equipo (worship / técnico / ningún equipo) con estado de
+  // disponibilidad para la semana de la ficha — alimenta el sidebar y los
+  // puntos de color del autocomplete de personas.
+  const rosterCampusId = ficha && Number.isFinite(Number(ficha.campusId)) ? Number(ficha.campusId) : null;
+  const rosterWeekLabel = ficha ? toWeekLabel(parseFichaDate(ficha.date)) : '';
+  const { data: roster, isLoading: rosterLoading } = useEquipoRoster(rosterCampusId, rosterWeekLabel);
+  const rosterStatusByUserId = useMemo(() => {
+    const map: Record<number, 'disponible' | 'no_disponible' | 'sin_responder'> = {};
+    if (roster) {
+      for (const cat of ['worship', 'tecnico', 'ninguno'] as const) {
+        for (const p of roster[cat]) map[p.userId] = p.status;
+      }
+    }
+    return map;
+  }, [roster]);
+
   // Setear document.title con el nombre de la ficha para que, cuando el
   // usuario descargue como PDF (window.print → Guardar como PDF), Chrome
   // sugiera un nombre útil en lugar de "document.pdf". Restauramos al
@@ -232,6 +251,11 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const [isEditing, setIsEditing]             = useState(false);
   const [transitioningToEdit, setTransitioningToEdit] = useState(false);
 
+  // Panel de edición de módulos: mientras está abierto, reemplaza la lista
+  // de Equipo en el side panel. Se cierra al salir del modo edición.
+  const [modulesOpen, setModulesOpen] = useState(false);
+  useEffect(() => { if (!isEditing) setModulesOpen(false); }, [isEditing]);
+
   const [localHidden, setLocalHidden] = useState<SectionName[]>([]);
   // Contador de mutaciones en vuelo. Usamos contador (no booleano) para
   // soportar clicks rápidos encadenados: cada uno dispara su propia mutación
@@ -256,6 +280,17 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ficha?.hiddenSections]);
 
+  const [localLayout, setLocalLayout] = useState<{ left: string[]; right: string[]; leftRatio?: number } | undefined>(undefined);
+  // Mismo patrón de contador en vuelo que localHidden, para que clicks
+  // encadenados de ▲/▼ no se pisen entre sí ni con el snapshot del servidor.
+  const layoutInflight = useRef(0);
+
+  useEffect(() => {
+    if (layoutInflight.current !== 0) return;
+    setLocalLayout(ficha?.sectionLayout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ficha?.sectionLayout]);
+
   const { mutateAsync: updateSectionAsync } = useUpdateSection();
   const { mutateAsync: completeSection } = useCompleteSection();
   const { mutateAsync: reopenSection } = useReopenSection();
@@ -267,13 +302,19 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { mutate: unpublishFicha, isPending: isUnpublishing } = useUnpublishFicha();
   const { mutateAsync: splitPrayerGlobal, isPending: isSplitting } = useSplitPrayerGlobal();
 
-  function handleToggleModule(name: SectionName) {
+  function handleToggleModule(name: SectionName | SectionName[]) {
     if (!ficha) return;
+    // Acepta uno o varios nombres a la vez (el slot 'worship' agrupa 3
+    // secciones que togglean juntas, como una sola fila en la lista) —
+    // siempre en UNA sola pasada para no perder toggles por condición de
+    // carrera entre clicks encadenados.
+    const names = Array.isArray(name) ? name : [name];
     // Toggle contra localHidden (estado optimista), no contra ficha.hiddenSections
     // — así clicks encadenados componen bien sin esperar el roundtrip.
-    const next = localHidden.includes(name)
-      ? localHidden.filter((s) => s !== name)
-      : [...localHidden, name];
+    const allHidden = names.every((n) => localHidden.includes(n));
+    const next = allHidden
+      ? localHidden.filter((s) => !names.includes(s))
+      : Array.from(new Set([...localHidden, ...names]));
     setLocalHidden(next);
     hiddenInflight.current += 1;
     setSaveState('saving');
@@ -301,8 +342,33 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     );
   }
 
-  // handleUpdateLayout eliminado: el reordenamiento y resize de columnas
-  // se retiró (nunca funcionó de forma confiable en producción).
+  function handleUpdateLayout(layout: { left: string[]; right: string[]; leftRatio?: number }) {
+    if (!ficha) return;
+    setLocalLayout(layout);
+    layoutInflight.current += 1;
+    setSaveState('saving');
+    updateFicha(
+      { fichaId: ficha.fichaId, sectionLayout: layout },
+      {
+        onSuccess: () => {
+          layoutInflight.current = Math.max(0, layoutInflight.current - 1);
+          if (layoutInflight.current === 0) {
+            setSaveState('saved');
+            setTimeout(() => setSaveState('idle'), 800);
+          }
+        },
+        onError: (err) => {
+          layoutInflight.current = Math.max(0, layoutInflight.current - 1);
+          if (layoutInflight.current === 0) {
+            setLocalLayout(ficha.sectionLayout);
+            setSaveState('error');
+            setActionError(apiErrorMessage(err, 'No se pudo guardar el orden de las secciones'));
+            setTimeout(() => setSaveState('idle'), 3000);
+          }
+        },
+      },
+    );
+  }
 
   function handleUpdateLayoutVisual(patch: { slots: LayoutVisualSlot[] }) {
     if (!ficha) return;
@@ -540,10 +606,12 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     );
   }
 
-  const canViewDisponibilidad = isAdmin || can('disponibilidad:view');
-  const canViewTecnicos       = isAdmin || can('tecnicos:view');
-  const showSidePanel = editable && (canViewDisponibilidad || canViewTecnicos);
-  const fichaCampusId = Number.isFinite(Number(ficha.campusId)) ? Number(ficha.campusId) : null;
+  // El roster de equipo se muestra a cualquiera con acceso de edición a la
+  // ficha (fichas:view ya se validó vía `allowed` arriba) — antes dependía de
+  // permisos separados (disponibilidad:view / tecnicos:view) que la mayoría
+  // de los roles productores no tenían, dejando el panel siempre oculto.
+  const showSidePanel = editable;
+  const fichaCampusId = rosterCampusId;
 
   function handleAssignSection(sectionName: SectionName, userId: number | null, userName: string | null) {
     setActionError(null);
@@ -674,6 +742,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
       )}
 
       {/* Layout: ficha + panel lateral cuando está en edición */}
+      <RosterStatusContext.Provider value={rosterStatusByUserId}>
       <div className={showSidePanel ? 'flex gap-5 items-start' : ''}>
         <div className={showSidePanel ? 'flex-1 min-w-0' : ''}>
           <FichaDocumentView
@@ -706,18 +775,36 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             sectionStatus={sectionStatus}
             saveState={saveState}
             hiddenSections={localHidden}
-            onToggleModule={canEdit ? handleToggleModule : undefined}
+            modulesPanelOpen={modulesOpen}
+            onToggleModulesPanel={canEdit ? () => setModulesOpen((o) => !o) : undefined}
+            sectionLayout={localLayout}
             onUpdateLayoutVisual={canEdit ? handleUpdateLayoutVisual : undefined}
           />
         </div>
 
         {showSidePanel && (
           <div className="w-56 flex-shrink-0 sticky top-4 flex flex-col gap-3">
-            {canViewDisponibilidad && <DisponibilidadSideCard fichaDate={ficha.date} campusId={fichaCampusId} />}
-            {canViewTecnicos       && <TecnicosDisponibilidadSideCard fichaDate={ficha.date} campusId={fichaCampusId} />}
+            {modulesOpen ? (
+              <ModulesEditPanel
+                fichaType={ficha.type}
+                hiddenSections={localHidden}
+                onToggleModule={handleToggleModule}
+                sectionLayout={localLayout}
+                onUpdateLayout={handleUpdateLayout}
+                onClose={() => setModulesOpen(false)}
+              />
+            ) : (
+              <EquipoRosterSideCard
+                roster={roster}
+                isLoading={rosterLoading}
+                weekLabel={rosterWeekLabel}
+                campusId={fichaCampusId}
+              />
+            )}
           </div>
         )}
       </div>
+      </RosterStatusContext.Provider>
     </div>
   );
 }

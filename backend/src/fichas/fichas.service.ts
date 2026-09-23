@@ -1,11 +1,13 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { FirebaseService } from '../common/firebase/firebase.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { hasPermission } from '../common/permissions';
 import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto } from './dto/ficha.dto';
 import {
   ALL_FICHA_SECTIONS,
   activeSectionsForType,
   deriveFichaStatus,
+  FICHA_SECTION_LABELS,
   formatFichaDateLabel,
   missingRequiredRows,
   parseFichaDate,
@@ -442,7 +444,10 @@ function buildGlobalSectionsFromMixedFicha(
 
 @Injectable()
 export class FichasService {
-  constructor(private fb: FirebaseService) {}
+  constructor(
+    private fb: FirebaseService,
+    private notifications: NotificationsService,
+  ) {}
 
   private has(user: FichaAuthUser, permission: string): boolean {
     return hasPermission(user.permissions ?? [], permission);
@@ -800,7 +805,16 @@ export class FichasService {
       );
     }
     if (dto.sectionLayout !== undefined) {
-      data.sectionLayout = dto.sectionLayout;
+      // dto.sectionLayout es una instancia de SectionLayoutDto (class-transformer
+      // la instancia por el @Type() en UpdateFichaDto) — Firestore rechaza
+      // objetos con prototipo custom ("Firestore doesn't support JavaScript
+      // objects with custom prototypes"), así que reconstruimos un objeto
+      // plano antes de escribir. Mismo patrón que updateLayoutVisual() más abajo.
+      data.sectionLayout = {
+        left:  dto.sectionLayout.left,
+        right: dto.sectionLayout.right,
+        ...(dto.sectionLayout.leftRatio !== undefined ? { leftRatio: dto.sectionLayout.leftRatio } : {}),
+      };
     }
     await this.fb.db.collection(COL).doc(fichaId).update(data);
     return this.findOne(fichaId);
@@ -1052,6 +1066,13 @@ export class FichasService {
     }
     const { expectedRevision, ...sectionDto } = JSON.parse(JSON.stringify(dto));
     const ref = this.fb.db.collection(COL).doc(fichaId);
+
+    // Se calculan dentro de la transacción (puede reintentar) pero solo se
+    // usan después de que confirma — así no se dispara notificación si la
+    // transacción termina abortando.
+    let notifyAssignedTo: number | null = null;
+    let fichaTitle = '';
+
     await this.fb.db.runTransaction(async (transaction) => {
       const snap = await transaction.get(ref);
       if (!snap.exists) throw new NotFoundException(`Ficha ${fichaId} no encontrada`);
@@ -1119,7 +1140,27 @@ export class FichasService {
         lastModifiedAt:     this.fb.now(),
       };
       transaction.update(ref, update);
+
+      if (
+        'assignedTo' in sectionDto &&
+        sectionDto.assignedTo &&
+        sectionDto.assignedTo !== currentSection.assignedTo &&
+        sectionDto.assignedTo !== user.sub
+      ) {
+        notifyAssignedTo = sectionDto.assignedTo;
+        fichaTitle = ficha.title ?? 'una ficha técnica';
+      }
     });
+
+    if (notifyAssignedTo) {
+      this.notifications.create({
+        userId:  notifyAssignedTo,
+        title:   'Te asignaron una sección',
+        body:    `Quedaste como responsable de "${FICHA_SECTION_LABELS[sectionName as FichaSectionName] ?? sectionName}" en la ficha "${fichaTitle}".`,
+        link:    `/dashboard/fichas-tecnicas/${fichaId}`,
+        channel: 'in_app',
+      }, user.sub).catch(() => {});
+    }
 
     await this.fb.db.collection(COL).doc(fichaId).collection('changelog').add({
       userId:    user.sub,
