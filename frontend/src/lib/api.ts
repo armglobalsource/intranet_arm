@@ -32,11 +32,24 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Helper para redirigir al login (solo en cliente)
+// Rutas públicas que NO deben redirigir al login aunque un request colateral
+// devuelva 401. Ej: la landing pública /agenda o la vista pública de una
+// ficha compartida por link. Estos bundles pueden importar transitivamente
+// hooks que usan `api`, y si alguno se dispara sin sesión, no queremos
+// arrastrar a un visitante anónimo al login.
+const PUBLIC_ROUTES = ['/agenda', '/ficha/', '/auth/', '/politicas'];
+
+function isOnPublicRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  return PUBLIC_ROUTES.some((prefix) => path === prefix || path.startsWith(prefix));
+}
+
+// Helper para redirigir al login (solo en cliente y desde rutas privadas)
 function redirectToLogin() {
-  if (typeof window !== 'undefined') {
-    window.location.href = '/auth/login';
-  }
+  if (typeof window === 'undefined') return;
+  if (isOnPublicRoute()) return; // nunca desde una landing pública
+  window.location.href = '/auth/login';
 }
 
 // Endpoints públicos de auth: un 401 aquí es un error de credenciales del propio
