@@ -2329,8 +2329,32 @@ export function FichaDocumentView({
   function commitDate() {
     if (!localDate || localDate === toInputDate(date)) { setEditingDate(false); return; }
     const [y, mo, d] = localDate.split('-').map(Number);
-    const localNoon = new Date(y, mo - 1, d, 12, 0, 0).toISOString();
-    updateFicha({ fichaId: String(ficha.fichaId), date: localNoon });
+    const newDate = new Date(y, mo - 1, d, 12, 0, 0);
+    const localNoon = newDate.toISOString();
+
+    // El título se auto-genera al crear la ficha con el patrón fijo
+    // "Tipo · fecha corta · hora" (ej. "Encuentro Presencial · 19 sept ·
+    // 17:30"), pero después queda como texto libre desconectado de `date`.
+    // En vez de buscar el texto exacto de la fecha anterior (frágil: el
+    // formato de Intl puede diferir sutilmente entre el momento en que se
+    // generó y ahora), reemplazamos estructuralmente el segmento del medio
+    // cuando el título todavía tiene esos 3 segmentos separados por " · ".
+    // Si el título fue editado a mano y ya no calza esa estructura, no lo
+    // tocamos.
+    const newLabel = newDate.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+    const titleParts = title.split(' · ');
+    let nextTitle: string | undefined;
+    if (titleParts.length === 3) {
+      titleParts[1] = newLabel;
+      nextTitle = titleParts.join(' · ');
+    }
+
+    updateFicha({
+      fichaId: String(ficha.fichaId),
+      date: localNoon,
+      ...(nextTitle !== undefined ? { title: nextTitle } : {}),
+    });
+    if (nextTitle !== undefined) setLocalTitle(nextTitle);
     setEditingDate(false);
   }
 
