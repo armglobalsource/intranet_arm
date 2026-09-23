@@ -749,7 +749,16 @@ export class FichasService {
       );
     }
     if (dto.sectionLayout !== undefined) {
-      data.sectionLayout = dto.sectionLayout;
+      // dto.sectionLayout es una instancia de SectionLayoutDto (class-transformer
+      // la instancia por el @Type() en UpdateFichaDto) — Firestore rechaza
+      // objetos con prototipo custom ("Firestore doesn't support JavaScript
+      // objects with custom prototypes"), así que reconstruimos un objeto
+      // plano antes de escribir. Mismo patrón que updateLayoutVisual() más abajo.
+      data.sectionLayout = {
+        left:  dto.sectionLayout.left,
+        right: dto.sectionLayout.right,
+        ...(dto.sectionLayout.leftRatio !== undefined ? { leftRatio: dto.sectionLayout.leftRatio } : {}),
+      };
     }
     await this.fb.db.collection(COL).doc(fichaId).update(data);
     return this.findOne(fichaId);
