@@ -32,10 +32,13 @@ export class CreateFichaDto {
 }
 
 export class SectionLayoutDto {
-  @IsArray() @ArrayMaxSize(7) @IsIn(LAYOUT_SLOTS, { each: true })
+  // LAYOUT_SLOTS tiene 8 valores posibles — una columna podría en teoría
+  // contener todos (usuario mueve todo a un lado), así que el máximo debe
+  // ser 8, no 7 (con 7 se rechazaba silenciosamente ese caso límite).
+  @IsArray() @ArrayMaxSize(LAYOUT_SLOTS.length) @IsIn(LAYOUT_SLOTS, { each: true })
   left: string[];
 
-  @IsArray() @ArrayMaxSize(7) @IsIn(LAYOUT_SLOTS, { each: true })
+  @IsArray() @ArrayMaxSize(LAYOUT_SLOTS.length) @IsIn(LAYOUT_SLOTS, { each: true })
   right: string[];
 
   // Proporción del ancho de la columna izquierda (0.2–0.8). Default: 0.5 (50/50)

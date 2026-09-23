@@ -2105,7 +2105,7 @@ function EncuentroTabs({
   );
 }
 
-// ── Layout drag-to-reorder ────────────────────────────────────────────────────
+// ── Layout de secciones (reordenable por botones ▲▼⇄, sin drag) ───────────────
 
 type LayoutSlot = 'pastoral' | 'produccion' | 'media' | 'streaming' | 'horarios' | 'worship' | 'voluntarios' | 'anuncios';
 
@@ -2117,6 +2117,37 @@ const DEFAULT_LAYOUT_ORACION: { left: LayoutSlot[]; right: LayoutSlot[] } = {
   left:  ['pastoral', 'produccion', 'streaming', 'horarios'],
   right: ['worship', 'media'],
 };
+
+function slotLabel(slot: LayoutSlot): string {
+  if (slot === 'worship') return 'AR Worship / Banda';
+  if (slot === 'media')   return 'Media';
+  return SECTION_LABELS[slot as SectionName] ?? slot;
+}
+
+/** Secciones que agrupa un slot — 'worship' junta 3 (escena+setList+outfit)
+ *  porque siempre se renderizan como una sola card en una sola posición; el
+ *  resto mapea 1:1 con su SectionName. */
+function slotSectionNames(slot: LayoutSlot): SectionName[] {
+  if (slot === 'worship') return ['escena', 'setList', 'outfit'];
+  return [slot as SectionName];
+}
+
+/** Resuelve el layout guardado contra el default del tipo de ficha. 'media'
+ *  siempre debe estar presente en algún lado (legacy: fichas creadas antes
+ *  de que 'media' existiera como slot no lo tienen guardado). */
+function resolveSectionLayout(
+  fichaType: string,
+  sectionLayoutProp?: { left: string[]; right: string[]; leftRatio?: number },
+): { left: LayoutSlot[]; right: LayoutSlot[]; leftRatio: number } {
+  const defaultLayout = fichaType === 'oracion' ? DEFAULT_LAYOUT_ORACION : DEFAULT_LAYOUT;
+  const storedLayout = (sectionLayoutProp ?? defaultLayout) as { left: LayoutSlot[]; right: LayoutSlot[]; leftRatio?: number };
+  const layoutHasMedia = [...storedLayout.left, ...storedLayout.right].includes('media');
+  return {
+    left:  layoutHasMedia ? storedLayout.left  : [...storedLayout.left],
+    right: layoutHasMedia ? storedLayout.right : [...storedLayout.right, 'media'],
+    leftRatio: Math.min(0.8, Math.max(0.2, storedLayout.leftRatio ?? 0.5)),
+  };
+}
 
 // ── FichaDocumentView — componente principal ──────────────────────────────────
 
@@ -2144,9 +2175,12 @@ export interface FichaDocumentViewProps {
   sectionStatus?: Partial<Record<SectionName, boolean>>;
   saveState?: 'idle' | 'saving' | 'saved' | 'error';
   hiddenSections?: SectionName[];
-  onToggleModule?: (name: SectionName) => void;
+  /** Estado (controlado por el padre) de si el panel de edición de módulos
+   *  está abierto — cuando lo está, el padre reemplaza el side panel de
+   *  Equipo por <ModulesEditPanel/> en su lugar. */
+  modulesPanelOpen?: boolean;
+  onToggleModulesPanel?: () => void;
   sectionLayout?: { left: string[]; right: string[]; leftRatio?: number };
-  onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
   /** Persistir el bloque layoutVisual completo (vista alternativa por canción). */
   onUpdateLayoutVisual?: (patch: { songs: LayoutVisualSong[]; producerNotes: string }) => void;
 }
@@ -2155,8 +2189,8 @@ export function FichaDocumentView({
   ficha, onEdit, onSave, onArchive, onUnarchive, canArchive,
   onPublish, onUnpublish, canPublish, isPublishing,
   editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onSectionComplete,
-  sectionStatus, saveState, hiddenSections, onToggleModule,
-  sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual,
+  sectionStatus, saveState, hiddenSections, modulesPanelOpen, onToggleModulesPanel,
+  sectionLayout: sectionLayoutProp, onUpdateLayoutVisual,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
 
@@ -2190,10 +2224,8 @@ export function FichaDocumentView({
   });
 
   const [copied,           setCopied]           = useState(false);
-  const [modulesOpen,      setModulesOpen]      = useState(false);
   const [confirmingPublish, setConfirmingPublish] = useState(false);
   const isPublished = ficha.published ?? false;
-  const modulesRef = useRef<HTMLDivElement>(null);
   const docRef     = useRef<HTMLDivElement>(null);
   const bodyRef    = useRef<HTMLDivElement>(null);       // vista clásica (encuentro)
   const layoutRef  = useRef<HTMLDivElement>(null);       // vista Layout Visual
@@ -2255,28 +2287,10 @@ export function FichaDocumentView({
 
   const hidden = (n: SectionName) => (hiddenSections ?? []).includes(n);
 
-  // ── Layout drag-to-reorder ────────────────────────────────────────────────
-  const defaultLayout = ficha.type === 'oracion' ? DEFAULT_LAYOUT_ORACION : DEFAULT_LAYOUT;
-  const storedLayout = (sectionLayoutProp ?? defaultLayout) as { left: LayoutSlot[]; right: LayoutSlot[]; leftRatio?: number };
-  const layoutHasMedia = [...storedLayout.left, ...storedLayout.right].includes('media');
-  const resolvedLayout: { left: LayoutSlot[]; right: LayoutSlot[]; leftRatio: number } = {
-    left:  layoutHasMedia ? storedLayout.left  : [...storedLayout.left],
-    right: layoutHasMedia ? storedLayout.right : [...storedLayout.right, 'media'],
-    leftRatio: Math.min(0.8, Math.max(0.2, storedLayout.leftRatio ?? 0.5)),
-  };
-
+  // Layout de secciones (solo lectura acá — la edición vive en <ModulesEditPanel/>)
+  const resolvedLayout = resolveSectionLayout(ficha.type, sectionLayoutProp);
 
   const { paletas, loading: paletasLoading } = usePaletas();
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (modulesRef.current && !modulesRef.current.contains(e.target as Node)) {
-        setModulesOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // ── Edición inline del título ─────────────────────────────────────────────
   const { mutate: updateFicha } = useUpdateFicha();
@@ -2749,77 +2763,29 @@ export function FichaDocumentView({
                 </button>
               )}
 
-              {/* Módulos (solo modo edición) */}
-              {editable && onToggleModule && (
-                <div ref={modulesRef} style={{ position: 'relative' }}>
-                  <button
-                    onClick={() => setModulesOpen((o) => !o)}
-                    title="Gestionar módulos"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                      background: modulesOpen ? 'rgba(127,119,221,0.15)' : 'rgba(255,255,255,0.06)',
-                      color: modulesOpen ? C.purple : D.textSecond,
-                      border: `0.5px solid ${modulesOpen ? 'rgba(127,119,221,0.35)' : D.cardBorder}`,
-                      cursor: 'pointer', transition: 'all 0.2s',
-                    }}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                      <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-                    </svg>
-                    Módulos
-                  </button>
-                  {modulesOpen && (
-                    <div
-                      style={{
-                        position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
-                        background: '#1a1a1a', border: '0.5px solid rgba(255,255,255,0.12)',
-                        borderRadius: 10, padding: '6px 0', minWidth: 220,
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-                      }}
-                    >
-                      <p style={{ padding: '4px 12px 8px', fontSize: 10, fontWeight: 700,
-                        textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.25)' }}>
-                        Módulos activos
-                      </p>
-                      {(SECTIONS_BY_TYPE[ficha.type] ?? Object.keys(SECTION_LABELS) as SectionName[]).map((name) => {
-                        const isHidden = hidden(name);
-                        return (
-                          <button
-                            key={name}
-                            onClick={() => onToggleModule(name)}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 10,
-                              width: '100%', padding: '8px 12px', fontSize: 12,
-                              color: isHidden ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)',
-                              background: 'transparent', border: 'none', cursor: 'pointer',
-                              textAlign: 'left', transition: 'background 0.15s',
-                            }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
-                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                          >
-                            <span style={{
-                              flexShrink: 0, width: 16, height: 16, borderRadius: 4,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              background: isHidden ? 'rgba(255,255,255,0.06)' : 'rgba(29,158,117,0.2)',
-                              border: `1px solid ${isHidden ? 'rgba(255,255,255,0.1)' : 'rgba(29,158,117,0.4)'}`,
-                            }}>
-                              {!isHidden && (
-                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none"
-                                  stroke={C.green} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                              )}
-                            </span>
-                            {SECTION_LABELS[name]}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+              {/* Módulos (solo modo edición) — el panel de edición vive en el
+                  side panel del padre (<ModulesEditPanel/>), no acá, para que
+                  reemplace la lista de Equipo mientras se editan módulos. */}
+              {editable && onToggleModulesPanel && (
+                <button
+                  onClick={onToggleModulesPanel}
+                  title="Gestionar módulos"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    background: modulesPanelOpen ? 'rgba(127,119,221,0.15)' : 'rgba(255,255,255,0.06)',
+                    color: modulesPanelOpen ? C.purple : D.textSecond,
+                    border: `0.5px solid ${modulesPanelOpen ? 'rgba(127,119,221,0.35)' : D.cardBorder}`,
+                    cursor: 'pointer', transition: 'all 0.2s',
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                    <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+                  </svg>
+                  Módulos
+                </button>
               )}
 
               {/* Descargar PDF */}
@@ -3066,13 +3032,6 @@ export function FichaDocumentView({
               return hidden(slot as SectionName);
             };
 
-            // Etiqueta legible del slot, usada por el ghost del DragOverlay.
-            const slotLabel = (slot: LayoutSlot): string => {
-              if (slot === 'worship') return 'AR Worship';
-              if (slot === 'media')   return 'Media';
-              return SECTION_LABELS[slot as SectionName] ?? slot;
-            };
-
             // Filtramos ocultos ANTES del map para no renderear cards vacías.
             const visibleLeft  = resolvedLayout.left.filter((s) => !slotIsHidden(s));
             const visibleRight = resolvedLayout.right.filter((s) => !slotIsHidden(s));
@@ -3125,6 +3084,139 @@ export function FichaDocumentView({
           )}
         </div>
 
+      </div>
+    </div>
+  );
+}
+
+// ── ModulesEditPanel ──────────────────────────────────────────────────────────
+// Panel de edición de módulos (visibilidad + orden). Vive en el side panel del
+// editor (reemplazando la lista de Equipo mientras está abierto) en vez de un
+// dropdown flotante — así no queda recortado por el `overflow:hidden` de la
+// tarjeta del documento ni desaparece al hacer click fuera por accidente.
+
+const moveBtnClass =
+  'w-[18px] h-[18px] flex items-center justify-center text-[9px] rounded border border-gray-200 bg-white text-gray-500 flex-shrink-0 disabled:opacity-30 disabled:cursor-default';
+
+export interface ModulesEditPanelProps {
+  fichaType:       string;
+  hiddenSections?: SectionName[];
+  /** Acepta un nombre o varios (el slot 'worship' agrupa 3 secciones que se
+   *  togglean juntas, como una sola fila en la lista). */
+  onToggleModule:  (name: SectionName | SectionName[]) => void;
+  sectionLayout?:  { left: string[]; right: string[]; leftRatio?: number };
+  onUpdateLayout:  (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
+  onClose:         () => void;
+}
+
+export function ModulesEditPanel({
+  fichaType, hiddenSections, onToggleModule, sectionLayout, onUpdateLayout, onClose,
+}: ModulesEditPanelProps) {
+  const hidden = (n: SectionName) => (hiddenSections ?? []).includes(n);
+  const resolvedLayout = resolveSectionLayout(fichaType, sectionLayout);
+
+  // Mismo reordenamiento por botones ▲▼⇄ que el resto de la ficha — ver
+  // comentario al inicio del archivo sobre por qué no es drag-and-drop.
+  function moveSlot(column: 'left' | 'right', index: number, direction: -1 | 1) {
+    const source = [...resolvedLayout[column]];
+    const target = index + direction;
+    if (target < 0 || target >= source.length) return;
+    [source[index], source[target]] = [source[target], source[index]];
+    onUpdateLayout({
+      left:  column === 'left'  ? source : resolvedLayout.left,
+      right: column === 'right' ? source : resolvedLayout.right,
+      leftRatio: resolvedLayout.leftRatio,
+    });
+  }
+
+  function moveSlotAcross(column: 'left' | 'right', index: number) {
+    const fromArr = [...resolvedLayout[column]];
+    const toArr   = [...resolvedLayout[column === 'left' ? 'right' : 'left']];
+    const [slot]  = fromArr.splice(index, 1);
+    toArr.push(slot);
+    onUpdateLayout({
+      left:  column === 'left' ? fromArr : toArr,
+      right: column === 'left' ? toArr   : fromArr,
+      leftRatio: resolvedLayout.leftRatio,
+    });
+  }
+
+  return (
+    <div className="card flex flex-col" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
+      <div className="flex items-center justify-between px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid #F3F4F6' }}>
+        <p className="text-xs font-semibold text-gray-900">Módulos</p>
+        <button
+          onClick={onClose}
+          className="text-[11px] font-semibold px-2.5 py-1 rounded-md"
+          style={{ background: 'rgba(29,158,117,0.12)', color: C.green }}
+        >
+          Listo
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-3 px-4 py-3 overflow-y-auto">
+        {(['left', 'right'] as const).map((column) => (
+          <div key={column}>
+            <p className="text-[9px] font-bold uppercase tracking-wide text-gray-400 mb-1">
+              {column === 'left' ? 'Columna izquierda' : 'Columna derecha'}
+            </p>
+            <div className="flex flex-col gap-1">
+              {resolvedLayout[column].map((slot, i) => {
+                const names = slotSectionNames(slot);
+                const isHidden = names.every((n) => hidden(n));
+                return (
+                  <div key={slot} className="flex items-center gap-1 px-1.5 py-1 rounded-md bg-gray-50 border border-gray-100">
+                    <button
+                      onClick={() => onToggleModule(names.length > 1 ? names : names[0])}
+                      className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
+                    >
+                      <span
+                        className="flex-shrink-0 w-4 h-4 rounded flex items-center justify-center"
+                        style={{
+                          background: isHidden ? '#F3F4F6' : 'rgba(29,158,117,0.12)',
+                          border: `1px solid ${isHidden ? '#E5E7EB' : 'rgba(29,158,117,0.4)'}`,
+                        }}
+                      >
+                        {!isHidden && (
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none"
+                            stroke={C.green} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className={`text-[11px] truncate ${isHidden ? 'text-gray-400' : 'text-gray-700'}`}>
+                        {slotLabel(slot)}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => moveSlot(column, i, -1)}
+                      disabled={i === 0}
+                      title="Subir"
+                      className={moveBtnClass}
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => moveSlot(column, i, 1)}
+                      disabled={i === resolvedLayout[column].length - 1}
+                      title="Bajar"
+                      className={moveBtnClass}
+                    >
+                      ▼
+                    </button>
+                    <button
+                      onClick={() => moveSlotAcross(column, i)}
+                      title={column === 'left' ? 'Mover a columna derecha' : 'Mover a columna izquierda'}
+                      className={moveBtnClass}
+                    >
+                      {column === 'left' ? '→' : '←'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

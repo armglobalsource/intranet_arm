@@ -10,7 +10,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { apiErrorMessage } from '@/lib/api';
 import { useUsers } from '@/hooks/useUsers';
 import { displayName } from '@/types/user';
-import { FichaDocumentView } from './FichaDocumentView';
+import { FichaDocumentView, ModulesEditPanel } from './FichaDocumentView';
 import { EquipoRosterSideCard } from '@/components/fichas/EquipoRosterSideCard';
 import { RosterStatusContext } from '@/components/fichas/RosterStatusContext';
 import { useEquipoRoster } from '@/hooks/useEquipoRoster';
@@ -251,6 +251,11 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const [isEditing, setIsEditing]             = useState(false);
   const [transitioningToEdit, setTransitioningToEdit] = useState(false);
 
+  // Panel de edición de módulos: mientras está abierto, reemplaza la lista
+  // de Equipo en el side panel. Se cierra al salir del modo edición.
+  const [modulesOpen, setModulesOpen] = useState(false);
+  useEffect(() => { if (!isEditing) setModulesOpen(false); }, [isEditing]);
+
   const [localHidden, setLocalHidden] = useState<SectionName[]>([]);
   // Contador de mutaciones en vuelo. Usamos contador (no booleano) para
   // soportar clicks rápidos encadenados: cada uno dispara su propia mutación
@@ -275,6 +280,17 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ficha?.hiddenSections]);
 
+  const [localLayout, setLocalLayout] = useState<{ left: string[]; right: string[]; leftRatio?: number } | undefined>(undefined);
+  // Mismo patrón de contador en vuelo que localHidden, para que clicks
+  // encadenados de ▲/▼ no se pisen entre sí ni con el snapshot del servidor.
+  const layoutInflight = useRef(0);
+
+  useEffect(() => {
+    if (layoutInflight.current !== 0) return;
+    setLocalLayout(ficha?.sectionLayout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ficha?.sectionLayout]);
+
   const { mutateAsync: updateSectionAsync } = useUpdateSection();
   const { mutateAsync: completeSection } = useCompleteSection();
   const { mutateAsync: reopenSection } = useReopenSection();
@@ -286,13 +302,19 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { mutate: unpublishFicha, isPending: isUnpublishing } = useUnpublishFicha();
   const { mutateAsync: splitPrayerGlobal, isPending: isSplitting } = useSplitPrayerGlobal();
 
-  function handleToggleModule(name: SectionName) {
+  function handleToggleModule(name: SectionName | SectionName[]) {
     if (!ficha) return;
+    // Acepta uno o varios nombres a la vez (el slot 'worship' agrupa 3
+    // secciones que togglean juntas, como una sola fila en la lista) —
+    // siempre en UNA sola pasada para no perder toggles por condición de
+    // carrera entre clicks encadenados.
+    const names = Array.isArray(name) ? name : [name];
     // Toggle contra localHidden (estado optimista), no contra ficha.hiddenSections
     // — así clicks encadenados componen bien sin esperar el roundtrip.
-    const next = localHidden.includes(name)
-      ? localHidden.filter((s) => s !== name)
-      : [...localHidden, name];
+    const allHidden = names.every((n) => localHidden.includes(n));
+    const next = allHidden
+      ? localHidden.filter((s) => !names.includes(s))
+      : Array.from(new Set([...localHidden, ...names]));
     setLocalHidden(next);
     hiddenInflight.current += 1;
     setSaveState('saving');
@@ -320,8 +342,33 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     );
   }
 
-  // handleUpdateLayout eliminado: el reordenamiento y resize de columnas
-  // se retiró (nunca funcionó de forma confiable en producción).
+  function handleUpdateLayout(layout: { left: string[]; right: string[]; leftRatio?: number }) {
+    if (!ficha) return;
+    setLocalLayout(layout);
+    layoutInflight.current += 1;
+    setSaveState('saving');
+    updateFicha(
+      { fichaId: ficha.fichaId, sectionLayout: layout },
+      {
+        onSuccess: () => {
+          layoutInflight.current = Math.max(0, layoutInflight.current - 1);
+          if (layoutInflight.current === 0) {
+            setSaveState('saved');
+            setTimeout(() => setSaveState('idle'), 800);
+          }
+        },
+        onError: (err) => {
+          layoutInflight.current = Math.max(0, layoutInflight.current - 1);
+          if (layoutInflight.current === 0) {
+            setLocalLayout(ficha.sectionLayout);
+            setSaveState('error');
+            setActionError(apiErrorMessage(err, 'No se pudo guardar el orden de las secciones'));
+            setTimeout(() => setSaveState('idle'), 3000);
+          }
+        },
+      },
+    );
+  }
 
   function handleUpdateLayoutVisual(patch: { songs: any[]; producerNotes: string }) {
     if (!ficha) return;
@@ -729,19 +776,32 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             sectionStatus={sectionStatus}
             saveState={saveState}
             hiddenSections={localHidden}
-            onToggleModule={canEdit ? handleToggleModule : undefined}
+            modulesPanelOpen={modulesOpen}
+            onToggleModulesPanel={canEdit ? () => setModulesOpen((o) => !o) : undefined}
+            sectionLayout={localLayout}
             onUpdateLayoutVisual={canEdit ? handleUpdateLayoutVisual : undefined}
           />
         </div>
 
         {showSidePanel && (
           <div className="w-56 flex-shrink-0 sticky top-4 flex flex-col gap-3">
-            <EquipoRosterSideCard
-              roster={roster}
-              isLoading={rosterLoading}
-              weekLabel={rosterWeekLabel}
-              campusId={fichaCampusId}
-            />
+            {modulesOpen ? (
+              <ModulesEditPanel
+                fichaType={ficha.type}
+                hiddenSections={localHidden}
+                onToggleModule={handleToggleModule}
+                sectionLayout={localLayout}
+                onUpdateLayout={handleUpdateLayout}
+                onClose={() => setModulesOpen(false)}
+              />
+            ) : (
+              <EquipoRosterSideCard
+                roster={roster}
+                isLoading={rosterLoading}
+                weekLabel={rosterWeekLabel}
+                campusId={fichaCampusId}
+              />
+            )}
           </div>
         )}
       </div>
