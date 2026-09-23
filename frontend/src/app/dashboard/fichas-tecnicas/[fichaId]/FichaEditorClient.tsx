@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useFichaRealtime, useUpdateSection, useCompleteSection, useReopenSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, useUpdateLayoutVisual, usePublishFicha, useUnpublishFicha, useSplitPrayerGlobal } from '@/hooks/useFichas';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
@@ -247,8 +248,12 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
   // La ficha abre en modo Vista por default. El usuario hace click en
   // "Editar" para entrar en edición, y "Guardar" para volver a Vista.
-  // (Antes abría en Edición por default y el botón "Editar" nunca se veía.)
-  const [isEditing, setIsEditing]             = useState(false);
+  // Excepción: si el link viene con ?edit=1 (ej. desde el botón "Abrir
+  // editor" del listado) arranca directamente en modo edición para
+  // ahorrar un click.
+  const searchParams = useSearchParams();
+  const startInEditMode = searchParams?.get('edit') === '1';
+  const [isEditing, setIsEditing]             = useState(startInEditMode);
   const [transitioningToEdit, setTransitioningToEdit] = useState(false);
 
   // Panel de edición de módulos: mientras está abierto, reemplaza la lista
