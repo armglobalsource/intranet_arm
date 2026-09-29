@@ -9,8 +9,8 @@ import {
 import { usePermissions } from '@/hooks/usePermissions';
 import { useActiveCampuses } from '@/hooks/useCampus';
 import {
-  useSiembraDashboard, useUpdateTipoCambio, useRefreshTipoCambio,
-  type GroupBy, type SiembraDashboardResponse, type SiembraReferencia,
+  useSiembraDashboard, useUpdateTipoCambio, useRefreshTipoCambio, useResetTipoCambio,
+  type GroupBy, type SiembraDashboardResponse, type SiembraReferencia, type TasaClp,
 } from '@/hooks/useSiembraDashboard';
 
 const ACCENTS = {
@@ -111,7 +111,7 @@ function TrendChart({ periods, groupBy, currency }: {
             {groupBy === 'month' ? 'Comportamiento mensual durante el año'
               : groupBy === 'week' ? 'Comportamiento semana a semana'
               : 'Comportamiento día a día'}
-            {' · referencia en '}{currency.toUpperCase()}
+            {currency === 'clp' ? ' · en pesos chilenos' : ' · en dólares'}
           </p>
         </div>
         <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-500">
@@ -170,54 +170,69 @@ function RefreshRatesButton() {
   );
 }
 
-function TipoCambioRow({ moneda, label, rate }: {
-  moneda: string;
-  label: string;
-  rate?: { unitsPerUSD: number; source?: 'api' | 'manual'; updatedAt?: string };
-}) {
-  const [value, setValue] = useState(rate?.unitsPerUSD ? String(rate.unitsPerUSD) : '');
+/** "1 USD = $943,62" — tasa legible en pesos chilenos. */
+function tasaTexto(moneda: string, clpPorUnidad: number) {
+  const decimales = clpPorUnidad >= 100 ? 2 : 4;
+  return `1 ${moneda} = $${clpPorUnidad.toLocaleString('es-CL', { maximumFractionDigits: decimales })}`;
+}
+
+function fechaHora(iso: string | null) {
+  if (!iso) return 'sin actualizar';
+  return new Date(iso).toLocaleString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function TipoCambioRow({ tasa }: { tasa: TasaClp }) {
+  const [value, setValue] = useState(tasa.clpPorUnidad ? String(Number(tasa.clpPorUnidad.toFixed(4))) : '');
   const update = useUpdateTipoCambio();
+  const reset = useResetTipoCambio();
+  const manual = tasa.fuente === 'manual';
 
   function save() {
-    const parsed = Number(value);
+    const parsed = Number(value.replace(',', '.'));
     if (!parsed || parsed <= 0) return;
-    update.mutate({ moneda, unitsPerUSD: parsed });
+    update.mutate({ moneda: tasa.moneda, clpPorUnidad: parsed });
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5">
-      <div className="w-28 shrink-0">
-        <p className="text-sm font-bold text-gray-900">{moneda}</p>
-        <p className="truncate text-[11px] text-gray-400">{label}</p>
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5">
+      <p className="w-20 shrink-0 text-sm font-bold text-gray-900">1 {tasa.moneda} =</p>
+      <div className="flex min-w-[140px] flex-1 items-center gap-1.5">
+        <span className="text-sm text-gray-500">$</span>
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          inputMode="decimal"
+          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-gray-400"
+        />
+        <span className="text-sm text-gray-500">CLP</span>
       </div>
-      <input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="unidades por 1 USD"
-        type="number"
-        min={0}
-        step="any"
-        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-gray-400"
-      />
       <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${
-        rate?.source === 'manual' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'
+        manual ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'
       }`}>
-        {rate?.source === 'manual' ? 'Manual' : 'API'}
+        {manual ? 'Manual' : 'Automática'}
       </span>
       <button
         onClick={save}
         disabled={update.isPending || !value}
         className="shrink-0 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
       >
-        {update.isPending ? 'Guardando…' : 'Guardar'}
+        {update.isPending ? 'Guardando…' : 'Fijar manual'}
       </button>
+      {manual && (
+        <button
+          onClick={() => reset.mutate(tasa.moneda)}
+          disabled={reset.isPending}
+          className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-40"
+        >
+          Volver a automática
+        </button>
+      )}
     </div>
   );
 }
 
 const EMPTY_REF: SiembraReferencia = {
   ofrendas: 0, diezmos: 0, otros: 0, total: 0, efectivo: 0, sumup: 0, metodoDesconocido: 0,
-  missingRateCurrencies: [],
 };
 
 export function FinanzasDashboardClient() {
@@ -243,7 +258,10 @@ export function FinanzasDashboardClient() {
 
   const clp = data?.reference.clp ?? EMPTY_REF;
   const usd = data?.reference.usd ?? EMPTY_REF;
-  const missing = clp.missingRateCurrencies;
+  const missing = data?.tipoCambio.sinTasa ?? [];
+  const tasasUsadas = (data?.tipoCambio.tasas ?? []).filter(
+    (t) => t.clpPorUnidad && data?.currencies.some((c) => c.moneda === t.moneda),
+  );
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6 pb-10">
@@ -316,23 +334,34 @@ export function FinanzasDashboardClient() {
           <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={18} />
           <div>
             <p className="text-sm font-semibold text-amber-800">
-              Sin tasa de cambio configurada para: {missing.join(', ')}
+              No hay tipo de cambio disponible para: {missing.join(', ')}
             </p>
             <p className="mt-1 text-xs text-amber-700/80">
-              Esos montos no se incluyen en los totales de referencia CLP/USD hasta que se configure una tasa.
+              Esos montos se muestran en su moneda en la tabla, pero no se suman a los totales en pesos chilenos.
             </p>
           </div>
         </div>
       )}
 
+      {tasasUsadas.length > 0 && (
+        <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 px-5 py-3.5">
+          <RefreshCw className="mt-0.5 shrink-0 text-blue-600" size={16} />
+          <p className="text-sm text-blue-900">
+            Los montos en otras monedas se convierten a pesos chilenos:{' '}
+            <span className="font-semibold">{tasasUsadas.map((t) => tasaTexto(t.moneda, t.clpPorUnidad!)).join(' · ')}</span>
+            <span className="text-blue-700/70"> (tipo de cambio del día, actualizado {fechaHora(data?.tipoCambio.actualizadoApi ?? null)})</span>
+          </p>
+        </div>
+      )}
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Ofrendas" value={money(clp.ofrendas)} detail="Referencia en CLP" icon={Gift} accent={ACCENTS.ofrendas} />
-        <MetricCard label="Diezmos" value={money(clp.diezmos)} detail="Referencia en CLP" icon={HandCoins} accent={ACCENTS.diezmos} />
-        <MetricCard label="Otros aportes" value={money(clp.otros)} detail="Referencia en CLP" icon={Coins} accent={ACCENTS.otros} />
-        <MetricCard label="Total general" value={money(clp.total)} detail={`≈ ${money(usd.total, 'US$')} de referencia`} icon={Banknote} accent={ACCENTS.totalClp} />
-        <MetricCard label="Efectivo / Sobres" value={money(clp.efectivo)} detail="Referencia en CLP" icon={Wallet} accent={ACCENTS.efectivo} />
-        <MetricCard label="SumUp (tarjeta)" value={money(clp.sumup)} detail="Referencia en CLP" icon={CreditCard} accent={ACCENTS.sumup} />
-        <MetricCard label="Total en USD" value={money(usd.total, 'US$')} detail="Referencia consolidada" icon={RefreshCw} accent={ACCENTS.totalUsd} />
+        <MetricCard label="Ofrendas" value={money(clp.ofrendas)} detail="En pesos chilenos" icon={Gift} accent={ACCENTS.ofrendas} />
+        <MetricCard label="Diezmos" value={money(clp.diezmos)} detail="En pesos chilenos" icon={HandCoins} accent={ACCENTS.diezmos} />
+        <MetricCard label="Otros aportes" value={money(clp.otros)} detail="En pesos chilenos" icon={Coins} accent={ACCENTS.otros} />
+        <MetricCard label="Total general" value={money(clp.total)} detail="Todas las monedas, en CLP" icon={Banknote} accent={ACCENTS.totalClp} />
+        <MetricCard label="Efectivo / Sobres" value={money(clp.efectivo)} detail="En pesos chilenos" icon={Wallet} accent={ACCENTS.efectivo} />
+        <MetricCard label="SumUp (tarjeta)" value={money(clp.sumup)} detail="En pesos chilenos" icon={CreditCard} accent={ACCENTS.sumup} />
+        <MetricCard label="Total en dólares" value={money(usd.total, 'US$')} detail="Equivalente del total general" icon={RefreshCw} accent={ACCENTS.totalUsd} />
         <MetricCard
           label="Registros del período"
           value={number(data?.meta.recordCount ?? 0)}
@@ -366,7 +395,7 @@ export function FinanzasDashboardClient() {
           <section className="grid gap-6 xl:grid-cols-2">
             <BreakdownCard
               title="Ofrendas, Diezmos y Otros aportes"
-              subtitle="Distribución acumulada del período (referencia CLP)"
+              subtitle="Distribución acumulada del período (en pesos chilenos)"
               rows={[
                 { key: 'ofrendas', label: 'Ofrendas', value: clp.ofrendas },
                 { key: 'diezmos', label: 'Diezmos', value: clp.diezmos },
@@ -376,7 +405,7 @@ export function FinanzasDashboardClient() {
             />
             <BreakdownCard
               title="Método de pago"
-              subtitle="Efectivo/Sobres vs SumUp (referencia CLP)"
+              subtitle="Efectivo/Sobres vs SumUp (en pesos chilenos)"
               rows={[
                 { key: 'efectivo', label: 'Efectivo / Sobres', value: clp.efectivo },
                 { key: 'sumup', label: 'SumUp (tarjeta)', value: clp.sumup },
@@ -390,11 +419,11 @@ export function FinanzasDashboardClient() {
 
           <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-100 px-5 py-4">
-              <h2 className="font-bold text-gray-900">Montos por moneda (sin convertir)</h2>
-              <p className="mt-1 text-xs text-gray-500">Tal como se registraron en cada moneda</p>
+              <h2 className="font-bold text-gray-900">Montos por moneda</h2>
+              <p className="mt-1 text-xs text-gray-500">Lo registrado en cada moneda y su equivalente en pesos chilenos</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] text-left text-sm">
+              <table className="w-full min-w-[860px] text-left text-sm">
                 <thead className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-400">
                   <tr>
                     <th className="px-5 py-3 font-semibold">Moneda</th>
@@ -402,13 +431,14 @@ export function FinanzasDashboardClient() {
                     <th className="px-4 py-3 text-right font-semibold">Diezmos</th>
                     <th className="px-4 py-3 text-right font-semibold">Otros</th>
                     <th className="px-4 py-3 text-right font-semibold">Total</th>
-                    <th className="px-5 py-3 text-right font-semibold">Tasa</th>
+                    <th className="px-4 py-3 text-right font-semibold">Tipo de cambio</th>
+                    <th className="px-5 py-3 text-right font-semibold">Total en CLP</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {data.currencies.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-400">
+                      <td colSpan={7} className="px-5 py-12 text-center text-sm text-gray-400">
                         No hay registros de siembra para este período.
                       </td>
                     </tr>
@@ -418,13 +448,14 @@ export function FinanzasDashboardClient() {
                       <td className="px-4 py-3.5 text-right text-gray-600">{number(c.ofrendas)}</td>
                       <td className="px-4 py-3.5 text-right text-gray-600">{number(c.diezmos)}</td>
                       <td className="px-4 py-3.5 text-right text-gray-600">{number(c.otros)}</td>
-                      <td className="px-4 py-3.5 text-right font-semibold text-gray-900">{number(c.total)}</td>
-                      <td className="px-5 py-3.5 text-right">
-                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                          c.hasRate ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                        }`}>
-                          {c.hasRate ? 'Configurada' : 'Sin tasa'}
-                        </span>
+                      <td className="px-4 py-3.5 text-right font-semibold text-gray-900">{number(c.total)} {c.moneda}</td>
+                      <td className="px-4 py-3.5 text-right text-xs text-gray-500">
+                        {c.moneda === 'CLP' ? '—' : c.clpPorUnidad ? tasaTexto(c.moneda, c.clpPorUnidad) : (
+                          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">Sin tipo de cambio</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5 text-right font-semibold text-gray-900">
+                        {c.totalClp == null ? '—' : money(c.totalClp)}
                       </td>
                     </tr>
                   ))}
@@ -435,22 +466,18 @@ export function FinanzasDashboardClient() {
 
           {canManageRates && (
             <details className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <summary className="cursor-pointer font-bold text-gray-900">Tasas de cambio (admin)</summary>
+              <summary className="cursor-pointer font-bold text-gray-900">Tipo de cambio (admin)</summary>
               <div className="mt-2 flex items-start justify-between gap-4">
                 <p className="text-xs text-gray-500">
-                  Unidades de cada moneda equivalentes a 1 USD. Se actualizan automáticamente una vez al día desde una
-                  API pública; también se pueden editar manualmente si hace falta un ajuste puntual.
+                  Cuántos pesos chilenos vale 1 unidad de cada moneda. Se actualiza solo una vez al día
+                  (última actualización: {fechaHora(data.tipoCambio.actualizadoApi)}). Si necesitas usar otro valor,
+                  escríbelo y presiona &quot;Fijar manual&quot;; con &quot;Volver a automática&quot; se deshace.
                 </p>
                 <RefreshRatesButton />
               </div>
               <div className="mt-4 space-y-2">
-                {data.currencies.map((c) => (
-                  <TipoCambioRow
-                    key={c.moneda}
-                    moneda={c.moneda}
-                    label={c.label}
-                    rate={data.fxRates.find((r) => r.moneda === c.moneda)}
-                  />
+                {data.tipoCambio.tasas.map((t) => (
+                  <TipoCambioRow key={`${t.moneda}-${t.fuente}-${t.clpPorUnidad}`} tasa={t} />
                 ))}
               </div>
             </details>

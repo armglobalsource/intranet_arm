@@ -1,6 +1,8 @@
 import { IsNumber, Min } from 'class-validator';
 
 export class UpdateTipoCambioDto {
-  /** Unidades de esta moneda equivalentes a 1 USD (ej. CLP ~950, USD siempre 1). */
-  @IsNumber() @Min(0.000001) unitsPerUSD: number;
+  /** Pesos chilenos por 1 unidad de la moneda (ej: 1 USD = 943.62 CLP). */
+  @IsNumber()
+  @Min(0.000001)
+  clpPorUnidad: number;
 }

@@ -16,11 +16,18 @@ export interface SiembraTotales {
 export interface SiembraMoneda extends SiembraTotales {
   moneda: string;
   label: string;
-  hasRate: boolean;
+  /** Pesos chilenos por 1 unidad (1 para CLP, null si no hay tasa). */
+  clpPorUnidad: number | null;
+  totalClp: number | null;
 }
 
-export interface SiembraReferencia extends SiembraTotales {
-  missingRateCurrencies: string[];
+export type SiembraReferencia = SiembraTotales;
+
+export interface TasaClp {
+  moneda: string;
+  clpPorUnidad: number | null;
+  fuente: 'api' | 'manual';
+  updatedAt: string | null;
 }
 
 export interface SiembraPeriodo {
@@ -30,14 +37,6 @@ export interface SiembraPeriodo {
   end: string;
   referenceCLP: number;
   referenceUSD: number;
-}
-
-export interface FxRate {
-  moneda: string;
-  unitsPerUSD: number;
-  source?: 'api' | 'manual';
-  updatedAt?: string;
-  updatedBy?: { uid: string; email: string };
 }
 
 export interface SiembraDashboardResponse {
@@ -52,7 +51,11 @@ export interface SiembraDashboardResponse {
   currencies: SiembraMoneda[];
   reference: { clp: SiembraReferencia; usd: SiembraReferencia };
   periods: SiembraPeriodo[];
-  fxRates: FxRate[];
+  tipoCambio: {
+    actualizadoApi: string | null;
+    sinTasa: string[];
+    tasas: TasaClp[];
+  };
 }
 
 const keys = {
@@ -73,8 +76,17 @@ export function useSiembraDashboard(year: number, groupBy: GroupBy, campus?: str
 export function useUpdateTipoCambio() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ moneda, unitsPerUSD }: { moneda: string; unitsPerUSD: number }) =>
-      api.patch(`/tipo-cambio/${moneda}`, { unitsPerUSD }).then((r) => r.data),
+    mutationFn: ({ moneda, clpPorUnidad }: { moneda: string; clpPorUnidad: number }) =>
+      api.patch(`/tipo-cambio/${moneda}`, { clpPorUnidad }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['siembra-dashboard'] }),
+  });
+}
+
+/** Quita el ajuste manual de una moneda: vuelve a la tasa automática. */
+export function useResetTipoCambio() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (moneda: string) => api.delete(`/tipo-cambio/${moneda}`).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['siembra-dashboard'] }),
   });
 }

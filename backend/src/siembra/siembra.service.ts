@@ -11,7 +11,7 @@ const COL = 'siembra';
 
 type GroupBy = 'day' | 'week' | 'month';
 
-interface Totales {
+export interface Totales {
   ofrendas: number;
   diezmos: number;
   otros: number;
@@ -278,7 +278,15 @@ export class SiembraService {
       .filter((r) => String(r.fecha ?? '').slice(0, 4) === String(year))
       .filter((r) => !campus || r.campus === campus);
 
-    const rates = await this.tipoCambio.findMap();
+    const lines = rows.map((row) => ({
+      fecha: String(row.fecha ?? ''),
+      montos: ((Array.isArray(row.montos) ? row.montos : []) as any[]).map(normalizeMonto).filter((n) => n.moneda),
+    }));
+    const monedasUsadas = Array.from(new Set(lines.flatMap((l) => l.montos.map((n) => n.moneda))));
+    const { tasas, actualizadoApi } = await this.tipoCambio.getTasasClp([...monedasUsadas, 'USD']);
+    const clpPor = (moneda: string) => (moneda === 'CLP' ? 1 : tasas[moneda]?.clpPorUnidad ?? null);
+    const clpPorUsd = clpPor('USD');
+
     const monedaCatalog = await this.armCatalogos.findActive('moneda');
     const labelByMoneda = new Map(monedaCatalog.map((m) => [m.key.toUpperCase(), m.label]));
 
@@ -288,45 +296,41 @@ export class SiembraService {
     const byCurrency = new Map<string, Totales & { moneda: string }>();
     const referenceClp = emptyTotales();
     const referenceUsd = emptyTotales();
-    const missingRateCurrencies = new Set<string>();
+    const sinTasa = new Set<string>();
     let legacyRecordCount = 0;
 
-    for (const row of rows) {
-      const montos = Array.isArray(row.montos) ? row.montos : [];
-      const periodo = periodByKey.get(periodKey(String(row.fecha ?? ''), groupBy));
-      let rowIsLegacy = false;
+    for (const line of lines) {
+      const periodo = periodByKey.get(periodKey(line.fecha, groupBy));
+      if (line.montos.some((n) => n.isLegacy)) legacyRecordCount++;
 
-      for (const raw of montos) {
-        const n = normalizeMonto(raw);
-        if (!n.moneda) continue;
-        if (n.isLegacy) rowIsLegacy = true;
-
+      for (const n of line.montos) {
         const acc = byCurrency.get(n.moneda) ?? { moneda: n.moneda, ...emptyTotales() };
         addLine(acc, n);
         byCurrency.set(n.moneda, acc);
 
-        const rate = rates[n.moneda];
-        if (!rate) { missingRateCurrencies.add(n.moneda); continue; }
+        const factorClp = clpPor(n.moneda);
+        if (factorClp == null) { sinTasa.add(n.moneda); continue; }
 
-        const usdFactor = 1 / rate;
-        addLine(referenceUsd, n, usdFactor);
-        if (periodo) periodo.referenceUSD += n.total * usdFactor;
-
-        const clpRate = rates.CLP;
-        if (clpRate) {
-          addLine(referenceClp, n, usdFactor * clpRate);
-          if (periodo) periodo.referenceCLP += n.total * usdFactor * clpRate;
+        addLine(referenceClp, n, factorClp);
+        if (periodo) periodo.referenceCLP += n.total * factorClp;
+        if (clpPorUsd) {
+          addLine(referenceUsd, n, factorClp / clpPorUsd);
+          if (periodo) periodo.referenceUSD += (n.total * factorClp) / clpPorUsd;
         }
       }
-      if (rowIsLegacy) legacyRecordCount++;
     }
 
     const currencies = Array.from(byCurrency.values())
-      .map((acc) => ({ ...acc, label: labelByMoneda.get(acc.moneda) ?? acc.moneda, hasRate: !!rates[acc.moneda] }))
-      .sort((a, b) => a.moneda.localeCompare(b.moneda));
-
-    const missingList = Array.from(missingRateCurrencies);
-    const clpMissingList = rates.CLP ? missingList : Array.from(new Set([...missingList, 'CLP']));
+      .map((acc) => {
+        const clpPorUnidad = clpPor(acc.moneda);
+        return {
+          ...acc,
+          label: labelByMoneda.get(acc.moneda) ?? acc.moneda,
+          clpPorUnidad,
+          totalClp: clpPorUnidad == null ? null : acc.total * clpPorUnidad,
+        };
+      })
+      .sort((a, b) => (a.moneda === 'CLP' ? -1 : b.moneda === 'CLP' ? 1 : a.moneda.localeCompare(b.moneda)));
 
     return {
       meta: {
@@ -336,15 +340,16 @@ export class SiembraService {
         legacyRecordCount,
       },
       currencies,
-      reference: {
-        clp: { ...referenceClp, missingRateCurrencies: clpMissingList },
-        usd: { ...referenceUsd, missingRateCurrencies: missingList },
-      },
+      reference: { clp: referenceClp, usd: referenceUsd },
       periods: periods.map((p) => ({
         key: p.key, label: p.label, start: p.start, end: p.end,
         referenceCLP: p.referenceCLP, referenceUSD: p.referenceUSD,
       })),
-      fxRates: await this.tipoCambio.findAll(),
+      tipoCambio: {
+        actualizadoApi,
+        sinTasa: Array.from(sinTasa),
+        tasas: Object.values(tasas),
+      },
     };
   }
 }

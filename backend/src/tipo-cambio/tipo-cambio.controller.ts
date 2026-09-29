@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
@@ -12,21 +12,30 @@ export class TipoCambioController {
   constructor(private readonly tipoCambio: TipoCambioService) {}
 
   @Get()
-  findAll() {
-    return this.tipoCambio.findAll();
-  }
-
-  @Patch(':moneda')
-  @UseGuards(PermissionsGuard)
-  @RequirePermission('arm-catalogos:manage')
-  upsert(@Param('moneda') moneda: string, @Body() dto: UpdateTipoCambioDto, @CurrentUser() user: any) {
-    return this.tipoCambio.upsert(moneda, dto, { sub: user.sub, email: user.email });
+  findAll(@Query('monedas') monedas?: string) {
+    const codigos = (monedas || 'USD,ARS,BRL,VES,UYU,EUR').split(',').filter(Boolean);
+    return this.tipoCambio.getTasasClp(codigos);
   }
 
   @Post('refresh')
   @UseGuards(PermissionsGuard)
   @RequirePermission('arm-catalogos:manage')
-  refresh() {
-    return this.tipoCambio.refreshFromApi();
+  async refresh() {
+    const doc = await this.tipoCambio.refreshFromApi();
+    return { clpPorUsd: doc.rates.CLP, actualizado: doc.fetchedAt.toDate().toISOString() };
+  }
+
+  @Patch(':moneda')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('arm-catalogos:manage')
+  setManual(@Param('moneda') moneda: string, @Body() dto: UpdateTipoCambioDto, @CurrentUser() user: any) {
+    return this.tipoCambio.setManual(moneda, dto, { sub: user.sub, email: user.email });
+  }
+
+  @Delete(':moneda')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('arm-catalogos:manage')
+  clearManual(@Param('moneda') moneda: string) {
+    return this.tipoCambio.clearManual(moneda);
   }
 }
