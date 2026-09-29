@@ -160,6 +160,11 @@ export class UsersService {
     return this.findOne(id);
   }
 
+  async isBasicRole(roleId: number): Promise<boolean> {
+    const snap = await this.fb.db.collection('roles').doc(String(roleId)).get();
+    return snap.exists && snap.data()!.name === 'user';
+  }
+
   async update(id: number, dto: UpdateUserDto) {
     const current = await this.fb.db.collection(COL).doc(String(id)).get();
     if (!current.exists) throw new NotFoundException(`User con id ${id} no encontrado`);

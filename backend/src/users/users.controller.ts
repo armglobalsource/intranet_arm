@@ -1,7 +1,7 @@
 import {
   Controller, Get, Post, Patch, Delete,
   Body, Param, Query, ParseIntPipe, DefaultValuePipe, UseGuards,
-  UseInterceptors, UploadedFile,
+  UseInterceptors, UploadedFile, ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -12,6 +12,12 @@ import { RequirePermission } from '../common/decorators/require-permission.decor
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto, ApproveUserDto } from './dto/create-user.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { hasPermission } from '../common/permissions';
+
+// Sin users:edit, nadie puede tocar estos campos (ni siquiera sobre sí mismo).
+const ADMIN_ONLY_FIELDS = ['roleId', 'status', 'jobTitleIds', 'ministerialTitle'];
+// Lo que el organigrama (orgchart:edit) puede editar de otras personas.
+const ORGCHART_FIELDS = ['firstName', 'lastName', 'email', 'phone', 'country', 'campusId'];
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -48,17 +54,38 @@ export class UsersController {
 
   @Post()
   @ApiOperation({ summary: 'Crear un nuevo usuario' })
-  create(@Body() dto: CreateUserDto, @CurrentUser() user: any) {
+  async create(@Body() dto: CreateUserDto, @CurrentUser() user: any) {
+    const perms: string[] = user.permissions ?? [];
+    if (!hasPermission(perms, 'users:create')) {
+      // El organigrama puede dar de alta personas, pero solo con el rol básico.
+      if (!hasPermission(perms, 'orgchart:edit') || !(await this.service.isBasicRole(dto.roleId))) {
+        throw new ForbiddenException('No tienes permiso para crear esta persona');
+      }
+    }
     return this.service.create(dto, user.sub);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar datos de un usuario (incluye status)' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
-    return this.service.update(id, dto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto, @CurrentUser() user: any) {
+    const perms: string[] = user.permissions ?? [];
+    if (hasPermission(perms, 'users:edit')) return this.service.update(id, dto);
+
+    const fields = Object.keys(dto).filter((k) => (dto as any)[k] !== undefined);
+    if (Number(user.sub) === id) {
+      const blocked = fields.filter((f) => ADMIN_ONLY_FIELDS.includes(f));
+      if (blocked.length) throw new ForbiddenException(`No puedes modificar: ${blocked.join(', ')}`);
+      return this.service.update(id, dto);
+    }
+    if (hasPermission(perms, 'orgchart:edit') && fields.every((f) => ORGCHART_FIELDS.includes(f))) {
+      return this.service.update(id, dto);
+    }
+    throw new ForbiddenException('No tienes permiso para modificar a esta persona');
   }
 
   @Delete(':id')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('users:delete')
   @ApiOperation({ summary: 'Eliminar un usuario' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
@@ -86,7 +113,11 @@ export class UsersController {
   uploadAvatar(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: any,
   ) {
+    if (Number(user.sub) !== id && !hasPermission(user.permissions ?? [], 'users:edit')) {
+      throw new ForbiddenException('Solo puedes cambiar tu propia foto');
+    }
     return this.service.uploadAvatar(id, file);
   }
 }
