@@ -6,6 +6,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CampusService } from '../campus/campus.service';
+import { resolveCampusScope, applyLimit } from '../common/campus-scope';
 import { KiloamorService } from './kiloamor.service';
 import { CreateKiloamorDto, UpdateKiloamorDto } from './dto/kiloamor.dto';
 
@@ -40,8 +41,15 @@ export class KiloamorController {
   @Get()
   @UseGuards(PermissionsGuard)
   @RequirePermission('kiloamor:view')
-  findAll(@Query('campusId') campusId?: string, @Query('periodo') periodo?: any) {
-    return this.kiloamor.findAll(campusId, periodo);
+  async findAll(
+    @CurrentUser()     user: any,
+    @Query('campusId') campusId?: string,
+    @Query('periodo')  periodo?: any,
+    @Query('limit')    limit?: string,
+  ) {
+    const campus = await resolveCampusScope(user, campusId, this.campusService);
+    if (campus === null) return [];
+    return applyLimit(await this.kiloamor.findAll(campus, periodo), limit);
   }
 
   @Get('mine')

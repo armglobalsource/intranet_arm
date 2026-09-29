@@ -108,17 +108,22 @@ function TrendChart({ periods, groupBy, currency }: {
         <div>
           <h2 className="font-bold text-gray-900">Evolución de la siembra</h2>
           <p className="mt-1 text-xs text-gray-500">
-            {groupBy === 'month' ? 'Comportamiento mensual durante el año' : 'Comportamiento semana a semana'}
+            {groupBy === 'month' ? 'Comportamiento mensual durante el año'
+              : groupBy === 'week' ? 'Comportamiento semana a semana'
+              : 'Comportamiento día a día'}
             {' · referencia en '}{currency.toUpperCase()}
           </p>
         </div>
         <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-500">
-          {groupBy === 'month' ? '12 meses' : `${periods.length} semanas`}
+          {groupBy === 'month' ? '12 meses' : groupBy === 'week' ? `${periods.length} semanas` : `${periods.length} días`}
         </span>
       </div>
 
       <div className="overflow-x-auto pb-2">
-        <div className={`flex h-64 items-end gap-2 ${groupBy === 'week' ? 'min-w-[1450px]' : 'min-w-[680px]'}`}>
+        <div
+          className="flex h-64 items-end gap-2"
+          style={{ minWidth: groupBy === 'day' ? periods.length * 20 : groupBy === 'week' ? 1450 : 680 }}
+        >
           {periods.map((period, index) => {
             const value = values[index];
             const height = hasData ? Math.max(value > 0 ? 8 : 2, (value / max) * 190) : 2;
@@ -132,7 +137,9 @@ function TrendChart({ periods, groupBy, currency }: {
                   className="w-full max-w-8 rounded-t-md bg-gray-900 transition-all group-hover:bg-emerald-500"
                   style={{ height }}
                 />
-                <span className="mt-2 whitespace-nowrap text-[10px] capitalize text-gray-400">{period.label}</span>
+                <span className="mt-2 whitespace-nowrap text-[10px] capitalize text-gray-400">
+                  {groupBy === 'day' && index % 7 !== 0 ? '' : period.label}
+                </span>
               </div>
             );
           })}
@@ -217,7 +224,7 @@ export function FinanzasDashboardClient() {
   const router = useRouter();
   const { can, isAdmin } = usePermissions();
   const now = new Date();
-  const canView = isAdmin || can('siembra:view');
+  const canView = isAdmin || can('finanzas:view');
   const canManageRates = isAdmin || can('arm-catalogos:manage');
 
   const [year, setYear] = useState(now.getFullYear());
@@ -285,7 +292,7 @@ export function FinanzasDashboardClient() {
           <div className="grid gap-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Vista</span>
             <div className="flex rounded-xl bg-gray-100 p-1">
-              {([['month', 'Mensual'], ['week', 'Semanal']] as const).map(([value, label]) => (
+              {([['month', 'Mensual'], ['week', 'Semanal'], ['day', 'Diario']] as const).map(([value, label]) => (
                 <button key={value} onClick={() => setGroupBy(value)}
                   className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition ${
                     groupBy === value ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-400 hover:text-gray-600'

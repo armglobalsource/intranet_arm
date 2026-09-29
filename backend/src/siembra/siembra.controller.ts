@@ -5,19 +5,31 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CampusService } from '../campus/campus.service';
+import { resolveCampusScope, applyLimit } from '../common/campus-scope';
 import { SiembraService } from './siembra.service';
 import { CreateSiembraDto, UpdateSiembraDto } from './dto/siembra.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('siembra')
 export class SiembraController {
-  constructor(private readonly siembra: SiembraService) {}
+  constructor(
+    private readonly siembra: SiembraService,
+    private readonly campusService: CampusService,
+  ) {}
 
   @Get()
   @UseGuards(PermissionsGuard)
   @RequirePermission('siembra:view')
-  findAll(@Query('campusId') campusId?: string, @Query('periodo') periodo?: any) {
-    return this.siembra.findAll(campusId, periodo);
+  async findAll(
+    @CurrentUser()     user: any,
+    @Query('campusId') campusId?: string,
+    @Query('periodo')  periodo?: any,
+    @Query('limit')    limit?: string,
+  ) {
+    const campus = await resolveCampusScope(user, campusId, this.campusService);
+    if (campus === null) return [];
+    return applyLimit(await this.siembra.findAll(campus, periodo), limit);
   }
 
   @Get('mine')
@@ -29,14 +41,14 @@ export class SiembraController {
 
   @Get('dashboard')
   @UseGuards(PermissionsGuard)
-  @RequirePermission('siembra:view')
+  @RequirePermission('finanzas:view')
   dashboard(
     @Query('year') yearText?: string,
     @Query('groupBy') groupByText?: string,
     @Query('campus') campus?: string,
   ) {
     const year = Number(yearText) || new Date().getFullYear();
-    const groupBy = groupByText === 'week' ? 'week' : 'month';
+    const groupBy = groupByText === 'week' ? 'week' : groupByText === 'day' ? 'day' : 'month';
     return this.siembra.dashboard(year, groupBy, campus);
   }
 

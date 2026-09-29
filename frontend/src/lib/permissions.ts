@@ -157,6 +157,13 @@ export const PERMISSION_CATALOG = {
       delete: 'Eliminar encuentros',
     },
   },
+  finanzas: {
+    label: 'Finanzas',
+    description: 'Dashboard consolidado de siembras de todos los campus',
+    actions: {
+      view: 'Ver el dashboard de finanzas de todos los campus',
+    },
+  },
   siembra: {
     label: 'Siembra',
     description: 'Registro de ofrendas y diezmos por campus',
@@ -248,7 +255,10 @@ export const PERMISSION_UI_CONFIG: Record<string, PermissionUiSection> = {
     ],
   },
   content:   { breadcrumb: ['Noticias'],                             viewActions: ['view'], editActions: ['create', 'publish', 'delete'] },
-  siembra:   { breadcrumb: ['Producción General', 'Finanzas'],       viewActions: ['view'], editActions: ['create', 'edit', 'delete'] },
+  finanzas:   { breadcrumb: ['Producción General', 'Finanzas'],      viewActions: ['view'], editActions: [] },
+  encuentros: { breadcrumb: ['App móvil', 'Encuentros'],             viewActions: ['view'], editActions: ['create', 'edit', 'delete'] },
+  siembra:    { breadcrumb: ['App móvil', 'Siembra'],                viewActions: ['view'], editActions: ['create', 'edit', 'delete'] },
+  kiloamor:   { breadcrumb: ['App móvil', 'Kilo de Amor'],           viewActions: ['view'], editActions: ['create', 'edit', 'delete'] },
   tecnicos:  {
     breadcrumb: ['Producción General', 'Disp. Técnicos'],
     viewActions: ['submit'], editActions: [],

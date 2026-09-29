@@ -122,6 +122,13 @@ export const PERMISSION_CATALOG = {
       delete: 'Eliminar encuentros',
     },
   },
+  finanzas: {
+    label: 'Finanzas',
+    description: 'Dashboard consolidado de siembras de todos los campus',
+    actions: {
+      view: 'Ver el dashboard de finanzas de todos los campus',
+    },
+  },
   siembra: {
     label: 'Siembra',
     description: 'Registro de ofrendas y diezmos por campus',

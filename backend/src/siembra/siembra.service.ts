@@ -9,7 +9,7 @@ const COL = 'siembra';
 
 // ── Dashboard: agregación por moneda/categoría/método + serie por período ────
 
-type GroupBy = 'week' | 'month';
+type GroupBy = 'day' | 'week' | 'month';
 
 interface Totales {
   ofrendas: number;
@@ -95,7 +95,9 @@ function startOfWeek(key: string) {
 
 function periodKey(fecha: string, groupBy: GroupBy) {
   const key = String(fecha ?? '').slice(0, 10);
-  return groupBy === 'month' ? key.slice(0, 7) : isoKey(startOfWeek(key));
+  if (groupBy === 'month') return key.slice(0, 7);
+  if (groupBy === 'day') return key;
+  return isoKey(startOfWeek(key));
 }
 
 function buildPeriods(year: number, groupBy: GroupBy) {
@@ -114,8 +116,25 @@ function buildPeriods(year: number, groupBy: GroupBy) {
   }
 
   const periods: { key: string; label: string; start: string; end: string; referenceCLP: number; referenceUSD: number }[] = [];
-  let cursor = startOfWeek(`${year}-01-01`);
   const last = utcDate(`${year}-12-31`);
+
+  if (groupBy === 'day') {
+    let cursor = utcDate(`${year}-01-01`);
+    while (cursor <= last) {
+      periods.push({
+        key: isoKey(cursor),
+        label: cursor.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', timeZone: 'UTC' }),
+        start: isoKey(cursor),
+        end: isoKey(cursor),
+        referenceCLP: 0,
+        referenceUSD: 0,
+      });
+      cursor = addDays(cursor, 1);
+    }
+    return periods;
+  }
+
+  let cursor = startOfWeek(`${year}-01-01`);
   while (cursor <= last) {
     const end = addDays(cursor, 6);
     periods.push({

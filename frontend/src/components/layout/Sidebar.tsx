@@ -209,7 +209,7 @@ const NAV: NavGroup[] = [
   { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon,   permission: 'orgchart:view' },
   { href: '/dashboard/produccion-general/noticias',     label: 'Noticias',      icon: NoticiasIcon, permission: 'content:view' },
   { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon, permission: 'estadisticas:view' },
-  { href: '/dashboard/produccion-general/finanzas',      label: 'Finanzas',      icon: SiembraIcon, permission: 'siembra:view' },
+  { href: '/dashboard/produccion-general/finanzas',      label: 'Finanzas',      icon: SiembraIcon, permission: 'finanzas:view' },
   {
     href:  '/dashboard/ministerios',
     label: 'Ministerios',

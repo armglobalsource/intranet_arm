@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
-export type GroupBy = 'week' | 'month';
+export type GroupBy = 'day' | 'week' | 'month';
 
 export interface SiembraTotales {
   ofrendas: number;
