@@ -321,8 +321,23 @@ function CampusModal({ campus, onClose }: { campus?: Campus; onClose: () => void
     return () => document.removeEventListener('keydown', h);
   }, [onClose]);
 
+  // Solo cerramos el modal si BOTH mousedown y click ocurren sobre el
+  // backdrop. Esto evita cierres accidentales cuando se hace mousedown
+  // en un elemento interno (ej. un botón del dropdown de UserSelector) que
+  // React re-monta en el mismo gesto: el mouseup termina sobre el backdrop
+  // porque el target original ya no existe, y el browser dispara click en
+  // el ancestro común.
+  const backdropMouseDownRef = useRef(false);
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto" onClick={onClose}>
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto"
+      onMouseDown={(e) => { backdropMouseDownRef.current = e.target === e.currentTarget; }}
+      onClick={(e) => {
+        if (backdropMouseDownRef.current && e.target === e.currentTarget) onClose();
+        backdropMouseDownRef.current = false;
+      }}
+    >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[600px] overflow-hidden my-8" onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
