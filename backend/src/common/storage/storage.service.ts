@@ -18,13 +18,24 @@ export class StorageService implements OnModuleInit {
 
   constructor(private config: ConfigService) {
     this.useLocal = config.get<string>('STORAGE', 'local') === 'local';
+    if (process.env.VERCEL && this.useLocal) {
+      throw new Error('Vercel requiere almacenamiento externo. Configura STORAGE=gcs y sus credenciales antes de desplegar.');
+    }
     this.uploadsDir = path.resolve(process.cwd(), 'uploads');
     this.backendUrl = config.get<string>('BACKEND_URL', 'http://localhost:3001');
 
     if (!this.useLocal) {
       const keyFile  = config.get<string>('GCS_KEY_FILE');
       const projectId = config.get<string>('GCS_PROJECT_ID');
-      this.storage = keyFile
+      const credentialsJson = config.get<string>('GCS_CREDENTIALS_JSON');
+      let credentials: any;
+      if (credentialsJson) {
+        try { credentials = JSON.parse(credentialsJson); }
+        catch { throw new Error('GCS_CREDENTIALS_JSON no tiene un formato válido'); }
+      }
+      this.storage = credentials
+        ? new Storage({ projectId, credentials })
+        : keyFile
         ? new Storage({ projectId, keyFilename: keyFile })
         : new Storage({ projectId });
     }

@@ -24,8 +24,13 @@ export class OnboardingController {
 
   @Get(':slug')
   @ApiOperation({ summary: 'Obtener onboarding por slug' })
-  findOne(@Param('slug') slug: string) {
-    return this.service.findBySlug(slug);
+  async findOne(@Param('slug') slug: string, @CurrentUser() user: any) {
+    const onboarding = await this.service.findBySlug(slug);
+    if (!(user.permissions ?? []).includes('*') &&
+        (onboarding.isActive === false || !(onboarding.roleNames ?? []).includes(user.role))) {
+      throw new ForbiddenException('Este onboarding no está disponible para tu rol');
+    }
+    return onboarding;
   }
 
   @Post()

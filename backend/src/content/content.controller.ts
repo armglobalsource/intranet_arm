@@ -31,8 +31,9 @@ export class ContentsController {
   findNews(
     @Query('campusId') campusId?: string,
     @Query('status')   status?: string,
+    @CurrentUser() user?: any,
   ) {
-    return this.service.findNews(campusId, status);
+    return this.service.findNews(campusId, status, user);
   }
 
   // ── Públicas (autenticado) ─────────────────────────────────────────────────
@@ -59,8 +60,8 @@ export class ContentsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener por ID' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.service.findOne(id, user);
   }
 
   @Post()

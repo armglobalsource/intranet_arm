@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+service-account*.json
+uploads
+node_modules
+dist
+scripts
+**/*.spec.ts
+*.tsbuildinfo

@@ -13,7 +13,7 @@ export class DocumentsService {
     return this.fb.toDocs(snap);
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, _user?: any) {
     const snap = await this.fb.db.collection(COL).doc(String(id)).get();
     if (!snap.exists) throw new NotFoundException(`Document con id ${id} no encontrado`);
     return this.fb.toObj(snap);

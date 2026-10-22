@@ -1,0 +1,73 @@
+require('dotenv').config({path:['.env.supabase','.env'],quiet:true});
+require('ts-node/register');require('reflect-metadata');
+const assert=require('node:assert/strict');
+const {randomUUID}=require('node:crypto');
+const {Pool}=require('pg');
+const {buildPostgresOptions}=require('../src/common/database/postgres-options');
+const {PostgresFichasService}=require('../src/fichas/postgres-fichas.service');
+let phase='connect';
+async function main(){
+ const pool=new Pool(buildPostgresOptions(process.env.DATABASE_URL,process.env.DATABASE_CA_CERT));
+ const client=await pool.connect();let sequence=0;
+ const db={query:client.query.bind(client),transaction:async operation=>{
+  const sp=`ficha_test_${++sequence}`;await client.query(`SAVEPOINT ${sp}`);
+  try{const result=await operation(client);await client.query(`RELEASE SAVEPOINT ${sp}`);return result;}
+  catch(error){await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);await client.query(`RELEASE SAVEPOINT ${sp}`);throw error;}
+ }};
+ const service=new PostgresFichasService(db);
+ try{
+  await client.query('BEGIN');
+  // Existing identities are read only; all writes target synthetic fichas.
+  const identity=(await client.query('SELECT id,"campusId" FROM arm_app.users WHERE "campusId" IS NOT NULL ORDER BY id LIMIT 1')).rows[0];
+  const user={sub:Number(identity.id),campusId:Number(identity.campusId),email:'ficha-test@example.invalid',permissions:['fichas:create']};
+  const outsider={...user,campusId:-1,sub:-1};
+  const marker='ficha-test-'+randomUUID();
+  phase='create and scope';
+  const dto={campusId:String(user.campusId),campusName:'Test',type:'multi',title:marker,date:'2026-10-21',encuentros:[{id:'e1',label:'Test',time:'10:00',color:'blue',isLive:false}]};
+  const f=await service.create(dto,user);
+  assert.equal(f.source_path,undefined);assert.equal(f.title,marker);
+  await assert.rejects(service.findOneForUser(f.fichaId,outsider),e=>e.getStatus()===403);
+  await assert.rejects(service.updateLayoutVisual(f.fichaId,{songs:[]},outsider),e=>e.getStatus()===403);
+  assert((await service.findAll(user)).some(x=>x.fichaId===f.fichaId));
+  assert((await service.findMine(user.sub,false)).some(x=>x.fichaId===f.fichaId));
+  await assert.rejects(service.findPublic(f.fichaId),e=>e.getStatus()===403);
+  phase='section revision and history';
+  const rows=f.sections.pastoral.rows.map(r=>({...r,values:{e1:'Persona de prueba'}}));
+  const edited=await service.updateSection(f.fichaId,'pastoral',{expectedRevision:0,rows},user);
+  assert.equal(edited.sections.pastoral.revision,1);
+  assert.equal((await service.getChangelog(f.fichaId,user)).length,1);
+  await assert.rejects(service.updateSection(f.fichaId,'pastoral',{expectedRevision:0,rows},user),e=>e.getStatus()===409);
+  assert.equal((await service.getChangelog(f.fichaId,user)).length,1);
+  await assert.rejects(service.updateSection(f.fichaId,'pastoral',{expectedRevision:1,rows:[]},user),e=>e.getStatus()===400);
+  const completed=await service.completeSection(f.fichaId,'pastoral',user);
+  assert.equal(completed.sections.pastoral.isCompleted,true);assert.equal(completed.sections.pastoral.revision,2);
+  await assert.rejects(service.updateSection(f.fichaId,'pastoral',{expectedRevision:1,rows},user),e=>e.getStatus()===409);
+  await service.reopenSection(f.fichaId,'pastoral',user);
+  phase='publication and clones';
+  await service.updateLayoutVisual(f.fichaId,{songs:[]},user);
+  await service.publish(f.fichaId,user);
+  const publicFicha=await service.findPublic(f.fichaId);
+  assert.equal(publicFicha.createdBy,undefined);assert.equal(publicFicha.sections.pastoral.assignedTo,undefined);
+  assert.equal(publicFicha.layoutVisual.updatedBy,undefined);
+  assert((await service.findPublishedForMobile(user)).some(x=>x.fichaId===f.fichaId));
+  await service.findPublicWeek();
+  const clone=await service.clone(f.fichaId,user,{date:'2026-10-28'});
+  assert.notEqual(clone.fichaId,f.fichaId);assert.equal(clone.published,false);
+  assert.deepEqual(clone.sections.pastoral.rows[0].values,{});
+  await service.archive(f.fichaId,user);
+  await assert.rejects(service.publish(f.fichaId,user),e=>e.getStatus()===400);
+  await service.unarchive(f.fichaId,user);await service.publish(f.fichaId,user);await service.unpublish(f.fichaId,user);
+  phase='split mixed prayer';
+  const prayer=await service.create({...dto,type:'oracion'},user);
+  await client.query('UPDATE arm_app.fichas SET encuentros=$2 WHERE document_id=$1',[prayer.fichaId,JSON.stringify([{id:'e1',label:'Oración'},{id:'e2',label:'Global'}])]);
+  const split=await service.splitPrayerAndGlobal(prayer.fichaId,user);
+  assert.equal(split.prayerFicha.encuentros.length,1);assert.equal(split.globalFicha.splitFrom,prayer.fichaId);
+  await assert.rejects(service.splitPrayerAndGlobal(prayer.fichaId,user),e=>e.getStatus()===400);
+  phase='delete with history';
+  await service.remove(f.fichaId,user);
+  assert.equal((await client.query('SELECT count(*)::int AS n FROM arm_app.ficha_changelog WHERE ficha_document_id=$1',[f.fichaId])).rows[0].n,0);
+  await assert.rejects(service.findOne(f.fichaId),e=>e.getStatus()===404);
+  console.log('PASS: ficha scope, section revisions, atomic history, required rows, completion, publication, public projection, cloning, split, archive and deletion.');
+ }finally{await client.query('ROLLBACK');client.release();await pool.end();}
+}
+main().catch(error=>{console.error(`Ficha integration failed at ${phase} (${error.code??error.name??'error'}). No rows or credentials logged.`);process.exitCode=1;});

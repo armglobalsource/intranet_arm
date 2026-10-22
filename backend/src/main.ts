@@ -8,12 +8,15 @@ import * as express from 'express';
 import * as path from 'path';
 import * as fs from 'fs';
 import { AppModule } from './app.module';
+import { DatabaseService } from './common/database/database.service';
+import { assertRuntimeSchema } from './common/database/runtime-schema';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { getAllowedOrigins } from './common/allowed-origins';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  await assertRuntimeSchema(app.get(DatabaseService));
 
   // ── Archivos estáticos locales (solo desarrollo) ─────────────
   if (config.get('STORAGE', 'local') === 'local') {

@@ -26,11 +26,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? (body as { message: unknown }).message
         : body;
     } else {
-      message = exception instanceof Error ? exception.message : 'Error interno del servidor';
+      message = 'Error interno del servidor';
     }
 
     if (status >= 500) {
-      this.logger.error(`${req.method} ${req.url}`, exception instanceof Error ? exception.stack : String(exception));
+      // PostgreSQL errors may contain row values or credentials in diagnostics.
+      // Do not serialize unknown exceptions to either the client or request logs.
+      this.logger.error(`${req.method} ${req.path}: error interno`);
     }
 
     res.status(status).json({

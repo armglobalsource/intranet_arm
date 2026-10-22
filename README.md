@@ -2,6 +2,10 @@
 
 Stack: **NestJS** (backend) · **Next.js 14** (frontend) · **Firestore** · **Google Cloud Storage** · **Firebase Hosting + Cloud Run**
 
+Migración a Supabase en preparación: ver [alcance, herramientas y criterios de validación](docs/migracion-supabase.md). La aplicación todavía utiliza Firestore.
+
+Conexión PostgreSQL preparada: copiar `backend/supabase.env.example` a `backend/.env.supabase`, completar `DATABASE_URL` y ejecutar `npm run db:check` desde `backend`. Este chequeo es de solo lectura y no cambia la base usada por los servicios actuales.
+
 ---
 
 ## Desarrollo local — Guía de configuración

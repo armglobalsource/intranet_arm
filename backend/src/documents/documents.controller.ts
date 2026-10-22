@@ -22,8 +22,8 @@ export class DocumentsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un registro por ID' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.service.findOne(id, user);
   }
 
   @Post()

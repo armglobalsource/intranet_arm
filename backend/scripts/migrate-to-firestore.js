@@ -18,8 +18,8 @@ const path         = require('path');
 
 const FIREBASE_KEY_FILE  = process.env.FIREBASE_KEY_FILE  || './service-account.json';
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'intranet-arm';
-const PG_URL = process.env.PG_URL
-  || 'postgresql://postgres.pgedgsugjpcqwgzvrfrm:T0eabQ332G8KpOWQ@aws-1-us-west-1.pooler.supabase.com:5432/postgres';
+const PG_URL = process.env.PG_URL;
+if (!PG_URL) throw new Error('PG_URL es obligatorio; configura la conexión mediante una variable de entorno');
 
 // ── Init ───────────────────────────────────────────────────────────────────
 

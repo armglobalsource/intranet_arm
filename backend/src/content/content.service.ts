@@ -26,7 +26,7 @@ export class ContentsService {
     });
   }
 
-  async findNews(campusId?: string | 'global', status?: string) {
+  async findNews(campusId?: string | 'global', status?: string, _user?: any) {
     let list = (await this.fetchAll()).filter((n) => n.type === 'news');
     if (status)                list = list.filter((n) => n.status === status);
     if (campusId === 'global') list = list.filter((n) => n.campusId == null);
@@ -47,7 +47,7 @@ export class ContentsService {
 
   // ── CRUD ─────────────────────────────────────────────────────────────────────
 
-  async findOne(id: number) {
+  async findOne(id: number, _user?: any) {
     const snap = await this.fb.db.collection(COL).doc(String(id)).get();
     if (!snap.exists) throw new NotFoundException(`Content ${id} no encontrado`);
     return this.fb.toObj(snap);

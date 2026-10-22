@@ -1,3 +1,5 @@
 uploads/
 service-account*.json
 backend/.env
+.vercel
+.env*

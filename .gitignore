@@ -6,6 +6,7 @@ node_modules/
 frontend/.next/
 frontend/out/
 frontend/.vercel
+backend/.vercel/
 
 # ── NestJS / TypeScript build ─────────────────────────────────
 backend/dist/
@@ -49,6 +50,10 @@ frontend/playwright-report/
 # ── Database dumps (excluye migraciones de Prisma) ────────────
 prod_data.sql
 /prod_data.sql
+
+# Exportaciones de migración: datos personales y hashes de autenticación
+/migration-artifacts/
+**/service-account*.json
 
 # package-lock.json se commitea para que npm ci funcione en CI/CD
 

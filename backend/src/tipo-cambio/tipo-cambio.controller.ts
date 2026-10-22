@@ -22,7 +22,8 @@ export class TipoCambioController {
   @RequirePermission('arm-catalogos:manage')
   async refresh() {
     const doc = await this.tipoCambio.refreshFromApi();
-    return { clpPorUsd: doc.rates.CLP, actualizado: doc.fetchedAt.toDate().toISOString() };
+    const fetchedAt: any = doc.fetchedAt;
+    return { clpPorUsd: doc.rates.CLP, actualizado: (fetchedAt instanceof Date ? fetchedAt : fetchedAt.toDate()).toISOString() };
   }
 
   @Patch(':moneda')
