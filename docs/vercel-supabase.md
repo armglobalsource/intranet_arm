@@ -2,6 +2,22 @@
 
 ## Un solo proyecto: intranet_arm (22 de octubre de 2026)
 
+Estado verificado tras corregir la clave: `SUPABASE_SECRET_KEY` funciona con
+Storage y está configurada en Production y Preview del proyecto unificado.
+La copia local está ignorada por Git. Despliegue Production
+`dpl_H4uGf9P5J5WPF27BqHH1XhWpNeKq` READY; el dominio público responde health 200
+con PostgreSQL conectado. STORAGE de Production es supabase.
+Buckets creados: arm-public público, arm-documents y arm-uploads privados.
+Probadas subida, descarga, integridad y privacidad con imágenes sintéticas,
+eliminadas al terminar. Copiados y verificados por SHA-256 los 26 archivos del
+respaldo: 15 públicos (acceso anónimo comprobado en origen) y 11 privados en
+legacy-backup. Manifiesto privado: migration-artifacts/storage-transfer-verified.json.
+Reemplazados 15 enlaces mediante transacción con control de concurrencia:
+feedback (4), org_areas (5), users (3), visual_references (3). Verificación
+posterior: cero referencias al bucket antiguo en esas tablas. Las rutas privadas
+y el login inválido responden 401 en el dominio de producción.
+Todavía falta cerrar la conciliación del origen y probar los flujos de usuario.
+
 La API ya no se despliega como proyecto aparte. El proyecto Vercel `intranet_arm`
 (raíz `frontend`) sirve la web y la API en `/api/v1` desde el mismo dominio:
 
@@ -15,7 +31,7 @@ La API ya no se despliega como proyecto aparte. El proyecto Vercel `intranet_arm
 - CORS admite además el propio dominio de la petición (incluye URLs de Preview).
 - Desplegar desde la raíz del repo; `.vercelignore` solo sube `frontend` y
   `backend`, sin `.env`, credenciales, exportaciones ni `node_modules`.
-- Variables en `intranet_arm` (Preview configurado; Production pendiente):
+- Variables en `intranet_arm` (Preview y Production configurados):
   DATABASE_URL (pooler, rol arm_api), JWT_SECRET nuevo, STORAGE, SUPABASE_URL,
   SUPABASE_BUCKET_PUBLIC, SUPABASE_BUCKET_DOCUMENTS, FRONTEND_URL y
   SUPABASE_SECRET_KEY. El frontend usa `/api/v1` relativo; no definir
@@ -71,13 +87,12 @@ FRONTEND_URL y un JWT_SECRET nuevo, sin exponer su valor.
   las cargas abandonadas y comprobar el flujo real de extremo a extremo.
 - Backend: 32 pruebas unitarias, compilación TypeScript y prueba HTTP/identidad
   con PostgreSQL aprobadas. Frontend: compilación de producción aprobada.
-- La clave secreta de Storage existe en el panel. Su transferencia cifrada a
-  configuración local privada y Vercel fue bloqueada por revisión automática;
-  se solicitó autorización explícita para ambos destinos y sigue pendiente.
+- La clave de Storage fue corregida y validada; está en configuración local
+  privada y en el proyecto Vercel unificado, con autorización del usuario.
 
 - StorageService admite Supabase Storage. Documentos usan bucket privado y enlaces
-  firmados; las imágenes públicas usan un bucket separado. Los buckets aún no se
-  crearon y falta la clave del servidor para verificar subidas reales.
+  firmados; las imágenes públicas usan un bucket separado. Los tres buckets ya
+  están creados y las operaciones de Storage fueron verificadas.
 - SDK fijado a @supabase/supabase-js 2.118.0. TypeScript y 29 pruebas aprobadas.
 - Respaldo de 26 objetos de Google Cloud (6.786.174 bytes) guardado exclusivamente
   en migration-artifacts, ignorado por Git. Ningún archivo fue borrado del origen.
