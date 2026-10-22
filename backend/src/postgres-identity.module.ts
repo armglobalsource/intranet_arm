@@ -25,6 +25,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PendingAccountGuard } from './common/guards/pending-account.guard';
 import { PostgresUsersPermissionsGuard } from './auth/guards/postgres-users-permissions.guard';
 import { postgresDomainControllers,postgresDomainProviders } from './postgres-domain.providers';
+import { UploadsController } from './common/storage/uploads.controller';
 
 // Independent application root: no Firebase providers or legacy domain modules.
 // Use only for migration validation until all domain services have SQL repositories.
@@ -40,7 +41,7 @@ import { postgresDomainControllers,postgresDomainProviders } from './postgres-do
     ThrottlerModule.forRoot([{ttl:60000,limit:100}]),
     JwtModule.registerAsync({inject:[ConfigService],useFactory:(config:ConfigService)=>({secret:config.get<string>('JWT_SECRET')})}),
   ],
-  controllers:[AuthController,UsersController,RolesController,NotificationsController,...postgresDomainControllers],
+  controllers:[AuthController,UsersController,RolesController,NotificationsController,UploadsController,...postgresDomainControllers],
   providers:[
     ...postgresDomainProviders,
     PostgresAuthService,PostgresUsersService,PostgresRolesService,PostgresNotificationsService,

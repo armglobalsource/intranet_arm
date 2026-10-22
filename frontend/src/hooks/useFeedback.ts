@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { directUpload, requiresDirectUpload } from '@/lib/direct-upload';
 
 export interface FeedbackItem {
   id:             number;
@@ -28,8 +29,14 @@ export function useFeedbackList() {
 export function useSubmitFeedback() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (form: FormData) =>
-      api.post('/feedback', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then((r) => r.data),
+    mutationFn: async (form: FormData) => {
+      const file = form.get('screenshot');
+      if (file instanceof File && requiresDirectUpload(file)) {
+        const ticket = await directUpload(file, 'feedback');
+        return api.post('/uploads/feedback/complete', { ticket, metadata: { type: form.get('type'), message: form.get('message') } }).then(r => r.data);
+      }
+      return api.post('/feedback', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['feedback'] }),
   });
 }

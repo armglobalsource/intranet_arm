@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { directUpload, requiresDirectUpload } from '@/lib/direct-upload';
 import type { User, UpdateUserDto } from '@/types/user';
 
 export interface Role {
@@ -170,7 +171,11 @@ export function useDeleteUser() {
 export function useUploadUserAvatar() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, file }: { id: number; file: File }) => {
+    mutationFn: async ({ id, file }: { id: number; file: File }) => {
+      if (requiresDirectUpload(file)) {
+        const ticket = await directUpload(file, 'avatar', id);
+        return api.post<User>('/uploads/avatar/complete', { ticket }).then(r => r.data);
+      }
       const form = new FormData();
       form.append('file', file);
       return api.post<User>(`/users/${id}/avatar`, form, {

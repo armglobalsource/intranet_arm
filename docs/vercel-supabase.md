@@ -7,7 +7,33 @@ BACKEND_URL definitivo, despliegue y verificación pública. Ya se configuraron 
 Production y Preview STORAGE=supabase, SUPABASE_URL, SUPABASE_BUCKET_PUBLIC,
 SUPABASE_BUCKET_DOCUMENTS, FRONTEND_URL y un JWT_SECRET nuevo, sin exponer su valor.
 
-## Avance de preparación (21 de octubre de 2026)
+## Avance de preparación (22 de octubre de 2026)
+
+- El usuario autorizó expresamente los permisos del rol `arm_api`. La migración
+  arm_backend_runtime_role se aplicó: 32 tablas accesibles exclusivamente para el
+  servidor mediante ese rol. No es superusuario, no omite RLS y no accede a
+  arm_migration. Login directo probado con credencial generada localmente, guardada
+  solo en backend/.env.runtime.local (ignorada por Git).
+- El panel confirma aws-1-ca-central-1.pooler.supabase.com:6543 para Transaction
+  pooler IPv4; el usuario debe incluir el sufijo .kqqufmijfvrgzrfrqsby. Las pruebas
+  desde este computador terminan en timeout; no se sustituyó todavía la conexión
+  directa guardada. Verificar desde Vercel antes de configurar producción.
+- Vercel frontend corregido de pdencina/intranet_arm a
+  armglobalsource/intranet_arm, conservando Root Directory frontend.
+- Next.js actualizado de 14.2.3 a 14.2.35 (parche de la misma rama), cliente y
+  dependencia Firebase del frontend retirados porque ya no tenían consumidores.
+- Cargas mayores de 3 MB en producción van directamente al bucket privado
+  arm-uploads. La API emite un ticket por usuario/destino/tamaño/tipo válido diez
+  minutos y vuelve a comprobar permisos al finalizar. Los archivos se verifican
+  en tamaño y se procesan con los servicios existentes. El bucket debe limitarse
+  a 10 MB y los MIME de imagen aceptados; sin políticas de acceso público.
+  Las cargas temporales completadas se eliminan. Pendiente programar limpieza de
+  las cargas abandonadas y comprobar el flujo real de extremo a extremo.
+- Backend: 32 pruebas unitarias, compilación TypeScript y prueba HTTP/identidad
+  con PostgreSQL aprobadas. Frontend: compilación de producción aprobada.
+- La clave secreta de Storage existe en el panel. Su transferencia cifrada a
+  configuración local privada y Vercel fue bloqueada por revisión automática;
+  se solicitó autorización explícita para ambos destinos y sigue pendiente.
 
 - StorageService admite Supabase Storage. Documentos usan bucket privado y enlaces
   firmados; las imágenes públicas usan un bucket separado. Los buckets aún no se
@@ -23,22 +49,16 @@ SUPABASE_BUCKET_DOCUMENTS, FRONTEND_URL y un JWT_SECRET nuevo, sin exponer su va
   el origen sigue recibiendo escrituras y hay que conciliar de nuevo antes del cambio.
 - Los workflows antiguos de GitHub pasan a ejecución manual; no desplegarán
   automáticamente en Google Cloud después de publicar este cambio.
-- El panel Supabase requiere completar MFA; sigue pendiente autorización explícita
-  del rol SQL rechazada por la revisión automática anterior.
-- Sigue pendiente adaptar las subidas de 5/10 MB al límite HTTP de Vercel antes
-  del corte. La nueva integración de Storage por sí sola no elimina ese límite.
+- El acceso al panel se recuperó tras un error 504 del inicio de sesión.
 
 Herramientas de traslado: inventory-storage.cjs (solo lectura), copy-storage.cjs
 (copia sin sobrescribir, verifica SHA-256 del destino) y compare-exports.cjs.
 Nunca incluir sus respaldos, URLs firmadas o credenciales en Git.
 
-La migración `arm_backend_runtime_role` NO se aplicó: la revisión automática
-rechazó el rol `arm_api` con CRUD y políticas de acceso a todas las tablas privadas
-`arm_app`. El SQL propuesto queda en `backend/scripts/supabase-migration/sql/backend-role.sql`
-para revisión. No otorga acceso a `arm_migration`, `anon` o `authenticated`, pero
-permite al servidor trabajar con todos los usuarios; la autorización de cada
-solicitud corresponde a los guards y servicios de NestJS. Se requiere resolver
-esa autorización antes de configurar las credenciales del despliegue.
+La migración `arm_backend_runtime_role` se aplicó después de la autorización
+expresa del usuario. SQL: `backend/scripts/supabase-migration/sql/backend-role.sql`.
+No otorga acceso a `arm_migration`, `anon` o `authenticated`. La autorización de
+cada solicitud corresponde a los guards y servicios de NestJS.
 
 El arranque normal `src/main.ts` importa ahora exclusivamente el módulo PostgreSQL.
 Antes de escuchar verifica las 32 tablas requeridas. El módulo anterior queda
@@ -75,8 +95,9 @@ Nunca poner DATABASE_URL, JWT_SECRET ni credenciales GCS en variables NEXT_PUBLI
 El traslado de los objetos a Supabase Storage sigue pendiente; los enlaces
 existentes se conservan hasta verificar cada copia. El disco local no es
 almacenamiento persistente en Vercel y el backend rechaza STORAGE=local en ese
-entorno. Las peticiones de Vercel tienen límite de 4,5 MB: los límites actuales
-de upload de 5/10 MB requieren carga directa para esos tamaños antes del corte.
+entorno. Las peticiones de Vercel tienen límite de 4,5 MB: el frontend nuevo usa
+carga directa para archivos mayores de 3 MB y requiere desplegar la API nueva
+antes de activar ese frontend.
 
 ## Verificación y corte
 

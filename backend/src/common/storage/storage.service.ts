@@ -183,4 +183,28 @@ export class StorageService implements OnModuleInit {
     const { error } = await this.supabase!.storage.from(bucket).upload(key, buffer, { contentType, upsert: false });
     if (error) throw new Error('No se pudo guardar el archivo en Supabase Storage');
   }
+
+  async createUploadUrl(key: string): Promise<string> {
+    this.validateKey(key);
+    if (!this.supabase) throw new Error('Las cargas directas requieren Supabase Storage');
+    const { data, error } = await this.supabase.storage.from('arm-uploads').createSignedUploadUrl(key, { upsert: false });
+    if (error || !data) throw new Error('No se pudo autorizar la carga');
+    return data.signedUrl;
+  }
+
+  async readUpload(key: string, expectedSize: number): Promise<Buffer> {
+    this.validateKey(key);
+    if (!this.supabase) throw new Error('Las cargas directas requieren Supabase Storage');
+    const { data, error } = await this.supabase.storage.from('arm-uploads').download(key);
+    if (error || !data || data.size !== expectedSize || data.size > 10 * 1024 * 1024) {
+      throw new Error('El archivo cargado no coincide con la carga autorizada');
+    }
+    return Buffer.from(await data.arrayBuffer());
+  }
+
+  async discardUpload(key: string): Promise<void> {
+    this.validateKey(key);
+    const { error } = await this.supabase!.storage.from('arm-uploads').remove([key]);
+    if (error) this.logger.warn('No se pudo limpiar una carga temporal ya procesada');
+  }
 }

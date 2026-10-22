@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { directUpload, requiresDirectUpload } from '@/lib/direct-upload';
 
 export interface VisualReference {
   id:             number;
@@ -52,7 +53,11 @@ export function useVisualReference(id: number | null) {
 export function useUploadVisualReference() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ file, name, tags }: { file: File; name: string; tags?: string }) => {
+    mutationFn: async ({ file, name, tags }: { file: File; name: string; tags?: string }) => {
+      if (requiresDirectUpload(file)) {
+        const ticket = await directUpload(file, 'visual-reference');
+        return api.post('/uploads/visual-reference/complete', { ticket, metadata: { name, tags } }).then(r => r.data);
+      }
       const form = new FormData();
       form.append('file', file);
       form.append('name', name);
