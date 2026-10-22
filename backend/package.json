@@ -36,6 +36,7 @@
     "@nestjs/platform-express": "^10.3.0",
     "@nestjs/swagger": "^7.3.0",
     "@nestjs/throttler": "^5.1.2",
+    "@supabase/supabase-js": "2.118.0",
     "@types/passport-google-oauth20": "^2.0.17",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",

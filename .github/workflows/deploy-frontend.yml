@@ -1,13 +1,7 @@
-name: Deploy Frontend
+name: Legacy Cloud Run Frontend (manual recovery only)
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
 
 env:
   PROJECT_ID: intranet-arm

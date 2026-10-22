@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Storage, Bucket } from '@google-cloud/storage';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -10,6 +11,9 @@ export class StorageService implements OnModuleInit {
   private storage: Storage;
   private bucketDocs: Bucket;
   private bucketAvatars: Bucket;
+  private supabase?: SupabaseClient;
+  private readonly publicBucket: string;
+  private readonly documentsBucket: string;
 
   /** true cuando no hay GCS configurado (desarrollo local) */
   private readonly useLocal: boolean;
@@ -17,14 +21,24 @@ export class StorageService implements OnModuleInit {
   private readonly backendUrl: string;
 
   constructor(private config: ConfigService) {
-    this.useLocal = config.get<string>('STORAGE', 'local') === 'local';
+    const provider = config.get<string>('STORAGE', 'local');
+    if (!['local', 'gcs', 'supabase'].includes(provider)) throw new Error('Proveedor STORAGE inválido');
+    this.useLocal = provider === 'local';
+    this.publicBucket = config.get('SUPABASE_BUCKET_PUBLIC', 'arm-public');
+    this.documentsBucket = config.get('SUPABASE_BUCKET_DOCUMENTS', 'arm-documents');
     if (process.env.VERCEL && this.useLocal) {
-      throw new Error('Vercel requiere almacenamiento externo. Configura STORAGE=gcs y sus credenciales antes de desplegar.');
+      throw new Error('Vercel requiere almacenamiento externo. Configura STORAGE=supabase y sus credenciales.');
     }
     this.uploadsDir = path.resolve(process.cwd(), 'uploads');
     this.backendUrl = config.get<string>('BACKEND_URL', 'http://localhost:3001');
 
-    if (!this.useLocal) {
+    if (provider === 'supabase') {
+      const url = config.get<string>('SUPABASE_URL');
+      const key = config.get<string>('SUPABASE_SECRET_KEY');
+      if (!url || !key) throw new Error('Faltan SUPABASE_URL o SUPABASE_SECRET_KEY para Storage');
+      if (new URL(url).protocol !== 'https:') throw new Error('Supabase Storage requiere HTTPS');
+      this.supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    } else if (!this.useLocal) {
       const keyFile  = config.get<string>('GCS_KEY_FILE');
       const projectId = config.get<string>('GCS_PROJECT_ID');
       const credentialsJson = config.get<string>('GCS_CREDENTIALS_JSON');
@@ -42,6 +56,10 @@ export class StorageService implements OnModuleInit {
   }
 
   onModuleInit() {
+    if (this.supabase) {
+      this.logger.log('Storage Supabase configurado');
+      return;
+    }
     if (this.useLocal) {
       fs.mkdirSync(path.join(this.uploadsDir, 'team-logos'), { recursive: true });
       this.logger.log(`Storage LOCAL — sirviendo archivos desde ${this.uploadsDir}`);
@@ -55,6 +73,11 @@ export class StorageService implements OnModuleInit {
   // ── Upload público (team logos, avatares, etc.) ────────────────
 
   async uploadPublic(key: string, buffer: Buffer, mimeType: string): Promise<string> {
+    this.validateKey(key);
+    if (this.supabase) {
+      await this.uploadSupabase(this.publicBucket, key, buffer, mimeType);
+      return this.supabase.storage.from(this.publicBucket).getPublicUrl(key).data.publicUrl;
+    }
     if (this.useLocal) {
       const filePath = path.join(this.uploadsDir, key);
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -82,6 +105,8 @@ export class StorageService implements OnModuleInit {
   // ── Documentos (siempre privados) ─────────────────────────────
 
   async uploadDocument(key: string, buffer: Buffer, mimeType: string): Promise<void> {
+    this.validateKey(key);
+    if (this.supabase) return this.uploadSupabase(this.documentsBucket, key, buffer, mimeType);
     if (this.useLocal) {
       const filePath = path.join(this.uploadsDir, key);
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -95,6 +120,8 @@ export class StorageService implements OnModuleInit {
   }
 
   async uploadAvatar(key: string, buffer: Buffer, mimeType: string): Promise<void> {
+    this.validateKey(key);
+    if (this.supabase) return this.uploadSupabase(this.publicBucket, key, buffer, mimeType);
     if (this.useLocal) {
       const filePath = path.join(this.uploadsDir, key);
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -108,6 +135,12 @@ export class StorageService implements OnModuleInit {
   }
 
   async getPresignedUrl(bucket: 'documents' | 'avatars', key: string, expirySeconds = 3600): Promise<string> {
+    this.validateKey(key);
+    if (this.supabase) {
+      const { data, error } = await this.supabase.storage.from(bucket === 'documents' ? this.documentsBucket : this.publicBucket).createSignedUrl(key, expirySeconds);
+      if (error || !data?.signedUrl) throw new Error('No se pudo generar el enlace del archivo');
+      return data.signedUrl;
+    }
     if (this.useLocal) {
       return `${this.backendUrl}/uploads/${key}`;
     }
@@ -123,6 +156,12 @@ export class StorageService implements OnModuleInit {
   }
 
   async deleteObject(bucket: 'documents' | 'avatars', key: string): Promise<void> {
+    this.validateKey(key);
+    if (this.supabase) {
+      const { error } = await this.supabase.storage.from(bucket === 'documents' ? this.documentsBucket : this.publicBucket).remove([key]);
+      if (error) throw new Error('No se pudo eliminar el archivo');
+      return;
+    }
     if (this.useLocal) {
       const filePath = path.join(this.uploadsDir, key);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -132,5 +171,16 @@ export class StorageService implements OnModuleInit {
       ? this.bucketDocs.file(key)
       : this.bucketAvatars.file(key);
     await file.delete({ ignoreNotFound: true });
+  }
+
+  private validateKey(key: string) {
+    if (!key || key.includes('\\') || key.split('/').some(part => !part || part === '.' || part === '..')) {
+      throw new Error('Ruta de archivo inválida');
+    }
+  }
+
+  private async uploadSupabase(bucket: string, key: string, buffer: Buffer, contentType: string): Promise<void> {
+    const { error } = await this.supabase!.storage.from(bucket).upload(key, buffer, { contentType, upsert: false });
+    if (error) throw new Error('No se pudo guardar el archivo en Supabase Storage');
   }
 }

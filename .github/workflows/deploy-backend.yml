@@ -1,13 +1,7 @@
-name: Deploy Backend
+name: Legacy Cloud Run Backend (manual recovery only)
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
 
 env:
   PROJECT_ID: intranet-arm

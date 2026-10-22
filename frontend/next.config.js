@@ -15,6 +15,7 @@ const nextConfig = {
   },
   images: {
     remotePatterns: [
+      { protocol: 'https', hostname: 'kqqufmijfvrgzrfrqsby.supabase.co', pathname: '/storage/v1/object/**' },
       // Backend local — logos de equipo/área en desarrollo
       { protocol: 'http', hostname: 'localhost', port: '3001' },
       // Cloud Run backend (producción)
