@@ -16,7 +16,12 @@ Reemplazados 15 enlaces mediante transacción con control de concurrencia:
 feedback (4), org_areas (5), users (3), visual_references (3). Verificación
 posterior: cero referencias al bucket antiguo en esas tablas. Las rutas privadas
 y el login inválido responden 401 en el dominio de producción.
-Todavía falta cerrar la conciliación del origen y probar los flujos de usuario.
+Exportación actualizada production-2026-10-22-01: 1.409 documentos; frente a
+production-2026-10-21-03 solo cambiaron un contador y cuatro tokens de sesión
+(tres nuevos, uno actualizado). Sin cambios nuevos de datos de negocio.
+El origen no está congelado; no se importaron tokens antiguos sobre las sesiones
+nuevas. Falta probar login válido y cargas desde la interfaz antes de retirar
+los servicios antiguos. Los respaldos y el origen permanecen conservados.
 
 La API ya no se despliega como proyecto aparte. El proyecto Vercel `intranet_arm`
 (raíz `frontend`) sirve la web y la API en `/api/v1` desde el mismo dominio:
