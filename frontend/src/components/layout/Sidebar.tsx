@@ -230,7 +230,7 @@ const NAV: NavGroup[] = [
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 export function Sidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
   const router   = useRouter();
   const { logout, refreshToken, user } = useAuthStore();
   const { isAdmin, can } = usePermissions();

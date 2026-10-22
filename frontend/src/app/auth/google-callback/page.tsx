@@ -18,8 +18,8 @@ function GoogleCallbackInner() {
   const setSession   = useAuthStore((s) => s.setSession);
 
   useEffect(() => {
-    const access  = params.get('access');
-    const refresh = params.get('refresh');
+    const access  = params?.get('access') ?? null;
+    const refresh = params?.get('refresh') ?? null;
     if (!access || !refresh) { router.replace('/auth/login?error=oauth_failed'); return; }
 
     api.get('/auth/me', { headers: { Authorization: `Bearer ${access}` } })

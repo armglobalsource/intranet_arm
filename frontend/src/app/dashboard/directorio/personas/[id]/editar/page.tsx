@@ -45,7 +45,7 @@ const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px
 export default function EditarPersonaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const userId = Number(params.id);
+  const userId = Number(params?.id);
 
   const { data: user, isLoading: userLoading } = useUser(userId);
   const { data: roles = [] }        = useRoles();

@@ -1,11 +1,51 @@
 # Backend NestJS en Vercel y PostgreSQL
 
+## Un solo proyecto: intranet_arm (22 de octubre de 2026)
+
+La API ya no se despliega como proyecto aparte. El proyecto Vercel `intranet_arm`
+(raíz `frontend`) sirve la web y la API en `/api/v1` desde el mismo dominio:
+
+- `backend/src/app-factory.ts` crea y configura la aplicación Nest sin escuchar.
+  `main.ts` la sigue usando para el servidor local en el puerto 3001.
+- `frontend/src/pages/api/v1/[[...path]].ts` inicia Nest una vez por instancia y
+  le entrega cada petición sin procesar el body.
+- El frontend depende de `intranet-backend` (`file:../backend`). Next lo carga con
+  `require` sin empaquetarlo y el trazado de archivos incluye `backend/dist` y sus
+  dependencias (unos 18 MB). `frontend/vercel.json` compila el backend antes.
+- CORS admite además el propio dominio de la petición (incluye URLs de Preview).
+- Desplegar desde la raíz del repo; `.vercelignore` solo sube `frontend` y
+  `backend`, sin `.env`, credenciales, exportaciones ni `node_modules`.
+- Variables en `intranet_arm` (Preview configurado; Production pendiente):
+  DATABASE_URL (pooler, rol arm_api), JWT_SECRET nuevo, STORAGE, SUPABASE_URL,
+  SUPABASE_BUCKET_PUBLIC, SUPABASE_BUCKET_DOCUMENTS, FRONTEND_URL y
+  SUPABASE_SECRET_KEY. El frontend usa `/api/v1` relativo; no definir
+  NEXT_PUBLIC_API_URL en Vercel.
+- Preview `dpl_J7vS3oMD4biwXjbjhUKyw2VPzjWR` (con STORAGE=gcs solo en ese
+  despliegue): health 200 con postgres ok, login inválido 401, ruta protegida
+  401 y páginas 200.
+- Al confirmar el Preview con Storage real, el proyecto `intranet-arm-api` se puede
+  eliminar.
+
 El proyecto Vercel `intranet-arm-api` fue creado en `pdencinas-projects` y la
 carpeta `backend` está vinculada por CLI. El frontend existente es `intranet_arm`.
-El proyecto API todavía necesita DATABASE_URL del rol limitado, SUPABASE_SECRET_KEY,
-BACKEND_URL definitivo, despliegue y verificación pública. Ya se configuraron en
-Production y Preview STORAGE=supabase, SUPABASE_URL, SUPABASE_BUCKET_PUBLIC,
-SUPABASE_BUCKET_DOCUMENTS, FRONTEND_URL y un JWT_SECRET nuevo, sin exponer su valor.
+El proyecto API todavía necesita SUPABASE_SECRET_KEY y BACKEND_URL definitivo.
+Ya se configuraron en Production y Preview DATABASE_URL (pooler, rol arm_api),
+STORAGE=supabase, SUPABASE_URL, SUPABASE_BUCKET_PUBLIC, SUPABASE_BUCKET_DOCUMENTS,
+FRONTEND_URL y un JWT_SECRET nuevo, sin exponer su valor.
+
+## Primer despliegue de la API (22 de octubre de 2026)
+
+- DATABASE_URL se construyó desde backend/.env.runtime.local cambiando solo
+  usuario (`arm_api.kqqufmijfvrgzrfrqsby`), servidor y puerto del Transaction
+  pooler, y se subió por stdin a Production y Preview como Secret.
+- Desde este computador el TCP al pooler abre, pero el handshake PostgreSQL/TLS
+  expira (red local). Desde Vercel funciona.
+- Primer despliegue `dpl_D5j6mcNo8uuFX4pnUMKQwktoQvtN`, con `STORAGE=gcs` solo
+  para ese despliegue, porque sin SUPABASE_SECRET_KEY el arranque falla. Vercel lo
+  asignó a Production automáticamente por ser el primero; nada apunta a él todavía.
+  Verificado: `/api/v1/health` 200 con `postgres: ok`, login inválido 401 y ruta
+  protegida sin token 401. Las subidas no funcionan en ese despliegue.
+- Al agregar SUPABASE_SECRET_KEY y crear los buckets, redesplegar sin el override.
 
 ## Avance de preparación (22 de octubre de 2026)
 

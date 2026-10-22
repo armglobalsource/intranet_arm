@@ -716,7 +716,7 @@ function PersonasPageInner() {
   // Filters
   const [cargoFilter,  setCargoFilter]  = useState('');
   const [campusFilter, setCampusFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') ?? '');
+  const [statusFilter, setStatusFilter] = useState(searchParams?.get('status') ?? '');
   const [page, setPage] = useState(1);
 
   const { data: users = [], isLoading } = useUsers(debounced || undefined);

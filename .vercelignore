@@ -1,0 +1,17 @@
+# Despliegue de intranet_arm (frontend + API en /api/v1). Solo se suben
+# frontend y backend; nunca exportaciones, credenciales ni dependencias.
+/*
+!/frontend
+!/backend
+!/.vercelignore
+
+**/node_modules
+**/.env*
+**/.vercel
+**/service-account*.json
+/frontend/.next
+/frontend/tsconfig.tsbuildinfo
+/backend/dist
+/backend/uploads
+/backend/scripts
+/backend/*.tsbuildinfo

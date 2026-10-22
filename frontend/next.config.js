@@ -1,3 +1,10 @@
+const path = require('path');
+
+// La API NestJS (../backend, compilada en backend/dist) se sirve en /api/v1
+// desde src/pages/api/v1. Se carga con require en tiempo de ejecución, sin
+// pasar por webpack, y el trazado de archivos la incluye en la función.
+const BACKEND_ENTRY = 'intranet-backend/dist/app-factory';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
@@ -6,6 +13,11 @@ const nextConfig = {
       dynamic: 0,
       static: 180,
     },
+    outputFileTracingRoot: path.join(__dirname, '..'),
+  },
+  webpack(config, { isServer }) {
+    if (isServer) config.externals.push({ [BACKEND_ENTRY]: `commonjs ${BACKEND_ENTRY}` });
+    return config;
   },
   async redirects() {
     return [

@@ -218,8 +218,8 @@ function CompleteProfileInner() {
   const [loading, setLoading]         = useState(true);
   const [showPwd, setShowPwd]         = useState(false);
 
-  const accessFromUrl  = params.get('access');
-  const refreshFromUrl = params.get('refresh');
+  const accessFromUrl  = params?.get('access') ?? null;
+  const refreshFromUrl = params?.get('refresh') ?? null;
 
   const [currentKey, setCurrentKey] = useState<StepKey | 'intro' | 'result'>('intro');
   const [answers, setAnswers]       = useState<Answers>(EMPTY_ANSWERS);
