@@ -2349,6 +2349,15 @@ export function FichaDocumentView({
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
+        /* Ficha angosta (tablet, notebook chica o panel lateral abierto): las
+           secciones pasan a una columna, primero la izquierda y luego la
+           derecha. Depende del ancho de la ficha, no de la pantalla; en A4 la
+           ficha mide más de 680px y conserva las dos columnas. */
+        .ficha-doc { container-type: inline-size; }
+        @container (max-width: 680px) {
+          .ficha-grid { grid-template-columns: minmax(0, 1fr) !important; }
+        }
+
         @page {
           size: A4 portrait;
           margin: 6mm 8mm;
@@ -2911,7 +2920,7 @@ export function FichaDocumentView({
             return (
               <div className="ficha-grid" style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
+                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
                 gap: 16,
                 alignItems: 'start',
               }}>
@@ -3069,7 +3078,7 @@ export function ModulesEditPanel({
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 px-4 py-3 overflow-y-auto">
+      <div className="grid gap-3 px-4 py-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-1">
         {(['left', 'right'] as const).map((column) => (
           <div key={column}>
             <p className="text-[9px] font-bold uppercase tracking-wide text-gray-400 mb-1">

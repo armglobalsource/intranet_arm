@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { RosterResult, RosterPerson, RosterStatus } from '@/types/disponibilidad';
 import { formatWeekLabel } from '@/types/disponibilidad';
 
@@ -23,6 +24,12 @@ const GROUPS: { key: keyof RosterResult; label: string }[] = [
 ];
 
 export function EquipoRosterSideCard({ roster, isLoading, weekLabel, campusId }: Props) {
+  // Sobre la ficha (pantallas angostas) arranca plegado para no tapar la ficha;
+  // al costado (xl) siempre se muestra completo.
+  const [open, setOpen] = useState(false);
+  const available = GROUPS.reduce((total, { key }) =>
+    total + (roster?.[key] ?? []).filter((p: RosterPerson) => p.status === 'disponible').length, 0);
+
   if (!campusId) {
     return (
       <div className="card p-4">
@@ -34,11 +41,25 @@ export function EquipoRosterSideCard({ roster, isLoading, weekLabel, campusId }:
 
   return (
     <div className="card p-4 flex flex-col gap-3">
-      <div>
-        <p className="text-xs font-semibold text-gray-900 leading-tight">Equipo</p>
-        <p className="text-[10px] text-gray-400 mt-0.5">{formatWeekLabel(weekLabel)}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold text-gray-900 leading-tight">Equipo</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            {formatWeekLabel(weekLabel)}
+            {!isLoading && roster && <span className="xl:hidden"> · {available} disponible{available === 1 ? '' : 's'}</span>}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="min-h-[36px] shrink-0 rounded-lg border border-gray-200 px-3 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 xl:hidden"
+        >
+          {open ? 'Ocultar' : 'Mostrar'}
+        </button>
       </div>
 
+      <div className={`${open ? 'flex' : 'hidden'} flex-col gap-3 xl:flex`}>
       {/* Leyenda */}
       <div className="flex items-center gap-3 flex-wrap" style={{ borderTop: '1px solid #F3F4F6', borderBottom: '1px solid #F3F4F6', padding: '8px 0' }}>
         {(['disponible', 'no_disponible', 'sin_responder'] as RosterStatus[]).map((s) => (
@@ -58,7 +79,7 @@ export function EquipoRosterSideCard({ roster, isLoading, weekLabel, campusId }:
           ))}
         </div>
       ) : (
-        <div className="flex flex-col gap-4" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto', paddingRight: 4 }}>
+        <div className="flex max-h-[320px] flex-col gap-4 overflow-y-auto pr-1 xl:max-h-[calc(100vh-260px)]">
           {GROUPS.map(({ key, label }) => {
             const people = roster?.[key] ?? [];
             if (people.length === 0) return null;
@@ -67,7 +88,7 @@ export function EquipoRosterSideCard({ roster, isLoading, weekLabel, campusId }:
                 <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
                   {label} · {people.length}
                 </p>
-                <div className="flex flex-col gap-1">
+                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
                   {people.map((p: RosterPerson) => (
                     <div
                       key={p.userId}
@@ -84,6 +105,7 @@ export function EquipoRosterSideCard({ roster, isLoading, weekLabel, campusId }:
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }

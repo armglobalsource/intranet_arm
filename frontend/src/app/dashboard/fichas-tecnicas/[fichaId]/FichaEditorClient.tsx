@@ -746,10 +746,12 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         <SectionAssignments ficha={ficha} onAssign={handleAssignSection} />
       )}
 
-      {/* Layout: ficha + panel lateral cuando está en edición */}
+      {/* Layout: ficha + panel lateral cuando está en edición. El panel va al
+          lado solo en pantallas anchas; antes queda arriba a ancho completo para
+          que la ficha no se aplaste y "Módulos" siga visible al abrirse. */}
       <RosterStatusContext.Provider value={rosterStatusByUserId}>
-      <div className={showSidePanel ? 'flex gap-5 items-start' : ''}>
-        <div className={showSidePanel ? 'flex-1 min-w-0' : ''}>
+      <div className={showSidePanel ? 'flex flex-col gap-5 xl:flex-row xl:items-start' : ''}>
+        <div className={showSidePanel ? 'order-2 min-w-0 xl:order-1 xl:flex-1' : ''}>
           <FichaDocumentView
             ficha={ficha}
             editable={editable}
@@ -788,7 +790,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         </div>
 
         {showSidePanel && (
-          <div className="w-56 flex-shrink-0 sticky top-4 flex flex-col gap-3">
+          <div className="order-1 flex w-full flex-col gap-3 xl:order-2 xl:sticky xl:top-4 xl:w-56 xl:flex-shrink-0">
             {modulesOpen ? (
               <ModulesEditPanel
                 fichaType={ficha.type}
