@@ -2343,7 +2343,7 @@ export function FichaDocumentView({
   return (
     <div
       className="ficha-doc-root"
-      style={{ maxWidth: 900, margin: '0 auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
+      style={{ maxWidth: 980, margin: '0 auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
     >
       {/* ── Estilos globales y de impresión ── */}
       <style>{`
@@ -2354,6 +2354,40 @@ export function FichaDocumentView({
            derecha. Depende del ancho de la ficha, no de la pantalla; en A4 la
            ficha mide más de 680px y conserva las dos columnas. */
         .ficha-doc { container-type: inline-size; }
+        .ficha-hdr-top { gap: 16px; }
+        .ficha-title-area { min-width: 0; }
+        .ficha-action-bar {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+          padding: 8px;
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 12px;
+          background: rgba(0,0,0,0.18);
+        }
+        .ficha-action-bar button { min-height: 34px; }
+        .ficha-publication-state {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          min-height: 34px;
+          padding: 0 9px;
+          border-radius: 8px;
+          color: #58d4a4;
+          background: rgba(29,158,117,0.1);
+          border: 1px solid rgba(29,158,117,0.23);
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .ficha-publication-state::before { content: ''; width: 6px; height: 6px; border-radius: 99px; background: #1D9E75; }
+        @container (max-width: 530px) {
+          .ficha-hdr-top { align-items: flex-start !important; padding: 18px 18px 14px !important; }
+          .ficha-hdr-top .ficha-logo { height: 31px !important; }
+          .ficha-hdr > div:last-child { padding: 14px 18px 18px !important; }
+          .ficha-title-text { font-size: 19px !important; }
+          .ficha-action-bar { padding: 6px; }
+        }
         @container (max-width: 680px) {
           .ficha-grid { grid-template-columns: minmax(0, 1fr) !important; }
         }
@@ -2524,7 +2558,7 @@ export function FichaDocumentView({
               className="ficha-logo"
               style={{ height: 40, width: 'auto', objectFit: 'contain', display: 'block', maxWidth: '40%' }}
             />
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
               {editable && editingDate ? (
                 <input
                   ref={dateInputRef}
@@ -2544,14 +2578,16 @@ export function FichaDocumentView({
                   }}
                 />
               ) : (
-                <div
+                <button
+                  type="button"
                   onClick={() => editable && setEditingDate(true)}
                   title={editable ? 'Clic para editar fecha' : undefined}
+                  aria-label={editable ? 'Editar fecha de la ficha' : undefined}
                   style={{
                     fontSize: 15, fontWeight: 600, color: D.textPrimary,
                     cursor: editable ? 'text' : 'default',
                     borderRadius: 6, padding: '2px 6px',
-                    border: editable ? '1px solid transparent' : 'none',
+                    border: editable ? '1px solid transparent' : 'none', background: 'transparent',
                     transition: 'border-color 0.15s, background 0.15s',
                     display: 'inline-block',
                   }}
@@ -2559,7 +2595,7 @@ export function FichaDocumentView({
                   onMouseLeave={(e) => { if (editable) (e.currentTarget as HTMLElement).style.borderColor = 'transparent'; }}
                 >
                   {formatDate(localDate || date)}
-                </div>
+                </button>
               )}
               {selectedEncuentro?.time && (
                 <div style={{ fontSize: 12, color: D.textSecond, marginTop: 3 }}>{selectedEncuentro.time} hrs</div>
@@ -2573,7 +2609,7 @@ export function FichaDocumentView({
             padding: '1rem 2rem 1.2rem', gap: 12,
           }}>
             {/* Campus + título */}
-            <div style={{ minWidth: 0 }}>
+            <div className="ficha-title-area" style={{ minWidth: 0 }}>
               <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600, marginBottom: 4 }}>
                 {/^(campus|arm)\s/i.test(campusName ?? '') ? campusName : `Campus ${campusName}`}
               </div>
@@ -2595,28 +2631,34 @@ export function FichaDocumentView({
                   }}
                 />
               ) : (
-                <div
+                <button
+                  type="button"
+                  className="ficha-title-text"
                   onClick={() => editable && setEditingTitle(true)}
                   title={editable ? 'Clic para editar título' : undefined}
+                  aria-label={editable ? 'Editar título de la ficha' : undefined}
                   style={{
                     fontSize: 22, fontWeight: 700, color: D.textPrimary, letterSpacing: '-0.01em',
                     cursor: editable ? 'text' : 'default',
                     borderRadius: 6,
                     padding: '2px 4px',
                     marginLeft: -4,
-                    border: editable ? '1px solid transparent' : 'none',
+                    border: editable ? '1px solid transparent' : 'none', background: 'transparent',
                     transition: 'border-color 0.15s, background 0.15s',
+                    lineHeight: 1.25, textAlign: 'left', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
                   }}
                   onMouseEnter={(e) => { if (editable) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'; }}
                   onMouseLeave={(e) => { if (editable) (e.currentTarget as HTMLElement).style.borderColor = 'transparent'; }}
                 >
                   {localTitle}
-                </div>
+                </button>
               )}
             </div>
 
             {/* ── Botones de acción (ocultos en impresión) ── */}
-            <div className="ficha-no-print" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <div className="ficha-no-print ficha-action-bar">
+
+              {isPublished && <span className="ficha-publication-state">En línea</span>}
 
               {/* Guardar (solo modo edición) */}
               {editable && onSave && (
@@ -2717,7 +2759,7 @@ export function FichaDocumentView({
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                Descargar PDF
+                Imprimir / PDF
               </button>
 
               {/* Publicar / Despublicar */}
@@ -2740,7 +2782,7 @@ export function FichaDocumentView({
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                     <circle cx="12" cy="12" r="3" />
                   </svg>
-                  {isPublished ? 'Publicada' : 'Publicar'}
+                  {isPublished ? 'Gestionar' : 'Publicar'}
                 </button>
               )}
 

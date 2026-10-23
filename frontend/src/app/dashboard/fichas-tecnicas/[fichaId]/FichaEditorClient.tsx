@@ -790,7 +790,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         </div>
 
         {showSidePanel && (
-          <div className="order-1 flex w-full flex-col gap-3 xl:order-2 xl:sticky xl:top-4 xl:w-56 xl:flex-shrink-0">
+          <div className="order-1 flex w-full flex-col gap-3 xl:order-2 xl:sticky xl:top-4 xl:w-72 xl:flex-shrink-0">
             {modulesOpen ? (
               <ModulesEditPanel
                 fichaType={ficha.type}
