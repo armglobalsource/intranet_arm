@@ -230,6 +230,18 @@ function PersonCellInput({ value, onChange, placeholder, style, multiline, rows 
   const { data: users = [] } = useUsers();
   const rosterStatus = useRosterStatus();
   const [open, setOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Las tarjetas de posiciones son deliberadamente compactas. Un textarea
+  // con altura fija termina mostrando la barra nativa del navegador apenas el
+  // nombre ocupa dos líneas. Ajustamos su alto al contenido para mantener la
+  // lectura limpia y evitar que el control parezca un selector antiguo.
+  useEffect(() => {
+    if (!multiline || !textareaRef.current) return;
+    const textarea = textareaRef.current;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [multiline, value]);
 
   const suggestions = useMemo(() => {
     const q = value.trim().toLowerCase();
@@ -266,7 +278,24 @@ function PersonCellInput({ value, onChange, placeholder, style, multiline, rows 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       {multiline ? (
-        <textarea rows={rows ?? 2} {...sharedProps} style={{ ...sharedProps.style, resize: 'none' }} />
+        <textarea
+          ref={textareaRef}
+          rows={rows ?? 2}
+          {...sharedProps}
+          onInput={(e) => {
+            const textarea = e.currentTarget;
+            textarea.style.height = 'auto';
+            textarea.style.height = `${textarea.scrollHeight}px`;
+          }}
+          style={{
+            ...sharedProps.style,
+            display: 'block',
+            boxSizing: 'border-box',
+            minHeight: '2.9em',
+            overflow: 'hidden',
+            resize: 'none',
+          }}
+        />
       ) : (
         <input type="text" {...sharedProps} />
       )}
