@@ -13,9 +13,8 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-// En ambientes desplegados (Firebase Hosting) se usa URL relativa /api/v1
-// y Firebase Hosting enruta al backend correcto según el dominio (dev o prod).
-// En desarrollo local se usa http://localhost:3001/api/v1.
+// En Vercel la API se sirve en el mismo dominio (src/pages/api/v1), así que se
+// usa la URL relativa /api/v1. En desarrollo local, http://localhost:3001/api/v1.
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   (process.env.NODE_ENV === 'production' ? '/api/v1' : 'http://localhost:3001/api/v1');
@@ -56,6 +55,29 @@ function redirectToLogin() {
 // endpoint, no una sesión expirada — no deben disparar el refresh/redirect.
 const AUTH_ENDPOINTS = ['/auth/login', '/auth/register'];
 
+// Una sola renovación en curso para todas las peticiones que reciben 401 a la
+// vez. El refresh token rota en cada uso y el backend trata su reutilización
+// como robo de sesión: renovaciones en paralelo cerraban la sesión al vencer
+// el access token.
+let refreshing: Promise<string> | null = null;
+
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshing) {
+    const refreshToken = useAuthStore.getState().refreshToken;
+    refreshing = (async () => {
+      if (!refreshToken) throw new Error('Sin sesión');
+      const { data } = await axios.post(`${api.defaults.baseURL}/auth/refresh`, { refreshToken });
+      useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
+      // El endpoint /auth/refresh también devuelve el user con permisos
+      // frescos (por si el admin cambió el rol o los permisos del rol desde
+      // el último login), para que la UI los refleje sin volver a entrar.
+      if (data.user) useAuthStore.getState().updateUser(data.user);
+      return data.accessToken as string;
+    })().finally(() => { refreshing = null; });
+  }
+  return refreshing;
+}
+
 // Auto-refresh on 401
 api.interceptors.response.use(
   (res) => res,
@@ -64,27 +86,14 @@ api.interceptors.response.use(
     const isAuthEndpoint = AUTH_ENDPOINTS.some((p) => original?.url?.includes(p));
     if (err.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true;
-      const refreshToken = useAuthStore.getState().refreshToken;
-      if (!refreshToken) {
+      if (!useAuthStore.getState().refreshToken) {
         useAuthStore.getState().logout();
         redirectToLogin();
         return Promise.reject(err);
       }
       try {
-        const { data } = await axios.post(
-          `${api.defaults.baseURL}/auth/refresh`,
-          { refreshToken },
-        );
-        useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
-        // El endpoint /auth/refresh también devuelve el user con permisos
-        // frescos leídos de Firestore (por si el admin cambió el rol o
-        // los permisos del rol desde el último login). Actualizamos el
-        // store para que la UI refleje los permisos actuales sin requerir
-        // logout+login manual.
-        if (data.user) {
-          useAuthStore.getState().updateUser(data.user);
-        }
-        original.headers.Authorization = `Bearer ${data.accessToken}`;
+        const accessToken = await refreshAccessToken();
+        original.headers.Authorization = `Bearer ${accessToken}`;
         return api(original);
       } catch (refreshErr) {
         useAuthStore.getState().logout();
