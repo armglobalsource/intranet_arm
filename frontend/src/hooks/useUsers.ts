@@ -52,14 +52,14 @@ export interface UserBirthday {
 /**
  * Lista liviana (sin cargos, permisos ni datos de cuenta) de quienes tienen
  * fecha de nacimiento registrada, para pintar cumpleaños en el calendario.
- * staleTime largo a propósito: los cumpleaños casi nunca cambian, así que no
- * hay razón para volver a pedirlos cada vez que se navega el calendario.
+ * Compartida entre inicio y calendario; se actualiza al volver a la ventana
+ * y después de editar perfiles mediante las invalidaciones de userKeys.all.
  */
 export function useBirthdays() {
   return useQuery<UserBirthday[]>({
     queryKey: userKeys.birthdays,
     queryFn:  () => api.get<UserBirthday[]>('/users/birthdays').then((r) => r.data),
-    staleTime: 24 * 60 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

@@ -14,6 +14,7 @@ import { membershipArea } from '@/types/orgchart';
 import { AvailabilityTask } from './AvailabilityTask';
 import { pendingDashboardFichas } from '@/lib/dashboard-tasks';
 import { parseFichaDate } from '@/lib/ficha-date';
+import { BirthdayPanel } from './BirthdayPanel';
 
 // ── Helper fecha ──────────────────────────────────────────────────────────────
 
@@ -257,6 +258,8 @@ export function DashboardClient() {
           <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5">Mi campus: <strong className="text-white">{user?.campus?.name ?? 'Sin asignar'}</strong></span>
           <Link href="/dashboard/perfil" className="px-2 py-2 underline underline-offset-4 hover:text-white">Ver mi perfil</Link>
         </div>
+
+        <BirthdayPanel />
 
         <section aria-labelledby="pending-heading" className="space-y-4">
           <div>
