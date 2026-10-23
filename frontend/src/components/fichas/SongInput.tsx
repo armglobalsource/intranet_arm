@@ -6,11 +6,11 @@ import type { Cancion } from '@/types/ficha';
 
 // Tokens del tema oscuro de la ficha (ver FichaDocumentView)
 const D = {
-  cardBorder:  'rgba(255,255,255,0.07)',
-  textPrimary: '#f0efec',
-  textSecond:  '#888580',
-  textMuted:   '#555350',
-  inputBorder: 'rgba(255,255,255,0.18)',
+  cardBorder:  'var(--song-border, rgba(255,255,255,0.07))',
+  textPrimary: 'var(--song-primary, #f0efec)',
+  textSecond:  'var(--song-secondary, #888580)',
+  textMuted:   'var(--song-muted, #555350)',
+  inputBorder: 'var(--song-border, rgba(255,255,255,0.18))',
 } as const;
 
 interface SongInputProps {
@@ -150,8 +150,8 @@ export function SongInput({ value, onChange, onSongSelect, readOnly = false, pla
           ref={dropdownRef}
           className="absolute z-50 left-0 right-0 top-full mt-1 overflow-hidden"
           style={{
-            background: '#1a1a1a',
-            border: `0.5px solid rgba(255,255,255,0.12)`,
+            background: 'var(--song-surface, #1a1a1a)',
+            border: `1px solid ${D.cardBorder}`,
             borderRadius: 8,
             boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
           }}

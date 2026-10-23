@@ -78,8 +78,8 @@ export function RichTextEditor({ value, editable, onChange, placeholder }: RichT
     return (
       <div style={{
         padding: 12, minHeight: 120,
-        border: '0.5px dashed rgba(255,255,255,0.1)', borderRadius: 8,
-        color: 'rgba(255,255,255,0.3)', fontSize: 12,
+        border: '1px dashed var(--song-border, #64748b)', borderRadius: 8,
+        color: 'var(--song-muted, #94a3b8)', fontSize: 12,
       }}>
         Cargando editor…
       </div>
@@ -93,8 +93,8 @@ export function RichTextEditor({ value, editable, onChange, placeholder }: RichT
       {editable && <Toolbar editor={editor} />}
       <div style={{
         position: 'relative',
-        background: editable ? 'rgba(255,255,255,0.03)' : 'transparent',
-        border: editable ? '0.5px solid rgba(255,255,255,0.12)' : 'none',
+        background: editable ? 'var(--song-surface, rgba(255,255,255,0.03))' : 'transparent',
+        border: editable ? '1px solid var(--song-border, rgba(255,255,255,0.12))' : 'none',
         borderRadius: 8,
         padding: editable ? '10px 14px' : 0,
         minHeight: editable ? 220 : 0,
@@ -103,7 +103,7 @@ export function RichTextEditor({ value, editable, onChange, placeholder }: RichT
         {editable && isEmpty && placeholder && (
           <div style={{
             position: 'absolute', top: 12, left: 16,
-            fontSize: 12, color: 'rgba(255,255,255,0.28)',
+            fontSize: 12, color: 'var(--song-muted, #94a3b8)',
             pointerEvents: 'none', userSelect: 'none',
           }}>
             {placeholder}
@@ -117,16 +117,16 @@ export function RichTextEditor({ value, editable, onChange, placeholder }: RichT
           outline: none;
           font-size: 13px;
           line-height: 1.55;
-          color: #f0efec;
+          color: var(--song-primary, #f0efec);
           min-height: 60px;
         }
         .ficha-rich-content p { margin: 0 0 8px 0; }
         .ficha-rich-content p:last-child { margin-bottom: 0; }
-        .ficha-rich-content strong { color: #ffffff; font-weight: 700; }
+        .ficha-rich-content strong { color: var(--song-primary, #ffffff); font-weight: 700; }
         .ficha-rich-content em { font-style: italic; }
         .ficha-rich-content u { text-decoration: underline; }
         .ficha-rich-content h2 {
-          font-size: 15px; font-weight: 700; color: #ffffff;
+          font-size: 15px; font-weight: 700; color: var(--song-primary, #ffffff);
           margin: 14px 0 6px 0; letter-spacing: -0.005em;
         }
         .ficha-rich-content h3 {
@@ -143,7 +143,7 @@ export function RichTextEditor({ value, editable, onChange, placeholder }: RichT
           border-left: 3px solid ${TEAL};
           background: rgba(13,148,136,0.06);
           border-radius: 0 6px 6px 0;
-          font-style: italic; color: rgba(255,255,255,0.8);
+          font-style: italic; color: var(--song-secondary, rgba(255,255,255,0.8));
         }
         .ficha-rich-link {
           color: ${TEAL}; text-decoration: underline;
@@ -207,7 +207,7 @@ function Toolbar({ editor }: { editor: Editor }) {
       display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2,
       padding: '6px 8px', marginBottom: 6,
       background: 'rgba(255,255,255,0.05)',
-      border: '0.5px solid rgba(255,255,255,0.1)',
+      border: '1px solid var(--song-border, rgba(255,255,255,0.1))',
       borderRadius: 8,
     }}>
       <TBtn label="Deshacer" active={false} onClick={() => editor.chain().focus().undo().run()}>
@@ -282,7 +282,7 @@ function Toolbar({ editor }: { editor: Editor }) {
         {linkOpen && (
           <div style={{
             position: 'absolute', top: '110%', left: 0, zIndex: 10,
-            background: '#1a1a1a', border: '0.5px solid rgba(255,255,255,0.15)',
+            background: 'var(--song-surface, #1a1a1a)', border: '1px solid var(--song-border, rgba(255,255,255,0.15))',
             borderRadius: 8, padding: 8, display: 'flex', gap: 6,
             boxShadow: '0 8px 24px rgba(0,0,0,0.5)', minWidth: 280,
           }}>
@@ -300,7 +300,7 @@ function Toolbar({ editor }: { editor: Editor }) {
                 flex: 1, padding: '4px 8px', fontSize: 12,
                 background: 'rgba(255,255,255,0.05)',
                 border: '0.5px solid rgba(255,255,255,0.2)',
-                borderRadius: 5, color: '#f0efec', outline: 'none',
+                borderRadius: 5, color: 'var(--song-primary, #f0efec)', outline: 'none',
               }}
             />
             <button onClick={applyLink} style={{
@@ -332,7 +332,7 @@ function TBtn({ label, active, onClick, children }: {
         width: 28, height: 28, borderRadius: 5,
         border: 'none',
         background: active ? 'rgba(13,148,136,0.22)' : 'transparent',
-        color: active ? '#fff' : 'rgba(240,239,236,0.75)',
+        color: active ? TEAL : 'var(--song-secondary, rgba(240,239,236,0.75))',
         cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 0, transition: 'background 0.12s',

@@ -9,6 +9,7 @@ import { useUsers } from '@/hooks/useUsers';
 import { displayName } from '@/types/user';
 import { useRosterStatus } from '@/components/fichas/RosterStatusContext';
 import type { RosterStatus } from '@/types/disponibilidad';
+import { SortableSection, SortableRow, SortableFichaLayout } from '@/components/fichas/FichaSortable';
 
 // Secciones disponibles por tipo de ficha (para el panel de módulos)
 const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
@@ -19,33 +20,31 @@ const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
 import { useUpdateFicha } from '@/hooks/useFichas';
 import { parseFichaDate as parseLocalDate, toFichaInputDate } from '@/lib/ficha-date';
 import { usePaletas, useCreatePaleta, type Paleta, type PaletaColor } from '@/hooks/usePaletas';
-// dnd-kit eliminado: el reordenamiento manual de módulos y filas se retiró
-// porque nunca fue lo bastante confiable en producción.
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
 
 const C = {
-  purple: '#7F77DD',
-  green:  '#1D9E75',
+  purple: '#6554C0',
+  green:  '#087F5B',
   amber:  '#D4890A',
   gray:   '#6b6b6b',
 } as const;
 
 const SONG_DOT_COLORS = [C.purple, C.green, C.green, C.green, C.amber, C.gray];
 
-// ── Dark theme tokens ─────────────────────────────────────────────────────────
+// ── Tema claro de la ficha ─────────────────────────────────────────────────────
 
 const D = {
-  bg:          '#111111',
-  cardBg:      'rgba(255,255,255,0.04)',
-  cardBorder:  'rgba(255,255,255,0.07)',
-  divider:     'rgba(255,255,255,0.06)',
-  headerBg:    'rgba(255,255,255,0.03)',
-  badgeBg:     'rgba(255,255,255,0.07)',
-  textPrimary: '#f0efec',
-  textSecond:  '#c4c1bc',
-  textMuted:   '#555350',
-  inputBorder: 'rgba(255,255,255,0.18)',
+  bg:          '#F4F6F9',
+  cardBg:      '#FFFFFF',
+  cardBorder:  '#DEE3EB',
+  divider:     '#EDF0F4',
+  headerBg:    '#FFFFFF',
+  badgeBg:     '#F1F3F8',
+  textPrimary: '#243047',
+  textSecond:  '#526078',
+  textMuted:   '#69768B',
+  inputBorder: '#CCD4E1',
 } as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -137,14 +136,15 @@ const S = {
     borderRadius: 12,
     padding: '1rem 1.1rem',
     marginBottom: 14,
+    boxShadow: '0 2px 5px rgba(36,48,71,0.03)',
   } as React.CSSProperties,
   cardTitle: {
     fontSize: 10, fontWeight: 600, textTransform: 'uppercase' as const,
-    letterSpacing: '0.12em', color: '#dbd7cf', marginBottom: 10,
+    letterSpacing: '0.1em', color: D.textSecond, marginBottom: 14,
   } as React.CSSProperties,
   roleRow: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '6px 0', borderBottom: `0.5px solid ${D.divider}`,
+    padding: '10px 0', borderBottom: `0.5px solid ${D.divider}`,
     gap: 8,
   } as React.CSSProperties,
   roleLabel: { fontSize: 12, color: D.textSecond, flexShrink: 0 } as React.CSSProperties,
@@ -239,8 +239,20 @@ function PersonCellInput({ value, onChange, placeholder, style, multiline, rows 
   useEffect(() => {
     if (!multiline || !textareaRef.current) return;
     const textarea = textareaRef.current;
-    textarea.style.height = 'auto';
-    textarea.style.height = `${textarea.scrollHeight}px`;
+    const resize = () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight + 1}px`;
+    };
+    resize();
+    let width = textarea.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (textarea.clientWidth !== width) {
+        width = textarea.clientWidth;
+        resize();
+      }
+    });
+    observer.observe(textarea);
+    return () => observer.disconnect();
   }, [multiline, value]);
 
   const suggestions = useMemo(() => {
@@ -285,7 +297,7 @@ function PersonCellInput({ value, onChange, placeholder, style, multiline, rows 
           onInput={(e) => {
             const textarea = e.currentTarget;
             textarea.style.height = 'auto';
-            textarea.style.height = `${textarea.scrollHeight}px`;
+            textarea.style.height = `${textarea.scrollHeight + 1}px`;
           }}
           style={{
             ...sharedProps.style,
@@ -304,7 +316,7 @@ function PersonCellInput({ value, onChange, placeholder, style, multiline, rows 
           className="ficha-no-print"
           style={{
             position: 'absolute', zIndex: 50, left: 0, right: 0, top: '100%', marginTop: 3,
-            background: '#1c1c1c', border: `1px solid ${D.cardBorder}`, borderRadius: 8,
+            background: D.cardBg, border: `1px solid ${D.cardBorder}`, borderRadius: 8,
             boxShadow: '0 8px 20px rgba(0,0,0,0.35)', maxHeight: 180, overflowY: 'auto', textAlign: 'left',
           }}
         >
@@ -353,38 +365,16 @@ function DeleteBtn({ onClick }: { onClick: () => void }) {
       title="Eliminar fila"
       className="ficha-no-print"
       style={{
-        flexShrink: 0, fontSize: 11, lineHeight: 1, color: 'rgba(255,255,255,0.15)',
+        flexShrink: 0, fontSize: 11, lineHeight: 1, color: D.textMuted,
         background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px',
         transition: 'color 0.15s',
       }}
       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.15)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = D.textMuted; }}
     >
       ✕
     </button>
   );
-}
-
-// ── Stubs para reemplazar el drag&drop de filas (eliminado) ───────────────────
-// Se mantiene la misma API que tenían SortableSection/SortableRow para no
-// tocar los 25+ callsites que ya los usan. Ahora simplemente renderean sin
-// funcionalidad de arrastre. El "handle" que se pasa por render-prop es null,
-// así que los grip visuales tampoco aparecen.
-
-function SortableSection({ children }: {
-  items?: { id: string }[];
-  onReorder?: (fromIndex: number, toIndex: number) => void;
-  children: React.ReactNode;
-}) {
-  return <>{children}</>;
-}
-
-function SortableRow({ children }: {
-  id: string;
-  editable?: boolean;
-  children: (handle: React.ReactNode) => React.ReactNode;
-}) {
-  return <>{children(null)}</>;
 }
 
 // ── AddRowInline ──────────────────────────────────────────────────────────────
@@ -418,6 +408,8 @@ function AddRowInline({ sectionName, onAdd }: {
 
   if (!open) return (
     <button
+      type="button"
+      className="ficha-add-row"
       onClick={() => setOpen(true)}
       style={{
         marginTop: 8, fontSize: 11, color: D.textMuted, background: 'none', border: 'none',
@@ -608,8 +600,8 @@ interface EditProps {
   onAddRow?: (label: string, type: Row['type'], shared: boolean) => void;
   /** Renombra el label (título) de una fila. */
   onLabelChange?: (rowId: string, newLabel: string) => void;
-  /** Reordena filas: fromIndex y toIndex son posiciones en el array ordenado (allRows) */
-  onReorderRow?: (fromIndex: number, toIndex: number) => void;
+  /** Identidades estables, incluso cuando se muestra solo una parte de la sección. */
+  onReorderRow?: (activeId: string, overId: string) => void;
   isCompleted?: boolean;
   onComplete?: () => void;
 }
@@ -1626,7 +1618,7 @@ function WorshipSetListCard({
 
       {/* ── Banda ── */}
       {displayedEscena.length > 0 && (
-        <SortableSection items={displayedEscena} onReorder={editable ? escena.onReorderRow : undefined}>
+        <>
           {editable && vio && (
             <SortableRow id={vio.id} editable={editable}>
               {(handle) => (
@@ -1646,7 +1638,8 @@ function WorshipSetListCard({
             </SortableRow>
           )}
           {(positions.length > 0 || editable) && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'stretch' }}>
+            <SortableSection items={positions} onReorder={editable ? escena.onReorderRow : undefined}>
+            <div className="ficha-positions" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12, alignItems: 'stretch' }}>
               {positions.map((row) => {
                 const posLabel = row.label.replace(/posición\s*/i, '');
                 return (
@@ -1688,8 +1681,10 @@ function WorshipSetListCard({
                 />
               )}
             </div>
+            </SortableSection>
           )}
           {musicians.length > 0 && (
+            <SortableSection items={musicians} onReorder={editable ? escena.onReorderRow : undefined}>
             <div>
               {musicians.map((row) => (
                 <SortableRow key={row.id} id={row.id} editable={editable}>
@@ -1721,8 +1716,9 @@ function WorshipSetListCard({
                 </SortableRow>
               ))}
             </div>
+            </SortableSection>
           )}
-        </SortableSection>
+        </>
       )}
 
       {/* Banda mini-footer */}
@@ -2199,7 +2195,7 @@ export interface FichaDocumentViewProps {
   onAddRow?: (section: SectionName, label: string, type: Row['type'], shared: boolean) => void;
   onDeleteRow?: (section: SectionName, rowId: string) => void;
   onLabelChange?: (section: SectionName, rowId: string, newLabel: string) => void;
-  onReorderRow?: (section: SectionName, fromIndex: number, toIndex: number) => void;
+  onReorderRow?: (section: SectionName, activeId: string, overId: string) => void;
   onSectionComplete?: (section: SectionName) => void;
   sectionStatus?: Partial<Record<SectionName, boolean>>;
   saveState?: 'idle' | 'saving' | 'saved' | 'error';
@@ -2210,6 +2206,7 @@ export interface FichaDocumentViewProps {
   modulesPanelOpen?: boolean;
   onToggleModulesPanel?: () => void;
   sectionLayout?: { left: string[]; right: string[]; leftRatio?: number };
+  onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
   /** Persistir el bloque layoutVisual completo (vista alternativa por canción). */
   onUpdateLayoutVisual?: (patch: { slots: LayoutVisualSlot[] }) => void;
 }
@@ -2219,7 +2216,7 @@ export function FichaDocumentView({
   onPublish, onUnpublish, canPublish, isPublishing,
   editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onSectionComplete,
   sectionStatus, saveState, hiddenSections, modulesPanelOpen, onToggleModulesPanel,
-  sectionLayout: sectionLayoutProp, onUpdateLayoutVisual,
+  sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
 
@@ -2262,7 +2259,7 @@ export function FichaDocumentView({
   const hidden = (n: SectionName) => (hiddenSections ?? []).includes(n);
 
   // Layout de secciones (solo lectura acá — la edición vive en <ModulesEditPanel/>)
-  const resolvedLayout = resolveSectionLayout(ficha.type, sectionLayoutProp);
+  const resolvedLayout = resolveSectionLayout(ficha.type, sectionLayoutProp ?? ficha.sectionLayout);
 
   const { paletas, loading: paletasLoading } = usePaletas();
 
@@ -2382,7 +2379,30 @@ export function FichaDocumentView({
            secciones pasan a una columna, primero la izquierda y luego la
            derecha. Depende del ancho de la ficha, no de la pantalla; en A4 la
            ficha mide más de 680px y conserva las dos columnas. */
-        .ficha-doc { container-type: inline-size; }
+        .ficha-doc { container-type: inline-size; color: ${D.textPrimary}; color-scheme: light; }
+        .ficha-doc-root { --song-primary: ${D.textPrimary}; --song-secondary: ${D.textSecond}; --song-muted: ${D.textMuted}; --song-border: ${D.inputBorder}; --song-surface: #fff; }
+        .ficha-hdr .ficha-logo { filter: brightness(0); opacity: 0.86; }
+        .ficha-drag-handle, .ficha-block-handle {
+          display: inline-flex; align-items: center; justify-content: center;
+          flex-shrink: 0; border: 1px solid transparent; border-radius: 6px;
+          color: #74819A; background: #F4F6FA; cursor: grab; touch-action: none;
+          padding: 5px 2px;
+        }
+        .ficha-drag-handle:active, .ficha-block-handle:active { cursor: grabbing; }
+        .ficha-drag-handle:hover, .ficha-block-handle:hover { color: #6554C0; background: #EEEAFB; }
+        .ficha-block-handle { position: absolute; top: 9px; right: 12px; gap: 4px; padding: 4px 6px; font-size: 10px; font-weight: 600; }
+        .ficha-sortable-block > .ficha-card > div:first-child { padding-right: 100px; min-height: 21px; }
+        .ficha-sortable-block.is-over { outline: 2px solid #A99CE7; border-radius: 12px; }
+        .ficha-drop-column { min-width: 0; min-height: 90px; border-radius: 12px; }
+        .ficha-drop-column.is-over { background: #EEEAFB; }
+        .ficha-drop-end { border: 1px dashed #CCD4E1; color: #69768B; border-radius: 10px; padding: 12px; text-align: center; font-size: 11px; }
+        .ficha-positions > .ficha-sortable-row { flex: 1 1 105px; display: flex; }
+        .ficha-sortable-row:hover { background: #F8F9FC; border-radius: 6px; }
+        .ficha-doc .ficha-cell-input { border-radius: 4px; transition: background 0.15s; }
+        .ficha-doc .ficha-cell-input:focus { background: #F0EDFC !important; border-bottom-color: #6554C0 !important; }
+        .ficha-doc button:focus-visible { outline: 2px solid #6554C0; outline-offset: 3px; }
+        .ficha-add-row { background: #F0EDFC !important; color: #6554C0 !important; border: 1px solid #DED7F5 !important; padding: 7px 10px !important; border-radius: 7px; font-weight: 600; }
+        .ficha-editor-help { display: flex; gap: 8px; align-items: center; margin: 0 0 18px; padding: 10px 12px; border: 1px solid #DFE5EF; border-radius: 9px; background: #EDF1F7; color: #526078; font-size: 12px; }
         .ficha-hdr-top { gap: 16px; }
         .ficha-title-area { min-width: 0; }
         .ficha-action-bar {
@@ -2391,9 +2411,9 @@ export function FichaDocumentView({
           gap: 6px;
           flex-wrap: wrap;
           padding: 8px;
-          border: 1px solid rgba(255,255,255,0.07);
+          border: 1px solid #E2E6EE;
           border-radius: 12px;
-          background: rgba(0,0,0,0.18);
+          background: #F7F8FB;
         }
         .ficha-action-bar button { min-height: 34px; }
         .ficha-publication-state {
@@ -2403,7 +2423,7 @@ export function FichaDocumentView({
           min-height: 34px;
           padding: 0 9px;
           border-radius: 8px;
-          color: #58d4a4;
+          color: #087F5B;
           background: rgba(29,158,117,0.1);
           border: 1px solid rgba(29,158,117,0.23);
           font-size: 11px;
@@ -2427,16 +2447,14 @@ export function FichaDocumentView({
         }
 
         @media print {
-          /* Preservar colores exactos del theme oscuro tal cual pantalla */
+          /* Conservar los acentos, con papel claro para una lectura cómoda. */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
 
-          /* Fondo del papel = mismo negro del ficha-doc para evitar franjas
-             blancas por márgenes de página. */
           html, body {
-            background: ${D.bg} !important;
+            background: white !important;
           }
 
           /* Ocultar controles */
@@ -2447,6 +2465,7 @@ export function FichaDocumentView({
 
           /* Wrapper del documento sin borde/radius, ocupa el ancho de página */
           .ficha-doc {
+            background: white !important;
             border: none !important;
             border-radius: 0 !important;
             overflow: visible !important;
@@ -2582,7 +2601,7 @@ export function FichaDocumentView({
             }}
           >
             <img
-              src="/logo2.png"
+              src="/logo.png"
               alt="ARM Global"
               className="ficha-logo"
               style={{ height: 40, width: 'auto', objectFit: 'contain', display: 'block', maxWidth: '40%' }}
@@ -2603,7 +2622,7 @@ export function FichaDocumentView({
                     fontSize: 14, fontWeight: 600, color: D.textPrimary,
                     background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.2)',
                     borderRadius: 6, padding: '2px 8px', outline: 'none',
-                    colorScheme: 'dark',
+                    colorScheme: 'light',
                   }}
                 />
               ) : (
@@ -2699,8 +2718,8 @@ export function FichaDocumentView({
                     padding: '6px 13px', borderRadius: 8, fontSize: 12, fontWeight: 600,
                     border: 'none', cursor: isSaving ? 'default' : 'pointer',
                     transition: 'all 0.2s',
-                    background: isSaveError ? 'rgba(220,38,38,0.15)' : isSaved ? C.green : 'rgba(255,255,255,0.1)',
-                    color: isSaveError ? '#f87171' : D.textPrimary,
+                    background: isSaveError ? '#FEF2F2' : isSaved ? C.green : C.purple,
+                    color: isSaveError ? '#B91C1C' : '#FFFFFF',
                     opacity: isSaving ? 0.7 : 1,
                   }}
                 >
@@ -2942,6 +2961,12 @@ export function FichaDocumentView({
           className={`ficha-body ficha-view-body ${isLayoutView ? 'ficha-view-hidden' : 'ficha-view-active'}`}
           style={{ padding: '1.5rem 2rem', display: isLayoutView ? 'none' : 'block' }}
         >
+          {editable && (
+            <div className="ficha-editor-help ficha-no-print">
+              <span aria-hidden="true">⠿</span>
+              <span>Arrastra las asas para ordenar filas o mover bloques entre columnas. Los cambios se guardan automáticamente.</span>
+            </div>
+          )}
           {(() => {
             // Función que renderiza una slot de sección
             const renderSlot = (slot: LayoutSlot) => {
@@ -2989,23 +3014,13 @@ export function FichaDocumentView({
             const visibleRight = resolvedLayout.right.filter((s) => !slotIsHidden(s));
 
             return (
-              <div className="ficha-grid" style={{
-                display: 'grid',
-                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-                gap: 16,
-                alignItems: 'start',
-              }}>
-                <div style={{ minWidth: 0 }}>
-                  {visibleLeft.map((slot) => (
-                    <React.Fragment key={slot}>{renderSlot(slot)}</React.Fragment>
-                  ))}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  {visibleRight.map((slot) => (
-                    <React.Fragment key={slot}>{renderSlot(slot)}</React.Fragment>
-                  ))}
-                </div>
-              </div>
+              <SortableFichaLayout
+                layout={resolvedLayout}
+                visible={{ left: visibleLeft, right: visibleRight }}
+                onChange={editable ? onUpdateLayout : undefined}
+                renderSlot={(slot) => renderSlot(slot as LayoutSlot)}
+                label={(slot) => slotLabel(slot as LayoutSlot)}
+              />
             );
           })()}
         </div>

@@ -19,6 +19,7 @@ import { toWeekLabel } from '@/types/disponibilidad';
 import { parseFichaDate } from '@/lib/ficha-date';
 import { SECTION_LABELS } from '@/types/ficha';
 import type { Ficha, Row, SectionName, Section, LayoutVisualSlot } from '@/types/ficha';
+import { reorderFichaRows, type FichaColumns } from '@/lib/ficha-order';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -28,8 +29,8 @@ function uid() {
 
 // ── Skeleton de carga ─────────────────────────────────────────────────────────
 
-const SK = 'rgba(255,255,255,0.07)';
-const SK2 = 'rgba(255,255,255,0.04)';
+const SK = '#E2E7EF';
+const SK2 = '#F4F6F9';
 
 function Pulse({ w, h, r = 6, style }: { w?: string | number; h: number; r?: number; style?: React.CSSProperties }) {
   return (
@@ -289,9 +290,11 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   // Mismo patrón de contador en vuelo que localHidden, para que clicks
   // encadenados de ▲/▼ no se pisen entre sí ni con el snapshot del servidor.
   const layoutInflight = useRef(0);
+  const layoutQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const pendingLayout = useRef<FichaColumns | null>(null);
 
   useEffect(() => {
-    if (layoutInflight.current !== 0) return;
+    if (layoutInflight.current !== 0 || pendingLayout.current) return;
     setLocalLayout(ficha?.sectionLayout);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ficha?.sectionLayout]);
@@ -301,7 +304,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { mutateAsync: reopenSection } = useReopenSection();
   const { mutate: archiveFicha } = useArchiveFicha();
   const { mutate: unarchiveFicha } = useUnarchiveFicha();
-  const { mutate: updateFicha } = useUpdateFicha();
+  const { mutate: updateFicha, mutateAsync: updateFichaAsync } = useUpdateFicha();
   const { mutate: updateLayoutVisual } = useUpdateLayoutVisual();
   const { mutate: publishFicha,   isPending: isPublishing  } = usePublishFicha();
   const { mutate: unpublishFicha, isPending: isUnpublishing } = useUnpublishFicha();
@@ -347,33 +350,33 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     );
   }
 
-  function handleUpdateLayout(layout: { left: string[]; right: string[]; leftRatio?: number }) {
-    if (!ficha) return;
+  const handleUpdateLayout = useCallback((layout: FichaColumns) => {
     setLocalLayout(layout);
+    pendingLayout.current = layout;
+    setActionError(null);
     layoutInflight.current += 1;
     setSaveState('saving');
-    updateFicha(
-      { fichaId: ficha.fichaId, sectionLayout: layout },
-      {
-        onSuccess: () => {
+    // Serializar arrastres rápidos para que una respuesta anterior no gane
+    // al último orden. Cada promesa finaliza su propio contador.
+    const task = layoutQueue.current.catch(() => undefined).then(() =>
+      updateFichaAsync({ fichaId, sectionLayout: layout }),
+    );
+    layoutQueue.current = task;
+    task.then(() => {
           layoutInflight.current = Math.max(0, layoutInflight.current - 1);
           if (layoutInflight.current === 0) {
+            pendingLayout.current = null;
             setSaveState('saved');
             setTimeout(() => setSaveState('idle'), 800);
           }
-        },
-        onError: (err) => {
+        }).catch((err) => {
           layoutInflight.current = Math.max(0, layoutInflight.current - 1);
           if (layoutInflight.current === 0) {
-            setLocalLayout(ficha.sectionLayout);
             setSaveState('error');
-            setActionError(apiErrorMessage(err, 'No se pudo guardar el orden de las secciones'));
-            setTimeout(() => setSaveState('idle'), 3000);
+            setActionError(apiErrorMessage(err, 'No se pudo guardar el orden. Pulsa Guardar para reintentar.'));
           }
-        },
-      },
-    );
-  }
+        });
+  }, [fichaId, updateFichaAsync]);
 
   function handleUpdateLayoutVisual(patch: { slots: LayoutVisualSlot[] }) {
     if (!ficha) return;
@@ -526,11 +529,22 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     [scheduleSave],
   );
 
-  // handleReorderRow eliminado: el drag&drop de filas se retiró junto con
-  // el resto del sistema de reordenamiento manual.
+  const handleReorderRow = useCallback(
+    (sectionName: SectionName, activeId: string, overId: string) => {
+      setLocalSections((prev) => {
+        const rows = prev[sectionName] ?? [];
+        const updated = reorderFichaRows(rows, activeId, overId);
+        if (updated === rows) return prev;
+        scheduleSave(sectionName, updated, true);
+        return { ...prev, [sectionName]: updated };
+      });
+    },
+    [scheduleSave],
+  );
 
   // ── Guardar todo de inmediato ──────────────────────────────────────────────
   const handleSaveAll = useCallback(() => {
+    if (pendingLayout.current && !layoutInflight.current) handleUpdateLayout(pendingLayout.current);
     // Recopilar todas las secciones con guardado pendiente
     const pending: { sectionName: SectionName; rows: Row[] }[] = [];
     for (const [sectionName, timeout] of Object.entries(debounceRefs.current)) {
@@ -542,7 +556,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
       }
     }
 
-    if (!pending.length) {
+    if (!pending.length && !layoutInflight.current && !Object.values(saveQueuesRef.current).some(Boolean)) {
       // Sin cambios pendientes: salir del modo edición directamente
       setSaveState('saved');
       setTimeout(() => { setSaveState('idle'); setIsEditing(false); }, 800);
@@ -551,7 +565,11 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
     // Guardar todas las secciones respetando la cola individual de cada una.
     setSaveState('saving');
-    Promise.all(pending.map(({ sectionName, rows }) => enqueueSectionUpdate(sectionName, { rows })))
+    Promise.all([
+      ...pending.map(({ sectionName, rows }) => enqueueSectionUpdate(sectionName, { rows })),
+      ...Object.values(saveQueuesRef.current).filter(Boolean),
+      layoutQueue.current,
+    ])
       .then(() => {
         setSaveState('saved');
         setTimeout(() => {
@@ -564,7 +582,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         setActionError(apiErrorMessage(err, 'No se pudieron guardar todos los cambios'));
         setTimeout(() => setSaveState('idle'), 3000);
       });
-  }, [localSections, enqueueSectionUpdate]);
+  }, [localSections, enqueueSectionUpdate, handleUpdateLayout]);
 
   // ── Marcar sección como completada ─────────────────────────────────────────
   const handleSectionComplete = useCallback(
@@ -778,6 +796,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             onAddRow={handleAddRow}
             onDeleteRow={handleDeleteRow}
             onLabelChange={handleLabelChange}
+            onReorderRow={handleReorderRow}
             onSectionComplete={handleSectionComplete}
             sectionStatus={sectionStatus}
             saveState={saveState}
@@ -785,6 +804,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             modulesPanelOpen={modulesOpen}
             onToggleModulesPanel={canEdit ? () => setModulesOpen((o) => !o) : undefined}
             sectionLayout={localLayout}
+            onUpdateLayout={canEdit ? handleUpdateLayout : undefined}
             onUpdateLayoutVisual={canEdit ? handleUpdateLayoutVisual : undefined}
           />
         </div>

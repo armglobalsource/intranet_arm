@@ -287,14 +287,14 @@ interface LayoutVisualViewProps {
 }
 
 const D = {
-  cardBg:      'rgba(255,255,255,0.04)',
-  cardBorder:  'rgba(255,255,255,0.07)',
-  divider:     'rgba(255,255,255,0.06)',
-  headerBg:    'rgba(255,255,255,0.03)',
-  textPrimary: '#f0efec',
-  textSecond:  '#c4c1bc',
-  textMuted:   '#555350',
-  inputBorder: 'rgba(255,255,255,0.18)',
+  cardBg:      '#FFFFFF',
+  cardBorder:  '#DEE3EB',
+  divider:     '#EDF0F4',
+  headerBg:    '#F1F3F8',
+  textPrimary: '#243047',
+  textSecond:  '#526078',
+  textMuted:   '#69768B',
+  inputBorder: '#CCD4E1',
 };
 const TEAL = '#0D9488';
 
@@ -610,7 +610,7 @@ function LayoutSlotBody({
                           resize: 'vertical',
                           outline: 'none',
                           lineHeight: 1.4,
-                          colorScheme: 'dark' as any,
+                          colorScheme: 'light',
                         }}
                       />
                       {/* Print-only mirror: el textarea se oculta en print. */}
@@ -652,7 +652,7 @@ function LayoutSlotBody({
                           resize: 'vertical',
                           outline: 'none',
                           lineHeight: 1.4,
-                          colorScheme: 'dark' as any,
+                          colorScheme: 'light',
                         }}
                       />
                       <span className="ficha-print-only" style={{
