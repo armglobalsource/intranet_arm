@@ -12,7 +12,7 @@ describe('PostgreSQL identity security',()=>{
     const jwt={sign:vi.fn()};
     const service=new PostgresAuthService(db as any,{} as any,jwt as any,{} as any,{} as any);
     await expect(service.refresh('old-token')).rejects.toMatchObject({status:401});
-    expect(client.query.mock.calls[0][0]).toContain('FOR UPDATE');
+    expect(client.query.mock.calls[2][0]).toContain('FOR UPDATE');
     expect(jwt.sign).not.toHaveBeenCalled();
   });
   it('uses current permissions and campus instead of stale JWT claims',async()=>{
@@ -25,6 +25,17 @@ describe('PostgreSQL identity security',()=>{
     const auth={isTokenRevoked:vi.fn().mockResolvedValue(false),getMe:vi.fn().mockResolvedValue({status:'active',role:{name:'user'},roleId:2,permissions:[]}),getRole:vi.fn().mockResolvedValue({id:2,name:'user',permissions:[]})};
     const strategy=new PostgresJwtStrategy({get:()=> 'x'.repeat(40)} as any,auth as any);
     await expect(strategy.validate({sub:1,jti:'test',impersonating:true,roleId:3})).rejects.toMatchObject({status:401});
+  });
+  it('rejects access tokens issued before password recovery, including legacy tokens',async()=>{
+    const auth={isTokenRevoked:vi.fn().mockResolvedValue(false),getMe:vi.fn().mockResolvedValue({status:'active',authVersion:1})};
+    const strategy=new PostgresJwtStrategy({get:()=> 'x'.repeat(40)} as any,auth as any);
+    await expect(strategy.validate({sub:1,jti:'old'})).rejects.toMatchObject({status:401});
+    await expect(strategy.validate({sub:1,jti:'old',authVersion:0})).rejects.toMatchObject({status:401});
+  });
+  it('never claims a passwordless account through public registration',async()=>{
+    const users={findByEmail:vi.fn().mockResolvedValue({id:1,passwordHash:null})};
+    const service=new PostgresAuthService({} as any,users as any,{} as any,{} as any,{} as any);
+    await expect(service.register({email:'owner@example.invalid',password:'attacker-password',firstName:'Other',lastName:'Person'})).rejects.toMatchObject({status:409});
   });
   it('does not allow a user to edit their own role through the generic update endpoint',()=>{
     const guard=new PostgresUsersPermissionsGuard();

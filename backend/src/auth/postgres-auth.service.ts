@@ -31,7 +31,7 @@ export class PostgresAuthService {
     const permissions=role?.isActive===false?[]:role?.permissions??[];
     const accessTtl=this.config.get<number>('JWT_ACCESS_TTL',900);
     const refreshTtl=this.config.get<number>('JWT_REFRESH_TTL',28800);
-    const payload={sub:user.id,email:user.email,role:role?.isActive===false?'user':role?.name??'user',roleId:role?.id??0,permissions,jti:randomUUID(),campusId:user.campusId??null};
+    const payload={sub:user.id,authVersion:user.authVersion??0,email:user.email,role:role?.isActive===false?'user':role?.name??'user',roleId:role?.id??0,permissions,jti:randomUUID(),campusId:user.campusId??null};
     const accessToken=this.jwt.sign(payload,{expiresIn:`${accessTtl}s`});
     const refreshToken=randomUUID();
     await db.query(`INSERT INTO arm_app.refresh_tokens(document_id,"userId","tokenHash","expiresAt","ipAddress","userAgent","createdAt") VALUES ($1,$2,$3,$4,$5,$6,now())`,[randomUUID(),user.id,this.hash(refreshToken),new Date(Date.now()+refreshTtl*1000),ipAddress??null,userAgent??null]);
@@ -40,7 +40,11 @@ export class PostgresAuthService {
   private async session(user:any,ip?:string,agent?:string) {
     this.active(user);
     await this.users.updateLastLogin(user.id);
-    const {permissions,...tokens}=await this.db.transaction(client=>this.issue(user.id,client,ip,agent));
+    const {permissions,...tokens}=await this.db.transaction(async client=>{
+      const current=(await client.query('SELECT "passwordHash" FROM arm_app.users WHERE id=$1 FOR UPDATE',[user.id])).rows[0];
+      if(!current || current.passwordHash!==user.passwordHash) throw new UnauthorizedException('La contraseña cambió. Inicia sesión nuevamente.');
+      return this.issue(user.id,client,ip,agent);
+    });
     const safe=await this.users.findOne(user.id);
     return {user:{...safe,permissions},...tokens,needsProfileCompletion:!safe.onboardingCompletedAt};
   }
@@ -52,8 +56,11 @@ export class PostgresAuthService {
   async refresh(token:string) {
     if(typeof token!=='string'||!token) throw new UnauthorizedException('Refresh token inválido o expirado');
     return this.db.transaction(async client=>{
-      // Row lock serializes concurrent refreshes. Revocation and replacement
-      // commit together; token replay cannot mint a second session.
+      const owner=(await client.query('SELECT "userId" FROM arm_app.refresh_tokens WHERE "tokenHash"=$1',[this.hash(token)])).rows[0];
+      if(!owner) throw new UnauthorizedException('Refresh token inválido o expirado');
+      await client.query('SELECT id FROM arm_app.users WHERE id=$1 FOR UPDATE',[owner.userId]);
+      // Lock user before token, matching recovery. A refresh racing a password
+      // reset either commits first and is revoked, or sees a revoked token.
       const result=apiRows(await client.query(`SELECT * FROM arm_app.refresh_tokens WHERE "tokenHash"=$1 FOR UPDATE`,[this.hash(token)]));
       const stored=result[0];
       if(!stored||stored.revokedAt||new Date(stored.expiresAt).getTime()<=Date.now()) throw new UnauthorizedException('Refresh token inválido o expirado');
@@ -76,9 +83,7 @@ export class PostgresAuthService {
   async register(dto:RegisterDto,ip?:string,agent?:string) {
     let user=await this.users.findByEmail(dto.email);
     if(user) {
-      if(user.passwordHash) throw new ConflictException('Este email ya tiene una cuenta. Usa "Iniciar sesión".');
-      this.active(user);
-      user=await this.users.claimAccount(user.id,{firstName:dto.firstName||user.firstName,lastName:dto.lastName||user.lastName,password:dto.password});
+      throw new ConflictException('Este correo ya tiene una cuenta. Inicia sesión o usa "Olvidé mi contraseña" para recuperar tu acceso.');
     } else {
       user=await this.users.selfRegister(dto);
       await this.notifyRegistration(dto.email,dto.firstName,dto.lastName);
@@ -96,9 +101,7 @@ export class PostgresAuthService {
   async checkEmail(email:string) {
     const user=await this.users.findByEmail(email);
     if(!user) return {exists:false};
-    const missingFields=['gender','phone','avatarUrl','birthDate'].filter(key=>!user[key]);
-    if(!user.passwordHash) missingFields.push('password');
-    return {exists:true,needsProfileCompletion:missingFields.length>0,missingFields,user:{firstName:user.firstName,lastName:user.lastName,avatarUrl:user.avatarUrl,email:user.email}};
+    return {exists:true};
   }
   async completeProfile(id:number,dto:CompleteProfileDto) {
     const update:UpdateUserDto={};
@@ -113,7 +116,7 @@ export class PostgresAuthService {
     const role=await this.getRole(roleId);
     if(!role||role.isActive===false||role.name==='admin'||(role.permissions??[]).includes('*')) throw new ForbiddenException('Rol no disponible para simulación');
     const permissions=role.permissions??[];
-    const accessToken=this.jwt.sign({sub:userId,email,role:role.name,roleId,permissions,jti:randomUUID(),campusId:me.campusId??null,firstName:me.firstName,lastName:me.lastName,impersonating:true},{expiresIn:'4h'});
+    const accessToken=this.jwt.sign({sub:userId,authVersion:me.authVersion??0,email,role:role.name,roleId,permissions,jti:randomUUID(),campusId:me.campusId??null,firstName:me.firstName,lastName:me.lastName,impersonating:true},{expiresIn:'4h'});
     return {accessToken,roleName:role.name,permissions};
   }
 }

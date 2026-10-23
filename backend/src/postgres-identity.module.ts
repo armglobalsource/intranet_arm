@@ -12,6 +12,8 @@ import { UsersController } from './users/users.controller';
 import { RolesController } from './roles/roles.controller';
 import { NotificationsController } from './notifications/notifications.controller';
 import { PostgresAuthService } from './auth/postgres-auth.service';
+import { PasswordRecoveryService } from './auth/password-recovery.service';
+import { ResendMailerService } from './auth/resend-mailer.service';
 import { PostgresUsersService } from './users/postgres-users.service';
 import { PostgresRolesService } from './roles/postgres-roles.service';
 import { PostgresNotificationsService } from './notifications/postgres-notifications.service';
@@ -38,7 +40,7 @@ import { UploadsController } from './common/storage/uploads.controller';
   controllers:[AuthController,UsersController,RolesController,NotificationsController,UploadsController,...postgresDomainControllers],
   providers:[
     ...postgresDomainProviders,
-    PostgresAuthService,PostgresUsersService,PostgresRolesService,PostgresNotificationsService,
+    PostgresAuthService,PasswordRecoveryService,ResendMailerService,PostgresUsersService,PostgresRolesService,PostgresNotificationsService,
     PostgresJwtStrategy,
     {provide:APP_GUARD,useClass:JwtAuthGuard},
     {provide:APP_GUARD,useClass:PendingAccountGuard},

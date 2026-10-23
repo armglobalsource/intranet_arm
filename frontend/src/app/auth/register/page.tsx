@@ -184,6 +184,9 @@ export default function RegisterPage() {
               Inicia sesión
             </Link>
           </p>
+          <p className="text-center text-sm mt-4">
+            <Link href="/auth/forgot-password" className="text-white/70 underline underline-offset-4 hover:text-white">¿Ya estás en ARM? Recupera tu acceso por correo</Link>
+          </p>
 
         </div>
       </div>

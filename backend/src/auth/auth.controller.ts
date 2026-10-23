@@ -4,6 +4,8 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PostgresAuthService } from './postgres-auth.service';
+import { PasswordRecoveryService } from './password-recovery.service';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-recovery.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
@@ -18,7 +20,24 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class AuthController {
   constructor(
     private authService: PostgresAuthService,
+    private recovery: PasswordRecoveryService,
   ) {}
+
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.recovery.request(dto.email);
+  }
+
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.recovery.reset(dto.token, dto.password);
+  }
 
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
@@ -42,7 +61,7 @@ export class AuthController {
   @Post('check-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verificar si un email ya existe en la plataforma' })
-  checkEmail(@Body() body: { email: string }) {
+  checkEmail(@Body() body: ForgotPasswordDto) {
     return this.authService.checkEmail(body.email);
   }
 

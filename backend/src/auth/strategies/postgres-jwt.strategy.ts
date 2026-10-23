@@ -17,6 +17,7 @@ export class PostgresJwtStrategy extends PassportStrategy(Strategy) {
       throw error;
     }
     if(!['active','pending'].includes(me.status)) throw new UnauthorizedException('Cuenta no activa');
+    if((payload.authVersion??0)!==(me.authVersion??0)) throw new UnauthorizedException('La contraseña cambió. Inicia sesión nuevamente.');
     let role=await this.auth.getRole(me.roleId??0);
     if(payload.impersonating) {
       if(me.status!=='active'||(me.role?.name!=='admin'&&!me.permissions.includes('*'))) throw new UnauthorizedException('Simulación revocada');

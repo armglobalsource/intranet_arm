@@ -53,7 +53,7 @@ function redirectToLogin() {
 
 // Endpoints públicos de auth: un 401 aquí es un error de credenciales del propio
 // endpoint, no una sesión expirada — no deben disparar el refresh/redirect.
-const AUTH_ENDPOINTS = ['/auth/login', '/auth/register'];
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password'];
 
 // Una sola renovación en curso para todas las peticiones que reciben 401 a la
 // vez. El refresh token rota en cada uso y el backend trata su reutilización

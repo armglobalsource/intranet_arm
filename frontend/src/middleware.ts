@@ -8,6 +8,7 @@ export function middleware(_request: NextRequest) {
   const response = NextResponse.next();
   response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   response.headers.set('Pragma', 'no-cache');
+  if (_request.nextUrl.pathname.startsWith('/auth/')) response.headers.set('Referrer-Policy', 'no-referrer');
   return response;
 }
 

@@ -79,6 +79,11 @@ export class PostgresUsersService {
       if(dto.firstName!==undefined||dto.lastName!==undefined) data.nameLower=`${data.firstName??current.firstName} ${data.lastName??current.lastName??''}`.toLowerCase();
       if(dto.jobTitleIds!==undefined) data.jobTitles=await this.jobTitles(dto.jobTitleIds,client);
       await updateIdentity(client,'users',id,data);
+      if(passwordHash || (data.email !== undefined && data.email !== current.email)) {
+        await client.query('UPDATE arm_app.users SET "authVersion"="authVersion"+1 WHERE id=$1',[id]);
+        await client.query('UPDATE arm_app.refresh_tokens SET "revokedAt"=now() WHERE "userId"=$1 AND "revokedAt" IS NULL',[id]);
+        await client.query('UPDATE arm_app.password_reset_tokens SET "usedAt"=now() WHERE "userId"=$1 AND "usedAt" IS NULL',[id]);
+      }
     });
     return this.findOne(id);
   }
@@ -87,12 +92,6 @@ export class PostgresUsersService {
     return this.findOne(id);
   }
   async updateLastLogin(id: number) { await updateIdentity(this.db,'users',id,{lastLoginAt:new Date()}); }
-  async claimAccount(id: number,data: {firstName:string;lastName:string;password:string}) {
-    const hash=await bcrypt.hash(data.password,12);
-    const result=await this.db.query(`UPDATE arm_app.users SET "passwordHash"=$2,"firstName"=$3,"lastName"=$4,"nameLower"=lower($3||' '||$4),"updatedAt"=now() WHERE id=$1 AND "passwordHash" IS NULL AND status IN ('active','pending') RETURNING id`,[id,hash,data.firstName.trim(),data.lastName.trim()]);
-    if(!result.rowCount) throw new ConflictException('La cuenta ya fue reclamada o no está disponible');
-    return this.rawById(id);
-  }
   async selfRegister(data: {email:string;password?:string;firstName:string;lastName:string;avatarUrl?:string|null}) {
     const row=await insertIdentity(this.db,'users',{email:data.email.trim().toLowerCase(),passwordHash:data.password?await bcrypt.hash(data.password,12):null,firstName:data.firstName.trim(),lastName:data.lastName.trim(),nameLower:`${data.firstName.trim()} ${data.lastName.trim()}`.toLowerCase(),roleId:2,jobTitles:[],avatarUrl:data.avatarUrl??null,status:'pending',createdAt:new Date(),updatedAt:new Date()});
     return this.rawById(row.id);

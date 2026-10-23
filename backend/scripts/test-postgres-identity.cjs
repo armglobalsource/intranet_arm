@@ -97,6 +97,10 @@ async function main() {
     const base=await app.getUrl();
     const request=(route,method='GET',body,accessToken)=>fetch(base+'/api/v1'+route,{method,headers:{'Content-Type':'application/json',...(accessToken?{Authorization:`Bearer ${accessToken}`}:{})},...(body?{body:JSON.stringify(body)}:{})});
     assert.equal((await request('/users')).status,401);
+    assert.equal((await request('/auth/forgot-password','POST',{email:'invalid'})).status,400);
+    assert.equal((await request('/auth/forgot-password','POST',{email})).status,503,'Missing mail configuration must be explicit');
+    assert.equal((await request('/auth/reset-password','POST',{token:'invalid',password:'long-enough-password'})).status,400);
+    assert.equal((await request('/auth/reset-password','POST',{token:'a'.repeat(64),password:'long-enough-password'})).status,400);
     const loginResponse=await request('/auth/login','POST',{email,password});
     assert.equal(loginResponse.status,200);
     const httpSession=await loginResponse.json();
