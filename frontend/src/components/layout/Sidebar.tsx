@@ -203,7 +203,7 @@ const NAV: NavGroup[] = [
     icon:  ProduccionIcon,
     children: [
       { href: '/dashboard/fichas-tecnicas',                             label: 'Fichas Técnicas', icon: FichaIcon,    permission: 'fichas:view' },
-      { href: '/dashboard/produccion-general/tecnicos/disponibilidad',  label: 'Disp. Técnicos',  icon: TecnicosIcon, permission: 'tecnicos:submit' },
+      { href: '/dashboard/produccion-general/tecnicos/disponibilidad',  label: 'Disponibilidad técnica',  icon: TecnicosIcon, permission: 'tecnicos:submit' },
     ],
   },
   { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon,   permission: 'orgchart:view' },
@@ -261,6 +261,13 @@ export function Sidebar() {
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [bellOpen,        setBellOpen]        = useState(false);
   const [collapsed,       setCollapsed]       = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileOpen(false); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, []);
   const [expandedGroups,  setExpandedGroups]  = useState<Set<string>>(new Set());
   const menuRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLDivElement>(null);
@@ -285,14 +292,13 @@ export function Sidebar() {
   }, [pathname]);
 
   function toggleGroup(href: string, e: React.MouseEvent) {
-    // Permitir que el Link navegue pero también alternar el grupo
+    // El botón solo despliega opciones; el enlace abre la página del grupo.
     e.preventDefault();
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       next.has(href) ? next.delete(href) : next.add(href);
       return next;
     });
-    router.push(href);
   }
 
   function toggleSidebar() {
@@ -333,15 +339,22 @@ export function Sidebar() {
 
   return (
     <>
+      <div className="fixed inset-x-0 top-0 z-50 flex h-14 items-center gap-3 border-b border-white/15 bg-[#0d0d0d] px-3 text-white md:hidden">
+        <button onClick={() => setMobileOpen(!mobileOpen)} aria-expanded={mobileOpen} aria-controls="main-navigation" aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'} className="min-h-[44px] min-w-[44px] rounded-lg border border-white/20 text-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300">{mobileOpen ? '×' : '☰'}</button>
+        <span className="text-sm font-semibold">ARM Global</span>
+        <span className="ml-auto truncate text-xs text-slate-300">{user?.campus?.name ?? 'Mi espacio'}</span>
+      </div>
+      {mobileOpen && <button aria-label="Cerrar navegación" onClick={() => setMobileOpen(false)} className="fixed inset-0 top-14 z-30 bg-black/60 md:hidden" />}
       {/* Botón flotante para reabrir cuando está colapsado */}
       {collapsed && (
         <button
           onClick={toggleSidebar}
           title="Abrir menú"
-          className="fixed left-0 top-1/2 -translate-y-1/2 z-50 flex items-center justify-center w-5 h-10 rounded-r-md transition-all hover:w-6"
+          aria-label="Abrir menú de navegación"
+          className="fixed left-0 top-1/2 -translate-y-1/2 z-50 hidden md:flex items-center justify-center w-11 h-12 rounded-r-md transition-all"
           style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderLeft: 'none' }}
         >
-          <svg className="w-3 h-3 text-white/40 hover:text-white/70" viewBox="0 0 24 24" fill="none"
+          <svg className="w-3 h-3 text-slate-300 hover:text-white" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6" />
           </svg>
@@ -349,10 +362,10 @@ export function Sidebar() {
       )}
 
     <aside
+      id="main-navigation"
+      onClickCapture={(event) => { if ((event.target as HTMLElement).closest('a')) setMobileOpen(false); }}
       style={{ background: '#0d0d0d', borderRight: '1px solid #1f1f1f' }}
-      className={`flex flex-col shrink-0 print:hidden overflow-hidden transition-all duration-300 ease-in-out ${
-        collapsed ? 'w-0' : 'w-56'
-      }`}
+      className={`app-sidebar fixed bottom-0 top-14 left-0 z-40 w-64 flex flex-col shrink-0 print:hidden overflow-hidden transition-all duration-300 ease-in-out md:static md:translate-x-0 ${mobileOpen ? 'translate-x-0 visible' : '-translate-x-full invisible'} ${collapsed ? 'md:w-0 md:invisible' : 'md:w-56 md:visible'}`}
     >
       {/* Logo + botón colapsar */}
       <div style={{ borderBottom: '1px solid #1f1f1f' }}
@@ -368,9 +381,9 @@ export function Sidebar() {
         <button
           onClick={toggleSidebar}
           title="Ocultar menú"
-          className="flex items-center justify-center w-6 h-6 rounded-md transition-all hover:bg-white/10 flex-shrink-0"
+          className="hidden md:flex items-center justify-center w-8 h-8 rounded-md transition-all hover:bg-white/10 flex-shrink-0"
         >
-          <svg className="w-3.5 h-3.5 text-white/30 hover:text-white/60" viewBox="0 0 24 24" fill="none"
+          <svg className="w-3.5 h-3.5 text-slate-300 hover:text-white" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -378,7 +391,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 pt-4 space-y-0.5 min-w-[224px]">
+      <nav aria-label="Navegación principal" className="min-h-0 overflow-y-auto flex-1 p-3 pt-4 space-y-0.5 min-w-[224px]">
         {visibleNav.map(({ href, label, icon: Icon, children }) => {
           const childActive  = children?.some((c) => pathname.startsWith(c.href)) ?? false;
           const isExpanded   = expandedGroups.has(href);
@@ -395,18 +408,21 @@ export function Sidebar() {
           return (
             <div key={href}>
               {/* Ítem principal */}
+              <div className="flex items-center gap-1">
               <Link
                 href={href}
-                onClick={children ? (e) => toggleGroup(href, e) : undefined}
+                aria-current={active && !children ? 'page' : undefined}
                 style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                className={`flex flex-1 items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  active ? 'text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'
                 }`}
               >
                 <Icon active={active} />
                 <span className="flex-1">{label}</span>
-                {/* Chevron para ítems con hijos */}
+              </Link>
+                {/* Expandir no cambia de página */}
                 {children && (
+                  <button onClick={(e) => toggleGroup(href, e)} aria-expanded={isExpanded} aria-label={`${isExpanded ? 'Contraer' : 'Expandir'} ${label}`} className="flex min-h-[44px] w-10 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-white/10">
                   <svg
                     className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${
                       isExpanded ? 'rotate-180' : ''
@@ -416,8 +432,9 @@ export function Sidebar() {
                   >
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
+                  </button>
                 )}
-              </Link>
+              </div>
 
               {/* Sub-ítems colapsables */}
               {children && isExpanded && (
@@ -428,9 +445,10 @@ export function Sidebar() {
                       <Link
                         key={chref}
                         href={chref}
+                        aria-current={cActive ? 'page' : undefined}
                         style={cActive ? { background: 'rgba(255,255,255,0.06)' } : {}}
                         className={`flex items-center gap-2.5 pl-8 pr-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                          cActive ? 'text-white/90' : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                          cActive ? 'text-white/90' : 'text-slate-300 hover:text-white hover:bg-white/5'
                         }`}
                       >
                         <span
@@ -457,11 +475,11 @@ export function Sidebar() {
               href={href}
               style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                active ? 'text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
             >
               <AdminCampusIcon active={active} />
-              Adm. Campus
+              Administración de campus
             </Link>
           );
         })()}
@@ -477,7 +495,7 @@ export function Sidebar() {
               href={href}
               style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                active ? 'text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
             >
               <ConfigIcon active={active} />
@@ -493,7 +511,7 @@ export function Sidebar() {
               href={href}
               style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active ? 'text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                active ? 'text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
             >
               <SoporteIcon active={active} />
@@ -626,7 +644,7 @@ export function Sidebar() {
                         <button
                           key={role.id}
                           onClick={() => { setMenuOpen(false); startImpersonation(role.id); }}
-                          className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
+                          className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 transition-all"
                         >
                           <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

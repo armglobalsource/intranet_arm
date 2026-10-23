@@ -13,6 +13,13 @@
 }
 
 @layer components {
+  .dashboard-action {
+    @apply inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/10;
+  }
+  .dashboard-home :is(a, button):focus-visible,
+  .app-sidebar :is(a, button):focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-emerald-300;
+  }
   .btn-primary {
     @apply bg-gray-900 hover:bg-black text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
   }
