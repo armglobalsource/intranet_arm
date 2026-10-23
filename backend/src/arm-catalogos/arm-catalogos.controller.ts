@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { AllowPending } from '../common/decorators/allow-pending.decorator';
-import { ArmCatalogosService } from './arm-catalogos.service';
+import { PostgresArmCatalogosService } from './postgres-arm-catalogos.service';
 import {
   ARM_CATALOGO_TIPOS, ArmCatalogoTipo, CreateArmCatalogoDto, UpdateArmCatalogoDto,
 } from './dto/arm-catalogo.dto';
@@ -23,7 +23,7 @@ function parseTipo(tipo: string): ArmCatalogoTipo {
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'arm-catalogos', version: '1' })
 export class ArmCatalogosController {
-  constructor(private readonly service: ArmCatalogosService) {}
+  constructor(private readonly service: PostgresArmCatalogosService) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar catálogo completo (admin) por tipo' })

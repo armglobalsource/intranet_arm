@@ -5,13 +5,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { DisponibilidadService } from './disponibilidad.service';
+import { PostgresDisponibilidadService } from './postgres-availability';
 import { BulkSubmitDto } from './dto/disponibilidad.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('disponibilidad')
 export class DisponibilidadController {
-  constructor(private readonly svc: DisponibilidadService) {}
+  constructor(private readonly svc: PostgresDisponibilidadService) {}
 
   /** Slots de encuentro de una semana para un campus (cualquier usuario autenticado) */
   @Get('encounters')

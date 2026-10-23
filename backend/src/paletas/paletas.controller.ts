@@ -1,12 +1,12 @@
 import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
-import { PaletasService } from './paletas.service';
+import { PostgresPaletasService } from './postgres-paletas.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreatePaletaDto } from './dto/paleta.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('paletas')
 export class PaletasController {
-  constructor(private readonly svc: PaletasService) {}
+  constructor(private readonly svc: PostgresPaletasService) {}
 
   /** GET /api/v1/paletas — paletas de outfit activas */
   @Get()

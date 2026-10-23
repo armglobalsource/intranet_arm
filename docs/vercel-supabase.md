@@ -1,5 +1,28 @@
 # Backend NestJS en Vercel y PostgreSQL
 
+## Sin Firebase ni Google Cloud (23 de octubre de 2026)
+
+- El código ya no depende de Firebase ni de Google Cloud. Se eliminaron los 30
+  servicios Firestore usados como tokens de inyección: los controladores reciben
+  directamente sus servicios PostgreSQL. También FirebaseService, los módulos
+  antiguos, `legacy-app.module.ts`, la rama GCS de StorageService (queda
+  `supabase` o `local`) y las dependencias `firebase-admin`,
+  `@google-cloud/storage` y `passport-google-oauth20`.
+- Al tipar los controladores con los servicios reales apareció un método que no
+  existía en PostgreSQL: `isBasicRole` (alta de personas desde el organigrama).
+  Se implementó en PostgresUsersService.
+- Se quitó el login con Google (rutas `auth/google`, estrategia, botón de registro
+  y página `/auth/google-callback`).
+- Se borró la configuración de despliegue antigua: Firebase Hosting, Cloud Build,
+  `deploy.sh`, Docker, nginx, los workflows de Cloud Run y los scripts de
+  Firestore. El README describe ahora Supabase + Vercel.
+- El frontend renueva el token con una sola petición compartida. Antes, varias
+  renovaciones simultáneas reutilizaban el refresh token y el backend cerraba la
+  sesión al vencer el access token (cada 15 minutos).
+- Se eliminó el proyecto Vercel `intranet-arm-api`; solo queda `intranet_arm`.
+- Verificado: 30 pruebas backend, 14 frontend, integración PostgreSQL (identidad
+  con HTTP real, fichas y dominios) y producción en ecosistema.armglobal.org.
+
 ## Retiro de Cloud Run (23 de octubre de 2026)
 
 El usuario confirmó login, acceso al dashboard y cambio de foto desde la web.

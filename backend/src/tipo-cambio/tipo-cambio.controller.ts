@@ -3,13 +3,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { TipoCambioService } from './tipo-cambio.service';
+import { PostgresTipoCambioService } from './postgres-tipo-cambio.service';
 import { UpdateTipoCambioDto } from './dto/tipo-cambio.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('tipo-cambio')
 export class TipoCambioController {
-  constructor(private readonly tipoCambio: TipoCambioService) {}
+  constructor(private readonly tipoCambio: PostgresTipoCambioService) {}
 
   @Get()
   findAll(@Query('monedas') monedas?: string) {

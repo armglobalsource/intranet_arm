@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ArmRecordStore } from '../common/database/arm-record-store';
-import { CampusService } from '../campus/campus.service';
-import { ArmCatalogosService } from '../arm-catalogos/arm-catalogos.service';
+import { PostgresCampusService } from '../campus/postgres-campus.service';
+import { PostgresArmCatalogosService } from '../arm-catalogos/postgres-arm-catalogos.service';
 import { sumCounts } from '../common/arm-records.util';
 
 export type GroupBy = 'week' | 'month';
@@ -118,8 +118,8 @@ function hasNumericValue(values?: Record<string, unknown>) {
 export class PostgresEstadisticasService {
   constructor(
     private store: ArmRecordStore,
-    private campuses: CampusService,
-    private catalogs: ArmCatalogosService,
+    private campuses: PostgresCampusService,
+    private catalogs: PostgresArmCatalogosService,
   ) {}
 
   async dashboard(options: DashboardOptions) {

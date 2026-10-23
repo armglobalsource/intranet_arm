@@ -6,13 +6,13 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { FichasService } from './fichas.service';
+import { PostgresFichasService } from './postgres-fichas.service';
 import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto } from './dto/ficha.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('fichas')
 export class FichasController {
-  constructor(private readonly fichasService: FichasService) {}
+  constructor(private readonly fichasService: PostgresFichasService) {}
 
   @Get()
   @RequirePermission('fichas:view')

@@ -11,24 +11,18 @@ import { AuthController } from './auth/auth.controller';
 import { UsersController } from './users/users.controller';
 import { RolesController } from './roles/roles.controller';
 import { NotificationsController } from './notifications/notifications.controller';
-import { AuthService } from './auth/auth.service';
-import { UsersService } from './users/users.service';
-import { RolesService } from './roles/roles.service';
-import { NotificationsService } from './notifications/notifications.service';
 import { PostgresAuthService } from './auth/postgres-auth.service';
 import { PostgresUsersService } from './users/postgres-users.service';
 import { PostgresRolesService } from './roles/postgres-roles.service';
 import { PostgresNotificationsService } from './notifications/postgres-notifications.service';
 import { PostgresJwtStrategy } from './auth/strategies/postgres-jwt.strategy';
-import { GoogleStrategy } from './auth/strategies/google.strategy';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PendingAccountGuard } from './common/guards/pending-account.guard';
 import { PostgresUsersPermissionsGuard } from './auth/guards/postgres-users-permissions.guard';
 import { postgresDomainControllers,postgresDomainProviders } from './postgres-domain.providers';
 import { UploadsController } from './common/storage/uploads.controller';
 
-// Independent application root: no Firebase providers or legacy domain modules.
-// Use only for migration validation until all domain services have SQL repositories.
+// Application root: identity, permissions and every domain on PostgreSQL (Supabase).
 @Module({
   imports:[
     ConfigModule.forRoot({isGlobal:true,envFilePath:['.env.supabase','.env'],validationSchema:Joi.object({
@@ -45,11 +39,7 @@ import { UploadsController } from './common/storage/uploads.controller';
   providers:[
     ...postgresDomainProviders,
     PostgresAuthService,PostgresUsersService,PostgresRolesService,PostgresNotificationsService,
-    {provide:AuthService,useExisting:PostgresAuthService},
-    {provide:UsersService,useExisting:PostgresUsersService},
-    {provide:RolesService,useExisting:PostgresRolesService},
-    {provide:NotificationsService,useExisting:PostgresNotificationsService},
-    PostgresJwtStrategy,GoogleStrategy,
+    PostgresJwtStrategy,
     {provide:APP_GUARD,useClass:JwtAuthGuard},
     {provide:APP_GUARD,useClass:PendingAccountGuard},
     {provide:APP_GUARD,useClass:PostgresUsersPermissionsGuard},

@@ -9,7 +9,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { VisualReferencesService } from './visual-references.service';
+import { PostgresVisualReferencesService } from './postgres-visual-references.service';
 import { CreateVisualReferenceDto, UpdateVisualReferenceDto } from './dto/visual-reference.dto';
 
 @ApiTags('VisualReferences')
@@ -17,7 +17,7 @@ import { CreateVisualReferenceDto, UpdateVisualReferenceDto } from './dto/visual
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'visual-references', version: '1' })
 export class VisualReferencesController {
-  constructor(private readonly service: VisualReferencesService) {}
+  constructor(private readonly service: PostgresVisualReferencesService) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar referencias visuales (con búsqueda opcional por nombre/tag)' })

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ArmRecordStore } from '../common/database/arm-record-store';
-import { TipoCambioService } from '../tipo-cambio/tipo-cambio.service';
-import { ArmCatalogosService } from '../arm-catalogos/arm-catalogos.service';
+import { PostgresTipoCambioService } from '../tipo-cambio/postgres-tipo-cambio.service';
+import { PostgresArmCatalogosService } from '../arm-catalogos/postgres-arm-catalogos.service';
 import { Periodo, mapId, inPeriodo } from '../common/arm-records.util';
 import { CreateSiembraDto, UpdateSiembraDto, MontoDto, MetodoPagoDto, AporteDto } from './dto/siembra.dto';
 
@@ -154,8 +154,8 @@ function buildPeriods(year: number, groupBy: GroupBy) {
 export class PostgresSiembraService {
   constructor(
     private store: ArmRecordStore,
-    private tipoCambio: TipoCambioService,
-    private armCatalogos: ArmCatalogosService,
+    private tipoCambio: PostgresTipoCambioService,
+    private armCatalogos: PostgresArmCatalogosService,
   ) {}
 
   /** Objetos planos (no instancias de clase) para que Firestore pueda serializarlos — mismo fix que encuentros.service.ts. */
@@ -257,7 +257,7 @@ export class PostgresSiembraService {
    * Agregación para el dashboard "Siembras" del intranet: totales por moneda
    * (ofrendas/diezmos/otros, efectivo/sumup), serie por período (semana/mes),
    * y un total de referencia convertido a CLP/USD vía las tasas manuales de
-   * TipoCambioService. Sin restricción por campus (se filtra solo si se pide).
+   * PostgresTipoCambioService. Sin restricción por campus (se filtra solo si se pide).
    */
   async dashboard(year: number, groupBy: GroupBy, campus?: string) {
     const rows = (await this.store.list(COL,{campus,start:`${year}-01-01`,end:`${year}-12-31`}))

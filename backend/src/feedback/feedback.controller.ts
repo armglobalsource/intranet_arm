@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
-import { FeedbackService } from './feedback.service';
+import { PostgresFeedbackService } from './postgres-feedback.service';
 import { CreateFeedbackDto, UpdateFeedbackStatusDto } from './dto/feedback.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -12,7 +12,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @ApiBearerAuth()
 @Controller({ path: 'feedback', version: '1' })
 export class FeedbackController {
-  constructor(private readonly service: FeedbackService) {}
+  constructor(private readonly service: PostgresFeedbackService) {}
 
   @Post()
   @ApiOperation({ summary: 'Enviar reporte o sugerencia' })

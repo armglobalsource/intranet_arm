@@ -5,17 +5,17 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CampusService } from '../campus/campus.service';
+import { PostgresCampusService } from '../campus/postgres-campus.service';
 import { resolveCampusScope, applyLimit } from '../common/campus-scope';
-import { KiloamorService } from './kiloamor.service';
+import { PostgresKiloamorService } from './postgres-kiloamor.service';
 import { CreateKiloamorDto, UpdateKiloamorDto } from './dto/kiloamor.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('kiloamor')
 export class KiloamorController {
   constructor(
-    private readonly kiloamor: KiloamorService,
-    private readonly campusService: CampusService,
+    private readonly kiloamor: PostgresKiloamorService,
+    private readonly campusService: PostgresCampusService,
   ) {}
 
   /** Resumen agregado del campus del usuario autenticado (nunca del campus que el cliente pida). */

@@ -5,17 +5,17 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CampusService } from '../campus/campus.service';
+import { PostgresCampusService } from '../campus/postgres-campus.service';
 import { resolveCampusScope, applyLimit } from '../common/campus-scope';
-import { SiembraService } from './siembra.service';
+import { PostgresSiembraService } from './postgres-siembra.service';
 import { CreateSiembraDto, UpdateSiembraDto } from './dto/siembra.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('siembra')
 export class SiembraController {
   constructor(
-    private readonly siembra: SiembraService,
-    private readonly campusService: CampusService,
+    private readonly siembra: PostgresSiembraService,
+    private readonly campusService: PostgresCampusService,
   ) {}
 
   @Get()

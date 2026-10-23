@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CampusTurnosService } from './campus-turnos.service';
+import { PostgresCampusTurnosService } from './postgres-campus-turnos.service';
 import {
   CAMPUS_TURNO_TIPOS, CampusTurnoTipo,
   CreateAdministradorDto, UpdateAdministradorDto,
@@ -26,7 +26,7 @@ function parseTipo(tipo?: string): CampusTurnoTipo {
 @UseGuards(JwtAuthGuard)
 @Controller('campus-turnos')
 export class CampusTurnosController {
-  constructor(private readonly service: CampusTurnosService) {}
+  constructor(private readonly service: PostgresCampusTurnosService) {}
 
   @Get('administradores')
   findAdministradores(@Query('campusId', ParseIntPipe) campusId: number, @Query('tipo') tipo?: string) {

@@ -5,17 +5,17 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CampusService } from '../campus/campus.service';
+import { PostgresCampusService } from '../campus/postgres-campus.service';
 import { resolveCampusScope, applyLimit } from '../common/campus-scope';
-import { EncuentrosService } from './encuentros.service';
+import { PostgresEncuentrosService } from './postgres-encuentros.service';
 import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('encuentros')
 export class EncuentrosController {
   constructor(
-    private readonly encuentros: EncuentrosService,
-    private readonly campusService: CampusService,
+    private readonly encuentros: PostgresEncuentrosService,
+    private readonly campusService: PostgresCampusService,
   ) {}
 
   /** Resumen agregado del campus del usuario autenticado (nunca del campus que el cliente pida). */

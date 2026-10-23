@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ArmRecordStore } from '../common/database/arm-record-store';
 import { Periodo, mapId, inPeriodo, inMonth } from '../common/arm-records.util';
 import { CreateKiloamorDto, UpdateKiloamorDto } from './dto/kiloamor.dto';
-import { CampusService } from '../campus/campus.service';
+import { PostgresCampusService } from '../campus/postgres-campus.service';
 
 const COL = 'kiloamor';
 
@@ -15,7 +15,7 @@ export interface KiloamorResumen {
 export class PostgresKiloamorService {
   constructor(
     private store: ArmRecordStore,
-    private campuses: CampusService,
+    private campuses: PostgresCampusService,
   ) {}
 
   async findAll(campusId?: string, periodo: Periodo = 'todo') {

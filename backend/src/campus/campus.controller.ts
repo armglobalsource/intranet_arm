@@ -3,13 +3,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { AllowPending } from '../common/decorators/allow-pending.decorator';
-import { CampusService } from './campus.service';
+import { PostgresCampusService } from './postgres-campus.service';
 import { CreateCampusDto, UpdateCampusDto } from './dto/campus.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('campus')
 export class CampusController {
-  constructor(private readonly campusService: CampusService) {}
+  constructor(private readonly campusService: PostgresCampusService) {}
 
   @Get()
   findAll() { return this.campusService.findAll(); }

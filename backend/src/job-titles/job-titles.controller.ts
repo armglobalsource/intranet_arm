@@ -5,7 +5,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { JobTitlesService } from './job-titles.service';
+import { PostgresJobTitlesService } from './postgres-job-titles.service';
 import { CreateJobTitleDto, UpdateJobTitleDto } from './dto/job-title.dto';
 
 @ApiTags('JobTitles')
@@ -13,7 +13,7 @@ import { CreateJobTitleDto, UpdateJobTitleDto } from './dto/job-title.dto';
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'job-titles', version: '1' })
 export class JobTitlesController {
-  constructor(private readonly service: JobTitlesService) {}
+  constructor(private readonly service: PostgresJobTitlesService) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar todos los cargos (admin)' })

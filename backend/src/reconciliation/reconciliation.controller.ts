@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { ReconciliationService } from './reconciliation.service';
+import { PostgresReconciliationService } from './postgres-reconciliation.service';
 import { MatchRequestDto, ApplyRequestDto } from './dto/reconciliation.dto';
 
 @ApiTags('Reconciliation')
@@ -13,7 +13,7 @@ import { MatchRequestDto, ApplyRequestDto } from './dto/reconciliation.dto';
 @Roles('admin')
 @Controller({ path: 'reconciliation', version: '1' })
 export class ReconciliationController {
-  constructor(private readonly service: ReconciliationService) {}
+  constructor(private readonly service: PostgresReconciliationService) {}
 
   @Post('match')
   @ApiOperation({ summary: 'Admin: proponer matches entre filas de Excel y usuarios existentes (sin escribir en la BD)' })

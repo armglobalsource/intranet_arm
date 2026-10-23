@@ -87,17 +87,6 @@ export class PostgresUsersService {
     return this.findOne(id);
   }
   async updateLastLogin(id: number) { await updateIdentity(this.db,'users',id,{lastLoginAt:new Date()}); }
-  async patchGoogleFields(id: number,patch: Record<string,string>) {
-    await this.db.transaction(async client=>{
-      await client.query('SELECT id FROM arm_app.users WHERE id=$1 FOR UPDATE',[id]);
-      const current=await this.rawById(id,client);
-      const data: any={updatedAt:new Date()};
-      for(const key of ['firstName','lastName','avatarUrl']) if(patch[key]!==undefined) data[key]=patch[key];
-      data.nameLower=`${data.firstName??current.firstName} ${data.lastName??current.lastName??''}`.toLowerCase();
-      await updateIdentity(client,'users',id,data);
-    });
-    return this.rawById(id);
-  }
   async claimAccount(id: number,data: {firstName:string;lastName:string;password:string}) {
     const hash=await bcrypt.hash(data.password,12);
     const result=await this.db.query(`UPDATE arm_app.users SET "passwordHash"=$2,"firstName"=$3,"lastName"=$4,"nameLower"=lower($3||' '||$4),"updatedAt"=now() WHERE id=$1 AND "passwordHash" IS NULL AND status IN ('active','pending') RETURNING id`,[id,hash,data.firstName.trim(),data.lastName.trim()]);
@@ -115,6 +104,11 @@ export class PostgresUsersService {
     } catch(error) {databaseError(error);}
     await this.notifications.create({userId:id,title:status==='active'?'Tu cuenta fue aprobada':'Tu solicitud de registro fue rechazada',link:'/auth/login',channel:'in_app'},0).catch(()=>this.logger.warn('No se pudo enviar notificación de estado'));
     return this.findOne(id);
+  }
+  /** El organigrama solo puede crear personas con el rol básico ("user"). */
+  async isBasicRole(roleId: number): Promise<boolean> {
+    const result=await this.db.query(`SELECT 1 FROM arm_app.roles WHERE id=$1 AND name='user'`,[roleId]);
+    return !!result.rowCount;
   }
   approve(id: number,roleId?:number) { return this.changeStatus(id,'active',['pending','rejected'],roleId); }
   reject(id: number) { return this.changeStatus(id,'rejected',['pending']); }

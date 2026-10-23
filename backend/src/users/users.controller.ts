@@ -9,7 +9,7 @@ import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { UsersService } from './users.service';
+import { PostgresUsersService } from './postgres-users.service';
 import { CreateUserDto, UpdateUserDto, ApproveUserDto } from './dto/create-user.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { hasPermission } from '../common/permissions';
@@ -24,7 +24,7 @@ const ORGCHART_FIELDS = ['firstName', 'lastName', 'email', 'phone', 'country', '
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
-  constructor(private readonly service: UsersService) {}
+  constructor(private readonly service: PostgresUsersService) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar usuarios paginados (con búsqueda opcional)' })

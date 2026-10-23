@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ArmRecordStore } from '../common/database/arm-record-store';
 import { Periodo, mapId, sumCounts, inPeriodo, inMonth } from '../common/arm-records.util';
 import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
-import { CampusService } from '../campus/campus.service';
+import { PostgresCampusService } from '../campus/postgres-campus.service';
 
 const COL = 'encuentros';
 
@@ -22,7 +22,7 @@ export interface EncuentrosResumen {
 export class PostgresEncuentrosService {
   constructor(
     private store: ArmRecordStore,
-    private campuses: CampusService,
+    private campuses: PostgresCampusService,
   ) {}
 
   // ── Lectura ──────────────────────────────────────────────────────────────

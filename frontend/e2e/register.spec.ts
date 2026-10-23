@@ -80,17 +80,6 @@ test.describe('Registro de nueva cuenta', () => {
     await expect(page).toHaveURL(/\/auth\/register/);
   });
 
-  // ── Escenario 2: Registro con Google ─────────────────────────────────────
-
-  test('botón de Google redirige a accounts.google.com', async ({ page }) => {
-    const [response] = await Promise.all([
-      page.waitForNavigation({ timeout: 8000 }),
-      page.getByRole('button', { name: /continuar con google/i }).click(),
-    ]);
-
-    expect(page.url()).toContain('accounts.google.com');
-  });
-
   // ── Navegación ────────────────────────────────────────────────────────────
 
   test('enlace "Inicia sesión" lleva al login', async ({ page }) => {

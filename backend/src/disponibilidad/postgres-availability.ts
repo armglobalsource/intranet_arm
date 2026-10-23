@@ -2,7 +2,7 @@ import { BadRequestException,Injectable,NotFoundException } from '@nestjs/common
 import { DatabaseService } from '../common/database/database.service';
 import { apiRows } from '../common/database/identity-sql';
 import { PostgresCampusService } from '../campus/postgres-campus.service';
-import { EncounterSlot } from './disponibilidad.service';
+import { EncounterSlot } from './encounter-slot';
 import { BulkSubmitDto } from './dto/disponibilidad.dto';
 
 export function isoWeekMonday(label:string) {

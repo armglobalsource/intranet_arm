@@ -6,7 +6,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { ContentsService } from './content.service';
+import { PostgresContentsService } from './postgres-content.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -15,7 +15,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'content', version: '1' })
 export class ContentsController {
-  constructor(private readonly service: ContentsService) {}
+  constructor(private readonly service: PostgresContentsService) {}
 
   // ── Admin ──────────────────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { OrgChartService } from './orgchart.service';
+import { PostgresOrgChartService } from './postgres-orgchart.service';
 import {
   CreateOrgAreaDto, UpdateOrgAreaDto,
   CreateOrgTeamDto, UpdateOrgTeamDto,
@@ -17,7 +17,7 @@ import {
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller({ path: 'orgchart', version: '1' })
 export class OrgChartController {
-  constructor(private readonly service: OrgChartService) {}
+  constructor(private readonly service: PostgresOrgChartService) {}
 
   // ── ÁREAS ────────────────────────────────────────────────────
 

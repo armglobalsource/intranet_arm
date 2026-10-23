@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { migrateMediaData } from './fichas.service';
+import { migrateMediaData } from './fichas.defaults';
 
 describe('migración del módulo Media', () => {
   it('mueve asignaciones antiguas desde Producción sin perder datos', () => {

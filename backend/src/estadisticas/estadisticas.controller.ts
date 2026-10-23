@@ -6,13 +6,15 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { hasPermission } from '../common/permissions';
-import { EstadisticasService, GroupBy, RecordType } from './estadisticas.service';
+import { PostgresEstadisticasService } from './postgres-estadisticas.service';
+import { GroupBy } from './postgres-estadisticas.service';
+import { RecordType } from './postgres-estadisticas.service';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermission('estadisticas:view')
 @Controller('estadisticas')
 export class EstadisticasController {
-  constructor(private readonly estadisticas: EstadisticasService) {}
+  constructor(private readonly estadisticas: PostgresEstadisticasService) {}
 
   @Get()
   async dashboard(

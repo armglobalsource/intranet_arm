@@ -1,12 +1,12 @@
 import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
-import { CancionesService } from './canciones.service';
+import { PostgresCancionesService } from './postgres-canciones.service';
 import { UpsertCancionDto } from './dto/cancion.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('canciones')
 export class CancionesController {
-  constructor(private readonly svc: CancionesService) {}
+  constructor(private readonly svc: PostgresCancionesService) {}
 
   /** GET /api/v1/canciones?q=aleluya  — buscar canciones */
   @Get()

@@ -1,7 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { SearchService } from './search.service';
+import { PostgresSearchService } from './postgres-search.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Search')
@@ -9,7 +9,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'search', version: '1' })
 export class SearchController {
-  constructor(private readonly searchService: SearchService) {}
+  constructor(private readonly searchService: PostgresSearchService) {}
 
   @Get()
   @ApiOperation({ summary: 'Búsqueda global en usuarios, contenido y documentos' })

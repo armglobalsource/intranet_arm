@@ -88,19 +88,6 @@ export class PostgresAuthService {
   private async notifyRegistration(email:string,first:string,last:string) {
     await this.notifications.createForPermission('users:edit',{title:`Nuevo usuario registrado: ${first} ${last}`,body:`${email} se registró y está pendiente de tu aprobación.`,link:'/dashboard/directorio/personas?status=pending',channel:'in_app'}).catch(()=>this.logger.warn('No se pudo crear notificación de registro'));
   }
-  async googleAuth(data:{email:string;firstName:string;lastName:string;avatarUrl?:string|null},ip?:string,agent?:string) {
-    let user=await this.users.findByEmail(data.email);
-    if(!user) {user=await this.users.selfRegister(data);await this.notifyRegistration(data.email,data.firstName,data.lastName);}
-    else {
-      this.active(user);
-      const patch:Record<string,string>={};
-      if(data.avatarUrl) patch.avatarUrl=data.avatarUrl;
-      if(!user.firstName&&data.firstName) patch.firstName=data.firstName;
-      if(!user.lastName&&data.lastName) patch.lastName=data.lastName;
-      if(Object.keys(patch).length) user=await this.users.patchGoogleFields(user.id,patch);
-    }
-    return this.session(user,ip,agent);
-  }
   async getMe(id:number) {
     const user=await this.users.findOne(id);
     const role=await this.getRole(user.roleId??0);

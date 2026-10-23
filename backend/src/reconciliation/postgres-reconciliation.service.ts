@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../common/database/database.service';
 import { apiRows } from '../common/database/identity-sql';
-import { UsersService } from '../users/users.service';
-import { CampusService } from '../campus/campus.service';
+import { PostgresUsersService } from '../users/postgres-users.service';
+import { PostgresCampusService } from '../campus/postgres-campus.service';
 import { normalizeName, scoreNameMatch, parseChileanDate, splitFullName } from './matching.util';
 import {
   ExcelRowDto, MatchResult, MatchCandidate, ApplyMatchDto, ApplyResult,
@@ -23,12 +23,12 @@ export class PostgresReconciliationService {
 
   constructor(
     private readonly db:      DatabaseService,
-    private readonly users:   UsersService,
-    private readonly campus:  CampusService,
+    private readonly users:   PostgresUsersService,
+    private readonly campus:  PostgresCampusService,
   ) {}
 
   /**
-   * Trae TODOS los usuarios sin el tope de 200 que aplica UsersService.findAll()
+   * Trae TODOS los usuarios sin el tope de 200 que aplica PostgresUsersService.findAll()
    * (paginación pensada para la UI, no para el matching, que necesita ver a todos
    * los candidatos — incluidos los recién creados por esta misma herramienta).
    */

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../common/database/database.service';
 import { apiRows } from '../common/database/identity-sql';
-import { OrgChartService } from '../orgchart/orgchart.service';
-import { DisponibilidadService } from '../disponibilidad/disponibilidad.service';
-import { TecnicosService } from '../tecnicos/tecnicos.service';
+import { PostgresOrgChartService } from '../orgchart/postgres-orgchart.service';
+import { PostgresDisponibilidadService } from '../disponibilidad/postgres-availability';
+import { PostgresTecnicosService } from '../disponibilidad/postgres-availability';
 
 export type RosterStatus   = 'disponible' | 'no_disponible' | 'sin_responder';
 export type RosterCategory = 'worship' | 'tecnico' | 'ninguno';
@@ -45,9 +45,9 @@ function statusFromSlots(worshipSlots?: Slots, tecnicoSlots?: Slots): RosterStat
 export class PostgresEquipoRosterService {
   constructor(
     private db:            DatabaseService,
-    private orgChart:      OrgChartService,
-    private disponibilidad: DisponibilidadService,
-    private tecnicos:      TecnicosService,
+    private orgChart:      PostgresOrgChartService,
+    private disponibilidad: PostgresDisponibilidadService,
+    private tecnicos:      PostgresTecnicosService,
   ) {}
 
   async getRoster(campusId: number, weekLabel: string): Promise<RosterResult> {

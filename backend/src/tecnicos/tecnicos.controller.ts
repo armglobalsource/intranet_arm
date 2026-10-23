@@ -5,13 +5,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { TecnicosService } from './tecnicos.service';
+import { PostgresTecnicosService } from '../disponibilidad/postgres-availability';
 import { BulkSubmitDto } from './dto/tecnicos.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('tecnicos')
 export class TecnicosController {
-  constructor(private readonly svc: TecnicosService) {}
+  constructor(private readonly svc: PostgresTecnicosService) {}
 
   /** Slots de encuentro de una semana para un campus (cualquier usuario autenticado) */
   @Get('encounters')

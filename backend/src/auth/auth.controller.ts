@@ -1,11 +1,9 @@
 import {
-  Controller, Post, Body, Req, Res, HttpCode, HttpStatus, Get, UseGuards, ForbiddenException,
+  Controller, Post, Body, Req, HttpCode, HttpStatus, Get, ForbiddenException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Response } from 'express';
-import { ConfigService } from '@nestjs/config';
-import { AuthService } from './auth.service';
+import { PostgresAuthService } from './postgres-auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
@@ -14,15 +12,12 @@ import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { AllowPending } from '../common/decorators/allow-pending.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { GoogleAuthGuard } from './guards/google-auth.guard';
-import { resolveReturnOrigin } from '../common/allowed-origins';
 
 @ApiTags('Auth')
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
   constructor(
-    private authService: AuthService,
-    private config: ConfigService,
+    private authService: PostgresAuthService,
   ) {}
 
   @Public()
@@ -49,47 +44,6 @@ export class AuthController {
   @ApiOperation({ summary: 'Verificar si un email ya existe en la plataforma' })
   checkEmail(@Body() body: { email: string }) {
     return this.authService.checkEmail(body.email);
-  }
-
-  // ── Google OAuth ────────────────────────────────────────────────────────
-
-  @Public()
-  @Get('google')
-  @UseGuards(GoogleAuthGuard)
-  @ApiOperation({ summary: 'Iniciar flujo OAuth con Google' })
-  googleLogin() {
-    // Passport redirige a Google automáticamente
-  }
-
-  @Public()
-  @Get('google/callback')
-  @UseGuards(GoogleAuthGuard)
-  @ApiOperation({ summary: 'Callback de Google OAuth' })
-  async googleCallback(@Req() req: any, @Res() res: Response) {
-    // Destino del redirect: si vino un `return_to` (via OAuth `state`) y es un
-    // origen permitido, se usa ese (p.ej. la PWA móvil armglobal.web.app).
-    // Si no, el primero de FRONTEND_URL. resolveReturnOrigin previene open redirect.
-    const defaultUrl = (this.config.get<string>('FRONTEND_URL', 'http://localhost:3000'))
-      .split(',')[0].trim();
-    const frontendUrl = resolveReturnOrigin(req.query?.state, this.config) ?? defaultUrl;
-    try {
-      const result = await this.authService.googleAuth(
-        req.user,
-        req.ip,
-        req.headers['user-agent'],
-      );
-      const params = new URLSearchParams({
-        access:           result.accessToken,
-        refresh:          result.refreshToken,
-        needs_completion: result.needsProfileCompletion ? '1' : '0',
-      });
-      const target = result.needsProfileCompletion
-        ? `${frontendUrl}/auth/complete-profile?${params}`
-        : `${frontendUrl}/auth/google-callback?${params}`;
-      res.redirect(target);
-    } catch {
-      res.redirect(`${frontendUrl}/auth/login?error=oauth_failed`);
-    }
   }
 
   // ── Perfil ─────────────────────────────────────────────────────────────

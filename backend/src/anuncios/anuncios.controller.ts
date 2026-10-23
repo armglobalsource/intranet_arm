@@ -5,13 +5,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { AnunciosService } from './anuncios.service';
+import { PostgresAnunciosService } from './postgres-anuncios.service';
 import { CreateAnuncioDto, UpdateAnuncioDto } from './dto/anuncio.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('anuncios')
 export class AnunciosController {
-  constructor(private readonly anuncios: AnunciosService) {}
+  constructor(private readonly anuncios: PostgresAnunciosService) {}
 
   /** Activos y no vencidos para el usuario (feed de miembros). */
   @Get('active')

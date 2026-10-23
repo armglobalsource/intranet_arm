@@ -5,7 +5,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { RolesService } from './roles.service';
+import { PostgresRolesService } from './postgres-roles.service';
 import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
 
 @ApiTags('Roles')
@@ -13,7 +13,7 @@ import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller({ path: 'roles', version: '1' })
 export class RolesController {
-  constructor(private readonly service: RolesService) {}
+  constructor(private readonly service: PostgresRolesService) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar todos los roles del sistema' })

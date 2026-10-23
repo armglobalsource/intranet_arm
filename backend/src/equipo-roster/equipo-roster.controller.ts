@@ -2,12 +2,12 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { EquipoRosterService } from './equipo-roster.service';
+import { PostgresEquipoRosterService } from './postgres-equipo-roster.service';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('equipo-roster')
 export class EquipoRosterController {
-  constructor(private readonly svc: EquipoRosterService) {}
+  constructor(private readonly svc: PostgresEquipoRosterService) {}
 
   /**
    * Listado de personas agrupadas por equipo (worship / técnico / ninguno)

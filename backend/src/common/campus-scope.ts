@@ -1,4 +1,4 @@
-import { CampusService } from '../campus/campus.service';
+import { PostgresCampusService } from '../campus/postgres-campus.service';
 
 /**
  * Campus (por nombre) cuyos registros puede listar el usuario.
@@ -9,7 +9,7 @@ import { CampusService } from '../campus/campus.service';
 export async function resolveCampusScope(
   user: any,
   requested: string | undefined,
-  campusService: CampusService,
+  campusService: PostgresCampusService,
 ): Promise<string | undefined | null> {
   if ((user.permissions ?? []).includes('*')) return requested || undefined;
   if (!user.campusId) return null;

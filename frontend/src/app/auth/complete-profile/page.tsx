@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { api, apiErrorMessage } from '@/lib/api';
 import type { ServingStatus } from '@/types/user';
@@ -203,8 +203,6 @@ const Spinner = () => (
 
 function CompleteProfileInner() {
   const router                 = useRouter();
-  const params                 = useSearchParams();
-  const setSession             = useAuthStore((s) => s.setSession);
   const logout                 = useAuthStore((s) => s.logout);
   const setTokens              = useAuthStore((s) => s.setTokens);
   const updateUser             = useAuthStore((s) => s.updateUser);
@@ -214,12 +212,10 @@ function CompleteProfileInner() {
   const storeUser              = useAuthStore((s) => s.user);
   const hasHydrated            = useAuthStore((s) => s._hasHydrated);
 
-  const [hasPassword, setHasPassword] = useState(true);
+  // Sin login con Google, toda cuenta que llega acá ya tiene contraseña.
+  const hasPassword = true;
   const [loading, setLoading]         = useState(true);
   const [showPwd, setShowPwd]         = useState(false);
-
-  const accessFromUrl  = params?.get('access') ?? null;
-  const refreshFromUrl = params?.get('refresh') ?? null;
 
   const [currentKey, setCurrentKey] = useState<StepKey | 'intro' | 'result'>('intro');
   const [answers, setAnswers]       = useState<Answers>(EMPTY_ANSWERS);
@@ -230,29 +226,15 @@ function CompleteProfileInner() {
 
   useEffect(() => {
     if (!hasHydrated) return;
-    const access  = accessFromUrl  ?? storeAccess;
-    const refresh = refreshFromUrl ?? storeRefresh;
-    if (!access || !refresh) { router.replace('/auth/login'); return; }
+    if (!storeAccess || !storeRefresh) { router.replace('/auth/login'); return; }
 
-    if (accessFromUrl) {
-      api.get('/auth/me', { headers: { Authorization: `Bearer ${access}` } })
-        .then((res) => {
-          setSession(res.data, access, refresh, true);
-          setHasPassword(!!res.data.passwordHash);
-          setAnswers((a) => ({ ...a, ...seedFromUser(res.data) }));
-          // Cuenta pending que ya llenó el wizard antes: saltar directo al
-          // resultado con el mensaje de "espera aprobación", no repetir todo.
-          if (res.data.status === 'pending' && res.data.onboardingCompletedAt) setCurrentKey('result');
-          setLoading(false);
-        })
-        .catch(() => router.replace('/auth/login?error=oauth_failed'));
-    } else {
-      setAnswers((a) => ({ ...a, ...seedFromUser(storeUser) }));
-      if (storeUser?.status === 'pending' && storeUser?.onboardingCompletedAt) setCurrentKey('result');
-      setLoading(false);
-    }
+    setAnswers((a) => ({ ...a, ...seedFromUser(storeUser) }));
+    // Cuenta pending que ya llenó el wizard antes: saltar directo al
+    // resultado con el mensaje de "espera aprobación", no repetir todo.
+    if (storeUser?.status === 'pending' && storeUser?.onboardingCompletedAt) setCurrentKey('result');
+    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasHydrated, accessFromUrl, refreshFromUrl, storeAccess, storeRefresh, router]);
+  }, [hasHydrated, storeAccess, storeRefresh, router]);
 
   useEffect(() => {
     if (loading) return;
@@ -485,7 +467,7 @@ function CompleteProfileInner() {
             <div>
               <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Acceso</p>
               <h2 className="text-xl font-semibold text-white mb-2">Crea una contraseña.</h2>
-              <p className="text-sm text-white/50 mb-6">Así podrás entrar sin depender de Google.</p>
+              <p className="text-sm text-white/50 mb-6">Así podrás entrar con tu email.</p>
               <FieldLabel>Contraseña</FieldLabel>
               <div className="relative">
                 <input

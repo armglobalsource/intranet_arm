@@ -3,7 +3,7 @@ import {
   Patch, Post, ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { OnboardingService } from './onboarding.service';
+import { PostgresOnboardingService } from './postgres-onboarding.service';
 import { CreateOnboardingDto, UpdateOnboardingDto } from './dto/onboarding.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -11,7 +11,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @ApiBearerAuth()
 @Controller({ path: 'onboarding', version: '1' })
 export class OnboardingController {
-  constructor(private readonly service: OnboardingService) {}
+  constructor(private readonly service: PostgresOnboardingService) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar onboardings visibles para el usuario' })

@@ -92,8 +92,8 @@ export default function PoliticasPage() {
           <p>
             No compartimos tus datos personales con terceros ajenos a ARM Global, salvo con
             proveedores de infraestructura tecnológica que procesan datos en nuestro nombre bajo
-            estrictos acuerdos de confidencialidad (por ejemplo, servicios de nube de Google
-            Cloud / Firebase, donde se alojan de forma segura los datos de la Plataforma), o
+            estrictos acuerdos de confidencialidad (por ejemplo, Supabase y Vercel, donde se
+            alojan de forma segura los datos y la aplicación de la Plataforma), o
             cuando la ley nos obligue a hacerlo ante una autoridad competente.
           </p>
         </Section>

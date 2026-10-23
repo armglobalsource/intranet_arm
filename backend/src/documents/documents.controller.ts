@@ -3,7 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { DocumentsService } from './documents.service';
+import { PostgresDocumentsService } from './postgres-documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -12,7 +12,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'documents', version: '1' })
 export class DocumentsController {
-  constructor(private readonly service: DocumentsService) {}
+  constructor(private readonly service: PostgresDocumentsService) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar todos los registros' })
