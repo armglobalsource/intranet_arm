@@ -1,5 +1,32 @@
 # Backend NestJS en Vercel y PostgreSQL
 
+## Retiro de Cloud Run (23 de octubre de 2026)
+
+El usuario confirmó login, acceso al dashboard y cambio de foto desde la web.
+Se deshabilitaron reversiblemente los cuatro servicios de `intranet-arm`, región
+`us-central1`, mediante escalamiento manual con cero instancias:
+
+- `intranet-backend`
+- `intranet-frontend`
+- `intranet-backend-dev`
+- `intranet-frontend-dev`
+
+Verificación externa posterior: los cuatro endpoints run.app responden HTTP 503.
+`https://intranetarm.vercel.app/api/v1/health` responde HTTP 200 y postgres ok.
+El backend antiguo conserva un error previo de la revisión 00078-h5v; su ajuste
+de escalamiento manual a cero sí quedó guardado. No se reparó esa revisión.
+
+Se conservan Firestore, buckets, imágenes de contenedor, configuraciones y respaldos.
+Estos recursos retenidos pueden seguir generando cargos de almacenamiento;
+deshabilitar Cloud Run no equivale a eliminar el proyecto ni cerrar su facturación.
+No se desactivó Firebase Hosting ni se revocaron credenciales de recuperación.
+Los workflows antiguos siguen limitados a ejecución manual.
+
+Para recuperar un servicio, revisar primero si corresponde reabrir el origen:
+Cloud Run > servicio > Escalamiento > Automático (antes: mínimo 0, máximo 20).
+El backend con revisión fallida necesita además seleccionar una revisión sana;
+no reactivar escrituras antiguas sin conciliar los cambios hechos en Supabase.
+
 ## Un solo proyecto: intranet_arm (22 de octubre de 2026)
 
 Estado verificado tras corregir la clave: `SUPABASE_SECRET_KEY` funciona con
@@ -19,9 +46,10 @@ y el login inválido responden 401 en el dominio de producción.
 Exportación actualizada production-2026-10-22-01: 1.409 documentos; frente a
 production-2026-10-21-03 solo cambiaron un contador y cuatro tokens de sesión
 (tres nuevos, uno actualizado). Sin cambios nuevos de datos de negocio.
-El origen no está congelado; no se importaron tokens antiguos sobre las sesiones
-nuevas. Falta probar login válido y cargas desde la interfaz antes de retirar
-los servicios antiguos. Los respaldos y el origen permanecen conservados.
+En esa exportación el origen no estaba congelado; no se importaron tokens antiguos
+sobre las sesiones nuevas. Posteriormente el usuario validó login y cambio de
+foto; los servicios Cloud Run fueron deshabilitados como se describe arriba.
+Los respaldos y el origen permanecen conservados.
 
 La API ya no se despliega como proyecto aparte. El proyecto Vercel `intranet_arm`
 (raíz `frontend`) sirve la web y la API en `/api/v1` desde el mismo dominio:
