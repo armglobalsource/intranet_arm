@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useId } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Globe2, MapPin, Search, Archive, SlidersHorizontal, X } from 'lucide-react';
 import { useFichas, useDeleteFicha, useArchiveFicha, usePublishFicha, useUnpublishFicha } from '@/hooks/useFichas';
 import { CloneModal } from '@/components/fichas/CloneModal';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAuthStore } from '@/lib/store/auth.store';
-import { useActiveCampuses } from '@/hooks/useCampus';
+import { useAllCampuses } from '@/hooks/useCampus';
 import { parseFichaDate } from '@/lib/ficha-date';
+import { buildFichaDirectory, groupFichaDirectory, normalizeSearch } from '@/lib/ficha-directory';
 import {
   completionPercent, statusColor, statusLabel,
   SECTION_LABELS,
@@ -36,13 +37,13 @@ function getCampusInitials(name: string): string {
 function formatDate(raw: any): string {
   if (!raw) return '—';
   const d = parseFichaDate(raw);
-  return d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' });
+  return d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // ── StatusBadge ───────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: FichaStatus }) {
-  const { bg, text } = statusColor(status);
+  const { bg, text } = status === 'draft' ? { bg: '#F1F5F9', text: '#475569' } : statusColor(status);
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide"
@@ -62,8 +63,8 @@ const SECTION_COLORS: Record<SectionName, string> = {
   streaming:   '#60A5FA', // azul
   escena:      '#F472B6', // rosado
   setList:     '#FACC15', // amarillo
-  horarios:    '#34D399', // verde esmeralda
-  anuncios:    '#F87171', // coral
+  horarios:    '#047857', // verde esmeralda
+  anuncios:    '#B91C1C', // coral
   voluntarios: '#A3E635', // lima
   outfit:      '#C084FC', // lila
 };
@@ -78,8 +79,8 @@ function ProgressBar({ completionStatus, hiddenSections }: { completionStatus: R
   return (
     <div className="mt-3">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] text-white/40">Completitud</span>
-        <span className="text-[10px] font-medium text-white/60">{pct}%</span>
+        <span className="text-[10px] text-slate-500">Secciones completadas</span>
+        <span className="text-[10px] font-medium text-slate-600">{pct}%</span>
       </div>
       {/* Segmentos por sección */}
       <div className="flex gap-0.5 h-1.5 rounded-full overflow-hidden">
@@ -88,7 +89,7 @@ function ProgressBar({ completionStatus, hiddenSections }: { completionStatus: R
             key={sec}
             className="flex-1 rounded-full transition-all duration-300"
             style={{
-              background: completionStatus[sec] ? '#1D9E75' : 'rgba(255,255,255,0.1)',
+              background: completionStatus[sec] ? '#1D9E75' : '#E2E8F0',
             }}
             title={`${SECTION_LABELS[sec]}: ${completionStatus[sec] ? 'Completado' : 'Pendiente'}`}
           />
@@ -103,11 +104,11 @@ function ProgressBar({ completionStatus, hiddenSections }: { completionStatus: R
             <span
               key={sec}
               className="flex items-center gap-1 text-[9px]"
-              style={{ color: done ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)' }}
+              style={{ color: done ? '#475569' : '#64748B' }}
             >
               <span
                 className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ background: done ? color : 'rgba(255,255,255,0.15)' }}
+                style={{ background: done ? color : '#CBD5E1' }}
               />
               {SECTION_LABELS[sec]}
             </span>
@@ -174,13 +175,13 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
 
   return (
     <div
-      className="rounded-2xl p-4 flex flex-col gap-3 transition-all duration-200 hover:scale-[1.01] hover:shadow-xl"
-      style={{ background: '#111111', border: '1px solid rgba(255,255,255,0.07)' }}
+      className="rounded-2xl p-4 flex flex-col gap-3 transition-all duration-200 hover:shadow-md"
+      style={{ background: '#FFFFFF', border: '1px solid #F1F5F9' }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">{ficha.title}</p>
-          <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{formatDate(ficha.date)}</p>
+          <p className="text-sm font-semibold text-slate-900 break-words">{ficha.title}</p>
+          <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{formatDate(ficha.date)}</p>
         </div>
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
           <StatusBadge status={ficha.status} />
@@ -195,7 +196,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
             )}
             <span
               className="text-[9px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded"
-              style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.4)' }}
+              style={{ background: '#F1F5F9', color: '#64748B' }}
             >
               {ficha.type === 'oracion' ? '🙏 Oración' : ficha.type === 'unico' ? 'Único' : 'Multi'}
             </span>
@@ -212,7 +213,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
             background: isPublished ? 'rgba(29,158,117,0.08)' : 'rgba(239,68,68,0.08)',
             border: `1px solid ${isPublished ? 'rgba(29,158,117,0.25)' : 'rgba(239,68,68,0.25)'}`,
           }}>
-          <p className="text-xs font-medium" style={{ color: isPublished ? '#34D399' : '#FCA5A5' }}>
+          <p className="text-xs font-medium" style={{ color: isPublished ? '#047857' : '#B91C1C' }}>
             {isPublished
               ? '¿Despublicar esta ficha? Dejará de ser visible para los asignados.'
               : '¿Publicar esta ficha? Será visible para los usuarios asignados y via link.'}
@@ -224,7 +225,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
               className="flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors disabled:opacity-50"
               style={{
                 background: isPublished ? 'rgba(29,158,117,0.2)' : 'rgba(239,68,68,0.2)',
-                color: isPublished ? '#1D9E75' : '#F87171',
+                color: isPublished ? '#1D9E75' : '#B91C1C',
                 border: `1px solid ${isPublished ? 'rgba(29,158,117,0.3)' : 'rgba(239,68,68,0.3)'}`,
               }}>
               {(publishing || unpublishing)
@@ -233,7 +234,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
             </button>
             <button onClick={() => setConfirmingPublish(false)}
               className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors"
-              style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              style={{ background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' }}>
               Cancelar
             </button>
           </div>
@@ -244,7 +245,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
       {confirmingArchive && (
         <div className="rounded-lg p-3 flex flex-col gap-2"
           style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
-          <p className="text-xs font-medium" style={{ color: '#FCD34D' }}>¿Archivar esta ficha? Se ocultará del listado principal.</p>
+          <p className="text-xs font-medium" style={{ color: '#92400E' }}>¿Archivar esta ficha? Se ocultará del listado principal.</p>
           <div className="flex gap-2">
             <button onClick={handleArchive} disabled={archiving}
               className="flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors disabled:opacity-50"
@@ -253,7 +254,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
             </button>
             <button onClick={() => setConfirmingArchive(false)}
               className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors"
-              style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              style={{ background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' }}>
               Cancelar
             </button>
           </div>
@@ -264,7 +265,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
       {confirming && (
         <div className="rounded-lg p-3 flex flex-col gap-2"
           style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)' }}>
-          <p className="text-xs font-medium" style={{ color: '#FCA5A5' }}>¿Eliminar esta ficha? No se puede deshacer.</p>
+          <p className="text-xs font-medium" style={{ color: '#B91C1C' }}>¿Eliminar esta ficha? No se puede deshacer.</p>
           <div className="flex gap-2">
             <button onClick={handleDelete} disabled={deleting}
               className="flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors disabled:opacity-50"
@@ -273,7 +274,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
             </button>
             <button onClick={() => setConfirming(false)}
               className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors"
-              style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              style={{ background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' }}>
               Cancelar
             </button>
           </div>
@@ -281,7 +282,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
       )}
 
       {/* Acciones */}
-      <div className="flex gap-2 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="flex flex-wrap gap-2 pt-2" style={{ borderTop: '1px solid #F1F5F9' }}>
         {isComplete ? (
           <Link
             href={`/dashboard/fichas-tecnicas/${ficha.fichaId}/view`}
@@ -292,11 +293,11 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
           </Link>
         ) : (
           <Link
-            href={`/dashboard/fichas-tecnicas/${ficha.fichaId}?edit=1`}
+            href={`/dashboard/fichas-tecnicas/${ficha.fichaId}${canArchive ? '?edit=1' : ''}`}
             className="flex-1 text-center text-xs font-medium py-1.5 rounded-lg transition-colors"
-            style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)' }}
+            style={{ background: '#F1F5F9', color: '#475569' }}
           >
-            Abrir editor
+            {canArchive ? 'Abrir editor' : 'Ver ficha'}
           </Link>
         )}
 
@@ -310,7 +311,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
               background: isPublished
                 ? (confirmingPublish ? 'rgba(29,158,117,0.2)' : 'rgba(29,158,117,0.15)')
                 : (confirmingPublish ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.12)'),
-              color: isPublished ? '#1D9E75' : '#F87171',
+              color: isPublished ? '#1D9E75' : '#B91C1C',
               border: `1px solid ${isPublished ? 'rgba(29,158,117,0.35)' : 'rgba(239,68,68,0.35)'}`,
             }}
           >
@@ -327,7 +328,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
             onClick={onClone}
             title="Duplicar ficha"
             className="px-2.5 py-1.5 rounded-lg transition-all"
-            style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.1)' }}
+            style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -343,9 +344,9 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
           title="Copiar link público"
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
           style={{
-            background: copied ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.07)',
-            color:      copied ? '#1D9E75' : 'rgba(255,255,255,0.5)',
-            border:     `1px solid ${copied ? 'rgba(29,158,117,0.35)' : 'rgba(255,255,255,0.1)'}`,
+            background: copied ? 'rgba(29,158,117,0.2)' : '#F1F5F9',
+            color:      copied ? '#1D9E75' : '#64748B',
+            border:     `1px solid ${copied ? 'rgba(29,158,117,0.35)' : '#E2E8F0'}`,
           }}
         >
           {copied ? (
@@ -367,9 +368,9 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
             title="Archivar ficha"
             className="px-2.5 py-1.5 rounded-lg transition-colors"
             style={{
-              background: confirmingArchive ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.07)',
-              color:      confirmingArchive ? '#F59E0B' : 'rgba(255,255,255,0.35)',
-              border:     `1px solid ${confirmingArchive ? 'rgba(251,191,36,0.25)' : 'rgba(255,255,255,0.1)'}`,
+              background: confirmingArchive ? 'rgba(251,191,36,0.12)' : '#F1F5F9',
+              color:      confirmingArchive ? '#F59E0B' : '#64748B',
+              border:     `1px solid ${confirmingArchive ? 'rgba(251,191,36,0.25)' : '#E2E8F0'}`,
             }}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
@@ -386,7 +387,7 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
             onClick={() => { setConfirmingArchive(false); setConfirmingPublish(false); setConfirming((v) => !v); }}
             className="px-2.5 py-1.5 rounded-lg transition-colors"
             title="Eliminar ficha"
-            style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.1)' }}
+            style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -406,6 +407,9 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
 
 function CampusGroup({
   campusName,
+  initials,
+  expanded,
+  onToggle,
   fichas,
   canDelete,
   canArchive,
@@ -414,6 +418,9 @@ function CampusGroup({
   onClone,
 }: {
   campusName: string;
+  initials?: string | null;
+  expanded: boolean;
+  onToggle: () => void;
   fichas: FichaListItem[];
   canDelete: boolean;
   canArchive?: boolean;
@@ -421,7 +428,7 @@ function CampusGroup({
   currentUserId?: number;
   onClone?: (ficha: FichaListItem) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const panelId = useId();
   const totalPct = fichas.length
     ? Math.round(fichas.reduce((a, f) => a + completionPercent(f.completionStatus, f.hiddenSections ?? []), 0) / fichas.length)
     : 0;
@@ -431,15 +438,16 @@ function CampusGroup({
     <div className="card overflow-hidden">
       {/* Header del campus */}
       <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors text-left"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        className="w-full flex flex-wrap items-center justify-between gap-3 px-4 py-4 hover:bg-slate-50 transition-colors text-left focus-visible:outline-violet-500"
       >
         <div className="flex items-center gap-3">
           <div
-            className="h-8 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0 px-2 min-w-[2rem] text-[11px] tracking-wide"
-            style={{ background: '#0d0d0d' }}
+            className="h-10 rounded-xl flex items-center justify-center text-violet-700 bg-violet-50 font-bold flex-shrink-0 px-2 min-w-[2.5rem] text-[11px] tracking-wide"
           >
-            {getCampusInitials(campusName)}
+            {initials || getCampusInitials(campusName)}
           </div>
           <div>
             <h3 className="text-sm font-bold text-gray-800">{campusName}</h3>
@@ -471,11 +479,11 @@ function CampusGroup({
 
       {/* Grid de fichas */}
       {expanded && (
-        <div className="px-4 pb-4 border-t border-gray-100">
+        <div id={panelId} className="px-4 pb-4 border-t border-gray-100 bg-slate-50/60">
           {fichas.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">No hay fichas para este campus</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3 pt-3">
               {fichas.map((f) => (
                 <FichaCard
                   key={f.fichaId}
@@ -502,258 +510,185 @@ type StatusFilter = 'all' | FichaStatus;
 
 export function FichasTecnicasClient() {
   const allowed = useRequirePermission('fichas:view');
-  const router = useRouter();
   const { can, isAdmin } = usePermissions();
   const user = useAuthStore((s) => s.user);
-
-  // Determinar campusId según rol (campus-scoped users ven solo su campus)
-  const campusIdFilter = useMemo(() => {
-    if (isAdmin || can('fichas:admin') || can('fichas:create')) return undefined;
-    return user?.campus?.id?.toString() ?? undefined;
-  }, [isAdmin, can, user]);
-
-  const { data: fichas, isLoading, error, refetch } = useFichas(campusIdFilter);
-  const { data: campusList = [] } = useActiveCampuses();
-
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [search,       setSearch]       = useState('');
-  const [cloneTarget,  setCloneTarget]  = useState<FichaListItem | null>(null);
-
-  const canClone = isAdmin || can('fichas:create') || can('fichas:admin');
-
-  // Mapa de normalización: id numérico → nombre canónico
-  // y nombre normalizado → nombre canónico
-  const campusNormMap = useMemo(() => {
-    const byId:   Record<string, string> = {};
-    const byNorm: Record<string, string> = {};
-    campusList.forEach((c) => {
-      byId[String(c.id)] = c.name;
-      // normalizar: minúsculas, quitar prefijo "campus " o "arm "
-      const norm = c.name.toLowerCase().replace(/^(campus|arm)\s+/, '').trim();
-      byNorm[norm] = c.name;
-    });
-    return { byId, byNorm };
-  }, [campusList]);
-
-  /** Devuelve el nombre canónico del campus para agrupar */
-  function canonicalName(f: FichaListItem): string {
-    if (campusNormMap.byId[f.campusId]) return campusNormMap.byId[f.campusId];
-    const norm = f.campusName.toLowerCase().replace(/^(campus|arm)\s+/, '').trim();
-    if (campusNormMap.byNorm[norm]) return campusNormMap.byNorm[norm];
-    return f.campusName;
-  }
-
-  // Filtrar y agrupar fichas por campus (usando nombre canónico)
-  const grouped = useMemo(() => {
-    if (!fichas) return {};
-    // Excluir fichas archivadas del listado principal
-    let filtered = fichas.filter((f) => !f.archived);
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((f) => f.status === statusFilter);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(
-        (f) =>
-          f.title.toLowerCase().includes(q) ||
-          f.campusName.toLowerCase().includes(q),
-      );
-    }
-
-    return filtered.reduce<Record<string, FichaListItem[]>>((acc, f) => {
-      const key = canonicalName(f);
-      acc[key] = acc[key] ?? [];
-      acc[key].push(f);
-      return acc;
-    }, {});
-  }, [fichas, statusFilter, search, campusNormMap]);
-
-  const campusNames = Object.keys(grouped).sort((a, b) => grouped[b].length - grouped[a].length);
   const canCreate = isAdmin || can('fichas:create') || can('fichas:admin');
   const canDelete = isAdmin || can('fichas:delete') || can('fichas:admin');
   const canArchive = isAdmin || can('fichas:edit') || can('fichas:admin');
+  const campusIdFilter = canCreate ? undefined : (user?.campus?.id ?? user?.campusId)?.toString();
+  const { data: fichas = [], isLoading, error, refetch } = useFichas(campusIdFilter);
+  // Include inactive campuses so historical fichas retain their country.
+  const { data: campuses = [], isLoading: loadingCampuses, error: campusError, refetch: refetchCampuses } = useAllCampuses();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [countryFilter, setCountryFilter] = useState('');
+  const [campusFilter, setCampusFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expandAll, setExpandAll] = useState(false);
+  const [cloneTarget, setCloneTarget] = useState<FichaListItem | null>(null);
 
-  // ── Stats rápidos ──────────────────────────────────────────────────────────
-  const stats = useMemo(() => {
-    if (!fichas) return { total: 0, draft: 0, inProgress: 0, complete: 0, archived: 0 };
-    const active = fichas.filter((f) => !f.archived);
-    return {
-      total:      active.length,
-      draft:      active.filter((f) => f.status === 'draft').length,
-      inProgress: active.filter((f) => f.status === 'in_progress').length,
-      complete:   active.filter((f) => f.status === 'complete').length,
-      archived:   fichas.filter((f) => f.archived).length,
-    };
-  }, [fichas]);
+  const directory = useMemo(() => buildFichaDirectory(fichas, campuses), [fichas, campuses]);
+  const active = useMemo(() => directory.filter((entry) => !entry.ficha.archived), [directory]);
+  const countries = useMemo(() => groupFichaDirectory(active), [active]);
+  const campusOptions = useMemo(() => countries
+    .filter((country) => !countryFilter || country.key === countryFilter)
+    .flatMap((country) => country.campuses.map((campus) => ({ ...campus, country: country.name })))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es')), [countries, countryFilter]);
+  const scope = useMemo(() => active.filter((entry) =>
+    (!countryFilter || entry.countryKey === countryFilter) &&
+    (!campusFilter || entry.campusKey === campusFilter) &&
+    (!search.trim() || entry.searchText.includes(normalizeSearch(search))),
+  ), [active, countryFilter, campusFilter, search]);
+  const filtered = useMemo(() => scope.filter((entry) => statusFilter === 'all' || entry.ficha.status === statusFilter), [scope, statusFilter]);
+  const grouped = useMemo(() => groupFichaDirectory(filtered), [filtered]);
+  const stats = [
+    { key: 'all' as const, label: 'Fichas activas', value: scope.length, color: 'text-slate-800' },
+    { key: 'draft' as const, label: 'Borradores', value: scope.filter((e) => e.ficha.status === 'draft').length, color: 'text-slate-600' },
+    { key: 'in_progress' as const, label: 'En progreso', value: scope.filter((e) => e.ficha.status === 'in_progress').length, color: 'text-violet-700' },
+    { key: 'complete' as const, label: 'Completas', value: scope.filter((e) => e.ficha.status === 'complete').length, color: 'text-emerald-700' },
+  ];
+  const hasFilters = !!countryFilter || !!campusFilter || !!search || statusFilter !== 'all';
+  const automaticallyExpanded = !!search.trim() || !!campusFilter || statusFilter !== 'all';
+  const loading = isLoading || loadingCampuses;
+  const selectedCountry = countries.find((c) => c.key === countryFilter);
+  const visibleCampuses = grouped.reduce((sum, country) => sum + country.campuses.length, 0);
+
+  function resetFilters() {
+    setCountryFilter(''); setCampusFilter(''); setSearch(''); setStatusFilter('all');
+    setExpanded({}); setExpandAll(false);
+  }
+  function selectCountry(key: string) {
+    setCountryFilter(key); setCampusFilter(''); setExpanded({});
+  }
 
   if (!allowed) return null;
-
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-6 min-w-0">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Fichas Técnicas</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Formularios de producción semanal por campus
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-violet-600 mb-2">Producción global</p>
+          <h1 className="text-2xl font-bold text-slate-900">Fichas Técnicas</h1>
+          <p className="text-slate-500 text-sm mt-1">Organiza cada encuentro, desde el país hasta su campus.</p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {canCreate && (
-            <Link
-              href="/dashboard/fichas-tecnicas/admin"
-              className="btn-primary flex items-center gap-2 text-sm"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Nueva ficha
-            </Link>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/dashboard/fichas-tecnicas/archivadas" className="btn-secondary flex items-center gap-2 text-sm">
+            <Archive size={15} aria-hidden="true" /> Archivadas
+          </Link>
+          {canCreate && <Link href="/dashboard/fichas-tecnicas/admin" className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">
+            <span aria-hidden="true">+</span> Nueva ficha
+          </Link>}
         </div>
-      </div>
+      </header>
 
-      {/* Stats */}
-      {!isLoading && fichas && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {[
-            { label: 'Total',       value: stats.total,      color: '#374151',          href: undefined },
-            { label: 'Borradores',  value: stats.draft,      color: 'rgba(0,0,0,0.3)',  href: undefined },
-            { label: 'En progreso', value: stats.inProgress, color: '#7F77DD',          href: undefined },
-            { label: 'Completas',   value: stats.complete,   color: '#1D9E75',          href: undefined },
-            { label: 'Archivadas',  value: stats.archived,   color: '#F59E0B',          href: '/dashboard/fichas-tecnicas/archivadas' },
-          ].map((s) =>
-            s.href ? (
-              <Link
-                key={s.label}
-                href={s.href}
-                className="card px-4 py-3 flex items-center gap-3 transition-all hover:shadow-md hover:border-amber-200 group"
-              >
-                <span className="text-2xl font-bold transition-colors" style={{ color: s.color }}>{s.value}</span>
-                <span className="text-xs text-gray-400 leading-tight group-hover:text-amber-500 transition-colors flex items-center gap-1">
-                  {s.label}
-                  <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14" /><polyline points="12 5 19 12 12 19" />
-                  </svg>
-                </span>
-              </Link>
-            ) : (
-              <div key={s.label} className="card px-4 py-3 flex items-center gap-3">
-                <span className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</span>
-                <span className="text-xs text-gray-400 leading-tight">{s.label}</span>
-              </div>
-            ),
-          )}
+      {loading ? (
+        <div className="space-y-4" aria-label="Cargando fichas">
+          {[1, 2, 3].map((i) => <div key={i} className="card h-28 animate-pulse bg-slate-100" />)}
         </div>
-      )}
-
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Búsqueda */}
-        <div className="relative flex-1">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
-            viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Buscar ficha o campus…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="input pl-9"
-          />
-        </div>
-
-        {/* Filtro estado */}
-        <div className="flex gap-1 p-1 bg-white border border-gray-200 rounded-lg">
-          {(['all', 'draft', 'in_progress', 'complete'] as StatusFilter[]).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                statusFilter === s
-                  ? 'bg-gray-900 text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {s === 'all' ? 'Todos' : statusLabel(s as FichaStatus)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Content */}
-      {isLoading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="card h-32 animate-pulse bg-gray-100" />
-          ))}
-        </div>
-      ) : error ? (
-        <div className="card p-8 text-center">
-          <svg className="w-10 h-10 text-red-300 mx-auto mb-3" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <p className="text-sm text-gray-500 mb-3">No se pudieron cargar las fichas</p>
-          <button onClick={() => refetch()} className="btn-secondary text-sm">
-            Reintentar
-          </button>
-        </div>
-      ) : campusNames.length === 0 ? (
-        <div className="card p-12 text-center">
-          <svg className="w-12 h-12 text-gray-200 mx-auto mb-4" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-          </svg>
-          <p className="text-gray-500 text-sm font-medium mb-1">
-            {search || statusFilter !== 'all' ? 'Sin resultados' : 'No hay fichas creadas'}
-          </p>
-          <p className="text-gray-400 text-xs mb-4">
-            {search || statusFilter !== 'all'
-              ? 'Prueba con otro filtro o término de búsqueda'
-              : 'Crea la primera ficha técnica para comenzar'}
-          </p>
-          {canCreate && !search && statusFilter === 'all' && (
-            <Link href="/dashboard/fichas-tecnicas/admin" className="btn-primary text-sm">
-              Crear primera ficha
-            </Link>
-          )}
+      ) : error || campusError ? (
+        <div className="card p-8 text-center" role="alert">
+          <p className="text-sm text-slate-600 mb-3">{error ? 'No se pudieron cargar las fichas.' : 'No se pudo cargar el catálogo de países y campus.'}</p>
+          <button onClick={() => { refetch(); refetchCampuses(); }} className="btn-secondary text-sm">Reintentar</button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {campusNames.map((name) => (
-            <CampusGroup
-              key={name}
-              campusName={name}
-              fichas={grouped[name]}
-              canDelete={canDelete}
-              canArchive={canArchive}
-              canPublish={isAdmin || can('fichas:create') || can('fichas:admin')}
-              currentUserId={user?.id}
-              onClone={canClone ? (f) => setCloneTarget(f) : undefined}
-            />
-          ))}
-        </div>
-      )}
+        <>
+          <section aria-label="Filtrar por país" className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+            <div className="flex flex-wrap justify-between gap-2 mb-4">
+              <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Globe2 size={17} className="text-violet-600" aria-hidden="true" /> Países</h2>
+              <span className="text-xs text-slate-500">Selecciona dónde quieres trabajar</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => selectCountry('')} aria-pressed={!countryFilter}
+                className={'rounded-xl border px-4 py-3 text-left transition-colors ' + (!countryFilter ? 'border-violet-300 bg-violet-50 text-violet-800 ring-1 ring-violet-200' : 'border-slate-200 text-slate-600 hover:bg-slate-50')}>
+                <span className="block text-sm font-semibold">Todos los países</span>
+                <span className="block mt-1 text-xs opacity-80">{active.length} fichas activas</span>
+              </button>
+              {countries.map((country) => {
+                const total = country.campuses.reduce((n, campus) => n + campus.fichas.length, 0);
+                return <button key={country.key} onClick={() => selectCountry(country.key)} aria-pressed={countryFilter === country.key}
+                  className={'rounded-xl border px-4 py-3 text-left transition-colors ' + (countryFilter === country.key ? 'border-violet-300 bg-violet-50 text-violet-800 ring-1 ring-violet-200' : 'border-slate-200 text-slate-600 hover:bg-slate-50')}>
+                  <span className="block text-sm font-semibold">{country.name}</span>
+                  <span className="block mt-1 text-xs opacity-80">{country.campuses.length} campus · {total} {total === 1 ? 'ficha' : 'fichas'}</span>
+                </button>;
+              })}
+            </div>
+          </section>
 
-      {/* Modal de clonación */}
-      {cloneTarget && (
-        <CloneModal ficha={cloneTarget} onClose={() => setCloneTarget(null)} />
+          <section aria-label="Buscar y filtrar fichas" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row">
+              <label className="relative flex-1 min-w-0">
+                <span className="sr-only">Buscar ficha, campus o país</span>
+                <Search size={17} className="absolute left-3 top-3 text-slate-400" aria-hidden="true" />
+                <input type="search" placeholder="Buscar ficha, campus o país…" value={search}
+                  onChange={(e) => { setSearch(e.target.value); setExpanded({}); }} className="input w-full pl-10" />
+              </label>
+              <label className="relative lg:w-64">
+                <span className="sr-only">Campus</span>
+                <MapPin size={16} className="absolute left-3 top-3 text-slate-400 pointer-events-none" aria-hidden="true" />
+                <select aria-label="Campus" value={campusFilter} onChange={(e) => { setCampusFilter(e.target.value); setExpanded({}); }} className="input w-full pl-9 pr-8">
+                  <option value="">Todos los campus</option>
+                  {campusOptions.map((campus) => <option key={campus.key} value={campus.key}>{campus.name}{!countryFilter ? ' · ' + campus.country : ''}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <SlidersHorizontal size={15} className="text-slate-400 mr-1" aria-hidden="true" />
+              {stats.map((stat) => <button key={stat.key} aria-pressed={statusFilter === stat.key}
+                onClick={() => { setStatusFilter(stat.key); setExpanded({}); }}
+                className={'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ' + (statusFilter === stat.key ? 'bg-violet-700 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100')}>
+                {stat.key === 'all' ? 'Todos los estados' : stat.label}
+              </button>)}
+              {hasFilters && <button onClick={resetFilters} className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"><X size={14} aria-hidden="true" /> Limpiar filtros</button>}
+            </div>
+          </section>
+
+          <section aria-label="Resumen de la selección" className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+            {stats.map((stat) => <button key={stat.key} onClick={() => { setStatusFilter(stat.key); setExpanded({}); }}
+              aria-label={stat.label + ': ' + stat.value} aria-pressed={statusFilter === stat.key}
+              className={'rounded-xl border bg-white px-4 py-3 text-left transition-colors hover:border-violet-300 ' + (statusFilter === stat.key ? 'border-violet-300' : 'border-slate-200')}>
+              <span className={'block text-2xl font-bold ' + stat.color}>{stat.value}</span>
+              <span className="block text-xs text-slate-500 mt-1">{stat.label}</span>
+            </button>)}
+          </section>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-500" role="status">
+              <strong className="text-slate-800">{filtered.length}</strong> {filtered.length === 1 ? 'ficha' : 'fichas'} en {visibleCampuses} campus
+              {selectedCountry ? ' · ' + selectedCountry.name : ''}
+            </p>
+            {filtered.length > 0 && <div className="flex gap-3 text-xs font-semibold text-violet-700">
+              <button onClick={() => { setExpandAll(true); setExpanded({}); }}>Expandir campus</button>
+              <span className="text-slate-300" aria-hidden="true">|</span>
+              <button onClick={() => { setExpandAll(false); setExpanded(Object.fromEntries(grouped.flatMap((c) => c.campuses.map((campus) => [campus.key, false])))); }}>Contraer campus</button>
+            </div>}
+          </div>
+
+          {grouped.length === 0 ? (
+            <div className="card p-8 sm:p-12 text-center">
+              <Search size={30} className="mx-auto mb-3 text-slate-300" aria-hidden="true" />
+              <h2 className="text-sm font-semibold text-slate-700">{hasFilters ? 'No encontramos fichas con estos filtros' : 'Todavía no hay fichas activas'}</h2>
+              <p className="mt-2 mb-4 text-xs text-slate-500">{hasFilters ? 'Prueba con otro país, campus o estado.' : 'Crea una ficha técnica para organizar el próximo encuentro.'}</p>
+              {hasFilters ? <button onClick={resetFilters} className="btn-secondary text-sm">Limpiar filtros</button>
+                : canCreate && <Link href="/dashboard/fichas-tecnicas/admin" className="btn-primary text-sm">Crear primera ficha</Link>}
+            </div>
+          ) : grouped.map((country) => (
+            <section key={country.key} aria-label={'Fichas de ' + country.name} className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                <h2 className="flex items-center gap-2 text-base font-bold text-slate-800"><Globe2 size={18} className="text-violet-500" aria-hidden="true" />{country.name}</h2>
+                <span className="text-xs text-slate-500">{country.campuses.length} campus · {country.campuses.reduce((n, c) => n + c.fichas.length, 0)} fichas</span>
+              </div>
+              {country.name === 'Sin país asignado' && <p className="text-xs text-amber-800 rounded-lg bg-amber-50 px-3 py-2">El país se configura en el directorio de campus. Las fichas siguen disponibles aquí.</p>}
+              {country.campuses.map((campus) => {
+                const isExpanded = expanded[campus.key] ?? (expandAll || automaticallyExpanded);
+                return <CampusGroup key={campus.key} campusName={campus.name} initials={campus.initials}
+                  fichas={campus.fichas} expanded={isExpanded} onToggle={() => setExpanded((prev) => ({ ...prev, [campus.key]: !isExpanded }))}
+                  canDelete={canDelete} canArchive={canArchive} canPublish={canCreate} currentUserId={user?.id}
+                  onClone={canCreate ? (f) => setCloneTarget(f) : undefined} />;
+              })}
+            </section>
+          ))}
+        </>
       )}
+      {cloneTarget && <CloneModal ficha={cloneTarget} onClose={() => setCloneTarget(null)} />}
     </div>
   );
 }
