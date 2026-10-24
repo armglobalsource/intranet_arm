@@ -772,6 +772,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         <div className={showSidePanel ? 'order-2 min-w-0 xl:order-1 xl:flex-1' : ''}>
           <FichaDocumentView
             ficha={ficha}
+            showHistory
             editable={editable}
             forceShowAll={canEdit}
             onEdit={canEdit ? () => {

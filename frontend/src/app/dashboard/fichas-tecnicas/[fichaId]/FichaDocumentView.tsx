@@ -17,7 +17,8 @@ const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
   multi:   ['pastoral', 'escena', 'produccion', 'media', 'streaming', 'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit'],
   oracion: ['pastoral', 'escena', 'produccion', 'media', 'streaming', 'setList', 'horarios', 'outfit'],
 };
-import { useUpdateFicha } from '@/hooks/useFichas';
+import { useChangelog, useUpdateFicha } from '@/hooks/useFichas';
+import { FichaQuickView } from '@/components/fichas/FichaQuickView';
 import { parseFichaDate as parseLocalDate, toFichaInputDate } from '@/lib/ficha-date';
 import { usePaletas, useCreatePaleta, type Paleta, type PaletaColor } from '@/hooks/usePaletas';
 
@@ -2134,12 +2135,14 @@ function EncuentroTabs({
 
 type LayoutSlot = 'pastoral' | 'produccion' | 'media' | 'streaming' | 'horarios' | 'worship' | 'voluntarios' | 'anuncios';
 
+// Orden pedido por Producción: primero el timing (qué sucederá y cuándo),
+// luego responsables y equipos, después noticias y contenidos.
 const DEFAULT_LAYOUT: { left: LayoutSlot[]; right: LayoutSlot[] } = {
-  left:  ['pastoral', 'produccion', 'streaming', 'horarios'],
+  left:  ['horarios', 'pastoral', 'produccion', 'streaming'],
   right: ['worship', 'media', 'voluntarios', 'anuncios'],
 };
 const DEFAULT_LAYOUT_ORACION: { left: LayoutSlot[]; right: LayoutSlot[] } = {
-  left:  ['pastoral', 'produccion', 'streaming', 'horarios'],
+  left:  ['horarios', 'pastoral', 'produccion', 'streaming'],
   right: ['worship', 'media'],
 };
 
@@ -2209,6 +2212,8 @@ export interface FichaDocumentViewProps {
   onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
   /** Persistir el bloque layoutVisual completo (vista alternativa por canción). */
   onUpdateLayoutVisual?: (patch: { slots: LayoutVisualSlot[] }) => void;
+  /** Mostrar el historial de cambios en la primera vista (requiere sesión). */
+  showHistory?: boolean;
 }
 
 export function FichaDocumentView({
@@ -2216,9 +2221,11 @@ export function FichaDocumentView({
   onPublish, onUnpublish, canPublish, isPublishing,
   editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onSectionComplete,
   sectionStatus, saveState, hiddenSections, modulesPanelOpen, onToggleModulesPanel,
-  sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual,
+  sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual, showHistory,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
+  const { data: changelog, refetch: refetchChangelog } = useChangelog(showHistory ? String(ficha.fichaId) : '');
+  useEffect(() => { if (showHistory) void refetchChangelog(); }, [showHistory, ficha.lastModifiedAt, refetchChangelog]);
 
   // selectedId puede ser el id de un encuentro ('unico', 'e1', 'e2', ...) o
   // el sentinel 'layout' para la vista alternativa de Layout Visual.
@@ -2953,6 +2960,20 @@ export function FichaDocumentView({
           </div>
         )}
 
+        {/* ── Primera vista: lo esencial en 15 segundos ── */}
+        {!isLayoutView && (
+          <FichaQuickView
+            ficha={ficha}
+            rowsFor={sec}
+            colId={colId}
+            encuentro={selectedEncuentro}
+            hiddenSections={hiddenSections ?? ficha.hiddenSections ?? []}
+            changes={showHistory ? changelog : undefined}
+            onOpenLayout={() => setSelectedId('layout')}
+            onJump={(slot) => document.querySelector(`[data-ficha-slot="${slot}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          />
+        )}
+
         {/* ── Cuerpo (vista clásica por encuentro) ──
             Va PRIMERO en el DOM para que en print salga como página 1.
             El Layout Visual viene después con page-break-before: always. */}
@@ -3018,7 +3039,7 @@ export function FichaDocumentView({
                 layout={resolvedLayout}
                 visible={{ left: visibleLeft, right: visibleRight }}
                 onChange={editable ? onUpdateLayout : undefined}
-                renderSlot={(slot) => renderSlot(slot as LayoutSlot)}
+                renderSlot={(slot) => <div data-ficha-slot={slot} style={{ scrollMarginTop: 72 }}>{renderSlot(slot as LayoutSlot)}</div>}
                 label={(slot) => slotLabel(slot as LayoutSlot)}
               />
             );

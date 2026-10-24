@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { parseFichaDate } from '@/lib/ficha-date';
+import { isRecent, relativeTime, sameLocalDay } from '@/lib/ficha-summary';
+import { statusLabel, type FichaStatus } from '@/types/ficha';
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -37,14 +39,19 @@ type FichaLite = {
   title: string;
   date: any;
   encuentros: Encuentro[];
+  status?: FichaStatus;
+  publishedAt?: any;
+  lastModifiedAt?: any;
 };
 
-function computeWeekRange(): { start: Date; end: Date } {
+const CAMPUS_KEY = 'agenda:campus';
+
+function computeWeekRange(offset = 0): { start: Date; end: Date } {
   const now = new Date();
   const dow = now.getDay(); // 0=Dom, 1=Lun...6=Sáb
   const daysFromMonday = (dow + 6) % 7;
   const monday = new Date(now);
-  monday.setDate(now.getDate() - daysFromMonday);
+  monday.setDate(now.getDate() - daysFromMonday + offset * 7);
   monday.setHours(0, 0, 0, 0);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
@@ -80,6 +87,11 @@ function typeBadge(type: FichaLite['type']): { label: string; bg: string; color:
 
 function FichaCard({ ficha }: { ficha: FichaLite }) {
   const badge = typeBadge(ficha.type);
+  const today = sameLocalDay(parseFichaDate(ficha.date), new Date());
+  // Editada después de publicarse, en las últimas 48 h: quien ya la leyó debe revisarla.
+  const changedAfterPublish = !!ficha.lastModifiedAt && !!ficha.publishedAt
+    && new Date(ficha.lastModifiedAt).getTime() - new Date(ficha.publishedAt).getTime() > 60_000
+    && isRecent(ficha.lastModifiedAt, 48);
   return (
     <Link
       href={`/ficha/${ficha.fichaId}`}
@@ -89,7 +101,7 @@ function FichaCard({ ficha }: { ficha: FichaLite }) {
         gap: 10,
         padding: 16,
         background: D.cardBg,
-        border: `0.5px solid ${D.cardBorder}`,
+        border: `0.5px solid ${today ? D.accent : D.cardBorder}`,
         borderRadius: 12,
         textDecoration: 'none',
         color: 'inherit',
@@ -102,24 +114,35 @@ function FichaCard({ ficha }: { ficha: FichaLite }) {
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget as HTMLElement;
-        el.style.borderColor = D.cardBorder;
+        el.style.borderColor = today ? D.accent : D.cardBorder;
         el.style.background = D.cardBg;
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ fontSize: 11, color: D.textSecond, textTransform: 'capitalize' }}>
-          {formatCardDate(ficha.date)}
+          {today ? 'Hoy · ' : ''}{formatCardDate(ficha.date)}
         </div>
-        {badge && (
-          <span style={{
-            fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
-            padding: '2px 8px', borderRadius: 999,
-            background: badge.bg, color: badge.color, textTransform: 'uppercase',
-            flexShrink: 0,
-          }}>
-            {badge.label}
-          </span>
-        )}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {badge && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+              padding: '2px 8px', borderRadius: 999,
+              background: badge.bg, color: badge.color, textTransform: 'uppercase',
+              flexShrink: 0,
+            }}>
+              {badge.label}
+            </span>
+          )}
+          {ficha.status && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', padding: '2px 8px', borderRadius: 999,
+              background: ficha.status === 'complete' ? 'rgba(29,158,117,0.15)' : 'rgba(255,255,255,0.08)',
+              color: ficha.status === 'complete' ? '#5DCAA5' : D.textSecond, textTransform: 'uppercase', flexShrink: 0,
+            }}>
+              {statusLabel(ficha.status)}
+            </span>
+          )}
+        </div>
       </div>
 
       <div style={{ fontSize: 16, fontWeight: 600, color: D.textPrimary, lineHeight: 1.25 }}>
@@ -140,6 +163,12 @@ function FichaCard({ ficha }: { ficha: FichaLite }) {
               <span style={{ color: D.textSecond }}>{enc.label}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {ficha.lastModifiedAt && (
+        <div style={{ fontSize: 11, color: changedAfterPublish ? '#F5C26B' : D.textMuted }}>
+          {changedAfterPublish ? '● Cambios recientes · ' : ''}Actualizada {relativeTime(ficha.lastModifiedAt)}
         </div>
       )}
 
@@ -189,24 +218,41 @@ export function AgendaClient() {
   const [fichas, setFichas]   = useState<FichaLite[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
-
-  const week = useMemo(computeWeekRange, []);
-  const weekLabel = useMemo(() => formatWeekLabel(week.start, week.end), [week]);
+  const [offset, setOffset]   = useState(0);
+  const [campus, setCampus]   = useState('');
 
   useEffect(() => {
-    fetch(`${API_BASE}/fichas/public/week`)
+    try { setCampus(localStorage.getItem(CAMPUS_KEY) ?? ''); } catch { /* sin almacenamiento */ }
+  }, []);
+  function chooseCampus(value: string) {
+    setCampus(value);
+    try { localStorage.setItem(CAMPUS_KEY, value); } catch { /* sin almacenamiento */ }
+  }
+
+  const week = useMemo(() => computeWeekRange(offset), [offset]);
+  const weekLabel = useMemo(() => formatWeekLabel(week.start, week.end), [week]);
+  const startParam = `${week.start.getFullYear()}-${String(week.start.getMonth() + 1).padStart(2, '0')}-${String(week.start.getDate()).padStart(2, '0')}`;
+
+  useEffect(() => {
+    setLoading(true); setError(null);
+    fetch(`${API_BASE}/fichas/public/week?start=${startParam}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`Error ${r.status}`);
         return r.json();
       })
       .then((data: FichaLite[]) => { setFichas(data); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
-  }, []);
+  }, [startParam]);
+
+  const campusOptions = useMemo(
+    () => Array.from(new Set((fichas ?? []).map((f) => f.campusName || 'Sin campus'))).sort((a, b) => a.localeCompare(b, 'es')),
+    [fichas],
+  );
 
   const byCampus = useMemo<Array<[string, FichaLite[]]>>(() => {
     if (!fichas) return [];
     const map = new Map<string, FichaLite[]>();
-    for (const f of fichas) {
+    for (const f of fichas.filter((x) => !campus || (x.campusName || 'Sin campus') === campus)) {
       const key = f.campusName || 'Sin campus';
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(f);
@@ -220,7 +266,12 @@ export function AgendaClient() {
       });
     }
     return entries.sort((a, b) => a[0].localeCompare(b[0], 'es'));
-  }, [fichas]);
+  }, [fichas, campus]);
+
+  const navBtn: React.CSSProperties = {
+    minHeight: 36, padding: '0 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+    background: 'rgba(255,255,255,0.06)', color: D.textPrimary, border: `0.5px solid ${D.cardBorder}`,
+  };
 
   return (
     <div style={{
@@ -259,6 +310,22 @@ export function AgendaClient() {
             {weekLabel}
           </h1>
         </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center' }}>
+          <button type="button" style={navBtn} onClick={() => setOffset((o) => o - 1)} aria-label="Semana anterior">← Anterior</button>
+          <button type="button" style={{ ...navBtn, opacity: offset === 0 ? 0.5 : 1 }} disabled={offset === 0} onClick={() => setOffset(0)}>Esta semana</button>
+          <button type="button" style={navBtn} onClick={() => setOffset((o) => o + 1)} aria-label="Semana siguiente">Siguiente →</button>
+          <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: D.textSecond }}>
+            Campus
+            <select
+              value={campus}
+              onChange={(e) => chooseCampus(e.target.value)}
+              style={{ ...navBtn, cursor: 'pointer', colorScheme: 'dark' }}
+            >
+              <option value="">Todos</option>
+              {(campus && !campusOptions.includes(campus) ? [campus, ...campusOptions] : campusOptions).map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </label>
+        </div>
       </header>
 
       <main style={{ maxWidth: 960, margin: '0 auto', padding: '16px 20px 60px' }}>
@@ -291,7 +358,7 @@ export function AgendaClient() {
             borderRadius: 12,
           }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: D.textPrimary, marginBottom: 6 }}>
-              No hay fichas publicadas para esta semana
+              No hay fichas publicadas {campus ? `de ${campus} ` : ''}para esta semana
             </div>
             <div style={{ fontSize: 12, color: D.textSecond }}>
               Vuelve más tarde o consulta con el equipo de producción de tu campus.

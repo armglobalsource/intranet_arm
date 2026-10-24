@@ -37,8 +37,8 @@ export class FichasController {
 
   @Public()
   @Get('public/week')
-  findPublicWeek() {
-    return this.fichasService.findPublicWeek();
+  findPublicWeek(@Query('start') start?: string) {
+    return this.fichasService.findPublicWeek(start);
   }
 
   @Public()

@@ -6,6 +6,9 @@ import { hasPermission } from '../common/permissions';
 import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto } from './dto/ficha.dto';
 import { ALL_FICHA_SECTIONS, activeSectionsForType, deriveFichaStatus, FICHA_SECTION_LABELS, formatFichaDateLabel, missingRequiredRows, parseFichaDate } from './fichas.utils';
 import { defaultRows, defaultRowsOracion, buildDefaultSections, buildDefaultCompletion, migrateMediaData, preservePrayerSections, buildGlobalSectionsFromMixedFicha } from './fichas.defaults';
+import { ChangelogEntry, CHANGELOG_MERGE_WINDOW_MS, capRowChanges, diffRows, mergeRowChanges } from './fichas.changelog';
+
+type Log = (seccion: string | null, entry: ChangelogEntry) => void;
 
 interface FichaUser { sub: number; email: string; campusId?: number | null; permissions?: string[]; }
 const jsonFields = new Set('encuentros hiddenSections completionStatus sections sectionLayout layoutVisual splitInto'.split(' '));
@@ -49,14 +52,31 @@ export class PostgresFichasService {
       return apiRows(result)[0];
     } catch (error) { databaseError(error); }
   }
-  private async change(id: string, u: FichaUser, operation: (f:any, db:SqlConnection)=>Promise<void>|void, publish = false) {
+  private async change(id: string, u: FichaUser, operation: (f:any, db:SqlConnection, log:Log)=>Promise<void>|void, publish = false) {
     return this.db.transaction(async db => {
       const f = await this.read(id,db,true);
       publish ? this.publisher(f,u) : this.manage(f,u);
-      await operation(f,db);
+      const logs: [string|null, ChangelogEntry][] = [];
+      await operation(f,db,(seccion,entry)=>logs.push([seccion,entry]));
       Object.assign(f,this.stamp(u));
+      // Same transaction: history and ficha are committed together.
+      for (const [seccion,entry] of logs) await this.log(db,id,u,seccion,entry);
       return this.save(db,id,f);
     });
+  }
+  private async log(db: SqlConnection, id: string, u: FichaUser, seccion: string|null, entry: ChangelogEntry) {
+    if (entry.kind==='rows') {
+      if (!entry.changes.length) return;
+      const last=(await db.query('SELECT document_id,cambios,timestamp FROM arm_app.ficha_changelog WHERE ficha_document_id=$1 AND seccion IS NOT DISTINCT FROM $2 AND "userId"=$3 ORDER BY timestamp DESC,document_id DESC LIMIT 1',[id,seccion,u.sub])).rows[0];
+      if (last?.cambios?.kind==='rows' && Date.now()-new Date(last.timestamp).getTime()<CHANGELOG_MERGE_WINDOW_MS) {
+        const merged=capRowChanges(mergeRowChanges(last.cambios.changes??[],entry.changes));
+        if (!merged.changes.length) await db.query('DELETE FROM arm_app.ficha_changelog WHERE document_id=$1',[last.document_id]);
+        else await db.query('UPDATE arm_app.ficha_changelog SET cambios=$2,timestamp=now() WHERE document_id=$1',[last.document_id,JSON.stringify(merged)]);
+        return;
+      }
+      entry=capRowChanges(entry.changes);
+    }
+    await db.query('INSERT INTO arm_app.ficha_changelog(document_id,ficha_document_id,"userId","userName",timestamp,seccion,cambios) VALUES ($1,$2,$3,$4,now(),$5,$6)',[randomUUID(),id,u.sub,u.email,seccion,JSON.stringify(entry)]);
   }
   async findAll(u: FichaUser, campusId?: string, status?: string) {
     const campus = this.global(u) ? campusId : String(u.campusId ?? '__none__');
@@ -69,8 +89,17 @@ export class PostgresFichasService {
     if (u.campusId == null) throw new BadRequestException('Tu cuenta no tiene un campus asignado');
     return apiRows(await this.db.query(`SELECT ${mobile} FROM arm_app.fichas WHERE "campusId"=$1 AND published AND archived IS DISTINCT FROM true ORDER BY date,document_id`, [u.campusId]));
   }
-  async findPublicWeek() {
-    return apiRows(await this.db.query(`SELECT ${mobile} FROM arm_app.fichas WHERE published AND archived IS DISTINCT FROM true AND date >= (date_trunc('week',now() AT TIME ZONE 'America/Santiago') AT TIME ZONE 'UTC') AND date < ((date_trunc('week',now() AT TIME ZONE 'America/Santiago')+interval '7 days') AT TIME ZONE 'UTC') ORDER BY date,document_id`));
+  /**
+   * Fichas publicadas de una semana (lunes a domingo, hora de Santiago). Sin
+   * `start` usa la semana actual. Es público: solo expone estado y fecha de
+   * actualización, nunca quién la hizo.
+   */
+  async findPublicWeek(start?: string) {
+    if (start !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(start)) throw new BadRequestException('Fecha de inicio inválida');
+    return apiRows(await this.db.query(`WITH w AS (SELECT date_trunc('week',coalesce($1::date::timestamp,now() AT TIME ZONE 'America/Santiago')) AS s)
+      SELECT ${mobile},status,"lastModifiedAt" FROM arm_app.fichas,w WHERE published AND archived IS DISTINCT FROM true
+      AND date >= (w.s AT TIME ZONE 'America/Santiago') AND date < ((w.s+interval '7 days') AT TIME ZONE 'America/Santiago')
+      ORDER BY date,document_id`,[start ?? null]));
   }
   findOne(id: string) { return this.read(id,this.db); }
   async findOneForUser(id: string, u: FichaUser) { const f=await this.findOne(id);this.access(f,u);return f; }
@@ -96,11 +125,21 @@ export class PostgresFichasService {
     return this.save(this.db,id,{...dto,date:parseFichaDate(dto.date),sections:buildDefaultSections(dto.type),completionStatus:buildDefaultCompletion(dto.type),hiddenSections:[],status:'draft',published:false,archived:false,createdBy:u.sub,createdByName:u.email,createdAt:new Date(),...this.stamp(u)},true);
   }
   update(id: string, dto: UpdateFichaDto, u: FichaUser) {
-    return this.change(id,u,f=>{
-      if(dto.title!==undefined) f.title=dto.title;
-      if(dto.date!==undefined) f.date=parseFichaDate(dto.date);
-      if(dto.sectionLayout!==undefined) f.sectionLayout=JSON.parse(JSON.stringify(dto.sectionLayout));
+    return this.change(id,u,(f,_db,log)=>{
+      if(dto.title!==undefined && dto.title!==f.title) { log(null,{kind:'title',before:f.title??'',after:dto.title}); f.title=dto.title; }
+      if(dto.date!==undefined) {
+        const date=parseFichaDate(dto.date), before=f.date?new Date(f.date).toISOString().slice(0,10):null, after=date.toISOString().slice(0,10);
+        if(before!==after) log(null,{kind:'date',before,after});
+        f.date=date;
+      }
+      if(dto.sectionLayout!==undefined) {
+        if(JSON.stringify(dto.sectionLayout)!==JSON.stringify(f.sectionLayout??null)) log(null,{kind:'layout'});
+        f.sectionLayout=JSON.parse(JSON.stringify(dto.sectionLayout));
+      }
       if(dto.hiddenSections!==undefined) {
+        const was=new Set<string>(f.hiddenSections??[]), now=new Set(dto.hiddenSections);
+        const shown=[...was].filter(s=>!now.has(s)), hidden=[...now].filter(s=>!was.has(s));
+        if(shown.length||hidden.length) log(null,{kind:'modules',shown,hidden});
         for(const name of (f.hiddenSections ?? []).filter((s:string)=>!dto.hiddenSections!.includes(s))) {
           const old=f.sections?.[name];
           if(!old?.rows?.length) {
@@ -145,7 +184,8 @@ export class PostgresFichasService {
     });
   }
   updateLayoutVisual(id: string, dto: UpdateLayoutVisualDto, u: FichaUser) {
-    return this.change(id,u,f=>{
+    return this.change(id,u,(f,_db,log)=>{
+      log(null,{kind:'layoutVisual'});
       const input=dto.slots?.length ? dto.slots : [{id:'default',label:'',encuentroIds:[],songs:dto.songs??[],producerNotes:dto.producerNotes??''}];
       const slots=input.map(s=>({id:s.id,label:s.label??'',encuentroIds:s.encuentroIds??[],producerNotes:s.producerNotes??'',songs:(s.songs??[]).map(song=>({songRowId:song.songRowId,iluminacion:song.iluminacion??'',illuminationColors:song.illuminationColors??[],visualDescription:song.visualDescription??'',referenceIds:song.referenceIds??[]}))}));
       f.layoutVisual={slots,updatedAt:new Date().toISOString(),updatedBy:u.sub};
@@ -155,7 +195,7 @@ export class PostgresFichasService {
     if(!ALL_FICHA_SECTIONS.includes(name as any)) throw new NotFoundException('Sección no encontrada');
     const {expectedRevision,...sectionDto}=JSON.parse(JSON.stringify(dto));
     // Row lock serializes modifications; history is committed with the section.
-    return this.change(id,u,async(f,db)=>{
+    return this.change(id,u,async(f,db,log)=>{
       const s=f.sections?.[name];if(!s) throw new NotFoundException('Sección no activa');
       const revision=Number(s.revision??0);
       if(expectedRevision!==undefined && Number(expectedRevision)!==revision) throw new ConflictException('La sección cambió. Recarga la ficha antes de continuar.');
@@ -165,12 +205,13 @@ export class PostgresFichasService {
         if(incoming.size!==sectionDto.rows.length) throw new BadRequestException('La sección contiene filas duplicadas');
         if((s.rows??[]).some((r:any)=>r.required && (incoming.get(r.id) as any)?.required!==true)) throw new BadRequestException('No puedes eliminar ni volver opcional una fila obligatoria');
       }
+      if(changed) log(name,{kind:'rows',changes:diffRows(s.rows??[],sectionDto.rows,f.encuentros??[])});
+      if('assignedTo' in sectionDto && sectionDto.assignedTo!==s.assignedTo) log(name,{kind:'assign',before:s.assignedName??null,after:sectionDto.assignedName??null});
       f.sections[name]={...s,...sectionDto,revision:revision+1,...(changed?{isCompleted:false,completedBy:null,completedAt:null}:{})};
       if(changed) {
         f.completionStatus={...(f.completionStatus??{}),[name]:false};
         f.status=deriveFichaStatus(f.type,f.completionStatus,f.hiddenSections??[]);
       }
-      await db.query('INSERT INTO arm_app.ficha_changelog(document_id,ficha_document_id,"userId","userName",timestamp,seccion,cambios) VALUES ($1,$2,$3,$4,now(),$5,$6)',[randomUUID(),id,u.sub,u.email,name,JSON.stringify(changed?{fields:['rows'],rowCount:sectionDto.rows.length}:sectionDto)]);
       if(sectionDto.assignedTo && sectionDto.assignedTo!==s.assignedTo && sectionDto.assignedTo!==u.sub) {
         // Same transaction: a failed notification cannot leave an unaudited section.
         await db.query(`WITH seq AS (SELECT nextval(pg_get_serial_sequence('arm_app.notifications','id')) AS id) INSERT INTO arm_app.notifications(id,document_id,"userId",title,body,link,channel,read,"createdAt") SELECT id,id::text,$1,$2,$3,$4,'in_app',false,now() FROM seq`,[sectionDto.assignedTo,'Te asignaron una sección',`Quedaste como responsable de "${FICHA_SECTION_LABELS[name as keyof typeof FICHA_SECTION_LABELS]??name}" en la ficha "${f.title}".`,`/dashboard/fichas-tecnicas/${id}`]);
@@ -180,9 +221,10 @@ export class PostgresFichasService {
   completeSection(id: string, name: string, u: FichaUser) { return this.completion(id,name,u,true); }
   reopenSection(id: string, name: string, u: FichaUser) { return this.completion(id,name,u,false); }
   private completion(id: string, name: string, u: FichaUser, complete: boolean) {
-    return this.change(id,u,f=>{
+    return this.change(id,u,(f,_db,log)=>{
       const s=f.sections?.[name];
       if(!activeSectionsForType(f.type).includes(name as any) || !s) throw new NotFoundException('Sección no activa');
+      log(name,{kind:complete?'complete':'reopen'});
       if(complete) {
         const missing=missingRequiredRows(s.rows??[],(f.encuentros??[]).map((e:any)=>e.id));
         if(missing.length) throw new BadRequestException(`Completa los campos obligatorios: ${missing.join(', ')}`);
@@ -192,12 +234,15 @@ export class PostgresFichasService {
       f.status=deriveFichaStatus(f.type,f.completionStatus,f.hiddenSections??[]);
     });
   }
-  archive(id: string, u: FichaUser) {return this.change(id,u,f=>{Object.assign(f,{archived:true,archivedBy:u.sub,archivedByName:u.email,archivedAt:new Date(),published:false,publishedBy:null,publishedByName:null,publishedAt:null});});}
-  unarchive(id: string, u: FichaUser) {return this.change(id,u,f=>{Object.assign(f,{archived:false,archivedBy:null,archivedByName:null,archivedAt:null});});}
-  publish(id: string, u: FichaUser) {return this.change(id,u,f=>{if(f.archived)throw new BadRequestException('Desarchiva la ficha antes de publicarla');Object.assign(f,{published:true,publishedBy:u.sub,publishedByName:u.email,publishedAt:new Date()});},true);}
-  unpublish(id: string, u: FichaUser) {return this.change(id,u,f=>{Object.assign(f,{published:false,publishedBy:null,publishedByName:null,publishedAt:null});},true);}
+  archive(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{log(null,{kind:'archive'});Object.assign(f,{archived:true,archivedBy:u.sub,archivedByName:u.email,archivedAt:new Date(),published:false,publishedBy:null,publishedByName:null,publishedAt:null});});}
+  unarchive(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{log(null,{kind:'unarchive'});Object.assign(f,{archived:false,archivedBy:null,archivedByName:null,archivedAt:null});});}
+  publish(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{if(f.archived)throw new BadRequestException('Desarchiva la ficha antes de publicarla');log(null,{kind:'publish'});Object.assign(f,{published:true,publishedBy:u.sub,publishedByName:u.email,publishedAt:new Date()});},true);}
+  unpublish(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{log(null,{kind:'unpublish'});Object.assign(f,{published:false,publishedBy:null,publishedByName:null,publishedAt:null});},true);}
   async getChangelog(id: string, u: FichaUser) {
     await this.findOneForUser(id,u);
-    return apiRows(await this.db.query('SELECT * FROM arm_app.ficha_changelog WHERE ficha_document_id=$1 ORDER BY timestamp DESC,document_id LIMIT 100',[id]));
+    return apiRows(await this.db.query(`SELECT c.document_id,c.ficha_document_id,c."userId",c.seccion,c.cambios,c.timestamp,
+      coalesce(nullif(btrim(concat_ws(' ',u."firstName",u."lastName")),''),c."userName") AS "userName"
+      FROM arm_app.ficha_changelog c LEFT JOIN arm_app.users u ON u.id=c."userId"
+      WHERE c.ficha_document_id=$1 ORDER BY c.timestamp DESC,c.document_id LIMIT 100`,[id]));
   }
 }
