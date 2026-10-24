@@ -19,6 +19,12 @@ const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
 };
 import { useChangelog, useUpdateFicha } from '@/hooks/useFichas';
 import { FichaQuickView } from '@/components/fichas/FichaQuickView';
+import { sameLocalDay } from '@/lib/ficha-summary';
+import {
+  MOMENT_KINDS, cleanLabel, durationMinutes, encodeMoment, formatRange, hasContent, kindInfo, momentTree,
+  parseMoment, toMinutes, withDuration,
+  type MomentKind, type MomentLink, type MomentValue, type ParsedMoment,
+} from '@/lib/ficha-timing';
 import { parseFichaDate as parseLocalDate, toFichaInputDate } from '@/lib/ficha-date';
 import { usePaletas, useCreatePaleta, type Paleta, type PaletaColor } from '@/hooks/usePaletas';
 
@@ -118,14 +124,6 @@ function encodeSongData(data: SongData): string {
 
 function allRows(rows: Row[]): Row[] {
   return [...rows].sort((a, b) => a.order - b.order);
-}
-
-function timelineColor(label: string): { color: string; opacity: number } {
-  const l = label.toLowerCase();
-  if (/worship|vio|arw/.test(l))        return { color: C.purple, opacity: 0.9 };
-  if (/predica/.test(l))                return { color: C.amber,  opacity: 0.9 };
-  if (/inicio|opening|start/.test(l))   return { color: C.green,  opacity: 0.9 };
-  return { color: '#444', opacity: 1 };
 }
 
 // ── Estilos base ──────────────────────────────────────────────────────────────
@@ -605,6 +603,8 @@ interface EditProps {
   onReorderRow?: (activeId: string, overId: string) => void;
   isCompleted?: boolean;
   onComplete?: () => void;
+  /** Cambia propiedades de la fila completa (por ahora, parentId en el timing). */
+  onRowPatch?: (rowId: string, patch: Partial<Row>) => void;
 }
 
 // ── RoleCard ──────────────────────────────────────────────────────────────────
@@ -1833,96 +1833,332 @@ function WorshipSetListCard({
   );
 }
 
-// ── HorariosCard ──────────────────────────────────────────────────────────────
+// ── TimingCard ────────────────────────────────────────────────────────────────
+// Horarios como timing estructurado: inicio–término, duración, tipo,
+// responsable, indicaciones y vínculo a una noticia (Info Encuentro) o a una
+// canción (Set List). Los sub-momentos cuelgan de un momento principal.
 
-function HorariosCard({
-  rows, colId,
-  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onLabelChange, onReorderRow, isCompleted, onComplete,
-}: { rows: Row[] } & EditProps) {
-  const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
-  if (!displayed.length && !editable) return null;
+function songText(row: Row | undefined, colId: string): string {
+  if (!row) return '';
+  const s = parseSongData(val(row, colId));
+  return [s.titulo || row.label, s.tonalidad && `(${s.tonalidad})`, s.cantante && `· ${s.cantante}`].filter(Boolean).join(' ');
+}
+
+const timingBadge = (color: string): React.CSSProperties => ({
+  fontSize: 9.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+  color, background: `${color}14`, border: `1px solid ${color}33`, borderRadius: 999, padding: '0 6px', lineHeight: '16px',
+});
+
+const timingSelect: React.CSSProperties = {
+  fontSize: 11, color: D.textSecond, background: '#fff', border: `1px solid ${D.inputBorder}`,
+  borderRadius: 6, padding: '2px 4px', maxWidth: 190, fontFamily: 'inherit',
+};
+
+const timingTime: React.CSSProperties = {
+  fontSize: 12, fontVariantNumeric: 'tabular-nums', color: D.textPrimary, background: 'transparent',
+  border: 'none', borderBottom: `1px dashed ${D.inputBorder}`, outline: 'none', padding: '1px 0', width: 78, fontFamily: 'inherit',
+};
+
+function TimingCard({
+  rows, colId, encuentros, anunciosRows, setListRows, fichaDate,
+  editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onLabelChange, onReorderRow, onRowPatch, isCompleted, onComplete,
+}: { rows: Row[]; encuentros: Encuentro[]; anunciosRows: Row[]; setListRows: Row[]; fichaDate?: any } & EditProps) {
+  const [comparing, setComparing] = useState(false);
+  const [openLink, setOpenLink] = useState<string | null>(null);
+  // La hora actual se lee recién en el navegador para no desalinear el render del servidor.
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const songs = setListRows.filter((r) => parseSongData(val(r, colId)).titulo);
+
+  // ── Edición ──
+  if (editable) {
+    const displayed = allRows(rows);
+    const ids = new Set(displayed.map((r) => r.id));
+    const isChild = (r: Row) => !!r.parentId && r.parentId !== r.id && ids.has(r.parentId);
+    const roots = displayed.filter((r) => !isChild(r));
+    const hasChildren = (id: string) => displayed.some((r) => r.parentId === id);
+
+    const write = (p: ParsedMoment, patch: Partial<MomentValue>) => {
+      onCellChange?.(p.row.id, effectiveColId(p.row, colId), encodeMoment({ ...p.value, ...patch }));
+      // Al pasar al formato nuevo, el rango escrito en el nombre ya no hace falta.
+      if (p.legacy && p.label !== p.row.label && (p.row.shared || encuentros.length <= 1)) onLabelChange?.(p.row.id, p.label);
+    };
+
+    return (
+      <div className="ficha-card" style={S.card}>
+        <div style={S.cardTitle}>Timing</div>
+        <SortableSection items={displayed} onReorder={onReorderRow}>
+          {displayed.map((row, i) => {
+            const p = parseMoment(row, colId);
+            const child = isChild(row);
+            const dur = durationMinutes(p.value);
+            const k = kindInfo(p.value.tipo);
+            const link = p.value.enlace ? `${p.value.enlace.seccion}:${p.value.enlace.rowId}` : '';
+            return (
+              <SortableRow key={row.id} id={row.id} editable>
+                {(handle) => (
+                  <div data-timing-row={row.id} style={{
+                    padding: '7px 0 7px 8px', marginLeft: child ? 22 : 0,
+                    borderLeft: `3px solid ${k.color}`,
+                    borderBottom: i === displayed.length - 1 ? 'none' : `0.5px solid ${D.divider}`,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {handle}
+                      <EditableLabel
+                        value={row.label}
+                        editable
+                        onChange={onLabelChange ? (v) => onLabelChange(row.id, v) : undefined}
+                        style={{ fontSize: 12, flex: 1, minWidth: 0, fontWeight: child ? 400 : 600, color: D.textPrimary }}
+                      />
+                      {onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                      <input
+                        type="time" aria-label="Inicio" value={p.value.inicio ?? ''} style={timingTime}
+                        onChange={(e) => {
+                          const inicio = e.target.value || undefined;
+                          // Mover el inicio conserva la duración.
+                          write(p, dur != null && inicio ? withDuration({ ...p.value, inicio }, dur) : { inicio });
+                        }}
+                      />
+                      <span style={{ fontSize: 11, color: D.textMuted }}>a</span>
+                      <input
+                        type="time" aria-label="Término" value={p.value.fin ?? ''} style={timingTime}
+                        onChange={(e) => write(p, { fin: e.target.value || undefined })}
+                      />
+                      <input
+                        type="number" min={0} max={600} aria-label="Duración en minutos" placeholder="min"
+                        value={dur ?? ''} disabled={!p.value.inicio}
+                        onChange={(e) => write(p, withDuration(p.value, e.target.value === '' ? null : Number(e.target.value)))}
+                        style={{ ...timingTime, width: 46, textAlign: 'right' }}
+                      />
+                      <span style={{ fontSize: 11, color: D.textMuted }}>min</span>
+                    </div>
+                    <div className="ficha-no-print" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
+                      <select aria-label="Tipo" value={p.value.tipo ?? 'momento'} style={timingSelect}
+                        onChange={(e) => write(p, { tipo: e.target.value as MomentKind })}>
+                        {MOMENT_KINDS.map((m) => <option key={m.kind} value={m.kind}>{m.label}</option>)}
+                      </select>
+                      <div style={{ width: 170 }}>
+                        <PersonCellInput
+                          value={p.value.responsable ?? ''} placeholder="Responsable"
+                          onChange={(v) => write(p, { responsable: v })}
+                          style={{ fontSize: 11.5 }}
+                        />
+                      </div>
+                      <select aria-label="Vínculo" value={link} style={timingSelect}
+                        onChange={(e) => {
+                          const [seccion, rowId] = e.target.value.split(':');
+                          write(p, { enlace: rowId ? { seccion: seccion as MomentLink['seccion'], rowId } : undefined });
+                        }}>
+                        <option value="">Sin vínculo</option>
+                        {anunciosRows.length > 0 && (
+                          <optgroup label="Info Encuentro">
+                            {allRows(anunciosRows).map((r) => <option key={r.id} value={`anuncios:${r.id}`}>{r.label}</option>)}
+                          </optgroup>
+                        )}
+                        {songs.length > 0 && (
+                          <optgroup label="Set List">
+                            {allRows(songs).map((r) => <option key={r.id} value={`setList:${r.id}`}>{songText(r, colId)}</option>)}
+                          </optgroup>
+                        )}
+                      </select>
+                      {onRowPatch && (
+                        <select aria-label="Sub-momento de" value={child ? row.parentId! : ''} style={timingSelect}
+                          disabled={hasChildren(row.id)}
+                          title={hasChildren(row.id) ? 'Este momento ya tiene sub-momentos' : 'Colgar este momento de otro'}
+                          onChange={(e) => onRowPatch(row.id, { parentId: e.target.value || null })}>
+                          <option value="">Momento principal</option>
+                          {roots.filter((r) => r.id !== row.id).map((r) => (
+                            <option key={r.id} value={r.id}>Sub-momento de {cleanLabel(r.label)}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    <CellInput
+                      value={p.value.nota ?? ''} placeholder="Indicaciones para el equipo…"
+                      onChange={(v) => write(p, { nota: v })}
+                      style={{ fontSize: 11.5, color: D.textSecond, marginTop: 5 }}
+                    />
+                  </div>
+                )}
+              </SortableRow>
+            );
+          })}
+        </SortableSection>
+        <SectionFooter sectionName="horarios" editable isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
+      </div>
+    );
+  }
+
+  // ── Lectura ──
+  const tree = momentTree(rows, colId, true)
+    .map((n) => ({ ...n, children: n.children.filter((c) => forceShowAll || hasContent(c.value)) }))
+    .filter((n) => forceShowAll || hasContent(n.value) || n.children.length > 0);
+  if (!tree.length) return null;
+
+  // Momento en curso y siguiente, solo el día del encuentro.
+  let currentId: string | null = null, nextId: string | null = null;
+  const isEventDay = !!now && !!fichaDate && sameLocalDay(parseLocalDate(fichaDate), now);
+  if (isEventDay && now) {
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    for (const n of tree) {
+      const start = toMinutes(n.value.inicio);
+      if (start == null) continue;
+      if (start <= nowMin) {
+        const end = toMinutes(n.value.fin);
+        currentId = end == null || end <= start || nowMin < end ? n.row.id : null;
+      } else { nextId = n.row.id; break; }
+    }
+  }
+
+  const linkChip = (m: ParsedMoment) => {
+    const link = m.value.enlace;
+    if (!link) return null;
+    if (link.seccion === 'anuncios') {
+      const target = anunciosRows.find((r) => r.id === link.rowId);
+      if (!target) return null;
+      const key = `${m.row.id}:${target.id}`;
+      const text = val(target, colId);
+      return (
+        <div style={{ marginTop: 3 }}>
+          <button
+            type="button" onClick={() => text && setOpenLink(openLink === key ? null : key)}
+            style={{ ...timingBadge('#0B7A75'), cursor: text ? 'pointer' : 'default', textTransform: 'none', letterSpacing: 0, fontSize: 10.5 }}
+          >
+            Noticia: {target.label}{text ? (openLink === key ? ' ▴' : ' ▾') : ''}
+          </button>
+          {openLink === key && text && (
+            <div style={{ fontSize: 11.5, color: D.textPrimary, background: '#0B7A750D', borderRadius: 6, padding: '6px 8px', marginTop: 4, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {text}
+            </div>
+          )}
+        </div>
+      );
+    }
+    const song = setListRows.find((r) => r.id === link.rowId);
+    if (!song) return null;
+    return (
+      <div style={{ marginTop: 3 }}>
+        <span style={{ ...timingBadge('#6554C0'), textTransform: 'none', letterSpacing: 0, fontSize: 10.5 }}>Canción: {songText(song, colId)}</span>
+      </div>
+    );
+  };
+
+  const renderMoment = (m: ParsedMoment, child: boolean, last: boolean) => {
+    const k = kindInfo(m.value.tipo);
+    const dur = durationMinutes(m.value);
+    const main = !child && !!m.value.tipo && m.value.tipo !== 'momento' && m.value.tipo !== 'transicion';
+    const isCurrent = m.row.id === currentId, isNext = m.row.id === nextId;
+    const detail = [m.value.responsable, m.value.nota].filter(Boolean).join(' · ');
+    return (
+      <div key={m.row.id} data-timing-row={m.row.id} style={{
+        display: 'flex', alignItems: 'stretch',
+        borderBottom: last ? 'none' : `0.5px solid ${D.divider}`,
+        background: isCurrent ? '#1D9E7514' : undefined, borderRadius: isCurrent ? 6 : 0,
+      }}>
+        <div style={{
+          width: child ? 106 : 92, flexShrink: 0, padding: '8px 10px 8px 0', textAlign: 'right',
+          fontSize: child ? 11 : 12, fontVariantNumeric: 'tabular-nums', fontWeight: main ? 700 : 500,
+          color: m.value.inicio ? (main ? D.textPrimary : D.textSecond) : D.textMuted, whiteSpace: 'nowrap',
+        }}>
+          {formatRange(m.value) || '—'}
+        </div>
+        <div style={{ width: 3, flexShrink: 0, borderRadius: 2, background: k.color, opacity: child ? 0.45 : 0.9, margin: '6px 10px 6px 0' }} />
+        <div style={{ flex: 1, minWidth: 0, padding: '7px 0' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: child ? 11.5 : 12, fontWeight: main ? 600 : 400, color: main ? D.textPrimary : D.textSecond }}>{m.label}</span>
+            {m.value.tipo && m.value.tipo !== 'momento' && !child && <span style={timingBadge(k.color)}>{k.label}</span>}
+            {dur != null && <span style={{ fontSize: 10.5, color: D.textMuted }}>{dur} min</span>}
+            {isCurrent && <span style={timingBadge('#1D9E75')}>Ahora</span>}
+            {isNext && <span style={timingBadge(D.textSecond)}>Próximo</span>}
+          </div>
+          {detail && <div style={{ fontSize: 11, color: D.textSecond, marginTop: 2, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{detail}</div>}
+          {linkChip(m)}
+        </div>
+      </div>
+    );
+  };
+
+  // Comparación entre encuentros: mismo momento, horario y duración en cada uno.
+  const canCompare = encuentros.length > 1;
+  const compareTable = () => {
+    const momentRows = tree.map((n) => ({
+      label: n.label,
+      cells: encuentros.map((e) => parseMoment(n.row, e.id).value),
+    }));
+    return (
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', padding: '4px 6px', color: D.textMuted, fontWeight: 600 }}>Momento</th>
+              {encuentros.map((e) => (
+                <th key={e.id} style={{ textAlign: 'left', padding: '4px 6px', color: e.id === colId ? D.textPrimary : D.textMuted, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  {e.time || e.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {momentRows.map((r, i) => {
+              const durations = r.cells.map((c) => (hasContent(c) ? durationMinutes(c) : 'vacío'));
+              const differs = new Set(durations.map(String)).size > 1;
+              return (
+                <tr key={i} style={{ borderTop: `0.5px solid ${D.divider}` }}>
+                  <td style={{ padding: '5px 6px', color: D.textPrimary, fontWeight: 600 }}>
+                    {r.label}
+                    {differs && <span style={{ ...timingBadge('#D4890A'), marginLeft: 6 }}>Distinto</span>}
+                  </td>
+                  {r.cells.map((c, j) => {
+                    const d = durationMinutes(c);
+                    return (
+                      <td key={j} style={{
+                        padding: '5px 6px', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
+                        color: hasContent(c) ? D.textSecond : D.textMuted,
+                        background: differs ? '#D4890A0F' : undefined,
+                      }}>
+                        {formatRange(c) || '—'}{d != null ? ` · ${d} min` : ''}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   return (
     <div className="ficha-card" style={S.card}>
-      <div style={S.cardTitle}>Horarios</div>
-      <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
-        {displayed.map((row, i) => {
-          const { color, opacity } = timelineColor(row.label);
-          const isBold    = /worship|vio|predicaci[oó]n|inicio/i.test(row.label);
-          const timeValue = editable ? rawVal(row, colId) : val(row, colId);
-          const hasTime   = !!timeValue;
-          const isLast    = i === displayed.length - 1;
-
-          return (
-            <SortableRow key={row.id} id={row.id} editable={editable}>
-              {(handle) => (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 0,
-                  padding: '0',
-                  borderBottom: isLast ? 'none' : `0.5px solid ${D.divider}`,
-                }}>
-                  {handle}
-
-                  {/* Columna de tiempo */}
-                  <div style={{ width: 72, flexShrink: 0, paddingRight: 12, textAlign: 'right' }}>
-                    {editable ? (
-                      <CellInput
-                        value={rawVal(row, colId)}
-                        onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
-                        placeholder="00:00"
-                        style={{
-                          fontSize: 12, width: '100%', textAlign: 'right',
-                          fontVariantNumeric: 'tabular-nums',
-                          fontWeight: isBold ? 700 : 400,
-                          color: hasTime ? (isBold ? D.textPrimary : D.textSecond) : D.textMuted,
-                        }}
-                      />
-                    ) : (
-                      <span style={{
-                        display: 'inline-block',
-                        fontSize: 12,
-                        fontVariantNumeric: 'tabular-nums',
-                        fontWeight: isBold ? 700 : 500,
-                        color: hasTime ? (isBold ? D.textPrimary : D.textSecond) : D.textMuted,
-                        background: hasTime && isBold ? 'rgba(255,255,255,0.06)' : 'transparent',
-                        borderRadius: 5,
-                        padding: hasTime && isBold ? '1px 5px' : '1px 0',
-                      }}>
-                        {timeValue || '—'}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Barra de color */}
-                  <div style={{
-                    width: 3, flexShrink: 0, borderRadius: 2,
-                    alignSelf: 'stretch',
-                    background: `linear-gradient(to bottom, transparent 10%, ${color} 30%, ${color} 70%, transparent 90%)`,
-                    opacity: hasTime ? opacity : 0.25,
-                    margin: '0 10px',
-                  }} />
-
-                  {/* Etiqueta */}
-                  <EditableLabel
-                    value={row.label}
-                    editable={editable}
-                    onChange={onLabelChange ? (v) => onLabelChange(row.id, v) : undefined}
-                    style={{
-                      fontSize: 12, flex: 1, padding: '8px 0',
-                      fontWeight: isBold ? 600 : 400,
-                      color: isBold ? D.textPrimary : D.textSecond,
-                      letterSpacing: isBold ? '-0.01em' : 'normal',
-                    }}
-                  />
-
-                  {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
-                </div>
-              )}
-            </SortableRow>
-          );
-        })}
-      </SortableSection>
-      <SectionFooter sectionName="horarios" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={S.cardTitle}>Timing</div>
+        {canCompare && (
+          <button
+            type="button" className="ficha-no-print" onClick={() => setComparing((c) => !c)}
+            style={{ fontSize: 11, fontWeight: 600, color: '#4338CA', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 8 }}
+          >
+            {comparing ? 'Ver timing' : 'Comparar encuentros'}
+          </button>
+        )}
+      </div>
+      {comparing && canCompare ? compareTable() : tree.map((n, i) => (
+        <React.Fragment key={n.row.id}>
+          {renderMoment(n, false, i === tree.length - 1 && n.children.length === 0)}
+          {n.children.length > 0 && (
+            <div style={{ marginLeft: 14, borderLeft: `1px dashed ${D.divider}`, paddingLeft: 4 }}>
+              {n.children.map((c, j) => renderMoment(c, true, i === tree.length - 1 && j === n.children.length - 1))}
+            </div>
+          )}
+        </React.Fragment>
+      ))}
     </div>
   );
 }
@@ -1930,10 +2166,22 @@ function HorariosCard({
 // ── AnunciosCard ──────────────────────────────────────────────────────────────
 
 function AnunciosCard({
-  rows, colId,
+  rows, colId, timingRows = [],
   editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onLabelChange, onReorderRow, isCompleted, onComplete,
-}: { rows: Row[] } & EditProps) {
+}: { rows: Row[]; timingRows?: Row[] } & EditProps) {
   const displayed = (editable || forceShowAll) ? allRows(rows) : rowsWithVal(rows, colId);
+  // Momentos del timing que leen cada noticia.
+  const inTiming = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const r of timingRows) {
+      const p = parseMoment(r, colId);
+      if (p.value.enlace?.seccion !== 'anuncios') continue;
+      const list = map.get(p.value.enlace.rowId) ?? [];
+      list.push([p.value.inicio, p.label].filter(Boolean).join(' '));
+      map.set(p.value.enlace.rowId, list);
+    }
+    return map;
+  }, [timingRows, colId]);
   if (!displayed.length && !editable) return null;
 
   return (
@@ -1999,6 +2247,11 @@ function AnunciosCard({
                         overflowWrap: 'anywhere' as const,
                       }}>
                         {content || '—'}
+                      </span>
+                    )}
+                    {inTiming.get(row.id) && (
+                      <span title="Momento del timing que lee esta noticia" style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 600, color: '#0B7A75', maxWidth: '45%', textAlign: 'right' as const }}>
+                        En el timing: {inTiming.get(row.id)!.join(', ')}
                       </span>
                     )}
                   </div>
@@ -2199,6 +2452,7 @@ export interface FichaDocumentViewProps {
   onDeleteRow?: (section: SectionName, rowId: string) => void;
   onLabelChange?: (section: SectionName, rowId: string, newLabel: string) => void;
   onReorderRow?: (section: SectionName, activeId: string, overId: string) => void;
+  onRowPatch?: (section: SectionName, rowId: string, patch: Partial<Row>) => void;
   onSectionComplete?: (section: SectionName) => void;
   sectionStatus?: Partial<Record<SectionName, boolean>>;
   saveState?: 'idle' | 'saving' | 'saved' | 'error';
@@ -2219,7 +2473,7 @@ export interface FichaDocumentViewProps {
 export function FichaDocumentView({
   ficha, onEdit, onSave, onArchive, onUnarchive, canArchive,
   onPublish, onUnpublish, canPublish, isPublishing,
-  editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onSectionComplete,
+  editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onRowPatch, onSectionComplete,
   sectionStatus, saveState, hiddenSections, modulesPanelOpen, onToggleModulesPanel,
   sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual, showHistory,
 }: FichaDocumentViewProps) {
@@ -2252,6 +2506,7 @@ export function FichaDocumentView({
     onAddRow:      onAddRow      ? (label, type, shared) => onAddRow(name, label, type, shared)       : undefined,
     onLabelChange: onLabelChange ? (rowId, newLabel) => onLabelChange(name, rowId, newLabel)          : undefined,
     onReorderRow:  onReorderRow  ? (from, to) => onReorderRow(name, from, to)                        : undefined,
+    onRowPatch:    onRowPatch    ? (rowId, patch) => onRowPatch(name, rowId, patch)                   : undefined,
     isCompleted:   sectionStatus?.[name] ?? sections?.[name]?.isCompleted,
     onComplete:    onSectionComplete ? () => onSectionComplete(name)                                  : undefined,
   });
@@ -3001,7 +3256,12 @@ export function FichaDocumentView({
                 case 'streaming':
                   return !hidden('streaming') ? <StreamingCard key="streaming" rows={sec('streaming')} {...editProps('streaming')} /> : null;
                 case 'horarios':
-                  return !hidden('horarios') ? <HorariosCard key="horarios" rows={sec('horarios')} {...editProps('horarios')} /> : null;
+                  return !hidden('horarios') ? (
+                    <TimingCard
+                      key="horarios" rows={sec('horarios')} {...editProps('horarios')}
+                      encuentros={encuentros ?? []} anunciosRows={sec('anuncios')} setListRows={sec('setList')} fichaDate={date}
+                    />
+                  ) : null;
                 case 'worship':
                   return (!hidden('escena') || !hidden('setList') || !hidden('outfit')) ? (
                     <WorshipSetListCard
@@ -3015,7 +3275,7 @@ export function FichaDocumentView({
                 case 'voluntarios':
                   return !hidden('voluntarios') ? <VoluntariosCard key="voluntarios" rows={sec('voluntarios')} {...editProps('voluntarios')} /> : null;
                 case 'anuncios':
-                  return !hidden('anuncios') ? <AnunciosCard key="anuncios" rows={sec('anuncios')} {...editProps('anuncios')} /> : null;
+                  return !hidden('anuncios') ? <AnunciosCard key="anuncios" rows={sec('anuncios')} timingRows={sec('horarios')} {...editProps('anuncios')} /> : null;
                 default: return null;
               }
             };

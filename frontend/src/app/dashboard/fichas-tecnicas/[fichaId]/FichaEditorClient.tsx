@@ -529,6 +529,19 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     [scheduleSave],
   );
 
+  // ── Cambiar propiedades de una fila (ej. sub-momento del timing) ───────────
+  const handleRowPatch = useCallback(
+    (sectionName: SectionName, rowId: string, patch: Partial<Row>) => {
+      setLocalSections((prev) => {
+        const rows = prev[sectionName] ?? [];
+        const updated = rows.map((r) => (r.id === rowId ? { ...r, ...patch } : r));
+        scheduleSave(sectionName, updated, true);
+        return { ...prev, [sectionName]: updated };
+      });
+    },
+    [scheduleSave],
+  );
+
   const handleReorderRow = useCallback(
     (sectionName: SectionName, activeId: string, overId: string) => {
       setLocalSections((prev) => {
@@ -798,6 +811,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             onDeleteRow={handleDeleteRow}
             onLabelChange={handleLabelChange}
             onReorderRow={handleReorderRow}
+            onRowPatch={handleRowPatch}
             onSectionComplete={handleSectionComplete}
             sectionStatus={sectionStatus}
             saveState={saveState}

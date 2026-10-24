@@ -24,6 +24,21 @@ describe('ficha changelog', () => {
     expect(displayValue(JSON.stringify({ titulo: 'Way Maker', tonalidad: 'E', cantante: 'Ana' }))).toBe('Way Maker (E) · Ana');
   });
 
+  it('shows timing moments as a readable range', () => {
+    expect(displayValue(JSON.stringify({ inicio: '20:00', fin: '20:17', tipo: 'worship', nota: 'Entrada suave' }))).toBe('20:00–20:17 · worship · Entrada suave');
+  });
+
+  it('records when a timing moment becomes a sub-moment', () => {
+    const changes = diffRows(
+      [row('w', 'Worship'), { ...row('c1', 'Canción 1'), parentId: null }],
+      [row('w', 'Worship'), { ...row('c1', 'Canción 1'), parentId: 'w' }],
+      encuentros,
+    );
+    expect(changes).toEqual([
+      { kind: 'value', rowId: 'c1#parent', label: 'Canción 1', encuentro: null, before: 'Momento principal', after: 'Sub-momento de Worship' },
+    ]);
+  });
+
   it('merges consecutive autosaves keeping the original before and the latest after', () => {
     const first = diffRows([row('p1', 'Bienvenida', { shared: '' })], [row('p1', 'Bienvenida', { shared: 'Hola' })], encuentros);
     const second = diffRows([row('p1', 'Bienvenida', { shared: 'Hola' })], [row('p1', 'Bienvenida', { shared: 'Hola a todos' })], encuentros);

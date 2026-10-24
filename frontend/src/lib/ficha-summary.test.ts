@@ -16,7 +16,7 @@ describe('ficha summary', () => {
       row('d', 'Ensayo', {}, 3),
     ], 'e1');
     expect(moments.map((m) => [m.label, m.time, m.main])).toEqual([
-      ['Preparativos', '05:10-05:40', false],
+      ['Preparativos', '05:10–05:40', false],
       ['Inicio Worship', '20:00', true],
       ['Predicación', '20:23', true],
     ]);

@@ -34,9 +34,13 @@ export function displayValue(raw: unknown): string | null {
   if (!text) return null;
   if (text.startsWith('{')) {
     try {
-      const song = JSON.parse(text);
-      if (song && typeof song === 'object' && song.titulo) {
-        text = [song.titulo, song.tonalidad && `(${song.tonalidad})`, song.cantante && `· ${song.cantante}`].filter(Boolean).join(' ');
+      const v = JSON.parse(text);
+      if (v && typeof v === 'object' && v.titulo) {
+        text = [v.titulo, v.tonalidad && `(${v.tonalidad})`, v.cantante && `· ${v.cantante}`].filter(Boolean).join(' ');
+      } else if (v && typeof v === 'object' && ('inicio' in v || 'fin' in v || 'nota' in v || 'enlace' in v || 'responsable' in v)) {
+        // Momento del timing (Horarios).
+        const range = v.inicio ? (v.fin ? `${v.inicio}–${v.fin}` : v.inicio) : null;
+        text = [range, v.tipo, v.responsable, v.nota, v.enlace && 'con vínculo'].filter(Boolean).join(' · ') || '—';
       }
     } catch { /* texto normal */ }
   }
@@ -61,6 +65,11 @@ export function diffRows(oldRows: any[], newRows: any[], encuentros: { id: strin
       changes.push({ kind: 'added', rowId: id, label, encuentro: null, before: null, after: null });
     } else if ((prev.label ?? '') !== (row.label ?? '')) {
       changes.push({ kind: 'renamed', rowId: id, label, encuentro: null, before: prev.label ?? '', after: row.label ?? '' });
+    }
+    if (prev && (prev.parentId ?? null) !== (row.parentId ?? null)) {
+      // Momento del timing que pasa a colgar de otro (o vuelve a ser principal).
+      const parent = (pid: string | null | undefined) => (pid ? `Sub-momento de ${after.get(pid)?.label ?? before.get(pid)?.label ?? pid}` : 'Momento principal');
+      changes.push({ kind: 'value', rowId: `${id}#parent`, label, encuentro: null, before: parent(prev.parentId), after: parent(row.parentId) });
     }
     const keys = new Set([...Object.keys(prev?.values ?? {}), ...Object.keys(row.values ?? {})]);
     for (const key of keys) {

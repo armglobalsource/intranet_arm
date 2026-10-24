@@ -42,6 +42,8 @@ export interface Row {
   values:   Record<string, string>;  // { e1: 'nombre', unico: 'valor' }
   order:    number;
   required: boolean;
+  /** Horarios: momento principal del que este es un sub-momento. */
+  parentId?: string | null;
 }
 
 export interface Section {

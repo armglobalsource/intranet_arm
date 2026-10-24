@@ -73,6 +73,8 @@ export class RowDto {
   @IsObject()  values: Record<string, string>;
   @IsNumber()  order: number;
   @IsBoolean() required: boolean;
+  /** Horarios: id del momento principal del que esta fila es un sub-momento. */
+  @IsOptional() @IsString() @MaxLength(80) parentId?: string | null;
 }
 
 export class UpdateSectionDto {

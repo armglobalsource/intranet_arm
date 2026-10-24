@@ -2,6 +2,7 @@
 // historial de cambios. Sin React: se prueba aparte.
 
 import type { Row, SectionName } from '@/types/ficha';
+import { formatRange, parseMoment, toMinutes } from './ficha-timing';
 
 export interface TimingMoment {
   id: string;
@@ -29,29 +30,20 @@ export function parseClock(text: string | undefined | null): number | null {
 
 const MAIN_MOMENT = /worship|vio|predicaci[oó]n|inicio|respuesta|siembra|despedida|bienvenida/i;
 
-function cellValue(row: Row, colId: string): string {
-  const v = row.shared ? (row.values?.shared ?? row.values?.[colId]) : row.values?.[colId];
-  return (v ?? '').trim();
-}
-
 /**
- * Momentos del timing para un encuentro, ordenados por hora. La hora está en
- * el valor ("20:00") o, en las fichas de oración, dentro del nombre de la fila
- * ("05:10-05:40 — Preparativos").
+ * Momentos principales del timing para un encuentro, ordenados por hora (los
+ * sub-momentos quedan fuera). Lee el formato estructurado y el antiguo.
  */
 export function timingFor(rows: Row[], colId: string): TimingMoment[] {
-  return [...rows]
-    .sort((a, b) => a.order - b.order)
+  const ids = new Set(rows.map((r) => r.id));
+  return rows
+    .filter((row) => !row.parentId || !ids.has(row.parentId))
     .map((row) => {
-      const value = cellValue(row, colId);
-      const fromValue = parseClock(value);
-      const minutes = fromValue ?? parseClock(row.label);
+      const { label, value } = parseMoment(row, colId);
+      const minutes = toMinutes(value.inicio);
       if (minutes == null) return null;
-      const label = fromValue != null
-        ? row.label
-        : (row.label.replace(/^\s*\d{1,2}[:.]\d{2}(\s*[-–]\s*\d{1,2}[:.]\d{2})?\s*[—–-]?\s*/, '') || row.label);
-      const time = fromValue != null ? value.match(/\d{1,2}[:.]\d{2}(\s*[-–]\s*\d{1,2}[:.]\d{2})?/)![0] : row.label.match(/\d{1,2}[:.]\d{2}(\s*[-–]\s*\d{1,2}[:.]\d{2})?/)![0];
-      return { id: row.id, label, time, minutes, main: MAIN_MOMENT.test(row.label) };
+      const main = (value.tipo && value.tipo !== 'momento' && value.tipo !== 'transicion') || MAIN_MOMENT.test(label);
+      return { id: row.id, label, time: formatRange(value), minutes, main };
     })
     .filter((m): m is TimingMoment => m !== null)
     .sort((a, b) => a.minutes - b.minutes);
