@@ -23,18 +23,18 @@ export class CampusController {
 
   @Post()
   @UseGuards(PermissionsGuard)
-  @RequirePermission('campus:manage')
+  @RequirePermission('campus:create')
   create(@Body() dto: CreateCampusDto) { return this.campusService.create(dto); }
 
   @Patch(':id')
   @UseGuards(PermissionsGuard)
-  @RequirePermission('campus:manage')
+  @RequirePermission('campus:edit')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCampusDto) {
     return this.campusService.update(id, dto);
   }
 
   @Delete(':id')
   @UseGuards(PermissionsGuard)
-  @RequirePermission('campus:manage')
+  @RequirePermission('campus:delete')
   remove(@Param('id', ParseIntPipe) id: number) { return this.campusService.remove(id); }
 }

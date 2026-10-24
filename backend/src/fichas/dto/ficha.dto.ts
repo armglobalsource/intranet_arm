@@ -1,5 +1,5 @@
 import {
-  ArrayMaxSize, IsString, IsOptional, IsIn, IsArray, ValidateNested,
+  ArrayMaxSize, ArrayMinSize, IsString, IsOptional, IsIn, IsArray, ValidateNested,
   IsBoolean, IsNumber, IsObject, IsDateString, IsNotEmpty, MaxLength,
   Min, Max, Matches,
 } from 'class-validator';
@@ -17,6 +17,11 @@ export class EncuentroDto {
   @IsString() @IsNotEmpty() @MaxLength(10) time: string;
   @IsBoolean() isLive: boolean;
   @IsString() @MaxLength(30) color: string;
+}
+
+/** En una edición, un encuentro nuevo puede copiar los valores de otro existente. */
+export class EncuentroUpdateDto extends EncuentroDto {
+  @IsOptional() @IsString() @MaxLength(40) copyFrom?: string;
 }
 
 export class CreateFichaDto {
@@ -53,6 +58,8 @@ export class UpdateFichaDto {
   hiddenSections?: string[];
   @IsOptional() @IsObject() @ValidateNested() @Type(() => SectionLayoutDto)
   sectionLayout?: SectionLayoutDto;
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(12) @ValidateNested({ each: true }) @Type(() => EncuentroUpdateDto)
+  encuentros?: EncuentroUpdateDto[];
 }
 
 export class CloneFichaDto {

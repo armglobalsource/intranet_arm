@@ -7,6 +7,7 @@ import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, Update
 import { ALL_FICHA_SECTIONS, activeSectionsForType, deriveFichaStatus, FICHA_SECTION_LABELS, formatFichaDateLabel, missingRequiredRows, parseFichaDate } from './fichas.utils';
 import { defaultRows, defaultRowsOracion, buildDefaultSections, buildDefaultCompletion, migrateMediaData, preservePrayerSections, buildGlobalSectionsFromMixedFicha } from './fichas.defaults';
 import { ChangelogEntry, CHANGELOG_MERGE_WINDOW_MS, capRowChanges, diffRows, mergeRowChanges } from './fichas.changelog';
+import { applyEncuentros } from './fichas.encuentros';
 
 type Log = (seccion: string | null, entry: ChangelogEntry) => void;
 
@@ -135,6 +136,13 @@ export class PostgresFichasService {
       if(dto.sectionLayout!==undefined) {
         if(JSON.stringify(dto.sectionLayout)!==JSON.stringify(f.sectionLayout??null)) log(null,{kind:'layout'});
         f.sectionLayout=JSON.parse(JSON.stringify(dto.sectionLayout));
+      }
+      if(dto.encuentros!==undefined) {
+        const {change,touched}=applyEncuentros(f,JSON.parse(JSON.stringify(dto.encuentros)));
+        if(change) log(null,change);
+        // Las filas cambiaron por fuera del editor de la sección: su revisión sube para que un guardado viejo no las pise.
+        for(const name of touched) f.sections[name].revision=Number(f.sections[name].revision??0)+1;
+        f.status=deriveFichaStatus(f.type,f.completionStatus??{},f.hiddenSections??[]);
       }
       if(dto.hiddenSections!==undefined) {
         const was=new Set<string>(f.hiddenSections??[]), now=new Set(dto.hiddenSections);

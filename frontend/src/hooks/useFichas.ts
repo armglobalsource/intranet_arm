@@ -86,7 +86,7 @@ export function useUpdateFicha() {
   const qc = useQueryClient();
   return useMutation({
     mutationKey: WRITE_KEY,
-    mutationFn: ({ fichaId, ...dto }: { fichaId: string; title?: string; date?: string; hiddenSections?: string[]; sectionLayout?: { left: string[]; right: string[]; leftRatio?: number } }) =>
+    mutationFn: ({ fichaId, ...dto }: { fichaId: string; title?: string; date?: string; hiddenSections?: string[]; sectionLayout?: { left: string[]; right: string[]; leftRatio?: number }; encuentros?: Array<import('@/types/ficha').Encuentro & { copyFrom?: string }> }) =>
       api.patch(`/fichas/${fichaId}`, dto).then(r => r.data),
     // Cancela cualquier GET en vuelo (disparado por el refetchInterval de
     // useFichaRealtime) antes de escribir — si no, esa respuesta stale puede

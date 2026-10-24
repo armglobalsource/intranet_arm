@@ -88,7 +88,7 @@ export function AdministracionCampusClient() {
   const router = useRouter();
   const { isAdmin, can } = usePermissions();
   const { data: campuses = [], isLoading } = useAllCampuses();
-  const hasAccess = isAdmin || can('campus:manage');
+  const hasAccess = isAdmin || can('campus:edit');
 
   useEffect(() => {
     if (!hasAccess) router.replace('/dashboard');

@@ -144,13 +144,21 @@ function ScheduleEditor({ schedules, onChange }: { schedules: CampusSchedule[]; 
 
       <div className="space-y-2">
         {schedules.map((s, i) => (
-          <div key={i} className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+          <div key={i} className="flex flex-wrap items-center gap-2 p-2.5 bg-slate-50 rounded-lg border border-slate-100">
             <select value={s.dia} onChange={(e) => update(i, 'dia', e.target.value)}
               className="px-2 py-1.5 border border-slate-200 rounded-lg text-[12.5px] bg-white focus:outline-none focus:border-teal-400 transition">
               {DAYS.map((d) => <option key={d}>{d}</option>)}
             </select>
             <input type="time" value={s.hora} onChange={(e) => update(i, 'hora', e.target.value)}
               className="px-2 py-1.5 border border-slate-200 rounded-lg text-[12.5px] bg-white focus:outline-none focus:border-teal-400 transition w-28" />
+            <select value={s.bloque ?? ''} onChange={(e) => update(i, 'bloque', e.target.value)}
+              title="Bloque: los horarios del mismo día y bloque van en una sola ficha (ej. Domingo AM y Domingo PM por separado)"
+              aria-label="Bloque"
+              className="px-2 py-1.5 border border-slate-200 rounded-lg text-[12px] bg-white focus:outline-none focus:border-teal-400 transition w-24">
+              <option value="">Sin bloque</option>
+              <option value="AM">Bloque AM</option>
+              <option value="PM">Bloque PM</option>
+            </select>
             <input type="text" value={s.descripcion ?? ''} onChange={(e) => update(i, 'descripcion', e.target.value)}
               placeholder="Ej: Encuentro principal, Jóvenes…"
               className="flex-1 px-2 py-1.5 border border-slate-200 rounded-lg text-[12.5px] bg-white focus:outline-none focus:border-teal-400 transition" />
@@ -544,7 +552,7 @@ function ScheduleBadges({ schedules }: { schedules: CampusSchedule[] }) {
         <span key={i} title={s.descripcion || undefined}
           className="inline-flex flex-col px-2 py-1 rounded-lg bg-teal-50 border border-teal-100 cursor-default">
           <span className="text-[11px] font-bold text-teal-700 leading-tight">
-            {s.dia.slice(0, 3)} {s.hora}
+            {s.dia.slice(0, 3)} {s.hora}{s.bloque ? ` · ${s.bloque}` : ''}
           </span>
           {s.descripcion && (
             <span className="text-[10px] text-teal-500 leading-tight truncate max-w-[110px]">{s.descripcion}</span>

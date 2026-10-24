@@ -24,6 +24,7 @@ export type ChangelogEntry =
   | { kind: 'title'; before: string; after: string }
   | { kind: 'date'; before: string | null; after: string | null }
   | { kind: 'modules'; shown: string[]; hidden: string[] }
+  | { kind: 'encuentros'; added: string[]; removed: string[]; changed: { before: string; after: string }[] }
   | { kind: 'layout' } | { kind: 'layoutVisual' }
   | { kind: 'publish' } | { kind: 'unpublish' } | { kind: 'archive' } | { kind: 'unarchive' };
 
@@ -70,6 +71,12 @@ export function diffRows(oldRows: any[], newRows: any[], encuentros: { id: strin
       // Momento del timing que pasa a colgar de otro (o vuelve a ser principal).
       const parent = (pid: string | null | undefined) => (pid ? `Sub-momento de ${after.get(pid)?.label ?? before.get(pid)?.label ?? pid}` : 'Momento principal');
       changes.push({ kind: 'value', rowId: `${id}#parent`, label, encuentro: null, before: parent(prev.parentId), after: parent(row.parentId) });
+    }
+    if (prev && !!prev.shared !== !!row.shared) {
+      // Pasar a compartida (o separar) reescribe los valores: basta con una línea.
+      const scope = (shared: boolean) => (shared ? 'Igual para todos' : 'Por encuentro');
+      changes.push({ kind: 'value', rowId: `${id}#shared`, label, encuentro: null, before: scope(!!prev.shared), after: scope(!!row.shared) });
+      continue;
     }
     const keys = new Set([...Object.keys(prev?.values ?? {}), ...Object.keys(row.values ?? {})]);
     for (const key of keys) {

@@ -28,7 +28,7 @@ export const SECTION_LABELS: Record<SectionName, string> = {
   streaming:   'Streaming',
   escena:      'AR Worship',
   setList:     'Set List',
-  horarios:    'Horarios',
+  horarios:    'Timing',
   anuncios:    'Info Encuentro',
   voluntarios: 'Voluntarios de Servicio',
   outfit:      'Outfit / Paleta',

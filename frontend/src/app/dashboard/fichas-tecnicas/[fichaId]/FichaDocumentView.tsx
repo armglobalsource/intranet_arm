@@ -19,6 +19,8 @@ const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
 };
 import { useChangelog, useUpdateFicha } from '@/hooks/useFichas';
 import { FichaQuickView } from '@/components/fichas/FichaQuickView';
+import { FichaCompareView } from '@/components/fichas/FichaCompareView';
+import { EncuentrosEditor, type EncuentroDraft } from '@/components/fichas/EncuentrosEditor';
 import { sameLocalDay } from '@/lib/ficha-summary';
 import {
   MOMENT_KINDS, cleanLabel, durationMinutes, encodeMoment, formatRange, hasContent, kindInfo, momentTree,
@@ -2318,8 +2320,8 @@ function VoluntariosCard({
 // ── EncuentroTabs ─────────────────────────────────────────────────────────────
 
 function EncuentroTabs({
-  encuentros, selected, onChange, showLayoutTab,
-}: { encuentros: Encuentro[]; selected: string; onChange: (id: string) => void; showLayoutTab?: boolean }) {
+  encuentros, selected, onChange, showLayoutTab, showCompareTab,
+}: { encuentros: Encuentro[]; selected: string; onChange: (id: string) => void; showLayoutTab?: boolean; showCompareTab?: boolean }) {
   const hasMultipleEncuentros = encuentros.length > 1;
   // Cuando showLayoutTab está activo, SIEMPRE mostramos al menos una píldora
   // de encuentro (aunque haya solo uno) para que el usuario pueda volver
@@ -2353,6 +2355,22 @@ function EncuentroTabs({
           {pillLabel(e)}
         </button>
       ))}
+
+      {showCompareTab && (
+        <button
+          onClick={() => onChange('compare')}
+          title="Ver todos los encuentros lado a lado"
+          style={{
+            padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+            border: '1px solid', cursor: 'pointer', transition: 'all 0.15s',
+            ...(selected === 'compare'
+              ? { background: '#4338CA', color: '#fff', borderColor: '#4338CA' }
+              : { background: '#4338CA12', color: '#4338CA', borderColor: '#4338CA55' }),
+          }}
+        >
+          Comparar
+        </button>
+      )}
 
       {showLayoutTab && (
         <>
@@ -2468,6 +2486,8 @@ export interface FichaDocumentViewProps {
   onUpdateLayoutVisual?: (patch: { slots: LayoutVisualSlot[] }) => void;
   /** Mostrar el historial de cambios en la primera vista (requiere sesión). */
   showHistory?: boolean;
+  /** Guardar la lista de encuentros (agregar, quitar, cambiar hora). */
+  onUpdateEncuentros?: (list: EncuentroDraft[]) => Promise<void>;
 }
 
 export function FichaDocumentView({
@@ -2475,7 +2495,7 @@ export function FichaDocumentView({
   onPublish, onUnpublish, canPublish, isPublishing,
   editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onRowPatch, onSectionComplete,
   sectionStatus, saveState, hiddenSections, modulesPanelOpen, onToggleModulesPanel,
-  sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual, showHistory,
+  sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual, showHistory, onUpdateEncuentros,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
   const { data: changelog, refetch: refetchChangelog } = useChangelog(showHistory ? String(ficha.fichaId) : '');
@@ -2488,10 +2508,19 @@ export function FichaDocumentView({
   );
 
   const isLayoutView = selectedId === 'layout';
+  const isCompareView = selectedId === 'compare';
+  const [encuentrosOpen, setEncuentrosOpen] = useState(false);
+  // Si se quita el encuentro abierto (o queda uno solo), volver al primero.
+  useEffect(() => {
+    const list = encuentros ?? [];
+    const first = list[0]?.id ?? 'unico';
+    if (selectedId === 'layout') return;
+    if (selectedId === 'compare' ? list.length < 2 : !list.some((e) => e.id === selectedId)) setSelectedId(first);
+  }, [encuentros, selectedId]);
   const selectedEncuentro = encuentros?.find((e) => e.id === selectedId) ?? null;
   // Cuando estamos en Layout Visual, usamos el primer encuentro como fallback
   // para colId (necesario porque las cards internas siguen recibiendo colId).
-  const colId = isLayoutView ? (encuentros?.[0]?.id ?? 'unico') : selectedId;
+  const colId = isLayoutView || isCompareView ? (encuentros?.[0]?.id ?? 'unico') : selectedId;
 
   const sec = (name: SectionName): Row[] =>
     (editable && localSections ? localSections[name] : null)
@@ -2813,6 +2842,7 @@ export function FichaDocumentView({
         selected={selectedId}
         onChange={setSelectedId}
         showLayoutTab
+        showCompareTab={(encuentros?.length ?? 0) > 1}
       />
 
       {/* Banner ficha archivada */}
@@ -3053,6 +3083,33 @@ export function FichaDocumentView({
                 </button>
               )}
 
+              {editable && onUpdateEncuentros && (
+                <button
+                  onClick={() => setEncuentrosOpen(true)}
+                  title="Agregar, quitar o cambiar la hora de los encuentros"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    background: 'rgba(255,255,255,0.06)', color: D.textSecond,
+                    border: `0.5px solid ${D.cardBorder}`, cursor: 'pointer',
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" />
+                  </svg>
+                  Encuentros ({encuentros?.length ?? 0})
+                </button>
+              )}
+              {encuentrosOpen && onUpdateEncuentros && (
+                <EncuentrosEditor
+                  encuentros={encuentros ?? []}
+                  type={ficha.type}
+                  onSave={onUpdateEncuentros}
+                  onClose={() => setEncuentrosOpen(false)}
+                />
+              )}
+
               {/* Descargar PDF */}
               <button
                 onClick={() => window.print()}
@@ -3216,7 +3273,7 @@ export function FichaDocumentView({
         )}
 
         {/* ── Primera vista: lo esencial en 15 segundos ── */}
-        {!isLayoutView && (
+        {!isLayoutView && !isCompareView && (
           <FichaQuickView
             ficha={ficha}
             rowsFor={sec}
@@ -3229,13 +3286,23 @@ export function FichaDocumentView({
           />
         )}
 
+        {isCompareView && (
+          <FichaCompareView
+            encuentros={encuentros ?? []}
+            sections={(SECTIONS_BY_TYPE[ficha.type] ?? SECTIONS_BY_TYPE.multi).filter((n) => !hidden(n))}
+            rowsFor={sec}
+            paletteName={(id) => paletas.find((p) => p.id === id)?.name}
+            onRowPatch={editable ? onRowPatch : undefined}
+          />
+        )}
+
         {/* ── Cuerpo (vista clásica por encuentro) ──
             Va PRIMERO en el DOM para que en print salga como página 1.
             El Layout Visual viene después con page-break-before: always. */}
         <div
           ref={bodyRef}
           className={`ficha-body ficha-view-body ${isLayoutView ? 'ficha-view-hidden' : 'ficha-view-active'}`}
-          style={{ padding: '1.5rem 2rem', display: isLayoutView ? 'none' : 'block' }}
+          style={{ padding: '1.5rem 2rem', display: isLayoutView || isCompareView ? 'none' : 'block' }}
         >
           {editable && (
             <div className="ficha-editor-help ficha-no-print">

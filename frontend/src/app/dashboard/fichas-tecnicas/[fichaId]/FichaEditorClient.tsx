@@ -9,6 +9,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { apiErrorMessage } from '@/lib/api';
+import type { EncuentroDraft } from '@/components/fichas/EncuentrosEditor';
 import { useUsers } from '@/hooks/useUsers';
 import { displayName } from '@/types/user';
 import { FichaDocumentView, ModulesEditPanel } from './FichaDocumentView';
@@ -555,6 +556,32 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     [scheduleSave],
   );
 
+  // ── Encuentros: primero se guarda lo pendiente para no perder ediciones ──
+  const handleUpdateEncuentros = useCallback(async (list: EncuentroDraft[]) => {
+    const pending: Promise<unknown>[] = [];
+    for (const [sectionName, timeout] of Object.entries(debounceRefs.current)) {
+      if (!timeout) continue;
+      clearTimeout(timeout);
+      debounceRefs.current[sectionName as SectionName] = undefined;
+      const rows = localSections[sectionName as SectionName];
+      if (rows) pending.push(enqueueSectionUpdate(sectionName as SectionName, { rows }));
+    }
+    setSaveState('saving');
+    try {
+      await Promise.all([...pending, ...Object.values(saveQueuesRef.current).filter(Boolean)]);
+      await updateFichaAsync({
+        fichaId,
+        encuentros: list.map(({ isNew: _isNew, copyFrom, ...e }) => ({ ...e, ...(_isNew && copyFrom ? { copyFrom } : {}) })),
+      });
+      setSaveState('saved');
+      setTimeout(() => setSaveState('idle'), 1500);
+    } catch (err) {
+      setSaveState('error');
+      setTimeout(() => setSaveState('idle'), 3000);
+      throw err;
+    }
+  }, [fichaId, localSections, enqueueSectionUpdate, updateFichaAsync]);
+
   // ── Guardar todo de inmediato ──────────────────────────────────────────────
   const handleSaveAll = useCallback(() => {
     if (pendingLayout.current && !layoutInflight.current) handleUpdateLayout(pendingLayout.current);
@@ -812,6 +839,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             onLabelChange={handleLabelChange}
             onReorderRow={handleReorderRow}
             onRowPatch={handleRowPatch}
+            onUpdateEncuentros={canEdit ? handleUpdateEncuentros : undefined}
             onSectionComplete={handleSectionComplete}
             sectionStatus={sectionStatus}
             saveState={saveState}

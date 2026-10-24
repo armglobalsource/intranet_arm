@@ -39,6 +39,17 @@ describe('ficha changelog', () => {
     ]);
   });
 
+  it('records sharing a row as a single change', () => {
+    const changes = diffRows(
+      [row('s', 'Sonido', { e1: 'Ana', e2: 'Ana' })],
+      [{ ...row('s', 'Sonido', { shared: 'Ana' }), shared: true }],
+      encuentros,
+    );
+    expect(changes).toEqual([
+      { kind: 'value', rowId: 's#shared', label: 'Sonido', encuentro: null, before: 'Por encuentro', after: 'Igual para todos' },
+    ]);
+  });
+
   it('merges consecutive autosaves keeping the original before and the latest after', () => {
     const first = diffRows([row('p1', 'Bienvenida', { shared: '' })], [row('p1', 'Bienvenida', { shared: 'Hola' })], encuentros);
     const second = diffRows([row('p1', 'Bienvenida', { shared: 'Hola' })], [row('p1', 'Bienvenida', { shared: 'Hola a todos' })], encuentros);

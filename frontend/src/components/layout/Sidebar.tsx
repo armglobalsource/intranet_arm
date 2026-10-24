@@ -467,7 +467,7 @@ export function Sidebar() {
         })}
 
         {/* Administración de Campus — debajo de Ministerios, independiente */}
-        {(isAdmin || can('campus:manage')) && (() => {
+        {(isAdmin || can('campus:edit')) && (() => {
           const href   = '/dashboard/administracion-campus';
           const active = pathname.startsWith(href);
           return (

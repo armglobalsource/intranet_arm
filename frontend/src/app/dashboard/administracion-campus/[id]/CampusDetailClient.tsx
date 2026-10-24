@@ -737,7 +737,7 @@ const TABS: { key: CampusTurnoTipo; label: string; titulo: string }[] = [
 export function CampusDetailClient({ campusId }: { campusId: number }) {
   const router = useRouter();
   const { isAdmin, can } = usePermissions();
-  const hasAccess = isAdmin || can('campus:manage');
+  const hasAccess = isAdmin || can('campus:edit');
   const { data: campus, isLoading } = useCampus(campusId);
   const [tab, setTab] = useState<CampusTurnoTipo>('administradores');
 

@@ -119,6 +119,14 @@ export function describeChange(entry: FichaChange, sectionLabels: Partial<Record
       ];
       return { title: 'Cambió los módulos visibles', details };
     }
+    case 'encuentros': {
+      const details = [
+        ...(c.added ?? []).map((e: string) => `Agregó el encuentro ${quote(e)}`),
+        ...(c.removed ?? []).map((e: string) => `Quitó el encuentro ${quote(e)}`),
+        ...(c.changed ?? []).map((e: any) => `${quote(e.before)} → ${quote(e.after)}`),
+      ];
+      return { title: 'Cambió los encuentros', details };
+    }
     case 'complete':
       return { title: `Marcó ${section} como completa`, details: [] };
     case 'reopen':

@@ -12,7 +12,7 @@ export const FICHA_SECTION_LABELS: Record<FichaSectionName, string> = {
   streaming:   'Streaming',
   escena:      'AR Worship',
   setList:     'Set List',
-  horarios:    'Horarios',
+  horarios:    'Timing',
   anuncios:    'Info Encuentro',
   voluntarios: 'Voluntarios de Servicio',
   outfit:      'Outfit / Paleta',
