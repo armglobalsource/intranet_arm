@@ -1,5 +1,5 @@
 import {
-  ArrayMaxSize, ArrayMinSize, IsString, IsOptional, IsIn, IsArray, ValidateNested,
+  ArrayMaxSize, ArrayMinSize, IsInt, IsString, IsOptional, IsIn, IsArray, ValidateNested,
   IsBoolean, IsNumber, IsObject, IsDateString, IsNotEmpty, MaxLength,
   Min, Max, Matches,
 } from 'class-validator';
@@ -60,6 +60,12 @@ export class UpdateFichaDto {
   sectionLayout?: SectionLayoutDto;
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(12) @ValidateNested({ each: true }) @Type(() => EncuentroUpdateDto)
   encuentros?: EncuentroUpdateDto[];
+}
+
+/** Designaciones de la ficha: id de usuario, o null para quitarla. */
+export class UpdateEquipoDto {
+  @IsOptional() @IsInt() @Min(1) encargadoTecnico?: number | null;
+  @IsOptional() @IsInt() @Min(1) responsableActualizacion?: number | null;
 }
 
 export class CloneFichaDto {

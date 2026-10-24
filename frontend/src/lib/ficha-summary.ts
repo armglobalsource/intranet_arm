@@ -119,6 +119,10 @@ export function describeChange(entry: FichaChange, sectionLabels: Partial<Record
       ];
       return { title: 'Cambió los módulos visibles', details };
     }
+    case 'equipo': {
+      const rol = c.rol === 'encargadoTecnico' ? 'Encargado Técnico' : 'Responsable de Actualización';
+      return { title: `Designó ${rol}`, details: [`${quote(c.before)} → ${quote(c.after)}`] };
+    }
     case 'encuentros': {
       const details = [
         ...(c.added ?? []).map((e: string) => `Agregó el encuentro ${quote(e)}`),

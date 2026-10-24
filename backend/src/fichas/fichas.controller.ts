@@ -7,7 +7,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { PostgresFichasService } from './postgres-fichas.service';
-import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto } from './dto/ficha.dto';
+import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto, UpdateEquipoDto } from './dto/ficha.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('fichas')
@@ -47,8 +47,8 @@ export class FichasController {
     return this.fichasService.findPublic(fichaId);
   }
 
+  // Quién puede ver cada ficha (publicada o no) lo decide el servicio según su rol en ella.
   @Get(':fichaId')
-  @RequirePermission('fichas:view')
   findOne(@Param('fichaId') fichaId: string, @CurrentUser() user: any) {
     return this.fichasService.findOneForUser(fichaId, user);
   }
@@ -112,8 +112,8 @@ export class FichasController {
     return this.fichasService.unarchive(fichaId, user);
   }
 
+  // Los permisos por ficha (área, visuales, encargado) se validan en el servicio.
   @Patch(':fichaId/layout-visual')
-  @RequirePermission('fichas:edit')
   updateLayoutVisual(
     @Param('fichaId') fichaId: string,
     @Body()           dto: UpdateLayoutVisualDto,
@@ -123,7 +123,6 @@ export class FichasController {
   }
 
   @Patch(':fichaId/sections/:sectionName')
-  @RequirePermission('fichas:edit')
   updateSection(
     @Param('fichaId')     fichaId: string,
     @Param('sectionName') sectionName: string,
@@ -134,7 +133,6 @@ export class FichasController {
   }
 
   @Patch(':fichaId/sections/:sectionName/complete')
-  @RequirePermission('fichas:edit')
   completeSection(
     @Param('fichaId')     fichaId: string,
     @Param('sectionName') sectionName: string,
@@ -144,7 +142,6 @@ export class FichasController {
   }
 
   @Patch(':fichaId/sections/:sectionName/reopen')
-  @RequirePermission('fichas:edit')
   reopenSection(
     @Param('fichaId')     fichaId: string,
     @Param('sectionName') sectionName: string,
@@ -153,8 +150,12 @@ export class FichasController {
     return this.fichasService.reopenSection(fichaId, sectionName, user);
   }
 
+  @Patch(':fichaId/equipo')
+  updateEquipo(@Param('fichaId') fichaId: string, @Body() dto: UpdateEquipoDto, @CurrentUser() user: any) {
+    return this.fichasService.updateEquipo(fichaId, dto, user);
+  }
+
   @Get(':fichaId/changelog')
-  @RequirePermission('fichas:view')
   getChangelog(@Param('fichaId') fichaId: string, @CurrentUser() user: any) {
     return this.fichasService.getChangelog(fichaId, user);
   }

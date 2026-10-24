@@ -222,6 +222,19 @@ export function useUpdateLayoutVisual() {
   });
 }
 
+export function useUpdateEquipo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: WRITE_KEY,
+    mutationFn: ({ fichaId, ...dto }: { fichaId: string; encargadoTecnico?: number | null; responsableActualizacion?: number | null }) =>
+      api.patch(`/fichas/${fichaId}/equipo`, dto).then(r => r.data),
+    onSuccess: (data, v) => {
+      qc.setQueryData(KEYS.detail(v.fichaId), data);
+      qc.invalidateQueries({ queryKey: ['fichas', 'mine'] });
+    },
+  });
+}
+
 export function useUpdateSection() {
   const qc = useQueryClient();
   return useMutation({

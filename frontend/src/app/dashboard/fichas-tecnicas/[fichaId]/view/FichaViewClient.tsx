@@ -3,16 +3,13 @@
 import Link from 'next/link';
 import { useFichaRealtime } from '@/hooks/useFichas';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { FichaDocumentView } from '../FichaDocumentView';
 
 export function FichaViewClient({ fichaId }: { fichaId: string }) {
-  const allowed = useRequirePermission('fichas:view');
   const { can, isAdmin } = usePermissions();
   const { ficha, loading, error } = useFichaRealtime(fichaId);
-  const canEdit = isAdmin || can('fichas:edit') || can('fichas:admin');
-
-  if (!allowed) return null;
+  const permisos = ficha?.permisos;
+  const canEdit = permisos ? (permisos.content || permisos.sections.length > 0 || permisos.layoutVisual) : (isAdmin || can('fichas:edit') || can('fichas:admin'));
 
   if (loading) {
     return (

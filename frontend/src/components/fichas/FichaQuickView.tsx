@@ -81,6 +81,16 @@ export function FichaQuickView({
               {ficha.published ? 'Publicada' : 'Sin publicar'}
             </span>
           </div>
+          {(ficha.equipo?.encargadoTecnico || ficha.equipo?.responsableActualizacion) && (
+            <dl className="mt-2 space-y-0.5 text-[11px] text-[#526078]">
+              {ficha.equipo?.encargadoTecnico && (
+                <div><dt className="inline font-semibold">Responde por la ficha:</dt> <dd className="inline">{ficha.equipo.encargadoTecnico.name}</dd></div>
+              )}
+              {ficha.equipo?.responsableActualizacion && (
+                <div><dt className="inline font-semibold">Actualiza:</dt> <dd className="inline">{ficha.equipo.responsableActualizacion.name}</dd></div>
+              )}
+            </dl>
+          )}
         </div>
 
         {/* 3-8 s: ¿Qué va a suceder? */}

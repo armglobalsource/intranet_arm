@@ -4,9 +4,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useFichaRealtime, useUpdateSection, useCompleteSection, useReopenSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, useUpdateLayoutVisual, usePublishFicha, useUnpublishFicha, useSplitPrayerGlobal } from '@/hooks/useFichas';
+import { useFichaRealtime, useUpdateSection, useCompleteSection, useReopenSection, useArchiveFicha, useUnarchiveFicha, useUpdateFicha, useUpdateLayoutVisual, usePublishFicha, useUnpublishFicha, useSplitPrayerGlobal, useUpdateEquipo } from '@/hooks/useFichas';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { apiErrorMessage } from '@/lib/api';
 import type { EncuentroDraft } from '@/components/fichas/EncuentrosEditor';
@@ -18,7 +17,7 @@ import { RosterStatusContext } from '@/components/fichas/RosterStatusContext';
 import { useEquipoRoster } from '@/hooks/useEquipoRoster';
 import { toWeekLabel } from '@/types/disponibilidad';
 import { parseFichaDate } from '@/lib/ficha-date';
-import { SECTION_LABELS } from '@/types/ficha';
+import { SECTION_LABELS, FICHA_ROLE_LABELS } from '@/types/ficha';
 import type { Ficha, Row, SectionName, Section, LayoutVisualSlot } from '@/types/ficha';
 import { reorderFichaRows, type FichaColumns } from '@/lib/ficha-order';
 
@@ -198,10 +197,79 @@ function SectionAssignments({
   );
 }
 
+// ── FichaEquipoPanel ──────────────────────────────────────────────────────────
+// Quién responde por la ficha (Encargado Técnico) y quién la actualiza
+// (Responsable de Actualización, designado por el Encargado).
+
+function FichaEquipoPanel({
+  ficha,
+  onDesignate,
+}: {
+  ficha: Ficha;
+  onDesignate: (key: 'encargadoTecnico' | 'responsableActualizacion', userId: number | null) => void;
+}) {
+  const { data: users = [], isLoading } = useUsers();
+  const permisos = ficha.permisos;
+  const campusId = Number(ficha.campusId);
+  const availableUsers = users
+    .filter((candidate) => candidate.status === 'active')
+    .filter((candidate) => !Number.isFinite(campusId) || candidate.campusId == null || candidate.campusId === campusId)
+    .sort((a, b) => displayName(a).localeCompare(displayName(b), 'es'));
+  const roles = [
+    { key: 'encargadoTecnico' as const, label: 'Encargado Técnico', help: 'Responde por la ficha: edita su contenido, publica y designa quién la actualiza.', canChange: !!permisos?.designateEncargado },
+    { key: 'responsableActualizacion' as const, label: 'Responsable de Actualización', help: 'Ingresa y actualiza la información. Lo designa el Encargado Técnico.', canChange: !!permisos?.designateResponsable },
+  ];
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm" aria-label="Equipo de la ficha">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-bold text-slate-800">Equipo de la ficha</h2>
+        {permisos && (
+          <p className="text-xs text-slate-500">
+            Tu rol: <strong className="text-slate-700">{FICHA_ROLE_LABELS[permisos.rol]}</strong>
+            {!permisos.content && permisos.sections.length > 0 && <> · Puedes editar: {permisos.sections.map((s) => SECTION_LABELS[s]).join(', ')}</>}
+            {!permisos.content && permisos.layoutVisual && <> · Puedes editar el Layout Visual</>}
+          </p>
+        )}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {roles.map((role) => {
+          const current = ficha.equipo?.[role.key];
+          return (
+            <label key={role.key} className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">{role.label}</span>
+              {role.canChange ? (
+                <select
+                  className="input w-full text-xs"
+                  value={current?.userId ?? ''}
+                  disabled={isLoading}
+                  onChange={(event) => onDesignate(role.key, event.target.value ? Number(event.target.value) : null)}
+                >
+                  <option value="">Sin designar</option>
+                  {current?.userId && !availableUsers.some((u) => u.id === current.userId) && (
+                    <option value={current.userId}>{current.name}</option>
+                  )}
+                  {availableUsers.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>{displayName(candidate)}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-sm text-slate-700">{current?.name ?? <span className="text-slate-400">Sin designar</span>}</p>
+              )}
+              <span className="mt-1 block text-[11px] text-slate-400">{role.help}</span>
+            </label>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 // ── FichaEditorClient ─────────────────────────────────────────────────────────
 
 export function FichaEditorClient({ fichaId }: { fichaId: string }) {
-  const allowed = useRequirePermission('fichas:view');
+  // Sin gate por permiso global: la API decide según el rol de la persona en
+  // esta ficha (responsable de área, encargado, consulta de la publicada…).
   const { can, isAdmin } = usePermissions();
   const { user } = useAuthStore();
   const { ficha, loading, error } = useFichaRealtime(fichaId);
@@ -310,6 +378,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { mutate: publishFicha,   isPending: isPublishing  } = usePublishFicha();
   const { mutate: unpublishFicha, isPending: isUnpublishing } = useUnpublishFicha();
   const { mutateAsync: splitPrayerGlobal, isPending: isSplitting } = useSplitPrayerGlobal();
+  const { mutateAsync: updateEquipo } = useUpdateEquipo();
 
   function handleToggleModule(name: SectionName | SectionName[]) {
     if (!ficha) return;
@@ -404,8 +473,12 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
     });
   }, [ficha?.sections]);
 
-  const canEdit    = isAdmin || can('fichas:edit') || can('fichas:admin');
-  const canPublish = ficha ? (isAdmin || can('fichas:admin') || ficha.createdBy === user?.id) : false;
+  // Lo que el usuario puede hacer en ESTA ficha lo calcula la API según su rol
+  // (Productor General, Encargado Técnico, responsable de área, etc.).
+  const permisos     = ficha?.permisos;
+  const canEdit      = permisos ? (permisos.content || permisos.sections.length > 0 || permisos.layoutVisual) : (isAdmin || can('fichas:edit') || can('fichas:admin'));
+  const canStructure = permisos ? permisos.structure : canEdit;
+  const canPublish   = permisos ? permisos.publish : (ficha ? (isAdmin || can('fichas:admin') || ficha.createdBy === user?.id) : false);
   const editable = canEdit && isEditing;
 
   // ── Status de secciones ────────────────────────────────────────────────────
@@ -652,8 +725,6 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   );
 
   // ── Carga inicial ─────────────────────────────────────────────────────────
-  if (!allowed) return null;
-
   if (loading) {
     return <FichaSkeleton />;
   }
@@ -675,6 +746,20 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   // de los roles productores no tenían, dejando el panel siempre oculto.
   const showSidePanel = editable;
   const fichaCampusId = rosterCampusId;
+
+  function handleDesignate(key: 'encargadoTecnico' | 'responsableActualizacion', userId: number | null) {
+    setActionError(null);
+    setSaveState('saving');
+    updateEquipo({ fichaId, [key]: userId })
+      .then(() => {
+        setSaveState('saved');
+        setTimeout(() => setSaveState('idle'), 1200);
+      })
+      .catch((err) => {
+        setSaveState('error');
+        setActionError(apiErrorMessage(err, 'No se pudo guardar la designación'));
+      });
+  }
 
   function handleAssignSection(sectionName: SectionName, userId: number | null, userName: string | null) {
     setActionError(null);
@@ -800,7 +885,9 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         </div>
       )}
 
-      {editable && (
+      {editable && <FichaEquipoPanel ficha={ficha} onDesignate={handleDesignate} />}
+
+      {editable && (!permisos || permisos.content) && (
         <SectionAssignments ficha={ficha} onAssign={handleAssignSection} />
       )}
 
@@ -825,9 +912,9 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
                 });
               } : undefined}
             onSave={handleSaveAll}
-            onArchive={canEdit ? () => archiveFicha(fichaId) : undefined}
-            onUnarchive={canEdit ? () => unarchiveFicha(fichaId) : undefined}
-            canArchive={canEdit}
+            onArchive={canStructure ? () => archiveFicha(fichaId) : undefined}
+            onUnarchive={canStructure ? () => unarchiveFicha(fichaId) : undefined}
+            canArchive={canStructure}
             onPublish={canPublish ? () => publishFicha(fichaId) : undefined}
             onUnpublish={canPublish ? () => unpublishFicha(fichaId) : undefined}
             canPublish={canPublish}
@@ -839,16 +926,17 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             onLabelChange={handleLabelChange}
             onReorderRow={handleReorderRow}
             onRowPatch={handleRowPatch}
-            onUpdateEncuentros={canEdit ? handleUpdateEncuentros : undefined}
+            onUpdateEncuentros={canStructure ? handleUpdateEncuentros : undefined}
+            permisos={permisos}
             onSectionComplete={handleSectionComplete}
             sectionStatus={sectionStatus}
             saveState={saveState}
             hiddenSections={localHidden}
             modulesPanelOpen={modulesOpen}
-            onToggleModulesPanel={canEdit ? () => setModulesOpen((o) => !o) : undefined}
+            onToggleModulesPanel={canStructure ? () => setModulesOpen((o) => !o) : undefined}
             sectionLayout={localLayout}
-            onUpdateLayout={canEdit ? handleUpdateLayout : undefined}
-            onUpdateLayoutVisual={canEdit ? handleUpdateLayoutVisual : undefined}
+            onUpdateLayout={canStructure ? handleUpdateLayout : undefined}
+            onUpdateLayoutVisual={(permisos ? permisos.layoutVisual : canEdit) ? handleUpdateLayoutVisual : undefined}
           />
         </div>
 

@@ -95,6 +95,8 @@ export const PERMISSION_CATALOG = {
       edit:    'Editar fichas existentes',
       delete:  'Eliminar fichas',
       admin:   'Administrar configuración de fichas',
+      publish: 'Publicar y despublicar fichas del propio campus',
+      layout:  'Editar el Layout Visual de todos los campus (responsable global de visuales)',
     },
   },
   tecnicos: {
@@ -252,6 +254,8 @@ export const PERMISSION_UI_CONFIG: Record<string, PermissionUiSection> = {
     extra: [
       { key: 'viewAll', label: 'Ver fichas de todos los usuarios',      actions: ['viewAll'] },
       { key: 'admin',   label: 'Administrar configuración de fichas',   actions: ['admin'] },
+      { key: 'publish', label: 'Publicar fichas del propio campus',     actions: ['publish'] },
+      { key: 'layout',  label: 'Responsable global de visuales (Layout Visual de todos los campus)', actions: ['layout'] },
     ],
   },
   content:   { breadcrumb: ['Noticias'],                             viewActions: ['view'], editActions: ['create', 'publish', 'delete'] },

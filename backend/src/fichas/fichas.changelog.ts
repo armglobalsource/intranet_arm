@@ -24,6 +24,7 @@ export type ChangelogEntry =
   | { kind: 'title'; before: string; after: string }
   | { kind: 'date'; before: string | null; after: string | null }
   | { kind: 'modules'; shown: string[]; hidden: string[] }
+  | { kind: 'equipo'; rol: 'encargadoTecnico' | 'responsableActualizacion'; before: string | null; after: string | null }
   | { kind: 'encuentros'; added: string[]; removed: string[]; changed: { before: string; after: string }[] }
   | { kind: 'layout' } | { kind: 'layoutVisual' }
   | { kind: 'publish' } | { kind: 'unpublish' } | { kind: 'archive' } | { kind: 'unarchive' };

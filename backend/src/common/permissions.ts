@@ -95,6 +95,8 @@ export const PERMISSION_CATALOG = {
       edit:    'Editar fichas existentes',
       delete:  'Eliminar fichas',
       admin:   'Administrar configuración de fichas',
+      publish: 'Publicar y despublicar fichas del propio campus',
+      layout:  'Editar el Layout Visual de todos los campus (responsable global de visuales)',
     },
   },
   tecnicos: {

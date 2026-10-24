@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSlot } from '@/types/ficha';
+import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSlot, FichaPermisos } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
 import { SongInput } from '@/components/fichas/SongInput';
 import { LayoutVisualView } from './LayoutVisualView';
@@ -1507,7 +1507,11 @@ function WorshipSetListCard({
   paletas?:         Paleta[];
   paletasLoading?:  boolean;
 }) {
-  const editable     = escena.editable;
+  const editable     = escena.editable;   // banda y comentarios
+  // Cada subsección respeta su propio permiso (responsable de área).
+  const setListEditable = setList.editable;
+  const outfitEditable  = outfit.editable;
+  const anyEditable     = editable || setListEditable || outfitEditable;
   const forceShowAll = escena.forceShowAll;
   const colId        = escena.colId;
 
@@ -1522,7 +1526,7 @@ function WorshipSetListCard({
   const musicians = displayedEscena.filter((r) => r !== vio && !positions.includes(r));
 
   const displayedSetList = !hideSetList
-    ? ((editable || forceShowAll) ? allRows(setListRows) : rowsWithVal(setListRows, colId))
+    ? ((setListEditable || forceShowAll) ? allRows(setListRows) : rowsWithVal(setListRows, colId))
     : [];
 
   // Cantantes disponibles: personas de escena que tienen un nombre asignado ese día
@@ -1595,10 +1599,10 @@ function WorshipSetListCard({
     }
   }
 
-  const showOutfit = !hideOutfit && (editable || !!outfitSelectedId);
+  const showOutfit = !hideOutfit && (outfitEditable || !!outfitSelectedId);
 
   const hasContent = displayedEscena.length > 0 || displayedSetList.length > 0 || showOutfit;
-  if (!hasContent && !editable) return null;
+  if (!hasContent && !anyEditable) return null;
 
   function SubDivider({ label }: { label: string }) {
     return (
@@ -1746,25 +1750,25 @@ function WorshipSetListCard({
       {!hideSetList && (
         <>
           <SubDivider label="Set List" />
-          <SortableSection items={displayedSetList} onReorder={editable ? setList.onReorderRow : undefined}>
+          <SortableSection items={displayedSetList} onReorder={setListEditable ? setList.onReorderRow : undefined}>
             {displayedSetList.map((row, i) => (
-              <SortableRow key={row.id} id={row.id} editable={editable}>
+              <SortableRow key={row.id} id={row.id} editable={setListEditable}>
                 {(handle) => (
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '7px 0', borderBottom: i === displayedSetList.length - 1 ? 'none' : `0.5px solid ${D.divider}` }}>
                     {handle}
                     <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 6,
                       background: SONG_DOT_COLORS[i % SONG_DOT_COLORS.length], opacity: 0.85 }} />
                     <SongRowCell
-                      row={row} colId={colId} editable={editable}
+                      row={row} colId={colId} editable={setListEditable}
                       onCellChange={setList.onCellChange} singers={singers}
                     />
-                    {editable && setList.onDeleteRow && !row.required && <DeleteBtn onClick={() => setList.onDeleteRow!(row.id)} />}
+                    {setListEditable && setList.onDeleteRow && !row.required && <DeleteBtn onClick={() => setList.onDeleteRow!(row.id)} />}
                   </div>
                 )}
               </SortableRow>
             ))}
           </SortableSection>
-          <SectionFooter sectionName="setList" editable={editable} isCompleted={setList.isCompleted} onAddRow={setList.onAddRow} onComplete={setList.onComplete} />
+          <SectionFooter sectionName="setList" editable={setListEditable} isCompleted={setList.isCompleted} onAddRow={setList.onAddRow} onComplete={setList.onComplete} />
         </>
       )}
 
@@ -1775,11 +1779,11 @@ function WorshipSetListCard({
           <OutfitPaletteSelector
             selectedId={outfitSelectedId}
             paletas={paletas ?? []}
-            editable={editable}
+            editable={outfitEditable}
             onSelect={handleSelectPalette}
             loading={paletasLoading && (paletas ?? []).length === 0}
           />
-          {editable && (
+          {outfitEditable && (
             <div className="ficha-no-print" style={{ marginTop: 8, textAlign: 'right' }}>
               {outfit.isCompleted ? (
                 <span style={{ fontSize: 10, fontWeight: 600, color: C.green }}>✓ Outfit completado</span>
@@ -2488,6 +2492,8 @@ export interface FichaDocumentViewProps {
   showHistory?: boolean;
   /** Guardar la lista de encuentros (agregar, quitar, cambiar hora). */
   onUpdateEncuentros?: (list: EncuentroDraft[]) => Promise<void>;
+  /** Qué puede editar el usuario en esta ficha; sin esto, todo `editable` aplica a todas las secciones. */
+  permisos?: FichaPermisos;
 }
 
 export function FichaDocumentView({
@@ -2495,7 +2501,7 @@ export function FichaDocumentView({
   onPublish, onUnpublish, canPublish, isPublishing,
   editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onRowPatch, onSectionComplete,
   sectionStatus, saveState, hiddenSections, modulesPanelOpen, onToggleModulesPanel,
-  sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual, showHistory, onUpdateEncuentros,
+  sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual, showHistory, onUpdateEncuentros, permisos,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
   const { data: changelog, refetch: refetchChangelog } = useChangelog(showHistory ? String(ficha.fichaId) : '');
@@ -2526,8 +2532,10 @@ export function FichaDocumentView({
     (editable && localSections ? localSections[name] : null)
     ?? sections?.[name]?.rows ?? [];
 
+  // Un responsable de área solo edita sus secciones; el resto se ve en modo lectura.
+  const canEditSection = (name: SectionName) => !permisos || permisos.sections.includes(name);
   const editProps = (name: SectionName): EditProps => ({
-    editable,
+    editable: editable && canEditSection(name),
     forceShowAll,
     colId,
     onCellChange:  onCellChange  ? (rowId, cId, value) => onCellChange(name, rowId, cId, value)      : undefined,
@@ -2556,6 +2564,8 @@ export function FichaDocumentView({
 
   // ── Edición inline del título ─────────────────────────────────────────────
   const { mutate: updateFicha } = useUpdateFicha();
+  // Título y fecha son parte de la estructura de la ficha.
+  const metaEditable = !!editable && (!permisos || permisos.structure);
   const [editingTitle, setEditingTitle] = useState(false);
   const [localTitle,   setLocalTitle]   = useState(title);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -2899,7 +2909,7 @@ export function FichaDocumentView({
               style={{ height: 40, width: 'auto', objectFit: 'contain', display: 'block', maxWidth: '40%' }}
             />
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              {editable && editingDate ? (
+              {metaEditable && editingDate ? (
                 <input
                   ref={dateInputRef}
                   type="date"
@@ -2920,7 +2930,7 @@ export function FichaDocumentView({
               ) : (
                 <button
                   type="button"
-                  onClick={() => editable && setEditingDate(true)}
+                  onClick={() => metaEditable && setEditingDate(true)}
                   title={editable ? 'Clic para editar fecha' : undefined}
                   aria-label={editable ? 'Editar fecha de la ficha' : undefined}
                   style={{
@@ -2954,7 +2964,7 @@ export function FichaDocumentView({
                 {/^(campus|arm)\s/i.test(campusName ?? '') ? campusName : `Campus ${campusName}`}
               </div>
 
-              {editable && editingTitle ? (
+              {metaEditable && editingTitle ? (
                 <input
                   ref={titleInputRef}
                   value={localTitle}
@@ -2974,7 +2984,7 @@ export function FichaDocumentView({
                 <button
                   type="button"
                   className="ficha-title-text"
-                  onClick={() => editable && setEditingTitle(true)}
+                  onClick={() => metaEditable && setEditingTitle(true)}
                   title={editable ? 'Clic para editar título' : undefined}
                   aria-label={editable ? 'Editar título de la ficha' : undefined}
                   style={{
@@ -3292,7 +3302,7 @@ export function FichaDocumentView({
             sections={(SECTIONS_BY_TYPE[ficha.type] ?? SECTIONS_BY_TYPE.multi).filter((n) => !hidden(n))}
             rowsFor={sec}
             paletteName={(id) => paletas.find((p) => p.id === id)?.name}
-            onRowPatch={editable ? onRowPatch : undefined}
+            onRowPatch={editable && (!permisos || permisos.content) ? onRowPatch : undefined}
           />
         )}
 

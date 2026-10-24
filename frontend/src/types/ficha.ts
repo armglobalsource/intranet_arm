@@ -34,6 +34,31 @@ export const SECTION_LABELS: Record<SectionName, string> = {
   outfit:      'Outfit / Paleta',
 };
 
+export interface FichaPerson { userId?: number; name: string }
+export interface FichaEquipo { encargadoTecnico?: FichaPerson | null; responsableActualizacion?: FichaPerson | null }
+export type FichaRole = 'productor' | 'editor' | 'encargado' | 'responsable' | 'area' | 'visuales' | 'lector';
+export interface FichaPermisos {
+  rol: FichaRole;
+  view: boolean;
+  structure: boolean;
+  content: boolean;
+  sections: SectionName[];
+  layoutVisual: boolean;
+  publish: boolean;
+  designateEncargado: boolean;
+  designateResponsable: boolean;
+}
+
+export const FICHA_ROLE_LABELS: Record<FichaRole, string> = {
+  productor:   'Productor General',
+  editor:      'Editor de fichas del campus',
+  encargado:   'Encargado Técnico de la ficha',
+  responsable: 'Responsable de Actualización',
+  area:        'Responsable de área',
+  visuales:    'Responsable global de visuales',
+  lector:      'Consulta',
+};
+
 export interface Row {
   id:       string;
   label:    string;
@@ -134,6 +159,10 @@ export interface Ficha {
   hiddenSections?:    SectionName[];
   sectionLayout?:     { left: string[]; right: string[]; leftRatio?: number };
   layoutVisual?:      LayoutVisual;
+  /** Quién responde por la ficha y quién la actualiza (Etapa 4). */
+  equipo?:            FichaEquipo;
+  /** Lo que el usuario actual puede hacer en esta ficha (lo calcula la API). */
+  permisos?:          FichaPermisos;
   /** Solo presente en respuestas de /fichas/public/:id — permite al cliente
    *  público resolver IDs de paletas y visual references sin llamar
    *  endpoints privados. */

@@ -3,16 +3,27 @@ import { randomUUID } from 'crypto';
 import { DatabaseService } from '../common/database/database.service';
 import { apiRows, databaseError, SqlConnection } from '../common/database/identity-sql';
 import { hasPermission } from '../common/permissions';
-import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto } from './dto/ficha.dto';
+import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto, UpdateEquipoDto } from './dto/ficha.dto';
 import { ALL_FICHA_SECTIONS, activeSectionsForType, deriveFichaStatus, FICHA_SECTION_LABELS, formatFichaDateLabel, missingRequiredRows, parseFichaDate } from './fichas.utils';
 import { defaultRows, defaultRowsOracion, buildDefaultSections, buildDefaultCompletion, migrateMediaData, preservePrayerSections, buildGlobalSectionsFromMixedFicha } from './fichas.defaults';
 import { ChangelogEntry, CHANGELOG_MERGE_WINDOW_MS, capRowChanges, diffRows, mergeRowChanges } from './fichas.changelog';
 import { applyEncuentros } from './fichas.encuentros';
+import { fichaPermisos, FichaUser } from './fichas.access';
 
 type Log = (seccion: string | null, entry: ChangelogEntry) => void;
+/** Qué exige cada escritura: ver fichas.access.ts. */
+type Need = 'structure' | 'content' | 'publish' | 'layout' | 'designate' | { section: string };
+const DENIED: Record<string, string> = {
+  structure: 'Solo el Productor General o quien edita las fichas del campus puede cambiar la estructura de la ficha',
+  content: 'Solo quien responde por la ficha puede hacer este cambio',
+  publish: 'No tienes permiso para publicar esta ficha',
+  layout: 'No puedes editar el Layout Visual de esta ficha',
+  designate: 'No puedes designar responsables en esta ficha',
+  section: 'Solo puedes editar las secciones de las que eres responsable',
+};
+const EQUIPO_LABELS = { encargadoTecnico: 'Encargado Técnico', responsableActualizacion: 'Responsable de Actualización' } as const;
 
-interface FichaUser { sub: number; email: string; campusId?: number | null; permissions?: string[]; }
-const jsonFields = new Set('encuentros hiddenSections completionStatus sections sectionLayout layoutVisual splitInto'.split(' '));
+const jsonFields = new Set('equipo encuentros hiddenSections completionStatus sections sectionLayout layoutVisual splitInto'.split(' '));
 const fields = new Set(('campusName type title descripcion ubicacion createdByName status publishedByName lastModifiedByName archivedByName campusId createdBy publishedBy lastModifiedBy archivedBy published archived createdAt publishedAt date lastModifiedAt mediaMigratedAt archivedAt splitFrom '+[...jsonFields].join(' ')).split(' '));
 const listing = 'document_id,"campusId","campusName",type,title,date,status,"completionStatus",archived,published,"createdBy","hiddenSections"';
 const mobile = 'document_id,"campusId","campusName",type,title,date,encuentros,"publishedAt"';
@@ -23,17 +34,21 @@ export class PostgresFichasService {
 
   private global(user: FichaUser) { return hasPermission(user.permissions ?? [], 'fichas:viewAll') || hasPermission(user.permissions ?? [], 'fichas:admin'); }
   private access(f: any, u: FichaUser) {
-    if (this.global(u) || f.createdBy === u.sub || (u.campusId != null && String(f.campusId) === String(u.campusId)) ||
-      (f.published && Object.values(f.sections ?? {}).some((s: any) => s.assignedTo === u.sub))) return;
-    throw new ForbiddenException('No tienes acceso a esta ficha');
+    const permisos = fichaPermisos(f, u);
+    if (!permisos.view) throw new ForbiddenException(f.published ? 'No tienes acceso a esta ficha' : 'Esta ficha aún no está publicada');
+    return permisos;
+  }
+  private require(f: any, u: FichaUser, need: Need) {
+    const p = fichaPermisos(f, u);
+    const ok = typeof need === 'object' ? p.sections.includes(need.section)
+      : need === 'structure' ? p.structure : need === 'content' ? p.content : need === 'publish' ? p.publish
+      : need === 'layout' ? p.layoutVisual : p.designateEncargado || p.designateResponsable;
+    if (!ok) throw new ForbiddenException(DENIED[typeof need === 'object' ? 'section' : need]);
+    return p;
   }
   private manage(f: any, u: FichaUser) {
     if (this.global(u) || (u.campusId != null && String(f.campusId) === String(u.campusId))) return;
     throw new ForbiddenException('No puedes modificar fichas de otro campus');
-  }
-  private publisher(f: any, u: FichaUser) {
-    if (this.global(u) || f.createdBy === u.sub) return;
-    throw new ForbiddenException('Solo el creador o un administrador puede publicar esta ficha');
   }
   private stamp(u: FichaUser) { return { lastModifiedBy: u.sub, lastModifiedByName: u.email, lastModifiedAt: new Date() }; }
   private async read(id: string, db: SqlConnection, lock = false) {
@@ -53,16 +68,17 @@ export class PostgresFichasService {
       return apiRows(result)[0];
     } catch (error) { databaseError(error); }
   }
-  private async change(id: string, u: FichaUser, operation: (f:any, db:SqlConnection, log:Log)=>Promise<void>|void, publish = false) {
+  private async change(id: string, u: FichaUser, operation: (f:any, db:SqlConnection, log:Log)=>Promise<void>|void, need: Need) {
     return this.db.transaction(async db => {
       const f = await this.read(id,db,true);
-      publish ? this.publisher(f,u) : this.manage(f,u);
+      this.require(f,u,need);
       const logs: [string|null, ChangelogEntry][] = [];
       await operation(f,db,(seccion,entry)=>logs.push([seccion,entry]));
       Object.assign(f,this.stamp(u));
       // Same transaction: history and ficha are committed together.
       for (const [seccion,entry] of logs) await this.log(db,id,u,seccion,entry);
-      return this.save(db,id,f);
+      const saved = await this.save(db,id,f);
+      return { ...saved, permisos: fichaPermisos(saved,u) };
     });
   }
   private async log(db: SqlConnection, id: string, u: FichaUser, seccion: string|null, entry: ChangelogEntry) {
@@ -81,10 +97,15 @@ export class PostgresFichasService {
   }
   async findAll(u: FichaUser, campusId?: string, status?: string) {
     const campus = this.global(u) ? campusId : String(u.campusId ?? '__none__');
-    return apiRows(await this.db.query(`SELECT ${listing} FROM arm_app.fichas WHERE ($1::text IS NULL OR "campusId"::text=$1) AND ($2::text IS NULL OR status=$2) ORDER BY date DESC NULLS LAST,document_id`, [campus || null,status || null]));
+    // Quien no edita fichas solo ve las publicadas y aquellas en que tiene un rol.
+    const editor = hasPermission(u.permissions ?? [], 'fichas:admin') || hasPermission(u.permissions ?? [], 'fichas:edit');
+    return apiRows(await this.db.query(`SELECT ${listing} FROM arm_app.fichas f WHERE ($1::text IS NULL OR "campusId"::text=$1) AND ($2::text IS NULL OR status=$2)
+      AND ($3 OR published OR "createdBy"=$4 OR f.equipo->'encargadoTecnico'->>'userId'=$4::text OR f.equipo->'responsableActualizacion'->>'userId'=$4::text
+        OR EXISTS (SELECT 1 FROM jsonb_each(coalesce(f.sections,'{}')) s WHERE s.value->>'assignedTo'=$4::text))
+      ORDER BY date DESC NULLS LAST,document_id`, [campus || null,status || null,editor,u.sub]));
   }
   async findMine(userId: number, isAdmin: boolean) {
-    return apiRows(await this.db.query(`SELECT * FROM arm_app.fichas f WHERE archived IS DISTINCT FROM true AND ($2 OR "createdBy"=$1 OR (published AND EXISTS (SELECT 1 FROM jsonb_each(coalesce(f.sections,'{}')) s WHERE s.value->>'assignedTo'=$1::text))) ORDER BY date DESC NULLS LAST,document_id`, [userId,isAdmin]));
+    return apiRows(await this.db.query(`SELECT * FROM arm_app.fichas f WHERE archived IS DISTINCT FROM true AND ($2 OR "createdBy"=$1 OR EXISTS (SELECT 1 FROM jsonb_each(coalesce(f.sections,'{}')) s WHERE s.value->>'assignedTo'=$1::text) OR f.equipo->'encargadoTecnico'->>'userId'=$1::text OR f.equipo->'responsableActualizacion'->>'userId'=$1::text) ORDER BY date DESC NULLS LAST,document_id`, [userId,isAdmin]));
   }
   async findPublishedForMobile(u: FichaUser) {
     if (u.campusId == null) throw new BadRequestException('Tu cuenta no tiene un campus asignado');
@@ -103,11 +124,12 @@ export class PostgresFichasService {
       ORDER BY date,document_id`,[start ?? null]));
   }
   findOne(id: string) { return this.read(id,this.db); }
-  async findOneForUser(id: string, u: FichaUser) { const f=await this.findOne(id);this.access(f,u);return f; }
+  async findOneForUser(id: string, u: FichaUser) { const f=await this.findOne(id);return {...f,permisos:this.access(f,u)}; }
   async findPublic(id: string) {
     const f=await this.findOne(id);
     if (!f.published || f.archived) throw new ForbiddenException('Esta ficha no está publicada');
     for (const k of ['createdBy','createdByName','lastModifiedBy','lastModifiedByName','archivedBy','archivedByName','publishedBy','publishedByName']) delete f[k];
+    if (f.equipo) f.equipo = Object.fromEntries(Object.entries(f.equipo).map(([k,v]:[string,any])=>[k,v?{name:v.name}:null]));
     for (const section of Object.values(f.sections ?? {}) as any[]) {
       delete section.assignedTo; delete section.completedBy; delete section.revision;
     }
@@ -159,11 +181,11 @@ export class PostgresFichasService {
         f.hiddenSections=dto.hiddenSections;
         f.status=deriveFichaStatus(f.type,f.completionStatus??{},f.hiddenSections);
       }
-    });
+    },'structure');
   }
   async remove(id: string, u: FichaUser) {
     return this.db.transaction(async db=>{
-      const f=await this.read(id,db,true);this.manage(f,u);
+      const f=await this.read(id,db,true);this.require(f,u,'structure');
       await db.query('DELETE FROM arm_app.ficha_changelog WHERE ficha_document_id=$1',[id]);
       await db.query('DELETE FROM arm_app.fichas WHERE document_id=$1',[id]);return {fichaId:id};
     });
@@ -181,7 +203,7 @@ export class PostgresFichasService {
   async splitPrayerAndGlobal(id: string, u: FichaUser) {
     if(!this.global(u) && !hasPermission(u.permissions??[],'fichas:create')) throw new ForbiddenException('Necesitas permiso para crear la ficha separada');
     return this.db.transaction(async db=>{
-      const f=await this.read(id,db,true);this.manage(f,u);
+      const f=await this.read(id,db,true);this.require(f,u,'structure');
       if(f.type!=='oracion' || f.encuentros?.length!==2 || f.archived) throw new BadRequestException('Se requiere una ficha de oración no archivada con dos encuentros');
       let i=f.encuentros.findIndex((e:any)=>/oraci[oó]n/i.test(e.label??'') && !/global/i.test(e.label??''));if(i<0)i=0;
       const prayer=f.encuentros[i],global=f.encuentros[1-i],newId=randomUUID();
@@ -197,7 +219,7 @@ export class PostgresFichasService {
       const input=dto.slots?.length ? dto.slots : [{id:'default',label:'',encuentroIds:[],songs:dto.songs??[],producerNotes:dto.producerNotes??''}];
       const slots=input.map(s=>({id:s.id,label:s.label??'',encuentroIds:s.encuentroIds??[],producerNotes:s.producerNotes??'',songs:(s.songs??[]).map(song=>({songRowId:song.songRowId,iluminacion:song.iluminacion??'',illuminationColors:song.illuminationColors??[],visualDescription:song.visualDescription??'',referenceIds:song.referenceIds??[]}))}));
       f.layoutVisual={slots,updatedAt:new Date().toISOString(),updatedBy:u.sub};
-    });
+    },'layout');
   }
   async updateSection(id: string, name: string, dto: UpdateSectionDto, u: FichaUser) {
     if(!ALL_FICHA_SECTIONS.includes(name as any)) throw new NotFoundException('Sección no encontrada');
@@ -214,6 +236,7 @@ export class PostgresFichasService {
         if((s.rows??[]).some((r:any)=>r.required && (incoming.get(r.id) as any)?.required!==true)) throw new BadRequestException('No puedes eliminar ni volver opcional una fila obligatoria');
       }
       if(changed) log(name,{kind:'rows',changes:diffRows(s.rows??[],sectionDto.rows,f.encuentros??[])});
+      if('assignedTo' in sectionDto && sectionDto.assignedTo!==s.assignedTo && !fichaPermisos(f,u).content) throw new ForbiddenException('Solo quien responde por la ficha puede asignar responsables de sección');
       if('assignedTo' in sectionDto && sectionDto.assignedTo!==s.assignedTo) log(name,{kind:'assign',before:s.assignedName??null,after:sectionDto.assignedName??null});
       f.sections[name]={...s,...sectionDto,revision:revision+1,...(changed?{isCompleted:false,completedBy:null,completedAt:null}:{})};
       if(changed) {
@@ -224,7 +247,7 @@ export class PostgresFichasService {
         // Same transaction: a failed notification cannot leave an unaudited section.
         await db.query(`WITH seq AS (SELECT nextval(pg_get_serial_sequence('arm_app.notifications','id')) AS id) INSERT INTO arm_app.notifications(id,document_id,"userId",title,body,link,channel,read,"createdAt") SELECT id,id::text,$1,$2,$3,$4,'in_app',false,now() FROM seq`,[sectionDto.assignedTo,'Te asignaron una sección',`Quedaste como responsable de "${FICHA_SECTION_LABELS[name as keyof typeof FICHA_SECTION_LABELS]??name}" en la ficha "${f.title}".`,`/dashboard/fichas-tecnicas/${id}`]);
       }
-    });
+    },{section:name});
   }
   completeSection(id: string, name: string, u: FichaUser) { return this.completion(id,name,u,true); }
   reopenSection(id: string, name: string, u: FichaUser) { return this.completion(id,name,u,false); }
@@ -240,12 +263,36 @@ export class PostgresFichasService {
       Object.assign(s,{revision:Number(s.revision??0)+1,isCompleted:complete,completedBy:complete?u.sub:null,completedAt:complete?new Date().toISOString():null});
       f.completionStatus={...(f.completionStatus??{}),[name]:complete};
       f.status=deriveFichaStatus(f.type,f.completionStatus,f.hiddenSections??[]);
-    });
+    },{section:name});
   }
-  archive(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{log(null,{kind:'archive'});Object.assign(f,{archived:true,archivedBy:u.sub,archivedByName:u.email,archivedAt:new Date(),published:false,publishedBy:null,publishedByName:null,publishedAt:null});});}
-  unarchive(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{log(null,{kind:'unarchive'});Object.assign(f,{archived:false,archivedBy:null,archivedByName:null,archivedAt:null});});}
-  publish(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{if(f.archived)throw new BadRequestException('Desarchiva la ficha antes de publicarla');log(null,{kind:'publish'});Object.assign(f,{published:true,publishedBy:u.sub,publishedByName:u.email,publishedAt:new Date()});},true);}
-  unpublish(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{log(null,{kind:'unpublish'});Object.assign(f,{published:false,publishedBy:null,publishedByName:null,publishedAt:null});},true);}
+  archive(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{log(null,{kind:'archive'});Object.assign(f,{archived:true,archivedBy:u.sub,archivedByName:u.email,archivedAt:new Date(),published:false,publishedBy:null,publishedByName:null,publishedAt:null});},'structure');}
+  unarchive(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{log(null,{kind:'unarchive'});Object.assign(f,{archived:false,archivedBy:null,archivedByName:null,archivedAt:null});},'structure');}
+  publish(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{if(f.archived)throw new BadRequestException('Desarchiva la ficha antes de publicarla');log(null,{kind:'publish'});Object.assign(f,{published:true,publishedBy:u.sub,publishedByName:u.email,publishedAt:new Date()});},'publish');}
+  unpublish(id: string, u: FichaUser) {return this.change(id,u,(f,_db,log)=>{log(null,{kind:'unpublish'});Object.assign(f,{published:false,publishedBy:null,publishedByName:null,publishedAt:null});},'publish');}
+  /** Designar al Encargado Técnico o al Responsable de Actualización de la ficha. */
+  updateEquipo(id: string, dto: UpdateEquipoDto, u: FichaUser) {
+    return this.change(id,u,async(f,db,log)=>{
+      const p=fichaPermisos(f,u);
+      f.equipo={...(f.equipo??{})};
+      for (const key of ['encargadoTecnico','responsableActualizacion'] as const) {
+        if(!(key in dto)) continue;
+        if(key==='encargadoTecnico' ? !p.designateEncargado : !p.designateResponsable) throw new ForbiddenException(`No puedes designar al ${EQUIPO_LABELS[key]}`);
+        const userId=dto[key] ?? null;
+        if(String(f.equipo[key]?.userId ?? '')===String(userId ?? '')) continue;
+        let person: { userId: number; name: string } | null = null;
+        if(userId!=null) {
+          const r=(await db.query(`SELECT id,coalesce(nullif(btrim(concat_ws(' ',"firstName","lastName")),''),email) AS name FROM arm_app.users WHERE id=$1`,[userId])).rows[0];
+          if(!r) throw new BadRequestException('Usuario no encontrado');
+          person={userId:Number(r.id),name:r.name};
+        }
+        log(null,{kind:'equipo',rol:key,before:f.equipo[key]?.name??null,after:person?.name??null});
+        f.equipo[key]=person;
+        if(person && person.userId!==u.sub) {
+          await db.query(`WITH seq AS (SELECT nextval(pg_get_serial_sequence('arm_app.notifications','id')) AS id) INSERT INTO arm_app.notifications(id,document_id,"userId",title,body,link,channel,read,"createdAt") SELECT id,id::text,$1,$2,$3,$4,'in_app',false,now() FROM seq`,[person.userId,`Te designaron ${EQUIPO_LABELS[key]}`,`Quedaste como ${EQUIPO_LABELS[key]} de la ficha "${f.title}".`,`/dashboard/fichas-tecnicas/${id}`]);
+        }
+      }
+    },'designate');
+  }
   async getChangelog(id: string, u: FichaUser) {
     await this.findOneForUser(id,u);
     return apiRows(await this.db.query(`SELECT c.document_id,c.ficha_document_id,c."userId",c.seccion,c.cambios,c.timestamp,

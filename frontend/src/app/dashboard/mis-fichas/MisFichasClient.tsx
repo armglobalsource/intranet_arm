@@ -154,15 +154,12 @@ function ProgressBar({ completionStatus, hiddenSections = [] }: {
 function FichaCard({ ficha, campusColor }: { ficha: FichaListItem; campusColor: string }) {
   const upcoming = isUpcoming(ficha.date);
   const st = STATUS_STYLES[ficha.status];
-  const href = ficha.published
-    ? `/ficha/${ficha.fichaId}`
-    : `/dashboard/fichas-tecnicas/${ficha.fichaId}/view`;
+  // Abre la ficha en el Ecosistema: ahí cada responsable puede editar su parte.
+  const href = `/dashboard/fichas-tecnicas/${ficha.fichaId}`;
 
   return (
     <Link
       href={href}
-      target={ficha.published ? '_blank' : undefined}
-      rel={ficha.published ? 'noopener noreferrer' : undefined}
       className="group block rounded-2xl bg-white transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
       style={{ border: '1px solid #E5E7EB', overflow: 'hidden' }}
     >
