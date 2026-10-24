@@ -20,6 +20,56 @@
   .app-sidebar :is(a, button):focus-visible {
     @apply outline outline-2 outline-offset-2 outline-emerald-300;
   }
+  /* ── Menú lateral ──────────────────────────────────────────────────────── */
+  /* Scroll discreto, del color del menú (sin la barra blanca del navegador). */
+  .app-sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  }
+  .app-sidebar-scroll::-webkit-scrollbar { width: 6px; }
+  .app-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+  .app-sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 999px; }
+  .app-sidebar-scroll:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.26); }
+
+  .nav-section-label {
+    @apply px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35;
+  }
+  /* Ítem: al pasar el mouse se desliza un poco y el ícono crece; el activo
+     lleva una barra verde a la izquierda. */
+  .nav-item {
+    @apply relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  }
+  .nav-item:hover { @apply bg-white/[0.06] text-white; transform: translateX(3px); }
+  .nav-icon { @apply flex shrink-0; transition: transform 0.2s ease; }
+  .nav-item:hover .nav-icon { transform: scale(1.12); }
+  /* El trazo del ícono viene del componente; al pasar el mouse se ilumina. */
+  .nav-item:hover .nav-icon svg, .nav-subitem:hover .nav-icon svg { stroke: #fff; }
+  .nav-item[data-active='true'] { @apply bg-white/[0.09] text-white; }
+  .nav-item[data-active='true']::before {
+    content: '';
+    @apply absolute -left-3 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-emerald-400;
+  }
+  .nav-subitem {
+    @apply relative flex items-center gap-2.5 rounded-lg py-2 pl-9 pr-3 text-[13px] font-medium text-slate-400;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  }
+  .nav-subitem:hover { @apply bg-white/[0.05] text-white; transform: translateX(3px); }
+  .nav-subitem[data-active='true'] { @apply bg-white/[0.07] text-white; }
+  .nav-subitem[data-active='true']::before {
+    content: '';
+    @apply absolute left-5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-emerald-400;
+  }
+  .nav-submenu { animation: nav-submenu-in 0.2s ease-out; }
+  @keyframes nav-submenu-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nav-item, .nav-subitem, .nav-item .nav-icon { transition: none; }
+    .nav-item:hover, .nav-subitem:hover, .nav-item:hover .nav-icon { transform: none; }
+    .nav-submenu { animation: none; }
+  }
   .btn-primary {
     @apply bg-gray-900 hover:bg-black text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
   }

@@ -186,34 +186,35 @@ function TecnicosIcon({ active }: { active: boolean }) {
 interface NavGroup {
   href:        string;
   label:       string;
+  /** Título de la sección del menú en que aparece el ítem. */
+  section:     string;
   icon:        (p: { active: boolean }) => React.JSX.Element;
   permission?: string;
   children?: { href: string; label: string; icon: (p: { active: boolean }) => React.JSX.Element; permission?: string }[];
 }
 
+// Agrupado por secciones para que cada módulo sea fácil de encontrar.
 const NAV: NavGroup[] = [
+  { href: '/dashboard',                    label: 'Inicio',      section: 'General', icon: HomeIcon },
+  { href: '/dashboard/produccion-general/noticias', label: 'Noticias', section: 'General', icon: NoticiasIcon, permission: 'content:view' },
+  { href: '/dashboard/orgchart',           label: 'Organigrama', section: 'General', icon: OrgIcon, permission: 'orgchart:view' },
   {
-    href:  '/dashboard',
-    label: 'Inicio',
-    icon:  HomeIcon,
-  },
-  {
-    href:  '/dashboard/produccion-general',
-    label: 'Producción General',
-    icon:  ProduccionIcon,
+    href:    '/dashboard/produccion-general',
+    label:   'Producción General',
+    section: 'Producción',
+    icon:    ProduccionIcon,
     children: [
       { href: '/dashboard/fichas-tecnicas',                             label: 'Fichas Técnicas', icon: FichaIcon,    permission: 'fichas:view' },
       { href: '/dashboard/produccion-general/tecnicos/disponibilidad',  label: 'Disponibilidad técnica',  icon: TecnicosIcon, permission: 'tecnicos:submit' },
     ],
   },
-  { href: '/dashboard/orgchart',                        label: 'Organigrama',   icon: OrgIcon,   permission: 'orgchart:view' },
-  { href: '/dashboard/produccion-general/noticias',     label: 'Noticias',      icon: NoticiasIcon, permission: 'content:view' },
-  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas',  icon: StatsIcon, permission: 'estadisticas:view' },
-  { href: '/dashboard/produccion-general/finanzas',      label: 'Finanzas',      icon: SiembraIcon, permission: 'finanzas:view' },
+  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas', section: 'Producción', icon: StatsIcon, permission: 'estadisticas:view' },
+  { href: '/dashboard/produccion-general/finanzas',     label: 'Finanzas',     section: 'Producción', icon: SiembraIcon, permission: 'finanzas:view' },
   {
-    href:  '/dashboard/ministerios',
-    label: 'Ministerios',
-    icon:  MinisteriosIcon,
+    href:    '/dashboard/ministerios',
+    label:   'Ministerios',
+    section: 'Comunidad',
+    icon:    MinisteriosIcon,
     children: [
       { href: '/dashboard/ministerios/ar-kids',    label: 'AR Kids',    icon: MinisterioSubIcon, permission: 'ministerio_ar_kids:view' },
       { href: '/dashboard/ministerios/ar-tweens',  label: 'AR Tweens',  icon: MinisterioSubIcon, permission: 'ministerio_ar_tweens:view' },
@@ -391,10 +392,11 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav aria-label="Navegación principal" className="min-h-0 overflow-y-auto flex-1 p-3 pt-4 space-y-0.5 min-w-[224px]">
-        {visibleNav.map(({ href, label, icon: Icon, children }) => {
+      <nav aria-label="Navegación principal" className="app-sidebar-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-3 pt-1 min-w-[224px]">
+        {visibleNav.map(({ href, label, section, icon: Icon, children }, index) => {
           const childActive  = children?.some((c) => pathname.startsWith(c.href)) ?? false;
           const isExpanded   = expandedGroups.has(href);
+          const newSection   = index === 0 || visibleNav[index - 1].section !== section;
 
           const active =
             href === '/dashboard'
@@ -406,39 +408,36 @@ export function Sidebar() {
                 : pathname.startsWith(href);
 
           return (
-            <div key={href}>
+            <div key={href} className="space-y-0.5">
+              {newSection && <p className="nav-section-label">{section}</p>}
               {/* Ítem principal */}
-              <div className="flex items-center gap-1">
-              <Link
-                href={href}
-                aria-current={active && !children ? 'page' : undefined}
-                style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
-                className={`flex flex-1 items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  active ? 'text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Icon active={active} />
-                <span className="flex-1">{label}</span>
-              </Link>
+              <div className="relative">
+                <Link
+                  href={href}
+                  aria-current={active && !children ? 'page' : undefined}
+                  data-active={active}
+                  className={`nav-item ${children ? 'pr-10' : ''}`}
+                >
+                  <span className="nav-icon"><Icon active={active} /></span>
+                  <span className="flex-1">{label}</span>
+                </Link>
                 {/* Expandir no cambia de página */}
                 {children && (
-                  <button onClick={(e) => toggleGroup(href, e)} aria-expanded={isExpanded} aria-label={`${isExpanded ? 'Contraer' : 'Expandir'} ${label}`} className="flex min-h-[44px] w-10 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-white/10">
-                  <svg
-                    className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${
-                      isExpanded ? 'rotate-180' : ''
-                    } ${active ? 'text-white/50' : 'text-white/20'}`}
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
+                  <button onClick={(e) => toggleGroup(href, e)} aria-expanded={isExpanded} aria-label={`${isExpanded ? 'Contraer' : 'Expandir'} ${label}`} className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-white/10 hover:text-white">
+                    <svg
+                      className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
                   </button>
                 )}
               </div>
 
               {/* Sub-ítems colapsables */}
               {children && isExpanded && (
-                <div className="mt-0.5 space-y-0.5">
+                <div className="nav-submenu space-y-0.5">
                   {children.map(({ href: chref, label: clabel, icon: CIcon }) => {
                     const cActive = pathname.startsWith(chref);
                     return (
@@ -446,16 +445,10 @@ export function Sidebar() {
                         key={chref}
                         href={chref}
                         aria-current={cActive ? 'page' : undefined}
-                        style={cActive ? { background: 'rgba(255,255,255,0.06)' } : {}}
-                        className={`flex items-center gap-2.5 pl-8 pr-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                          cActive ? 'text-white/90' : 'text-slate-300 hover:text-white hover:bg-white/5'
-                        }`}
+                        data-active={cActive}
+                        className="nav-subitem"
                       >
-                        <span
-                          className="flex-shrink-0 w-px h-3 rounded-full"
-                          style={{ background: cActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)' }}
-                        />
-                        <CIcon active={cActive} />
+                        <span className="nav-icon"><CIcon active={cActive} /></span>
                         {clabel}
                       </Link>
                     );
@@ -466,60 +459,26 @@ export function Sidebar() {
           );
         })}
 
-        {/* Administración de Campus — debajo de Ministerios, independiente */}
-        {(isAdmin || can('campus:edit')) && (() => {
-          const href   = '/dashboard/administracion-campus';
-          const active = pathname.startsWith(href);
-          return (
-            <Link
-              href={href}
-              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active ? 'text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <AdminCampusIcon active={active} />
-              Administración de campus
-            </Link>
-          );
-        })()}
+        {/* Administración: campus, configuración y soporte */}
+        {(isAdmin || can('campus:edit') || canSeeConfiguracion) && (
+          <div className="space-y-0.5">
+            <p className="nav-section-label">Administración</p>
+            {[
+              { href: '/dashboard/administracion-campus', label: 'Administración de campus', icon: AdminCampusIcon, show: isAdmin || can('campus:edit') },
+              { href: '/dashboard/directorio',            label: 'Configuración',            icon: ConfigIcon,      show: canSeeConfiguracion },
+              { href: '/dashboard/soporte',               label: 'Soporte',                  icon: SoporteIcon,     show: isAdmin },
+            ].filter((item) => item.show).map(({ href, label, icon: Icon }) => {
+              const active = pathname.startsWith(href);
+              return (
+                <Link key={href} href={href} aria-current={active ? 'page' : undefined} data-active={active} className="nav-item">
+                  <span className="nav-icon"><Icon active={active} /></span>
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </nav>
-
-      {/* Configuración + Soporte (admin-only) */}
-      <div className="px-3 pb-1 min-w-[224px] space-y-0.5">
-        {canSeeConfiguracion && (() => {
-          const href   = '/dashboard/directorio';
-          const active = pathname.startsWith(href);
-          return (
-            <Link
-              href={href}
-              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active ? 'text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <ConfigIcon active={active} />
-              Configuración
-            </Link>
-          );
-        })()}
-        {isAdmin && (() => {
-          const href   = '/dashboard/soporte';
-          const active = pathname.startsWith(href);
-          return (
-            <Link
-              href={href}
-              style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active ? 'text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <SoporteIcon active={active} />
-              Soporte
-            </Link>
-          );
-        })()}
-      </div>
 
       {/* Notificaciones */}
       <div ref={bellRef} style={{ borderTop: '1px solid #1f1f1f' }}
