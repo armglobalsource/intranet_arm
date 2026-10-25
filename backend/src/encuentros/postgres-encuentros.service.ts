@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ArmRecordStore } from '../common/database/arm-record-store';
 import { Periodo, mapId, sumCounts, inPeriodo, inMonth } from '../common/arm-records.util';
 import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
 import { PostgresCampusService } from '../campus/postgres-campus.service';
+import { allCampus, RecordUser, sameEncuentroLabel } from './encuentros.scope';
 
 const COL = 'encuentros';
 
@@ -65,18 +66,34 @@ export class PostgresEncuentrosService {
 
   // ── Escritura ──────────────────────────────────────────────────────────────
 
-  async create(dto: CreateEncuentroDto, user: { sub: string; email: string }) {
-    // Idempotencia: si ya existe un registro con esta clave, devolverlo (no duplicar).
+  async create(dto: CreateEncuentroDto, user: RecordUser) {
+    // Idempotencia: si ya existe un registro con esta clave, el store lo devuelve (no duplica).
 
     const now = new Date();
     const isEvento = dto.tipo === 'evento';
-    const campus = await this.campuses.findByName(dto.campus);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dto.fecha)) throw new BadRequestException('La fecha debe tener el formato AAAA-MM-DD');
+    let campus: any;
+    if (allCampus(user)) campus = await this.campuses.findByName(dto.campus);
+    else {
+      // Cada campus reporta lo suyo: el campus sale de la cuenta, no del formulario.
+      if (user.campusId == null) throw new BadRequestException('Tu cuenta no tiene un campus asignado');
+      campus = await this.campuses.findOne(Number(user.campusId));
+      if (dto.campus && dto.campus.trim().toLowerCase() !== String(campus.name).trim().toLowerCase()) {
+        throw new ForbiddenException('Solo puedes registrar encuentros de tu campus');
+      }
+    }
+    if (!isEvento && dto.encuentro?.trim()) {
+      const duplicate = (await this.store.list(COL,{campus:campus.name,start:dto.fecha,end:`${dto.fecha}T23:59:59.999Z`})).find((r) =>
+        r.tipo !== 'evento' && String(r.fecha ?? '').slice(0,10) === dto.fecha && sameEncuentroLabel(r.encuentro, dto.encuentro)
+        && !(dto.idempotencyKey && r.idempotencyKey === dto.idempotencyKey));
+      if (duplicate) throw new ConflictException(`Ya existe un registro de «${dto.encuentro}» del ${dto.fecha}. Edítalo en vez de crear otro.`);
+    }
 
     const doc = {
       idempotencyKey:   dto.idempotencyKey ?? null,
       tipo:             dto.tipo,
       campusId:         campus.id,
-      campus:           dto.campus,
+      campus:           campus.name,
       fecha:            dto.fecha,
       encuentro:        isEvento ? (dto.eventoHorario || 'Evento') : (dto.encuentro ?? ''),
       modalidad:        dto.modalidad ?? '',
@@ -106,7 +123,7 @@ export class PostgresEncuentrosService {
     return this.findOne(ref.id);
   }
 
-  async update(id: string, dto: UpdateEncuentroDto, user: { sub: string; email: string }) {
+  async update(id: string, dto: UpdateEncuentroDto, user: { sub: string | number; email: string }) {
     const current = await this.findOne(id);
 
     const data: any = {

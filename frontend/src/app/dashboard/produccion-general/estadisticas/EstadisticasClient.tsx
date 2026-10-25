@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Activity, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight,
@@ -373,7 +374,10 @@ export function EstadisticasClient() {
       <p className="text-xs font-bold uppercase tracking-widest text-violet-700">ARM Global · Nuestra comunidad en cifras</p>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div><h1 className="text-3xl font-bold text-slate-900">Estadísticas</h1><p className="mt-2 max-w-2xl text-sm text-slate-600">Comprende cada encuentro, acompaña a los campus y revisa cómo vamos creciendo juntos.</p></div>
-        <button onClick={() => void refetch()} disabled={isFetching} className="rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 disabled:opacity-50">{isFetching ? 'Actualizando…' : 'Actualizar datos'}</button>
+        <div className="flex flex-wrap gap-2">
+          {(isAdmin || can('encuentros:create')) && <Link href="/dashboard/produccion-general/estadisticas/registrar" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white">Registrar encuentro</Link>}
+          <button onClick={() => void refetch()} disabled={isFetching} className="rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 disabled:opacity-50">{isFetching ? 'Actualizando…' : 'Actualizar datos'}</button>
+        </div>
       </div>
       <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-slate-700"><CalendarDays size={17} aria-hidden="true" />{periodLabel}</p>
     </header>

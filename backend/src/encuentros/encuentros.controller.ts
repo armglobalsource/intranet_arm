@@ -9,6 +9,7 @@ import { PostgresCampusService } from '../campus/postgres-campus.service';
 import { resolveCampusScope, applyLimit } from '../common/campus-scope';
 import { PostgresEncuentrosService } from './postgres-encuentros.service';
 import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
+import { allCampus, assertRecordCampus } from './encuentros.scope';
 
 @UseGuards(JwtAuthGuard)
 @Controller('encuentros')
@@ -47,7 +48,7 @@ export class EncuentrosController {
     @Query('periodo')  periodo?: any,
     @Query('limit')    limit?: string,
   ) {
-    const campus = await resolveCampusScope(user, campusId, this.campusService);
+    const campus = allCampus(user) ? (campusId || undefined) : await resolveCampusScope(user, campusId, this.campusService);
     if (campus === null) return [];
     return applyLimit(await this.encuentros.findAll(campus, periodo), limit);
   }
@@ -62,28 +63,32 @@ export class EncuentrosController {
   @Get(':id')
   @UseGuards(PermissionsGuard)
   @RequirePermission('encuentros:view')
-  findOne(@Param('id') id: string) {
-    return this.encuentros.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    const record = await this.encuentros.findOne(id);
+    assertRecordCampus(record, user);
+    return record;
   }
 
   @Post()
   @UseGuards(PermissionsGuard)
   @RequirePermission('encuentros:create')
   create(@Body() dto: CreateEncuentroDto, @CurrentUser() user: any) {
-    return this.encuentros.create(dto, { sub: user.sub, email: user.email });
+    return this.encuentros.create(dto, user);
   }
 
   @Patch(':id')
   @UseGuards(PermissionsGuard)
   @RequirePermission('encuentros:edit')
-  update(@Param('id') id: string, @Body() dto: UpdateEncuentroDto, @CurrentUser() user: any) {
+  async update(@Param('id') id: string, @Body() dto: UpdateEncuentroDto, @CurrentUser() user: any) {
+    assertRecordCampus(await this.encuentros.findOne(id), user);
     return this.encuentros.update(id, dto, { sub: user.sub, email: user.email });
   }
 
   @Delete(':id')
   @UseGuards(PermissionsGuard)
   @RequirePermission('encuentros:delete')
-  remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    assertRecordCampus(await this.encuentros.findOne(id), user);
     return this.encuentros.remove(id);
   }
 }

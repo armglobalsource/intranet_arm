@@ -209,6 +209,7 @@ const NAV: NavGroup[] = [
     ],
   },
   { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas', section: 'Producción', icon: StatsIcon, permission: 'estadisticas:view' },
+  { href: '/dashboard/produccion-general/estadisticas/registrar', label: 'Registrar encuentro', section: 'Producción', icon: TecnicosIcon, permission: 'encuentros:create' },
   { href: '/dashboard/produccion-general/finanzas',     label: 'Finanzas',     section: 'Producción', icon: SiembraIcon, permission: 'finanzas:view' },
   {
     href:    '/dashboard/ministerios',
@@ -405,7 +406,8 @@ export function Sidebar() {
                 ? pathname === '/dashboard/produccion-general'
                   || pathname.startsWith('/dashboard/fichas-tecnicas')
                   || childActive
-                : pathname.startsWith(href);
+                // Si otro ítem calza más exacto (ej. Registrar encuentro dentro de Estadísticas), ese es el activo.
+                : pathname.startsWith(href) && !visibleNav.some((o) => o.href.length > href.length && o.href.startsWith(href) && pathname.startsWith(o.href));
 
           return (
             <div key={href} className="space-y-0.5">

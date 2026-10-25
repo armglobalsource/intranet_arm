@@ -9,7 +9,8 @@ export class ArmRecordStore {
  private table(table:Table){if(!tables.has(table))throw new Error('Unapproved record table');return `arm_app.${table}`;}
  private row(row:any){return {...row.data,id:row.document_id,fichaId:row.document_id};}
  async list(table:Table,filter:{campus?:string;userId?:number|string;start?:string;end?:string;active?:boolean}={}){
-  const result=await this.db.query(`SELECT document_id,data FROM ${this.table(table)} WHERE ($1::text IS NULL OR campus=$1) AND ($2::text IS NULL OR record_user=$2) AND ($3::text IS NULL OR record_date >= $3) AND ($4::text IS NULL OR record_date <= $4) AND ($5::boolean IS NULL OR (data->>'activo')::boolean=$5) ORDER BY record_date DESC NULLS LAST,document_id`,[filter.campus??null,filter.userId==null?null:String(filter.userId),filter.start??null,filter.end??null,filter.active??null]);return result.rows.map(r=>this.row(r));
+  // Listados sin 'source' (metadatos de la importación histórica): pesa casi la mitad y nadie lo usa.
+  const result=await this.db.query(`SELECT document_id,data - 'source' AS data FROM ${this.table(table)} WHERE ($1::text IS NULL OR campus=$1) AND ($2::text IS NULL OR record_user=$2) AND ($3::text IS NULL OR record_date >= $3) AND ($4::text IS NULL OR record_date <= $4) AND ($5::boolean IS NULL OR (data->>'activo')::boolean=$5) ORDER BY record_date DESC NULLS LAST,document_id`,[filter.campus??null,filter.userId==null?null:String(filter.userId),filter.start??null,filter.end??null,filter.active??null]);return result.rows.map(r=>this.row(r));
  }
  async find(table:Table,id:string){const row=(await this.db.query(`SELECT document_id,data FROM ${this.table(table)} WHERE document_id=$1`,[id])).rows[0];if(!row)throw new NotFoundException('Registro no encontrado');return this.row(row);}
  async create(table:Table,data:any){
