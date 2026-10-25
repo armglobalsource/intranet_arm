@@ -14,6 +14,8 @@ Incluye solo tareas `Finalizada` + `Registrado`, fecha válida hasta el corte, c
 
 `Santiago Centro` se corresponde con `Santiago`. Miami (Estados Unidos), Oriente (Chile) y Virtual (sin país) fueron autorizados como campus históricos inactivos. No asignar usuarios del ecosistema a partir del responsable de Asana.
 
+Después de la carga, el usuario confirmó que Miami, Oriente y Virtual son campus vigentes; quedaron activos. Una repetición del importador conserva el estado actual de los campus existentes, no vuelve a desactivarlos.
+
 Los campos vacíos permanecen ausentes; `0` se conserva como cero informado. `2.0` se convierte a 2; fracciones, negativos, separadores ambiguos y texto se retienen para revisión. Asistencia = auditorio + kids + tweens + sala bebé; voluntarios y espectadores online se mantienen separados. Info y Proyecto educativo se conservan como categorías de voluntarios. Los registros importados son `enviado`, no se inventa una validación pastoral.
 
 Cada registro conserva ID del proyecto/tarea, hash del CSV y de la fila, campus/estados/tipo originales y sección. El CSV completo queda en el respaldo local; no se copian correos de responsables ni notas libres a la aplicación. Los nombres originales de encuentros y mensajes se preservan.
@@ -38,3 +40,9 @@ python -B -m unittest discover -s backend/scripts/asana-import -p 'test_*.py'
 # Desde backend:
 node --test scripts/asana-import/apply.test.cjs
 ```
+
+## Auditoría posterior
+
+`python -B backend/scripts/asana-import/audit_history.py migration-artifacts/<lote>` compara los valores numéricos informados del CSV con los incluidos en el plan y los retenidos. Las categorías principales de revisión son excluyentes y suman exactamente las tareas retenidas. Los totales brutos del CSV no son cifras oficiales: pueden incluir resúmenes, estados pendientes y posibles duplicados. Un campo inválido se señala en el plan; los demás valores de esa fila siguen visibles en la auditoría.
+
+La búsqueda de coincidencias online compara fecha y hora entre Virtual y Santiago/Puente Alto. Es una detección de candidatos, no una prueba exhaustiva de ausencia de duplicados ni una regla automática para redistribuir audiencias.

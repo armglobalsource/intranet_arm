@@ -136,6 +136,16 @@ Motivos de revisión superpuestos: 142 tareas no finalizadas/registradas, 75 pos
 
 Código y procedimiento: `backend/scripts/asana-import/`. Respaldo, plan, conciliación y revisión detallada: `migration-artifacts/asana-2026-10-25/`, excluido de Git por contener datos del origen. No se necesita un nuevo despliegue para consultar los registros importados.
 
+### Revisión posterior del histórico
+
+El usuario aclaró que Miami, Oriente y Virtual siguen vigentes. Se activaron los tres campus; Virtual mantiene país nulo y representa el campus global online, con emisiones de los miércoles (oración y global) y domingos 11:00 desde Santiago o Puente Alto. No se cambió la atribución contable de los registros sin confirmar su alcance histórico.
+
+La auditoría de todo el CSV detectó que Virtual tiene registros solo en 2020–2021 (hasta junio de 2021) y las cifras online bajo Santiago/Puente Alto comienzan en julio de 2021. No hubo candidatos con igual fecha/hora y espectadores positivos entre Virtual y esos emisores; esto no equivale a deduplicación exhaustiva. Está pendiente confirmar si todo ese online debe atribuirse a Virtual.
+
+Las 67 tareas de Montevideo con fecha 2022-04-05 contienen 60 combinaciones distintas de cifras y están clasificadas en secciones de julio de 2021 a marzo de 2022. Suman 767 asistencias y 446 voluntarios. Se consultó si conservar precisión mensual, sin inventar un día.
+
+De las 239 tareas retenidas, 192 contienen cifras positivas. Además existen seis resúmenes anuales de decisiones de fe de 2014–2019 (2.342 decisiones), sin campus ni fecha de encuentro. Requieren tratamiento como agregados históricos, no como encuentros ficticios. Los totales actuales siguen siendo parciales hasta resolver estas categorías. Detalle local: `historical-audit.json`.
+
 ## Archivos de referencia
 
 - Origen: `types/index.ts`, `components/forms/NuevoReporteForm.tsx`, `components/charts/EjecutivoCharts.tsx`, `app/pastor/page.tsx`, `app/ejecutivo/page.tsx`, `lib/queries/encuentros.ts`, `lib/queries/ejecutivo.ts`, `lib/actions/informes.ts`, `supabase/migrations/001_initial.sql`.

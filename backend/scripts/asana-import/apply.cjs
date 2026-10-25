@@ -52,7 +52,9 @@ async function main() {
   check(process.env.DATABASE_URL, 'DATABASE_URL_MISSING');
   const connection = new URL(process.env.DATABASE_URL);
   check(`${connection.hostname}/${connection.username}`.includes('kqqufmijfvrgzrfrqsby'), 'WRONG_TARGET_PROJECT');
-  const pool = new Pool(buildPostgresOptions(process.env.DATABASE_URL, process.env.DATABASE_CA_CERT));
+  // Offline reconciliation can read the whole historical batch; keep API timeouts unchanged.
+  const pool = new Pool({ ...buildPostgresOptions(process.env.DATABASE_URL, process.env.DATABASE_CA_CERT),
+    statement_timeout: 60000, query_timeout: 65000 });
   pool.on('error', () => {});
   const client = await pool.connect();
   try {
@@ -72,7 +74,8 @@ async function main() {
       const matches = catalog.filter(x => normalize(x.name) === normalize(c.name));
       check(matches.length <= 1, 'AMBIGUOUS_CAMPUS');
       if (matches.length) {
-        check(matches[0].country === c.country && matches[0].isActive === false, 'HISTORICAL_CAMPUS_CHANGED');
+        // A campus can be reactivated after import. Preserve its current operational status.
+        check(matches[0].country === c.country, 'HISTORICAL_CAMPUS_CHANGED');
       } else if (apply) {
         const row = (await client.query(`WITH identity AS (SELECT nextval(pg_get_serial_sequence('arm_app.campuses','id')) AS id)
           INSERT INTO arm_app.campuses (id,document_id,name,"nameLower",country,"isActive",description,"createdAt","updatedAt")
