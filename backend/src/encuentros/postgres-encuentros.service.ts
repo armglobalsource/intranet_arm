@@ -4,6 +4,7 @@ import { Periodo, mapId, sumCounts, inPeriodo, inMonth } from '../common/arm-rec
 import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
 import { PostgresCampusService } from '../campus/postgres-campus.service';
 import { allCampus, RecordUser, sameEncuentroLabel } from './encuentros.scope';
+import { doubtfulDates, nowInSantiago, pendingEncuentros } from './encuentros.pending';
 
 const COL = 'encuentros';
 
@@ -62,6 +63,22 @@ export class PostgresEncuentrosService {
     }
 
     return acc;
+  }
+
+  /**
+   * Encuentros de los últimos `days` días que según los horarios debieron ocurrir y no tienen
+   * registro, y registros del mismo período cuya fecha no calza con el día que dice su nombre.
+   */
+  async pendientes(user: RecordUser, days = 14) {
+    const all = allCampus(user);
+    if (!all && user.campusId == null) return { pendientes: [], revisar: [] };
+    const now = nowInSantiago();
+    const start = new Date(`${now.date}T12:00:00Z`);
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    const from = start.toISOString().slice(0, 10);
+    const campuses = all ? await this.campuses.findAll() : [await this.campuses.findOne(Number(user.campusId))];
+    const records = await this.store.list(COL, { campus: all ? undefined : campuses[0].name, start: from, end: `${now.date}T23:59:59.999Z` });
+    return { pendientes: pendingEncuentros(campuses, records, from, now.date, now), revisar: doubtfulDates(records, campuses) };
   }
 
   // ── Escritura ──────────────────────────────────────────────────────────────

@@ -53,6 +53,16 @@ export class EncuentrosController {
     return applyLimit(await this.encuentros.findAll(campus, periodo), limit);
   }
 
+  /** Encuentros que según los horarios del campus aún no se reportan (últimos 14 días por defecto, máximo 60). */
+  @Get('pendientes')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('encuentros:create')
+  pendientes(@CurrentUser() user: any, @Query('dias') diasText?: string) {
+    const dias = diasText === undefined ? 14 : Number(diasText);
+    if (!Number.isInteger(dias) || dias < 1 || dias > 60) throw new BadRequestException('dias debe ser un número entre 1 y 60');
+    return this.encuentros.pendientes(user, dias);
+  }
+
   @Get('mine')
   @UseGuards(PermissionsGuard)
   @RequirePermission('encuentros:create')

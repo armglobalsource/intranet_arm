@@ -15,6 +15,7 @@ import { AvailabilityTask } from './AvailabilityTask';
 import { pendingDashboardFichas } from '@/lib/dashboard-tasks';
 import { parseFichaDate } from '@/lib/ficha-date';
 import { BirthdayPanel } from './BirthdayPanel';
+import { ReportesPendientesTask } from './ReportesPendientesTask';
 
 // ── Helper fecha ──────────────────────────────────────────────────────────────
 
@@ -286,7 +287,8 @@ export function DashboardClient() {
                 </ul>}
               <Link href="/dashboard/mis-fichas" className="dashboard-action">Ver mis fichas{pendingFichas.length > 3 ? ` (${pendingFichas.length} pendientes)` : ''} →</Link>
             </article>
-            {(hasWorship || hasTecnicos) && <div className="space-y-4">
+            {(hasWorship || hasTecnicos || isAdmin || can('encuentros:create')) && <div className="space-y-4">
+              {(isAdmin || can('encuentros:create')) && <ReportesPendientesTask />}
               {hasWorship && <AvailabilityTask campusId={user?.campusId ?? null} channel="worship" />}
               {hasTecnicos && <AvailabilityTask campusId={user?.campusId ?? null} channel="tecnicos" />}
             </div>}

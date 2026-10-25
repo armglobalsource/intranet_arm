@@ -39,6 +39,19 @@ export function useRegistrosRecientes(campusName?: string) {
   });
 }
 
+export interface EncuentroPendiente { campusId: number; campus: string; fecha: string; hora: string; encuentro: string }
+export interface RegistroDudoso { id?: string; campusId: number; campus: string; fecha: string; encuentro: string; diaFecha: string; diaNombre: string }
+
+/** Encuentros de los últimos 14 días sin registro, según los horarios del campus, y registros con fecha dudosa. */
+export function usePendientesReporte(enabled = true) {
+  return useQuery<{ pendientes: EncuentroPendiente[]; revisar: RegistroDudoso[] }>({
+    queryKey: [...KEY, 'pendientes'],
+    queryFn: () => api.get('/encuentros/pendientes').then((r) => r.data),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
 export function useGuardarRegistro() {
   const qc = useQueryClient();
   return useMutation({

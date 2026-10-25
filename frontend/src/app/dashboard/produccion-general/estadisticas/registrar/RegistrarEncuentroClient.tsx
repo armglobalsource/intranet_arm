@@ -5,8 +5,9 @@
 // Los nombres siguen el formato del historial («Encuentro Domingo 09:00 hrs»)
 // para que el panel de Estadísticas compare encuentros nuevos y antiguos.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -15,8 +16,8 @@ import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAllCampuses, type Campus } from '@/hooks/useCampus';
 import { useActiveArmCatalogos } from '@/hooks/useArmCatalogos';
 import {
-  useEliminarRegistro, useGuardarRegistro, useRegistrosRecientes,
-  type RegistroEncuentro, type RegistroInput,
+  useEliminarRegistro, useGuardarRegistro, usePendientesReporte, useRegistrosRecientes,
+  type EncuentroPendiente, type RegistroEncuentro, type RegistroInput,
 } from '@/hooks/useRegistrosEncuentros';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -149,6 +150,43 @@ export function RegistrarEncuentroClient() {
   }, [sugerido?.predicador]);
 
   const registros = useRegistrosRecientes(allCampus ? campus?.name : undefined);
+  const pendientesQ = usePendientesReporte(allowed);
+  const pendientes = (pendientesQ.data?.pendientes ?? []).filter((p) => !allCampus || !campus || p.campusId === campus.id);
+  const revisar = (pendientesQ.data?.revisar ?? []).filter((r) => !allCampus || !campus || r.campusId === campus.id);
+
+  /** Abre el formulario con un encuentro pendiente ya elegido. */
+  function reportar(p: Pick<EncuentroPendiente, 'campusId' | 'fecha' | 'encuentro'>) {
+    const target = allCampus ? campuses.find((c) => c.id === p.campusId) ?? campus : campus;
+    if (allCampus && target) setCampusId(target.id);
+    // Si el nombre no está entre los horarios de ese día, queda escrito en «Otro».
+    const known = encuentrosDelDia(target, p.fecha).some((o) => o.label === p.encuentro);
+    setForm({ ...emptyForm(p.fecha), encuentroSel: known ? p.encuentro : OTRO, encuentroOtro: known ? '' : p.encuentro });
+    setNotice(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Enlaces desde el Inicio: ?fecha=AAAA-MM-DD&encuentro=…&campus=ID
+  const params = useSearchParams();
+  const appliedParams = useRef(false);
+  useEffect(() => {
+    if (appliedParams.current || !campuses.length) return;
+    const fecha = params?.get('fecha'), encuentro = params?.get('encuentro'), campusParam = Number(params?.get('campus'));
+    if (fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) && encuentro) {
+      reportar({ fecha, encuentro, campusId: Number.isFinite(campusParam) && campusParam > 0 ? campusParam : Number(user?.campusId) });
+    }
+    appliedParams.current = true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campuses.length]);
+
+  async function editarPorId(id?: string) {
+    if (!id) return;
+    try {
+      const record = (registros.data ?? []).find((r) => r.id === id) ?? (await api.get(`/encuentros/${id}`)).data;
+      editar(record);
+    } catch (err) {
+      setNotice({ ok: false, text: apiErrorMessage(err, 'No se pudo abrir el registro') });
+    }
+  }
   const guardar = useGuardarRegistro();
   const eliminar = useEliminarRegistro();
 
@@ -235,6 +273,39 @@ export function RegistrarEncuentroClient() {
           <Link href="/dashboard/produccion-general/estadisticas" className="rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700">Ver estadísticas</Link>
         </div>
       </header>
+
+      {(pendientes.length > 0 || revisar.length > 0) && !form.id && (
+        <section aria-label="Pendientes de reportar" className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 sm:p-5">
+          {pendientes.length > 0 && <>
+            <h2 className="font-bold text-slate-900">Pendientes de reportar</h2>
+            <p className="mb-3 text-xs text-slate-600">Según los horarios del campus, estos encuentros de las últimas dos semanas aún no tienen registro.</p>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {pendientes.slice(0, 8).map((p) => (
+                <li key={`${p.campusId}-${p.fecha}-${p.hora}`} className="flex items-center justify-between gap-3 rounded-xl border border-amber-100 bg-white px-3 py-2">
+                  <span className="min-w-0 text-sm">
+                    <span className="block font-semibold text-slate-800">{p.encuentro}</span>
+                    <span className="block text-xs capitalize text-slate-500">{shortDate(p.fecha)}{allCampus ? ` · ${p.campus}` : ''}</span>
+                  </span>
+                  <button type="button" onClick={() => reportar(p)} className="shrink-0 rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-semibold text-white">Registrar</button>
+                </li>
+              ))}
+            </ul>
+            {pendientes.length > 8 && <p className="mt-2 text-xs text-slate-500">Y {pendientes.length - 8} más.</p>}
+          </>}
+          {revisar.length > 0 && <div className={pendientes.length ? 'mt-4' : ''}>
+            <h2 className="font-bold text-slate-900">Revisar la fecha</h2>
+            <p className="mb-2 text-xs text-slate-600">El nombre de estos registros dice un día distinto al de su fecha.</p>
+            <ul className="space-y-1">
+              {revisar.slice(0, 6).map((r) => (
+                <li key={r.id ?? `${r.campusId}-${r.fecha}-${r.encuentro}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="text-slate-700"><strong>{r.encuentro}</strong> con fecha {shortDate(r.fecha)} ({r.diaFecha.toLowerCase()}){allCampus ? ` · ${r.campus}` : ''}</span>
+                  {canEdit && r.id && <button type="button" onClick={() => void editarPorId(r.id)} className="rounded-lg px-2 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100">Corregir</button>}
+                </li>
+              ))}
+            </ul>
+          </div>}
+        </section>
+      )}
 
       {notice && (
         <div role={notice.ok ? 'status' : 'alert'} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${notice.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
