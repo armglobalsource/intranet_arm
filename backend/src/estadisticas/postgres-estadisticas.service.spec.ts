@@ -126,7 +126,7 @@ describe('PostgresEstadisticasService', () => {
       canViewAll: false,
     });
 
-    expect(result.campuses).toEqual([{ id: 1, name: 'Santiago' }]);
+    expect(result.campuses).toEqual([expect.objectContaining({ id: 1, name: 'Santiago' })]);
     expect(result.totals.asistencia).toBe(40);
     expect(result.records).toHaveLength(1);
     expect(result.periods.length).toBeGreaterThanOrEqual(52);

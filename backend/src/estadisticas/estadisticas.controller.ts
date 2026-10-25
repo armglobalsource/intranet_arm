@@ -9,6 +9,7 @@ import { hasPermission } from '../common/permissions';
 import { PostgresEstadisticasService } from './postgres-estadisticas.service';
 import { GroupBy } from './postgres-estadisticas.service';
 import { RecordType } from './postgres-estadisticas.service';
+import { statisticsRange } from './statistics-range';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermission('estadisticas:view')
@@ -23,6 +24,9 @@ export class EstadisticasController {
     @Query('campusId') campusIdText: string | undefined,
     @Query('type') typeText: string | undefined,
     @CurrentUser() user: any,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('country') country?: string,
   ) {
     const year = Number(yearText);
     if (!Number.isInteger(year) || year < 2000 || year > 2100) {
@@ -43,23 +47,26 @@ export class EstadisticasController {
 
     const canViewAll = hasPermission(user.permissions ?? [], 'estadisticas:viewAll');
     const requestedCampusId = campusIdText ? Number(campusIdText) : undefined;
-    if (campusIdText && !Number.isInteger(requestedCampusId)) {
+    if (campusIdText !== undefined && (!/^\d+$/.test(campusIdText) || !Number.isSafeInteger(requestedCampusId) || requestedCampusId! <= 0)) {
       throw new BadRequestException('campusId inválido');
     }
 
-    if (!canViewAll && !user.campusId) {
+    if (!canViewAll && (!Number.isSafeInteger(Number(user.campusId)) || Number(user.campusId) <= 0)) {
       throw new BadRequestException('Tu cuenta no tiene un campus asignado');
     }
     if (!canViewAll && requestedCampusId && requestedCampusId !== Number(user.campusId)) {
       throw new BadRequestException('No puedes consultar otro campus');
     }
 
+    statisticsRange(year, from, to);
+    if (country && country.length > 100) throw new BadRequestException('País inválido');
     return this.estadisticas.dashboard({
       year,
       groupBy,
       type,
       campusId: canViewAll ? requestedCampusId : Number(user.campusId),
       canViewAll,
+      from, to, country,
     });
   }
 }

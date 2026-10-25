@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ArmRecordStore } from '../common/database/arm-record-store';
 import { PostgresCampusService } from '../campus/postgres-campus.service';
 import { PostgresArmCatalogosService } from '../arm-catalogos/postgres-arm-catalogos.service';
 import { sumCounts } from '../common/arm-records.util';
+import { countryName, statisticsRange, validDay } from './statistics-range';
 
 export type GroupBy = 'week' | 'month';
 export type RecordType = 'all' | 'encuentro' | 'evento';
@@ -13,9 +14,13 @@ interface DashboardOptions {
   type: RecordType;
   campusId?: number;
   canViewAll: boolean;
+  from?: string;
+  to?: string;
+  country?: string;
 }
 
 export interface Metrics {
+  auditorio: number;
   encuentros: number;
   eventos: number;
   asistencia: number;
@@ -36,6 +41,7 @@ export interface Quality {
 }
 
 const emptyMetrics = (): Metrics => ({
+  auditorio: 0,
   encuentros: 0,
   eventos: 0,
   asistencia: 0,
@@ -71,7 +77,8 @@ function normalized(value: unknown) {
 
 function dateKey(value: unknown): string | null {
   const match = String(value ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+  const key = match ? `${match[1]}-${match[2]}-${match[3]}` : '';
+  return validDay(key) ? key : null;
 }
 
 function utcDate(key: string) {
@@ -123,38 +130,59 @@ export class PostgresEstadisticasService {
   ) {}
 
   async dashboard(options: DashboardOptions) {
+    if (!options.canViewAll && (!Number.isSafeInteger(options.campusId) || options.campusId! <= 0)) throw new BadRequestException('Campus requerido');
+    const range = statisticsRange(options.year, options.from, options.to);
     const allCampuses = await this.campuses.findAll();
-    const visibleCampuses = allCampuses
-      .filter((campus: any) => campus.isActive !== false)
+    // Resolve legacy names against the FULL catalog, never a filtered subset.
+    // This prevents homonymous campuses from crossing an authorization boundary.
+    const campusById = new Map(allCampuses.map((campus: any) => [Number(campus.id), campus]));
+    const campusByName = new Map<string, any[]>();
+    for (const campus of allCampuses) {
+      const key = normalized(campus.name);
+      campusByName.set(key, [...(campusByName.get(key) ?? []), campus]);
+    }
+    const authorizedCampuses = allCampuses.filter((campus: any) => options.canViewAll || Number(campus.id) === options.campusId);
+    const visibleCampuses = authorizedCampuses
+      .filter((campus: any) => !options.country || normalized(countryName(campus.country)) === normalized(countryName(options.country)))
       .filter((campus: any) => !options.campusId || Number(campus.id) === options.campusId);
-    const campusById = new Map(visibleCampuses.map((campus: any) => [Number(campus.id), campus]));
-    const campusByName = new Map(visibleCampuses.map((campus: any) => [normalized(campus.name), campus]));
+    const visibleIds = new Set(visibleCampuses.map((campus: any) => Number(campus.id)));
 
-    const start = `${options.year}-01-01`;
-    const end = `${options.year}-12-31`;
+    const { start, end } = range;
     const [encuentrosSnap, kiloamorSnap, asistenciaCatalog, voluntariosCatalog] = await Promise.all([
-      this.store.list('encuentros',{start,end}),
-      this.store.list('kiloamor',{start,end}),
+      this.store.list('encuentros',{start: range.previousStart,end: `${end}T23:59:59.999Z`}),
+      this.store.list('kiloamor',{start: range.previousStart,end: `${end}T23:59:59.999Z`}),
       this.catalogs.findAll('asistencia'),
       this.catalogs.findAll('voluntarios'),
     ]);
 
     const resolveCampus = (row: any) => {
-      const byId = campusById.get(Number(row.campusId));
-      return byId ?? campusByName.get(normalized(row.campus));
+      const matches = campusByName.get(normalized(row.campus)) ?? [];
+      const campus = row.campusId != null && row.campusId !== '' ? campusById.get(Number(row.campusId)) : matches.length === 1 ? matches[0] : undefined;
+      return campus && visibleIds.has(Number(campus.id)) ? campus : undefined;
     };
-
-    const encounterRows = encuentrosSnap
+    const inRange = (row: any, from: string, to: string) => { const key = dateKey(row.fecha); return !!key && key >= from && key <= to; };
+    const scopedRows = encuentrosSnap
       .filter((row) => resolveCampus(row))
       .filter((row) => options.type === 'all' || row.tipo === options.type);
+    // Existing records without a workflow state remain eligible.
+    const eligible = (row: any) => !row.estado || ['enviado', 'validado'].includes(row.estado);
+    const encounterRows = scopedRows.filter(eligible).filter((row) => inRange(row, start, end));
     const kiloRows = kiloamorSnap
-      .filter((row) => resolveCampus(row));
+      .filter((row) => resolveCampus(row)).filter((row) => inRange(row, start, end));
+    const previous = emptyMetrics();
+    for (const row of scopedRows.filter(eligible).filter((row) => inRange(row, range.previousStart, range.previousEnd))) mergeMetrics(previous, this.encounterMetrics(row));
+    for (const row of kiloamorSnap.filter((row) => resolveCampus(row)).filter((row) => inRange(row, range.previousStart, range.previousEnd))) mergeMetrics(previous, { kiloAmorCajas: row.cajas ?? 0, kiloAmorRegistros: 1 });
 
-    const periods = this.buildPeriods(options.year, options.groupBy);
+    const periods = Array.from({ length: Number(end.slice(0, 4)) - Number(start.slice(0, 4)) + 1 }, (_, i) => Number(start.slice(0, 4)) + i)
+      .flatMap((year) => this.buildPeriods(year, options.groupBy))
+      .filter((period, index, all) => period.end >= start && period.start <= end && all.findIndex((p) => p.key === period.key) === index)
+      .map((period) => ({ ...period, start: period.start < start ? start : period.start, end: period.end > end ? end : period.end }));
     const periodMap = new Map(periods.map((period) => [period.key, period]));
     const campusRows = visibleCampuses.map((campus: any) => ({
       campusId: Number(campus.id),
       campusName: campus.name,
+      country: countryName(campus.country),
+      isActive: campus.isActive !== false,
       metrics: emptyMetrics(),
       quality: emptyQuality(),
     }));
@@ -190,6 +218,7 @@ export class PostgresEstadisticasService {
         fecha: key,
         campusId: Number(campus.id),
         campusName: campus.name,
+        country: countryName(campus.country),
         tipo: row.tipo === 'evento' ? 'evento' : 'encuentro',
         encuentro: row.encuentro ?? '',
         predicador: row.predicador ?? '',
@@ -233,16 +262,24 @@ export class PostgresEstadisticasService {
     return {
       meta: {
         year: options.year,
+        from: start, to: end, days: range.days,
+        country: options.country ? countryName(options.country) : null,
+        excludedReports: scopedRows.filter((row) => inRange(row, start, end) && !eligible(row)).length,
+        legacyReports: encounterRows.filter((row) => !row.estado).length,
         groupBy: options.groupBy,
         type: options.type,
         campusId: options.campusId ?? null,
         canViewAll: options.canViewAll,
         generatedAt: new Date().toISOString(),
       },
-      campuses: visibleCampuses.map((campus: any) => ({
+      countries: [...new Set(authorizedCampuses.map((campus: any) => countryName(campus.country)))].sort((a, b) => a.localeCompare(b, 'es')),
+      campuses: authorizedCampuses.map((campus: any) => ({
         id: Number(campus.id),
         name: campus.name,
+        country: countryName(campus.country),
+        isActive: campus.isActive !== false,
       })),
+      comparison: { from: range.previousStart, to: range.previousEnd, totals: this.withDerived(previous) },
       totals: this.withDerived(totals),
       periods: periods.map((period) => ({
         ...period,
@@ -263,6 +300,7 @@ export class PostgresEstadisticasService {
     return {
       encuentros: row.tipo === 'evento' ? 0 : 1,
       eventos: row.tipo === 'evento' ? 1 : 0,
+      auditorio: row.asistencia?.auditorio ?? 0,
       asistencia: typeof row.totalAsistencia === 'number'
         ? row.totalAsistencia
         : sumCounts(row.asistencia),
