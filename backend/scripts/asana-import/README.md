@@ -1,0 +1,40 @@
+# Histórico de Asana
+
+Importación del proyecto `1185873534171121` hacia `arm_app.encuentros`, dentro del repositorio del ecosistema. El frontend no depende de Asana.
+
+## Preparación
+
+`prepare.py` usa únicamente la biblioteca estándar de Python. Requiere el CSV de **tareas** con campos personalizados, un catálogo JSON de campus verificado con la BD y una lista explícita de campus históricos autorizados. Los archivos privados se generan dentro de `/migration-artifacts/`, excluido de Git.
+
+```powershell
+python -B backend/scripts/asana-import/prepare.py --csv '<archivo.csv>' --catalog migration-artifacts/<lote>/catalog.json --historical migration-artifacts/<lote>/historical.json --as-of 2026-10-25 --output migration-artifacts/<lote>
+```
+
+Incluye solo tareas `Finalizada` + `Registrado`, fecha válida hasta el corte, campus inequívoco y al menos una cifra informada. Retiene para revisión subtareas, fechas discordantes con secciones mensuales, campus desconocidos, cifras inválidas y todos los candidatos con igual campus/fecha/nombre. No corrige fechas ni decide qué duplicado conservar. Las coincidencias por nombre no detectan todos los posibles duplicados; la revisión del origen sigue siendo necesaria.
+
+`Santiago Centro` se corresponde con `Santiago`. Miami (Estados Unidos), Oriente (Chile) y Virtual (sin país) fueron autorizados como campus históricos inactivos. No asignar usuarios del ecosistema a partir del responsable de Asana.
+
+Los campos vacíos permanecen ausentes; `0` se conserva como cero informado. `2.0` se convierte a 2; fracciones, negativos, separadores ambiguos y texto se retienen para revisión. Asistencia = auditorio + kids + tweens + sala bebé; voluntarios y espectadores online se mantienen separados. Info y Proyecto educativo se conservan como categorías de voluntarios. Los registros importados son `enviado`, no se inventa una validación pastoral.
+
+Cada registro conserva ID del proyecto/tarea, hash del CSV y de la fila, campus/estados/tipo originales y sección. El CSV completo queda en el respaldo local; no se copian correos de responsables ni notas libres a la aplicación. Los nombres originales de encuentros y mensajes se preservan.
+
+## Simulación y aplicación
+
+Desde `backend/`, usando la conexión existente en `.env.supabase` (no imprimir ni versionar sus valores):
+
+```powershell
+node scripts/asana-import/apply.cjs ../migration-artifacts/<lote>/plan.json
+node scripts/asana-import/apply.cjs ../migration-artifacts/<lote>/plan.json --apply --sha256 <hash-del-plan-revisado>
+```
+
+La simulación es de solo lectura. La aplicación valida la huella del plan y la del CSV, catálogo y proyecto de destino. Usa una sola transacción y bloqueos breves en campus/encuentros para evitar escrituras concurrentes durante la conciliación. Crea únicamente los campus históricos que faltan, usa sus secuencias existentes y no altera permisos ni esquema. Inserta IDs deterministas `asana:<proyecto>:<tarea>`; una repetición idéntica no inserta nada, y un registro existente cambiado provoca rechazo, nunca sobrescritura. También rechaza coincidencias de campus/fecha/nombre con registros existentes de otro ID.
+
+Antes de confirmar la transacción se comparan todos los documentos y los totales por campus. Si algo falla se revierte toda la carga. Se guardan `before-<hash>.json`, `applied.json`, `review.json` y `review.md` en el lote local. Para una eventual reversión posterior, revisar esos archivos y retirar solo IDs del lote que aún coincidan exactamente con los datos importados; no borrar registros modificados ni campus referenciados. La reversión requiere autorización específica, no se ejecuta automáticamente.
+
+Pruebas:
+
+```powershell
+python -B -m unittest discover -s backend/scripts/asana-import -p 'test_*.py'
+# Desde backend:
+node --test scripts/asana-import/apply.test.cjs
+```

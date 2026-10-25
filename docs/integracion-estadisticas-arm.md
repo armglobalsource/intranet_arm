@@ -98,9 +98,9 @@ Cada registro importado debe guardar procedencia e ID original. Repetir una impo
 - Campus inactivos siguen presentes en su historia; no se fusionan campus homónimos.
 - Las pantallas usan la sesión actual, son utilizables en móvil y muestran errores de carga.
 
-## Pendiente de comprobar
+## Fuente del histórico
 
-El usuario identificó Asana como fuente oficial del histórico: https://app.asana.com/1/1185344329257213/project/1185873534171121/list/1204748178826867. El proyecto Supabase anterior fue eliminado; las tablas del repositorio sirven como referencia estructural. Falta verificar volumen, campos y correspondencias del histórico. La primera consulta al conector Asana devolvió `Not Authorized`; se solicitó reautorizar la conexión antes de leer los registros.
+El usuario identificó Asana como fuente oficial del histórico: https://app.asana.com/1/1185344329257213/project/1185873534171121/list/1204748178826867. El proyecto Supabase anterior fue eliminado; las tablas del repositorio sirven como referencia estructural. Ante fallos del conector, el usuario aportó el CSV de tareas con campos personalizados el 25 de octubre de 2026. La carga y los casos pendientes se detallan a continuación.
 
 ## Primera entrega integrada
 
@@ -117,7 +117,24 @@ Implementada en el repositorio del ecosistema, con API NestJS y sesión existent
 
 Validación: 71 pruebas de backend, 47 de frontend y 7 de navegador; compilación TypeScript del backend aprobada. Las pruebas funcionales usan datos controlados, sin insertar datos de ejemplo en producción.
 
-Una consulta de solo lectura al proyecto `kqqufmijfvrgzrfrqsby` confirmó que `arm_app.encuentros` contiene **0 registros** durante esta revisión. Por tanto, los estados vacíos son esperados hasta cargar encuentros o importar el histórico de Asana. No se han importado registros históricos en esta entrega.
+Antes de cargar el histórico, una consulta de solo lectura al proyecto `kqqufmijfvrgzrfrqsby` confirmó que `arm_app.encuentros` estaba vacía.
+
+## Importación histórica — 25 de octubre de 2026
+
+- CSV recibido: 4.613 tareas, sin IDs de Asana repetidos.
+- Insertados y conciliados: **4.374 reportes**, correspondientes a 2020–2026.
+- Retenidos para revisión: **239 tareas**, conservadas en el CSV y el informe local; no forman parte de los totales publicados.
+- Campus históricos autorizados: Miami (Estados Unidos), Oriente (Chile), Virtual (sin país). Creados inactivos, sin usuarios ni permisos adicionales.
+- Se conservaron ID de tarea, huellas del origen, estados y etiquetas; no se inventaron autores, fechas ni cifras ausentes.
+- Solo se cargaron Finalizada + Registrado como `enviado`. La asistencia excluye voluntarios y espectadores online, que mantienen sus propios indicadores.
+- Aplicación en una transacción, sin reemplazos ni borrados, con comparación completa de documentos y totales por campus antes de confirmar.
+- Simulación posterior: 4.374 existentes, **0 nuevas inserciones**.
+- Verificación con el servicio real de estadísticas y Supabase: conteos y totales coinciden por cada año; alcance de campus verificado. Semana 12–18 de octubre de 2026: 17 reportes y 1.982 asistencias.
+- 15 pruebas específicas del importador aprobadas.
+
+Motivos de revisión superpuestos: 142 tareas no finalizadas/registradas, 75 posibles duplicados, 69 fechas discordantes con sección, 41 sin cifras informadas, 15 sin campus resuelto, 13 sin fecha válida, una subtarea y un campo numérico inválido. Destacan 67 tareas de Montevideo con fecha repetida 2022-04-05. No corregirlas por suposición.
+
+Código y procedimiento: `backend/scripts/asana-import/`. Respaldo, plan, conciliación y revisión detallada: `migration-artifacts/asana-2026-10-25/`, excluido de Git por contener datos del origen. No se necesita un nuevo despliegue para consultar los registros importados.
 
 ## Archivos de referencia
 
