@@ -24,9 +24,22 @@ OTHER = {'Aceptaron a Jesús Presencial': ('presencial', 'acepto'),
          'Aceptaron a Jesús Online': ('online', 'acepto'),
          'Espectadores a la vez': ('online', 'espectadores')}
 MONTHS = {v: i + 1 for i, v in enumerate('enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre'.split())}
+# El origen cargó el mismo día (2022-04-05) en reportes semanales de Montevideo de varios meses.
+# Con autorización del usuario (25-10-2026) se incorporan por el mes de su sección, sin inventar el día.
+MONTH_ONLY_RULE = {'campus': 'montevideo', 'date': '2022-04-05'}
 
 def normalize(value):
     return ''.join(c for c in unicodedata.normalize('NFD', value.strip().lower()) if not unicodedata.combining(c))
+
+def month_of_section(section):
+    match = re.fullmatch(r'([a-z]+)\s+(20\d\d)', normalize(section))
+    return f'{match[2]}-{MONTHS[match[1]]:02d}' if match and match[1] in MONTHS else None
+
+def month_only_period(row, campus_name, day):
+    """Mes (YYYY-MM) de la sección cuando el reporte pertenece a la carga con fecha errónea de Montevideo."""
+    if campus_name == MONTH_ONLY_RULE['campus'] and day == MONTH_ONLY_RULE['date']:
+        return month_of_section(row.get('Section/Column', ''))
+    return None
 
 def digest(value):
     return hashlib.sha256(value).hexdigest()
@@ -80,7 +93,8 @@ def prepare(raw, catalog, historical, as_of):
     same_event = defaultdict(list)
     for row in rows:
         campus = aliases.get(normalize(row['Campus']), normalize(row['Campus']))
-        if campus and valid_date(row['Due Date'].strip()):
+        # Los reportes de solo mes comparten fecha y nombre por la carga errónea: no son duplicados entre sí.
+        if campus and valid_date(row['Due Date'].strip()) and not month_only_period(row, campus, row['Due Date'].strip()):
             same_event[(campus, row['Due Date'].strip(), normalize(row['Name']))].append(row['Task ID'])
     duplicates = {key: values for key, values in same_event.items() if len(values) > 1}
     accepted, review = [], []
@@ -91,19 +105,21 @@ def prepare(raw, catalog, historical, as_of):
         source_campus = normalize(row['Campus'])
         campus_name = aliases.get(source_campus, source_campus)
         candidates = by_name.get(campus_name, [])
+        period = month_only_period(row, campus_name, day)
         if not re.fullmatch(r'\d+', task_id) or ids[row['Task ID']] != 1:
             reasons.append('invalid_or_repeated_task_id')
         if len(candidates) != 1:
             reasons.append('unknown_or_ambiguous_campus')
         if not valid_date(day):
             reasons.append('missing_or_invalid_date')
-        elif day > as_of:
+        elif day > as_of or (period and period > as_of[:7]):
             reasons.append('future_date')
         if (campus_name, day, normalize(row['Name'])) in duplicates:
             reasons.append('possible_duplicate_event')
         section = normalize(row.get('Section/Column', ''))
         section_match = re.fullmatch(r'([a-z]+)\s+(20\d\d)', section)
-        if valid_date(day) and section_match and section_match[1] in MONTHS:
+        # Con mes de sección autorizado, la fecha discordante ya no retiene el reporte.
+        if not period and valid_date(day) and section_match and section_match[1] in MONTHS:
             if day[:7] != f'{section_match[2]}-{MONTHS[section_match[1]]:02d}':
                 reasons.append('date_differs_from_section')
         if normalize(row['Estado Registro']) != 'registrado' or normalize(row['Estado']) != 'finalizada':
@@ -144,6 +160,14 @@ def prepare(raw, catalog, historical, as_of):
                              'originalType': row.get('Tipo de Encuentro', ''),
                              'section': row.get('Section/Column', ''),
                              'createdDate': row.get('Created At', ''), 'modifiedDate': row.get('Last Modified', '')}}
+        if period:
+            # Solo se conoce el mes: `fecha` es el primer día por compatibilidad con el almacén, pero
+            # `fechaPrecision` impide usarla como día. No entra en semanas ni en comparaciones semanales.
+            record['fecha'] = f'{period}-01'
+            record['fechaPrecision'] = 'mes'
+            record['periodo'] = period
+            record['source']['originalDate'] = day
+            record['source']['dateRule'] = 'month_from_section'
         if kind == 'evento':
             record['eventoNombre'] = row['Name'].strip()
         # Assignees are not necessarily authors: do not invent ecosystem users or copy contact details.
@@ -160,6 +184,7 @@ def prepare(raw, catalog, historical, as_of):
     return {'version': 1, 'sourceSha256': digest(raw), 'projectId': PROJECT_ID, 'asOf': as_of,
             'historicalCampuses': historical, 'catalog': catalog, 'records': accepted,
             'summary': {'sourceRows': len(rows), 'ready': len(accepted), 'review': len(review),
+                        'monthOnly': sum(r['data'].get('fechaPrecision') == 'mes' for r in accepted),
                         'reasons': dict(reasons_count), 'byCampus': dict(totals)},
             'review': review}
 
@@ -192,7 +217,8 @@ def main():
     lines += [f'- {reason}: {n}' for reason, n in sorted(summary['reasons'].items())]
     lines += ['', 'Solo se preparan tareas Finalizadas y Registradas, con fechas y campus conocidos y cifras válidas.',
               'Los vacíos se conservan como faltantes; los ceros explícitos se conservan. Las asistencias excluyen voluntarios y espectadores online.',
-              'No se infiere fecha desde la sección, autor desde el responsable ni horarios ausentes. Los posibles duplicados se retienen para revisión.',
+              f"No se infiere fecha desde la sección, salvo los {summary['monthOnly']} reportes de Montevideo con fecha errónea (autorizados por el usuario): entran por el mes de su sección, con fechaPrecision = mes y sin día.",
+             'No se infiere autor desde el responsable ni horarios ausentes. Los posibles duplicados se retienen para revisión.',
               f"SHA-256 del plan: `{digest(encoded)}`", f"SHA-256 del CSV: `{digest(raw)}`"]
     (out / 'review.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     print(json.dumps({'planSha256': digest(encoded), **summary}, ensure_ascii=False, indent=2))

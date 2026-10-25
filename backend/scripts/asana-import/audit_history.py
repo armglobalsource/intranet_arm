@@ -4,7 +4,7 @@ import json
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-from prepare import read_csv, count, ASSISTANCE, VOLUNTEERS, OTHER, normalize
+from prepare import read_csv, count, ASSISTANCE, VOLUNTEERS, OTHER, MONTH_ONLY_RULE, normalize
 
 def metrics(row):
     result = {'asistencia': 0, 'voluntarios': 0, 'decisionesPresencial': 0, 'decisionesOnline': 0, 'espectadoresOnline': 0}
@@ -64,7 +64,9 @@ def audit(source, plan):
         days = sorted(r['Due Date'] for r in group if r['Due Date'])
         online_by_campus.append({'campus': campus, 'reportsWithViewers': len(group), 'firstDate': days[0] if days else None,
                                 'lastDate': days[-1] if days else None, 'metrics': totals(group)})
-    montevideo = [r for r in held if normalize(r['Campus']) == 'montevideo' and r['Due Date'] == '2022-04-05']
+    # Tareas con la fecha errónea de Montevideo: las liberadas entran por el mes de su sección (sin día).
+    montevideo = [r for r in rows if normalize(r['Campus']) == 'montevideo' and r['Due Date'] == MONTH_ONLY_RULE['date']]
+    montevideo_imported = [r for r in montevideo if r['Task ID'] in imported_ids]
     months = defaultdict(list)
     for row in montevideo:
         months[row['Section/Column']].append(row)
@@ -73,7 +75,8 @@ def audit(source, plan):
             'heldWithPositiveFigures': sum(any(v > 0 for v in metrics(r)[0].values()) for r in held),
             'exclusiveReviewGroups': {key: {'rows': len(group), 'positiveRows': sum(any(v > 0 for v in metrics(r)[0].values()) for r in group),
                                            'reportedMetrics': totals(group), 'taskIds': [r['Task ID'] for r in group]} for key, group in categories.items()},
-            'montevideo': {'rows': len(montevideo), 'reportedMetrics': totals(montevideo),
+            'montevideo': {'rows': len(montevideo), 'importedByMonth': len(montevideo_imported),
+                          'heldRows': len(montevideo) - len(montevideo_imported), 'reportedMetrics': totals(montevideo),
                           'sections': {key: {'rows': len(group), 'reportedMetrics': totals(group)} for key, group in months.items()},
                           'distinctMetricSets': len({json.dumps(metrics(r)[0], sort_keys=True) for r in montevideo})},
             'virtualYears': dict(Counter(r['Due Date'][:4] for r in virtual)),
@@ -102,7 +105,9 @@ def main():
     for key, group in result['exclusiveReviewGroups'].items():
         lines.append(f"| {labels.get(key,key)} | {group['rows']} | {group['positiveRows']} |")
     lines += ['', 'Cada tarea se cuenta una sola vez en esta tabla; puede tener más de un problema.', '',
-              '## Montevideo', '', 'Las tareas fechadas 2022-04-05 están distribuidas en estas secciones del origen. Esto permite revisar el mes, pero no deducir el día.', '',
+              '## Montevideo', '', 'Las tareas fechadas 2022-04-05 están distribuidas en estas secciones del origen. Esto permite conocer el mes, pero no deducir el día.',
+              f"{result['montevideo']['importedByMonth']} entraron por el mes de su sección (fechaPrecision = mes, sin día) y {result['montevideo']['heldRows']} "
+              f"{'sigue retenida' if result['montevideo']['heldRows'] == 1 else 'siguen retenidas'} por otros motivos.", '',
               '| Sección original | Tareas | Asistencias | Voluntarios |', '|---|---:|---:|---:|']
     for section, group in result['montevideo']['sections'].items():
         lines.append(f"| {section} | {group['rows']} | {group['reportedMetrics']['asistencia']} | {group['reportedMetrics']['voluntarios']} |")

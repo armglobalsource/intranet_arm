@@ -32,6 +32,13 @@ function validatePlan(plan, rawSource) {
     check(d.source.provider === 'asana' && d.source.csvSha256 === plan.sourceSha256 && known.has(d.campus), 'BAD_SOURCE');
     check(d.estado === 'enviado' && ['encuentro', 'evento'].includes(d.tipo), 'BAD_STATUS');
     check(/^\d{4}-\d{2}-\d{2}$/.test(d.fecha) && new Date(`${d.fecha}T00:00:00Z`).toISOString().slice(0, 10) === d.fecha && d.fecha <= plan.asOf, 'BAD_DATE');
+    // Reportes de solo mes: la fecha es el primer día del período y nunca se usa como día real.
+    check(d.fechaPrecision === undefined || d.fechaPrecision === 'mes', 'BAD_DATE_PRECISION');
+    if (d.fechaPrecision === 'mes') {
+      check(/^\d{4}-\d{2}$/.test(d.periodo) && d.fecha === `${d.periodo}-01` && d.source.dateRule === 'month_from_section' && /^\d{4}-\d{2}-\d{2}$/.test(d.source.originalDate), 'BAD_MONTH_ONLY');
+    } else {
+      check(d.periodo === undefined && d.source.dateRule === undefined, 'BAD_MONTH_ONLY');
+    }
     for (const group of ['asistencia', 'voluntarios', 'presencial', 'online']) {
       for (const value of Object.values(d[group])) check(Number.isSafeInteger(value) && value >= 0, 'BAD_METRIC');
     }
@@ -53,8 +60,11 @@ async function main() {
   const connection = new URL(process.env.DATABASE_URL);
   check(`${connection.hostname}/${connection.username}`.includes('kqqufmijfvrgzrfrqsby'), 'WRONG_TARGET_PROJECT');
   // Offline reconciliation can read the whole historical batch; keep API timeouts unchanged.
+  // Con un enlace lento a la base (decenas de KB/s) la lectura completa del histórico supera 60 s:
+  // ASANA_IMPORT_TIMEOUT_MS lo amplía. Sin la variable el límite sigue siendo de 60 s.
+  const timeout = Math.max(60000, Number(process.env.ASANA_IMPORT_TIMEOUT_MS) || 0);
   const pool = new Pool({ ...buildPostgresOptions(process.env.DATABASE_URL, process.env.DATABASE_CA_CERT),
-    statement_timeout: 60000, query_timeout: 65000 });
+    statement_timeout: timeout, query_timeout: timeout + 5000 });
   pool.on('error', () => {});
   const client = await pool.connect();
   try {
@@ -89,7 +99,8 @@ async function main() {
     const existing = (await client.query('SELECT document_id,data FROM arm_app.encuentros')).rows;
     const index = new Map(existing.map(r => [r.document_id, r.data]));
     const eventKey = d => [normalize(d.campus), String(d.fecha).slice(0,10), normalize(d.encuentro)].join('|');
-    const existingKeys = new Map(existing.map(r => [eventKey(r.data), r.document_id]));
+    // Los reportes de solo mes comparten primer día y nombre: se identifican por su tarea, no por campus/fecha/nombre.
+    const existingKeys = new Map(existing.filter(r => r.data.fechaPrecision !== 'mes').map(r => [eventKey(r.data), r.document_id]));
     const toInsert = [], target = [];
     for (const row of plan.records) {
       const matches = catalog.filter(c => c.name === row.data.campus);
@@ -99,7 +110,7 @@ async function main() {
       if (index.has(row.document_id)) {
         assert.deepStrictEqual(index.get(row.document_id), mapped.data, 'EXISTING_RECORD_CHANGED');
       } else {
-        check(!existingKeys.has(eventKey(mapped.data)), 'POSSIBLE_EXISTING_DUPLICATE');
+        check(mapped.data.fechaPrecision === 'mes' || !existingKeys.has(eventKey(mapped.data)), 'POSSIBLE_EXISTING_DUPLICATE');
         toInsert.push(mapped);
       }
     }

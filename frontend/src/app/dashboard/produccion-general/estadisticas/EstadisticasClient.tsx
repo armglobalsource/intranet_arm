@@ -44,6 +44,7 @@ interface StatsResponse {
     year: number;
     from: string; to: string; days: number; country: string | null;
     excludedReports: number; legacyReports: number;
+    monthOnly: { reports: number; metrics: Metrics };
     groupBy: GroupBy;
     type: RecordType;
     campusId: number | null;
@@ -72,8 +73,20 @@ interface StatsResponse {
   }[];
   attendanceBreakdown: Breakdown[];
   volunteerBreakdown: Breakdown[];
+  virtual: VirtualAttribution | null;
   quality: Quality;
   records: StatsRecord[];
+}
+
+/** Audiencia online transmitida por otros campus y atribuida al campus Virtual (no se suma al total global). */
+interface VirtualAttribution {
+  campusId: number;
+  campusName: string;
+  reports: number;
+  espectadoresOnline: number;
+  manitosOnline: number;
+  emitters: { campusId: number; campusName: string; reports: number; espectadoresOnline: number; manitosOnline: number }[];
+  criterion: string;
 }
 
 interface Breakdown {
@@ -85,6 +98,9 @@ interface Breakdown {
 interface StatsRecord {
   id: string;
   fecha: string;
+  /** 'mes': histórico del que solo se conoce el mes; `fecha` es el primer día y no un día real. */
+  fechaPrecision: 'dia' | 'mes';
+  periodo: string | null;
   campusId: number;
   campusName: string;
   tipo: 'encuentro' | 'evento';
@@ -403,6 +419,9 @@ export function EstadisticasClient() {
           <span>{data.meta.legacyReports} registros históricos incluidos</span>
           {data.meta.excludedReports > 0 && <span className="text-amber-800">{data.meta.excludedReports} reportes pendientes o no aprobados excluidos</span>}
         </div>
+        {(data.meta.monthOnly?.reports ?? 0) > 0 && <p role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          Incluye {number(data.meta.monthOnly.reports)} reportes históricos de los que solo se conoce el mes ({number(data.meta.monthOnly.metrics.asistencia)} asistencias). Suman en los totales, por campus y por mes; no aparecen en las semanas. Solo se incluyen cuando el rango cubre el mes completo.
+        </p>}
         {totalMeetings === 0 && <p role="status" className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">No hay encuentros incluidos en este período. Prueba otras fechas o revisa los filtros.</p>}
         {tab === 'summary' && <section aria-label="Resumen de estadísticas" className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -437,6 +456,12 @@ export function EstadisticasClient() {
         </section>}
         {tab === 'campuses' && <section aria-label="Resultados por campus" className="space-y-5">
           <div><h2 className="text-lg font-bold text-slate-900">Cada campus, una historia</h2><p className="mt-1 text-sm text-slate-600">Totales del período y promedio por encuentro o evento registrado.</p></div>
+          {data.virtual && <section aria-label="Audiencia del campus Virtual" className="rounded-2xl border border-cyan-200 bg-cyan-50/60 p-5">
+            <h3 className="flex items-center gap-2 font-bold text-slate-900"><Wifi size={17} className="text-cyan-700" aria-hidden="true" />{data.virtual.campusName}: audiencia transmitida desde otros campus</h3>
+            <p className="mt-1 text-sm text-slate-600">{number(data.virtual.reports)} transmisiones online · {number(data.virtual.espectadoresOnline)} espectadores · {number(data.virtual.manitosOnline)} decisiones online.</p>
+            {data.virtual.emitters.length > 0 && <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{data.virtual.emitters.map((e) => <li key={e.campusId} className="rounded-xl bg-white p-3 text-sm"><span className="font-semibold text-slate-800">{e.campusName}</span><span className="block text-xs text-slate-500">{number(e.reports)} transmisiones · {number(e.espectadoresOnline)} espectadores · {number(e.manitosOnline)} decisiones</span></li>)}</ul>}
+            <p className="mt-3 text-xs text-slate-600">{data.virtual.criterion} Estas cifras se muestran aparte: no se suman otra vez al total del período ni a la tarjeta del campus emisor.</p>
+          </section>}
           {Array.from(new Set(data.byCampus.map((c) => c.country))).sort((a, b) => a.localeCompare(b, 'es')).map((name) => <section key={name} className="space-y-3">
             <h3 className="flex items-center gap-2 font-semibold text-slate-800"><Globe2 size={17} className="text-violet-600" />{name}</h3>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.byCampus.filter((c) => c.country === name).map((c) => <article key={c.campusId} className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -486,7 +511,9 @@ export function EstadisticasClient() {
                     </tr>
                   ) : visibleRecords.map((record) => (
                     <tr key={record.id} className="hover:bg-gray-50/70">
-                      <td className="whitespace-nowrap px-5 py-3.5 font-medium text-gray-700">{formatDate(record.fecha)}</td>
+                      <td className="whitespace-nowrap px-5 py-3.5 font-medium text-gray-700">{record.fechaPrecision === 'mes'
+                        ? <>{MONTHS[Number((record.periodo ?? record.fecha).slice(5, 7)) - 1]} {(record.periodo ?? record.fecha).slice(0, 4)} <span className="ml-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800" title="El origen no registró el día de este reporte">solo mes</span></>
+                        : formatDate(record.fecha)}</td>
                       <td className="px-4 py-3.5 font-semibold text-gray-900">{record.campusName}</td>
                       <td className="px-4 py-3.5">
                         <span className={`mr-2 rounded-full px-2 py-0.5 text-[10px] font-semibold ${

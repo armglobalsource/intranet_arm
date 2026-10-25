@@ -95,6 +95,24 @@ function addDays(date: Date, days: number) {
   return next;
 }
 
+// Reportes históricos de los que solo se conoce el mes (`fechaPrecision: 'mes'`): `fecha` es el primer día
+// del mes por compatibilidad con el almacén, pero no es un día real. Cuentan en el mes completo, nunca en una semana.
+const isMonthOnly = (row: any) => row?.fechaPrecision === 'mes';
+
+function monthEnd(key: string) {
+  const [year, month] = key.split('-').map(Number);
+  return isoKey(new Date(Date.UTC(year, month, 0, 12)));
+}
+
+// Transmisiones que el propio reporte identifica como Online o Virtual (modalidad o nombre del encuentro).
+// Se atribuyen al campus Virtual sin quitarlas de su campus emisor ni duplicarlas en el total global.
+const ONLINE_BROADCAST = /\b(online|virtual)\b/;
+function isOnlineBroadcast(row: any) {
+  return ONLINE_BROADCAST.test(normalized(`${row?.modalidad ?? ''} ${row?.encuentro ?? ''}`));
+}
+
+const countOf = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0);
+
 function startOfWeek(key: string) {
   const date = utcDate(key);
   const mondayOffset = (date.getUTCDay() + 6) % 7;
@@ -155,12 +173,21 @@ export class PostgresEstadisticasService {
       this.catalogs.findAll('voluntarios'),
     ]);
 
-    const resolveCampus = (row: any) => {
+    // Campus del reporte según el catálogo completo (sin filtrar por permisos); la visibilidad se aplica aparte.
+    const campusOf = (row: any) => {
       const matches = campusByName.get(normalized(row.campus)) ?? [];
-      const campus = row.campusId != null && row.campusId !== '' ? campusById.get(Number(row.campusId)) : matches.length === 1 ? matches[0] : undefined;
+      return row.campusId != null && row.campusId !== '' ? campusById.get(Number(row.campusId)) : matches.length === 1 ? matches[0] : undefined;
+    };
+    const resolveCampus = (row: any) => {
+      const campus = campusOf(row);
       return campus && visibleIds.has(Number(campus.id)) ? campus : undefined;
     };
-    const inRange = (row: any, from: string, to: string) => { const key = dateKey(row.fecha); return !!key && key >= from && key <= to; };
+    // Un reporte de solo mes entra únicamente si el rango cubre el mes completo.
+    const inRange = (row: any, from: string, to: string) => {
+      const key = dateKey(row.fecha);
+      if (!key || key < from) return false;
+      return isMonthOnly(row) ? to >= monthEnd(key) : key <= to;
+    };
     const scopedRows = encuentrosSnap
       .filter((row) => resolveCampus(row))
       .filter((row) => options.type === 'all' || row.tipo === options.type);
@@ -192,6 +219,9 @@ export class PostgresEstadisticasService {
     const attendanceBreakdown: Record<string, number> = {};
     const volunteerBreakdown: Record<string, number> = {};
     const records: any[] = [];
+    // Reportes de solo mes incluidos: suman en totales y campus, y en períodos solo si se agrupa por mes.
+    const monthOnlyMetrics = emptyMetrics();
+    let monthOnlyReports = 0;
 
     for (const row of encounterRows) {
       const campus = resolveCampus(row);
@@ -199,12 +229,14 @@ export class PostgresEstadisticasService {
       if (!campus || !key) continue;
 
       const metrics = this.encounterMetrics(row);
+      const monthOnly = isMonthOnly(row);
       const periodKey = this.periodKey(key, options.groupBy);
-      const period = periodMap.get(periodKey);
+      const period = monthOnly && options.groupBy === 'week' ? undefined : periodMap.get(periodKey);
       const campusSummary = campusMap.get(Number(campus.id));
       mergeMetrics(totals, metrics);
       if (period) mergeMetrics(period.metrics, metrics);
       if (campusSummary) mergeMetrics(campusSummary.metrics, metrics);
+      if (monthOnly) { mergeMetrics(monthOnlyMetrics, metrics); monthOnlyReports++; }
       addBreakdown(attendanceBreakdown, row.asistencia);
       addBreakdown(volunteerBreakdown, row.voluntarios);
 
@@ -216,6 +248,8 @@ export class PostgresEstadisticasService {
       records.push({
         id: row.id,
         fecha: key,
+        fechaPrecision: monthOnly ? 'mes' : 'dia',
+        periodo: monthOnly ? String(row.periodo ?? key.slice(0, 7)) : null,
         campusId: Number(campus.id),
         campusName: campus.name,
         country: countryName(campus.country),
@@ -259,10 +293,22 @@ export class PostgresEstadisticasService {
       a.campusName.localeCompare(b.campusName, 'es'),
     );
 
+    // Campus Virtual: solo se calcula si el usuario ya puede ver ese campus; son totales, no registros de otros campus.
+    const virtualMatches = campusByName.get('virtual') ?? [];
+    const virtualCampus = virtualMatches.length === 1 ? virtualMatches[0] : undefined;
+    const virtual = virtualCampus && visibleIds.has(Number(virtualCampus.id))
+      ? this.virtualAttribution(
+        encuentrosSnap.filter(eligible).filter((row) => options.type === 'all' || row.tipo === options.type).filter((row) => inRange(row, start, end)),
+        campusOf,
+        virtualCampus,
+      )
+      : null;
+
     return {
       meta: {
         year: options.year,
         from: start, to: end, days: range.days,
+        monthOnly: { reports: monthOnlyReports, metrics: this.withDerived(monthOnlyMetrics) },
         country: options.country ? countryName(options.country) : null,
         excludedReports: scopedRows.filter((row) => inRange(row, start, end) && !eligible(row)).length,
         legacyReports: encounterRows.filter((row) => !row.estado).length,
@@ -291,8 +337,39 @@ export class PostgresEstadisticasService {
       })),
       attendanceBreakdown: this.labelBreakdown(attendanceBreakdown, asistenciaCatalog),
       volunteerBreakdown: this.labelBreakdown(volunteerBreakdown, voluntariosCatalog),
+      virtual,
       quality,
       records,
+    };
+  }
+
+  /**
+   * Audiencia online que otros campus transmiten como Online/Virtual, atribuida al campus Virtual.
+   * Es una vista paralela: no se suma a `totals` ni a `byCampus`, así el total global cuenta cada cifra una sola vez.
+   */
+  private virtualAttribution(rows: any[], campusOf: (row: any) => any, virtualCampus: any) {
+    const emitters = new Map<number, { campusId: number; campusName: string; reports: number; espectadoresOnline: number; manitosOnline: number }>();
+    for (const row of rows) {
+      const emitter = campusOf(row);
+      if (!emitter || Number(emitter.id) === Number(virtualCampus.id) || !isOnlineBroadcast(row)) continue;
+      const viewers = countOf(row.online?.espectadores);
+      const decisions = countOf(row.online?.acepto);
+      if (!viewers && !decisions) continue;
+      const entry = emitters.get(Number(emitter.id)) ?? { campusId: Number(emitter.id), campusName: emitter.name, reports: 0, espectadoresOnline: 0, manitosOnline: 0 };
+      entry.reports += 1;
+      entry.espectadoresOnline += viewers;
+      entry.manitosOnline += decisions;
+      emitters.set(Number(emitter.id), entry);
+    }
+    const byEmitter = [...emitters.values()].sort((a, b) => b.espectadoresOnline - a.espectadoresOnline || a.campusName.localeCompare(b.campusName, 'es'));
+    return {
+      campusId: Number(virtualCampus.id),
+      campusName: virtualCampus.name,
+      reports: byEmitter.reduce((sum, e) => sum + e.reports, 0),
+      espectadoresOnline: byEmitter.reduce((sum, e) => sum + e.espectadoresOnline, 0),
+      manitosOnline: byEmitter.reduce((sum, e) => sum + e.manitosOnline, 0),
+      emitters: byEmitter,
+      criterion: 'Transmisiones cuyo reporte dice Online o Virtual. Se mantiene el campus emisor y el total global no las cuenta dos veces.',
     };
   }
 

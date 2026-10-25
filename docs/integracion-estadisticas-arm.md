@@ -144,6 +144,12 @@ La auditoría de todo el CSV detectó que Virtual tiene registros solo en 2020�
 
 Las 67 tareas de Montevideo con fecha 2022-04-05 contienen 60 combinaciones distintas de cifras y están clasificadas en secciones de julio de 2021 a marzo de 2022. Suman 767 asistencias y 446 voluntarios. Se consultó si conservar precisión mensual, sin inventar un día.
 
+### Criterios definidos por el usuario (25-oct-2026) y su implementación
+
+- **Montevideo, reportes con fecha errónea (5-abr-2022):** se incorporan por el mes de su sección (julio 2021 – marzo 2022), sin inventar el día. 66 de las 67 tareas son finalizadas y registradas (767 asistencias, 446 voluntarios, 12 decisiones); la restante no tiene estado final ni cifras y sigue retenida. Llevan `fechaPrecision: 'mes'`. Cuentan en el mes completo, en totales y por campus; no aparecen en semanas ni en rangos que no cubran el mes entero, y la pantalla los marca como «solo mes».
+- **Campus Virtual:** solo se atribuyen las transmisiones cuyo reporte dice Online o Virtual (804 de las 849 de Santiago y Puente Alto con espectadores desde julio de 2021 dicen `Presencial+Online`). Se conserva el campus emisor y el total global no las cuenta dos veces. Se calcula al leer, como vista aparte visible solo para quien ya puede ver el campus Virtual.
+- Estado: código y pruebas listos; lote `migration-artifacts/asana-2026-10-25-mes/` preparado (4.440 listos = 4.374 existentes + 66; 173 retenidos). La simulación contra Supabase confirmó 4.374 existentes idénticos y 66 inserciones nuevas. **La aplicación está pendiente de autorización.**
+
 De las 239 tareas retenidas, 192 contienen cifras positivas. Además existen seis resúmenes anuales de decisiones de fe de 2014–2019 (2.342 decisiones), sin campus ni fecha de encuentro. Requieren tratamiento como agregados históricos, no como encuentros ficticios. Los totales actuales siguen siendo parciales hasta resolver estas categorías. Detalle local: `historical-audit.json`.
 
 ## Archivos de referencia

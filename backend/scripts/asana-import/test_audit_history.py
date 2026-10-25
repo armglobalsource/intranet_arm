@@ -24,6 +24,14 @@ class AuditTest(unittest.TestCase):
         self.assertEqual(result['sameDateTimeOnlineCandidates'][0]['virtualViewers'], 100)
         self.assertEqual(result['sameDateTimeOnlineCandidates'][0]['hostViewers'], 120)
 
+    def test_montevideo_split_between_month_only_imported_and_held(self):
+        catalog = CATALOG + [{'id': 2, 'name': 'Montevideo', 'country': 'Uruguay'}]
+        base = {'Campus': 'Montevideo', 'Due Date': '2022-04-05', 'Section/Column': 'Marzo 2022'}
+        raw = fixture({**base}, {**base, 'Estado': 'Sin Iniciar', 'Estado Registro': 'Pendiente', 'Asistencia Auditorio': '', 'V.Conexión': ''})
+        result = audit(raw, prepare(raw, catalog, [], '2026-10-25'))
+        self.assertEqual((result['montevideo']['rows'], result['montevideo']['importedByMonth'], result['montevideo']['heldRows']), (2, 1, 1))
+        self.assertEqual(result['montevideo']['sections']['Marzo 2022']['rows'], 2)
+
     def test_malformed_value_does_not_erase_other_figures(self):
         raw = fixture({'V.Sensorial':'no'})
         result = audit(raw, prepare(raw, CATALOG, [], '2026-10-25'))

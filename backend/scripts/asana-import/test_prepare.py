@@ -69,6 +69,43 @@ class PrepareTest(unittest.TestCase):
                 self.assertFalse(plan['records'])
                 self.assertIn(reason, plan['review'][0]['reasons'])
 
+    def test_montevideo_month_only_reports_are_released_without_inventing_the_day(self):
+        catalog = CATALOG + [{'id': 2, 'name': 'Montevideo', 'country': 'Uruguay'}]
+        base = {'Campus': 'Montevideo', 'Due Date': '2022-04-05', 'Name': 'Encuentro Jueves 20:00 hrs'}
+        plan = prepare(fixture({**base, 'Section/Column': 'Septiembre 2021', 'Asistencia Auditorio': '30'},
+                               {**base, 'Section/Column': 'Septiembre 2021', 'Asistencia Auditorio': '41'},
+                               {**base, 'Section/Column': 'Octubre 2021'}), catalog, [], '2026-10-25')
+        self.assertEqual(len(plan['records']), 3)
+        self.assertEqual(plan['summary']['monthOnly'], 3)
+        first = plan['records'][0]['data']
+        self.assertEqual((first['fecha'], first['fechaPrecision'], first['periodo']), ('2021-09-01', 'mes', '2021-09'))
+        self.assertEqual(first['source']['originalDate'], '2022-04-05')
+        self.assertEqual(first['source']['dateRule'], 'month_from_section')
+        self.assertEqual(plan['records'][2]['data']['periodo'], '2021-10')
+
+    def test_month_only_rule_does_not_leak_to_other_campuses_dates_or_sections(self):
+        catalog = CATALOG + [{'id': 2, 'name': 'Montevideo', 'country': 'Uruguay'}]
+        cases = [({'Campus': 'Santiago', 'Due Date': '2022-04-05', 'Section/Column': 'Septiembre 2021'}, 'date_differs_from_section'),
+                 ({'Campus': 'Montevideo', 'Due Date': '2022-04-06', 'Section/Column': 'Septiembre 2021'}, 'date_differs_from_section'),
+                 ({'Campus': 'Montevideo', 'Due Date': '2022-04-05', 'Section/Column': 'Sin mes'}, 'date_differs_from_section')]
+        for values, reason in cases:
+            with self.subTest(values=values):
+                plan = prepare(fixture(values), catalog, [], '2026-10-25')
+                self.assertEqual(plan['summary']['monthOnly'], 0)
+                self.assertFalse(plan['records'] and plan['records'][0]['data'].get('fechaPrecision'))
+        # El mes de la sección no puede quedar en el futuro respecto del corte.
+        plan = prepare(fixture({'Campus': 'Montevideo', 'Due Date': '2022-04-05', 'Section/Column': 'Diciembre 2026'}), catalog, [], '2026-10-25')
+        self.assertEqual(plan['records'], [])
+        self.assertIn('future_date', plan['review'][0]['reasons'])
+
+    def test_month_only_report_still_held_when_pending_or_empty(self):
+        catalog = CATALOG + [{'id': 2, 'name': 'Montevideo', 'country': 'Uruguay'}]
+        plan = prepare(fixture({'Campus': 'Montevideo', 'Due Date': '2022-04-05', 'Section/Column': 'Marzo 2022',
+                                'Estado': 'Sin Iniciar', 'Estado Registro': 'Pendiente', 'Asistencia Auditorio': '', 'V.Conexión': ''}), catalog, [], '2026-10-25')
+        self.assertEqual(plan['records'], [])
+        self.assertIn('not_final_registered', plan['review'][0]['reasons'])
+        self.assertIn('no_reported_metrics', plan['review'][0]['reasons'])
+
     def test_registered_but_empty_held(self):
         plan = prepare(fixture({'Asistencia Auditorio': '', 'V.Conexión': ''}), CATALOG, [], '2026-10-25')
         self.assertIn('no_reported_metrics', plan['review'][0]['reasons'])

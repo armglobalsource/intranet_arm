@@ -36,6 +36,21 @@ test('rejects invalid and future dates', () => {
     assert.throws(() => validatePlan(plan, raw), /BAD_DATE/);
   }
 });
+test('accepts month-only reports and rejects inconsistent precision', () => {
+  const monthOnly = plan => Object.assign(plan.records[0].data, { fecha: '2021-09-01', fechaPrecision: 'mes', periodo: '2021-09' }) &&
+    Object.assign(plan.records[0].data.source, { dateRule: 'month_from_section', originalDate: '2022-04-05' });
+  let plan = fixture(); monthOnly(plan); validatePlan(plan, raw);
+  plan = fixture(); monthOnly(plan); plan.records[0].data.periodo = '2021-10';
+  assert.throws(() => validatePlan(plan, raw), /BAD_MONTH_ONLY/);
+  plan = fixture(); monthOnly(plan); plan.records[0].data.fecha = '2021-09-15';
+  assert.throws(() => validatePlan(plan, raw), /BAD_MONTH_ONLY/);
+  plan = fixture(); monthOnly(plan); delete plan.records[0].data.source.dateRule;
+  assert.throws(() => validatePlan(plan, raw), /BAD_MONTH_ONLY/);
+  plan = fixture(); plan.records[0].data.fechaPrecision = 'semana';
+  assert.throws(() => validatePlan(plan, raw), /BAD_DATE_PRECISION/);
+  plan = fixture(); plan.records[0].data.periodo = '2026-10';
+  assert.throws(() => validatePlan(plan, raw), /BAD_MONTH_ONLY/);
+});
 test('rejects wrong status or campus', () => {
   let plan = fixture(); plan.records[0].data.estado = 'pendiente';
   assert.throws(() => validatePlan(plan, raw), /BAD_STATUS/);
