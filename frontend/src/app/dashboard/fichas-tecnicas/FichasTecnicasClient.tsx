@@ -175,8 +175,8 @@ function FichaCard({ ficha, canDelete, canArchive, canPublish, onClone }: { fich
 
   return (
     <div
-      className="rounded-2xl p-4 flex flex-col gap-3 transition-all duration-200 hover:shadow-md"
-      style={{ background: '#FFFFFF', border: '1px solid #F1F5F9' }}
+      className="rounded-xl p-4 flex flex-col gap-3 border border-slate-200 bg-white transition-shadow duration-200 hover:shadow-md"
+      style={{ background: '#FFFFFF' }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -564,7 +564,7 @@ export function FichasTecnicasClient() {
   if (!allowed) return null;
   return (
     <div className="space-y-6 min-w-0">
-      <header className="flex flex-wrap items-start justify-between gap-4">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-violet-600 mb-2">Producción global</p>
           <h1 className="text-2xl font-bold text-slate-900">Fichas Técnicas</h1>
@@ -591,7 +591,7 @@ export function FichasTecnicasClient() {
         </div>
       ) : (
         <>
-          <section aria-label="Filtrar por país" className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+          <section aria-label="Filtrar por país" className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
             <div className="flex flex-wrap justify-between gap-2 mb-4">
               <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Globe2 size={17} className="text-violet-600" aria-hidden="true" /> Países</h2>
               <span className="text-xs text-slate-500">Selecciona dónde quieres trabajar</span>
@@ -613,7 +613,7 @@ export function FichasTecnicasClient() {
             </div>
           </section>
 
-          <section aria-label="Buscar y filtrar fichas" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+          <section aria-label="Buscar y filtrar fichas" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
             <div className="flex flex-col gap-3 lg:flex-row">
               <label className="relative flex-1 min-w-0">
                 <span className="sr-only">Buscar ficha, campus o país</span>
@@ -663,7 +663,7 @@ export function FichasTecnicasClient() {
           </div>
 
           {grouped.length === 0 ? (
-            <div className="card p-8 sm:p-12 text-center">
+            <div className="rounded-xl border border-slate-200 bg-white p-8 sm:p-12 text-center shadow-sm">
               <Search size={30} className="mx-auto mb-3 text-slate-300" aria-hidden="true" />
               <h2 className="text-sm font-semibold text-slate-700">{hasFilters ? 'No encontramos fichas con estos filtros' : 'Todavía no hay fichas activas'}</h2>
               <p className="mt-2 mb-4 text-xs text-slate-500">{hasFilters ? 'Prueba con otro país, campus o estado.' : 'Crea una ficha técnica para organizar el próximo encuentro.'}</p>
