@@ -40,7 +40,7 @@ function HubRow({ href, icon, title, description, accentColor, count, countLabel
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3.5 px-5 py-3.5 hover:bg-slate-50/80 transition-colors"
+      className="group flex items-center gap-3.5 px-5 py-4 hover:bg-slate-50/80 transition-colors focus-visible:outline-none focus-visible:bg-slate-50"
     >
       {/* Colored icon */}
       <div
@@ -95,16 +95,15 @@ export function DirectorioClient() {
   const { can } = usePermissions();
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-3xl mx-auto">
       {/* Header */}
-      <div className="bg-white border border-slate-100 rounded-2xl px-8 pt-8 pb-7 flex flex-col items-center gap-2 mb-6 shadow-sm">
-        <h1 className="inline-block bg-slate-900 text-white text-[13px] font-black uppercase tracking-widest px-5 py-2 rounded-full">
-          Configuración
-        </h1>
-        <p className="text-[12.5px] text-slate-400 text-center max-w-xs mt-0.5">
-          Panel de administración central de personas, estructura y acceso del sistema.
+      <div className="border-b border-slate-200 pb-5 mb-6">
+        <p className="text-xs font-semibold uppercase tracking-widest text-violet-600 mb-2">Administración</p>
+        <h1 className="text-2xl font-bold text-slate-900">Configuración</h1>
+        <p className="text-sm text-slate-500 max-w-xl mt-1">
+          Gestiona personas, estructura organizativa y acceso al sistema desde un solo lugar.
         </p>
-        <div className="flex gap-2 flex-wrap justify-center mt-2">
+        <div className="flex gap-2 flex-wrap mt-4">
           {can('users:view')   && <StatPill count={persons?.length}  label="personas" loading={loadingPersons} />}
           {can('cargos:view')  && <StatPill count={cargos?.length}   label="cargos"   loading={loadingCargos} />}
           {can('areas:view')   && <StatPill count={areas?.length}    label="áreas"    loading={loadingAreas} />}
@@ -115,12 +114,13 @@ export function DirectorioClient() {
       </div>
 
       {/* Section label */}
-      <p className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-wider mb-2 px-0.5">
-        Secciones
-      </p>
+      <div className="flex items-center justify-between mb-2 px-0.5">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Secciones</p>
+        <span className="text-xs text-slate-400">Accesos disponibles según tu rol</span>
+      </div>
 
       {/* Compact list */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden divide-y divide-slate-100">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden divide-y divide-slate-100">
         {can('users:view') && (
           <HubRow
             href="/dashboard/directorio/personas"
