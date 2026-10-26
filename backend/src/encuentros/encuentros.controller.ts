@@ -8,8 +8,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PostgresCampusService } from '../campus/postgres-campus.service';
 import { resolveCampusScope, applyLimit } from '../common/campus-scope';
 import { PostgresEncuentrosService } from './postgres-encuentros.service';
-import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
-import { allCampus, assertRecordCampus } from './encuentros.scope';
+import { CreateEncuentroDto, ObservarEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
+import { allCampus } from './encuentros.scope';
 
 @UseGuards(JwtAuthGuard)
 @Controller('encuentros')
@@ -63,6 +63,22 @@ export class EncuentrosController {
     return this.encuentros.pendientes(user, dias);
   }
 
+  /** Reportes por revisar de los campus que el usuario administra (permiso o lista del campus). */
+  @Get('revision')
+  revision(@CurrentUser() user: any) {
+    return this.encuentros.revision(user);
+  }
+
+  @Patch(':id/subir')
+  subir(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.encuentros.subir(id, user);
+  }
+
+  @Patch(':id/observar')
+  observar(@Param('id') id: string, @Body() dto: ObservarEncuentroDto, @CurrentUser() user: any) {
+    return this.encuentros.observar(id, dto.observacion, user);
+  }
+
   @Get('mine')
   @UseGuards(PermissionsGuard)
   @RequirePermission('encuentros:create')
@@ -70,13 +86,10 @@ export class EncuentrosController {
     return this.encuentros.findMine(user.sub);
   }
 
+  // Lo ve quien tiene «Ver encuentros» en su campus o quien revisa los reportes de ese campus.
   @Get(':id')
-  @UseGuards(PermissionsGuard)
-  @RequirePermission('encuentros:view')
-  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
-    const record = await this.encuentros.findOne(id);
-    assertRecordCampus(record, user);
-    return record;
+  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.encuentros.findOneFor(id, user);
   }
 
   @Post()
@@ -86,19 +99,14 @@ export class EncuentrosController {
     return this.encuentros.create(dto, user);
   }
 
+  // Quién edita o elimina depende del estado del reporte y de quién lo envió: lo decide el servicio.
   @Patch(':id')
-  @UseGuards(PermissionsGuard)
-  @RequirePermission('encuentros:edit')
   async update(@Param('id') id: string, @Body() dto: UpdateEncuentroDto, @CurrentUser() user: any) {
-    assertRecordCampus(await this.encuentros.findOne(id), user);
-    return this.encuentros.update(id, dto, { sub: user.sub, email: user.email });
+    return this.encuentros.update(id, dto, user);
   }
 
   @Delete(':id')
-  @UseGuards(PermissionsGuard)
-  @RequirePermission('encuentros:delete')
   async remove(@Param('id') id: string, @CurrentUser() user: any) {
-    assertRecordCampus(await this.encuentros.findOne(id), user);
-    return this.encuentros.remove(id);
+    return this.encuentros.remove(id, user);
   }
 }

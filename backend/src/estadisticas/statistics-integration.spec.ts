@@ -26,6 +26,17 @@ describe('integrated statistics', () => {
     expect((await api.dashboard(options)).totals).toEqual(result.totals);
     expect(list).toHaveBeenCalledWith('encuentros', { start: '2025-12-25', end: '2026-01-07T23:59:59.999Z' });
   });
+  it('counts uploaded reports and Asana history, but not reports waiting for the campus administrator', async () => {
+    const { api } = service([
+      row('asana:1185873534171121:1', '2026-01-01', 1, 30, 'enviado'),
+      row('nuevo-subido', '2026-01-02', 1, 20, 'subido'),
+      row('por-revisar', '2026-01-03', 1, 500, 'enviado'),
+      row('observado', '2026-01-04', 1, 700, 'observado'),
+    ]);
+    const result = await api.dashboard(options);
+    expect(result.totals.asistencia).toBe(50);
+    expect(result.meta.excludedReports).toBe(2);
+  });
   it('retains inactive campuses, filters by country and preserves all authorized filter options', async () => {
     const { api } = service([row('cl', '2026-01-01', 1, 40), row('uy', '2026-01-01', 2, 90), row('old', '2026-01-01', 3, 20)]);
     const result = await api.dashboard({ ...options, country: 'CL' });

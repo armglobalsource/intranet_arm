@@ -122,6 +122,7 @@ export const PERMISSION_CATALOG = {
       create: 'Registrar nuevos encuentros',
       edit:   'Editar encuentros existentes',
       delete: 'Eliminar encuentros',
+      review: 'Revisar y subir los reportes de su campus (administrador de campus)',
     },
   },
   finanzas: {

@@ -3,6 +3,7 @@ import { ArmRecordStore } from '../common/database/arm-record-store';
 import { PostgresCampusService } from '../campus/postgres-campus.service';
 import { PostgresArmCatalogosService } from '../arm-catalogos/postgres-arm-catalogos.service';
 import { sumCounts } from '../common/arm-records.util';
+import { isUploaded } from '../encuentros/encuentros.review';
 import { countryName, statisticsRange, validDay } from './statistics-range';
 
 export type GroupBy = 'week' | 'month';
@@ -73,6 +74,10 @@ function normalized(value: unknown) {
     .replace(/\p{Diacritic}/gu, '')
     .trim()
     .toLowerCase();
+}
+
+function campusCountry(campus: any): string {
+  return normalized(campus.name) === 'virtual' && !campus.country ? 'Global' : countryName(campus.country);
 }
 
 function dateKey(value: unknown): string | null {
@@ -161,7 +166,7 @@ export class PostgresEstadisticasService {
     }
     const authorizedCampuses = allCampuses.filter((campus: any) => options.canViewAll || Number(campus.id) === options.campusId);
     const visibleCampuses = authorizedCampuses
-      .filter((campus: any) => !options.country || normalized(countryName(campus.country)) === normalized(countryName(options.country)))
+      .filter((campus: any) => !options.country || normalized(campusCountry(campus)) === normalized(countryName(options.country)))
       .filter((campus: any) => !options.campusId || Number(campus.id) === options.campusId);
     const visibleIds = new Set(visibleCampuses.map((campus: any) => Number(campus.id)));
 
@@ -191,8 +196,10 @@ export class PostgresEstadisticasService {
     const scopedRows = encuentrosSnap
       .filter((row) => resolveCampus(row))
       .filter((row) => options.type === 'all' || row.tipo === options.type);
-    // Existing records without a workflow state remain eligible.
-    const eligible = (row: any) => !row.estado || ['enviado', 'validado'].includes(row.estado);
+    // Cuentan los reportes que el administrador del campus ya subió (los importados de Asana
+    // cuentan como subidos), los validados y los registros antiguos sin estado. Los que esperan
+    // revisión u observados quedan como excluidos.
+    const eligible = (row: any) => !row.estado || row.estado === 'validado' || isUploaded(row);
     const encounterRows = scopedRows.filter(eligible).filter((row) => inRange(row, start, end));
     const kiloRows = kiloamorSnap
       .filter((row) => resolveCampus(row)).filter((row) => inRange(row, start, end));
@@ -208,7 +215,7 @@ export class PostgresEstadisticasService {
     const campusRows = visibleCampuses.map((campus: any) => ({
       campusId: Number(campus.id),
       campusName: campus.name,
-      country: countryName(campus.country),
+      country: campusCountry(campus),
       isActive: campus.isActive !== false,
       metrics: emptyMetrics(),
       quality: emptyQuality(),
@@ -252,7 +259,7 @@ export class PostgresEstadisticasService {
         periodo: monthOnly ? String(row.periodo ?? key.slice(0, 7)) : null,
         campusId: Number(campus.id),
         campusName: campus.name,
-        country: countryName(campus.country),
+        country: campusCountry(campus),
         tipo: row.tipo === 'evento' ? 'evento' : 'encuentro',
         encuentro: row.encuentro ?? '',
         predicador: row.predicador ?? '',
@@ -311,18 +318,18 @@ export class PostgresEstadisticasService {
         monthOnly: { reports: monthOnlyReports, metrics: this.withDerived(monthOnlyMetrics) },
         country: options.country ? countryName(options.country) : null,
         excludedReports: scopedRows.filter((row) => inRange(row, start, end) && !eligible(row)).length,
-        legacyReports: encounterRows.filter((row) => !row.estado).length,
+        legacyReports: encounterRows.filter((row) => !row.estado || row.source?.provider === 'asana' || String(row.id ?? '').startsWith('asana:')).length,
         groupBy: options.groupBy,
         type: options.type,
         campusId: options.campusId ?? null,
         canViewAll: options.canViewAll,
         generatedAt: new Date().toISOString(),
       },
-      countries: [...new Set(authorizedCampuses.map((campus: any) => countryName(campus.country)))].sort((a, b) => a.localeCompare(b, 'es')),
+      countries: [...new Set(authorizedCampuses.map((campus: any) => campusCountry(campus)))].sort((a, b) => a.localeCompare(b, 'es')),
       campuses: authorizedCampuses.map((campus: any) => ({
         id: Number(campus.id),
         name: campus.name,
-        country: countryName(campus.country),
+        country: campusCountry(campus),
         isActive: campus.isActive !== false,
       })),
       comparison: { from: range.previousStart, to: range.previousEnd, totals: this.withDerived(previous) },
@@ -351,7 +358,7 @@ export class PostgresEstadisticasService {
     const emitters = new Map<number, { campusId: number; campusName: string; reports: number; espectadoresOnline: number; manitosOnline: number }>();
     for (const row of rows) {
       const emitter = campusOf(row);
-      if (!emitter || Number(emitter.id) === Number(virtualCampus.id) || !isOnlineBroadcast(row)) continue;
+      if (!emitter || !['santiago', 'puente alto'].includes(normalized(emitter.name)) || !isOnlineBroadcast(row)) continue;
       const viewers = countOf(row.online?.espectadores);
       const decisions = countOf(row.online?.acepto);
       if (!viewers && !decisions) continue;
@@ -369,7 +376,7 @@ export class PostgresEstadisticasService {
       espectadoresOnline: byEmitter.reduce((sum, e) => sum + e.espectadoresOnline, 0),
       manitosOnline: byEmitter.reduce((sum, e) => sum + e.manitosOnline, 0),
       emitters: byEmitter,
-      criterion: 'Transmisiones cuyo reporte dice Online o Virtual. Se mantiene el campus emisor y el total global no las cuenta dos veces.',
+      criterion: 'Reportes de Santiago y Puente Alto identificados como Online o Virtual en su nombre o modalidad, incluidos Presencial + Online. Solo se atribuyen espectadores a la vez y decisiones online; las cifras presenciales permanecen en el campus emisor.',
     };
   }
 

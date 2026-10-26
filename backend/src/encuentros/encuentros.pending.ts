@@ -17,7 +17,7 @@ export interface PendingCampus {
   isActive?: boolean;
   schedules?: { dia: string; hora: string; fichaType?: string }[];
 }
-export interface PendingRecord { id?: string; campusId?: unknown; campus?: string; fecha?: string; encuentro?: string; tipo?: string }
+export interface PendingRecord { id?: string; campusId?: unknown; campus?: string; fecha?: string; fechaPrecision?: string; encuentro?: string; tipo?: string }
 export interface PendingEncuentro { campusId: number; campus: string; fecha: string; hora: string; encuentro: string }
 export interface DoubtfulRecord { id?: string; campusId: number; campus: string; fecha: string; encuentro: string; diaFecha: string; diaNombre: string }
 
@@ -56,7 +56,7 @@ export function pendingEncuentros(
 ): PendingEncuentro[] {
   const byDay = new Map<string, (string | null)[]>();
   for (const r of records) {
-    if (r.tipo === 'evento') continue;
+    if (r.tipo === 'evento' || r.fechaPrecision === 'mes') continue;
     const key = `${String(r.campusId)}|${String(r.fecha ?? '').slice(0, 10)}`;
     byDay.set(key, [...(byDay.get(key) ?? []), hhmm(r.encuentro ?? '')]);
   }
@@ -99,7 +99,7 @@ export function pendingEncuentros(
 export function doubtfulDates(records: PendingRecord[], campuses: PendingCampus[]): DoubtfulRecord[] {
   const names = new Map(campuses.map((c) => [String(c.id), c.name]));
   return records
-    .filter((r) => r.tipo !== 'evento' && r.fecha)
+    .filter((r) => r.tipo !== 'evento' && r.fechaPrecision !== 'mes' && r.fecha)
     .map((r) => {
       const fecha = String(r.fecha).slice(0, 10);
       return { r, fecha, diaFecha: weekdayOf(fecha), diaNombre: weekdayInName(r.encuentro ?? '') };

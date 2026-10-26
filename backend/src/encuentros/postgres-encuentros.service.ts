@@ -1,10 +1,14 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { ArmRecordStore } from '../common/database/arm-record-store';
 import { Periodo, mapId, sumCounts, inPeriodo, inMonth } from '../common/arm-records.util';
 import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
 import { PostgresCampusService } from '../campus/postgres-campus.service';
-import { allCampus, RecordUser, sameEncuentroLabel } from './encuentros.scope';
+import { allCampus, assertRecordCampus, RecordUser, sameEncuentroLabel } from './encuentros.scope';
+import { hasPermission } from '../common/permissions';
 import { doubtfulDates, nowInSantiago, pendingEncuentros } from './encuentros.pending';
+import { canDeleteReport, canEditReport, canReview, estadoDe, isUploaded } from './encuentros.review';
+import { validDay } from '../estadisticas/statistics-range';
+import { PostgresNotificationsService } from '../notifications/postgres-notifications.service';
 
 const COL = 'encuentros';
 
@@ -25,31 +29,51 @@ export class PostgresEncuentrosService {
   constructor(
     private store: ArmRecordStore,
     private campuses: PostgresCampusService,
+    @Optional() private notifications?: PostgresNotificationsService,
   ) {}
+  private readonly logger = new Logger(PostgresEncuentrosService.name);
+
+  /** Estado de revisión calculado (los importados de Asana cuentan como subidos). */
+  private withEstado<T extends { id?: string; estado?: string }>(r: T) { return { ...r, estado: estadoDe(r) }; }
+
+  /** Avisos de revisión: nunca impiden guardar el reporte. */
+  private async notify(task: () => Promise<unknown> | undefined) {
+    try { await task(); } catch (error) { this.logger.warn(`No se pudo enviar la notificación: ${(error as Error).message}`); }
+  }
 
   // ── Lectura ──────────────────────────────────────────────────────────────
 
   async findAll(campusId?: string, periodo: Periodo = 'todo') {
     return (await this.store.list(COL,{campus:campusId}))
-      .map((r) => mapId(r))
-      .filter((r) => inPeriodo(r.fecha, periodo))
+      .map((r) => this.withEstado(mapId(r)))
+      .filter((r) => inPeriodo(r.fecha, periodo, r.fechaPrecision))
       .sort((a, b) => String(b.fechaRegistroISO ?? '').localeCompare(String(a.fechaRegistroISO ?? '')));
   }
 
   async findOne(id: string) {
-    return mapId(await this.store.find(COL,id));
+    return this.withEstado(mapId<any>(await this.store.find(COL,id)));
+  }
+
+  async findOneFor(id: string, user: RecordUser) {
+    const record = await this.findOne(id);
+    const campus = await this.campuses.findOne(Number(record.campusId));
+    if (canReview(user, campus)) return record;
+    const mine = String(record.registradoPor?.uid ?? '') === String(user.sub);
+    if (!mine && !hasPermission(user.permissions ?? [], 'encuentros:view')) throw new ForbiddenException('No tienes acceso a este reporte');
+    assertRecordCampus(record, user);
+    return record;
   }
 
   /** Registros creados por el usuario autenticado — para la sección "Mis registros" del perfil. */
   async findMine(userId: number | string) {
     return (await this.store.list(COL,{userId}))
-      .map((r) => mapId(r))
+      .map((r) => this.withEstado(mapId(r)))
       .sort((a, b) => String(b.fechaRegistroISO ?? '').localeCompare(String(a.fechaRegistroISO ?? '')));
   }
 
   /** Resumen agregado (decisiones, voluntarios, asistencia) por campus y período, separado encuentro/evento. */
   async resumen(campus: string, year: number, month?: number): Promise<EncuentrosResumen> {
-    const rows = (await this.store.list(COL,{campus})).filter((r) => inMonth(r.fecha, year, month));
+    const rows = (await this.store.list(COL,{campus})).filter(isUploaded).filter((r) => inMonth(r.fecha, year, month));
 
     const empty = (): ResumenTipo => ({ count: 0, totalAsistencia: 0, decisiones: 0, totalVoluntarios: 0 });
     const acc: EncuentrosResumen = { encuentros: empty(), eventos: empty() };
@@ -88,7 +112,7 @@ export class PostgresEncuentrosService {
 
     const now = new Date();
     const isEvento = dto.tipo === 'evento';
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dto.fecha)) throw new BadRequestException('La fecha debe tener el formato AAAA-MM-DD');
+    if (!validDay(dto.fecha)) throw new BadRequestException('Ingresa una fecha válida con formato AAAA-MM-DD');
     let campus: any;
     if (allCampus(user)) campus = await this.campuses.findByName(dto.campus);
     else {
@@ -102,7 +126,7 @@ export class PostgresEncuentrosService {
     if (!isEvento && dto.encuentro?.trim()) {
       const duplicate = (await this.store.list(COL,{campus:campus.name,start:dto.fecha,end:`${dto.fecha}T23:59:59.999Z`})).find((r) =>
         r.tipo !== 'evento' && String(r.fecha ?? '').slice(0,10) === dto.fecha && sameEncuentroLabel(r.encuentro, dto.encuentro)
-        && !(dto.idempotencyKey && r.idempotencyKey === dto.idempotencyKey));
+        && !(dto.idempotencyKey && r.idempotencyKey === dto.idempotencyKey && String(r.registradoPor?.uid) === String(user.sub)));
       if (duplicate) throw new ConflictException(`Ya existe un registro de «${dto.encuentro}» del ${dto.fecha}. Edítalo en vez de crear otro.`);
     }
 
@@ -136,12 +160,35 @@ export class PostgresEncuentrosService {
       fechaRegistroISO: now.toISOString(),
     };
 
-    const ref = await this.store.create(COL,doc);
-    return this.findOne(ref.id);
+    const ref = await this.store.create(COL,{ ...doc, estado: 'enviado' });
+    const created = await this.findOne(ref.id);
+    // Un reintento con la misma clave devuelve el registro anterior: solo se avisa cuando esta llamada lo creó.
+    if (created.fechaRegistroISO === doc.fechaRegistroISO) {
+      await this.notify(() => this.notifications?.createForCampusPermission(Number(campus.id), 'encuentros:review', campus.adminIds ?? [], {
+        title: 'Reporte por revisar',
+        body: `${created.encuentro} del ${created.fecha} (${campus.name}) espera tu revisión.`,
+        link: '/dashboard/produccion-general/estadisticas/revisar',
+      }));
+    }
+    return created;
   }
 
-  async update(id: string, dto: UpdateEncuentroDto, user: { sub: string | number; email: string }) {
+  async update(id: string, dto: UpdateEncuentroDto, user: RecordUser) {
     const current = await this.findOne(id);
+    const campus = await this.campuses.findOne(Number(current.campusId));
+    const reviewer = canReview(user, campus);
+    const denied = canEditReport(user, current, reviewer);
+    if (denied) throw new ForbiddenException(denied);
+    if (dto.fecha !== undefined && !validDay(dto.fecha)) throw new BadRequestException('Ingresa una fecha válida con formato AAAA-MM-DD');
+    if (current.fechaPrecision === 'mes' && dto.fecha !== undefined && dto.fecha !== current.fecha) {
+      throw new BadRequestException('Este histórico solo tiene mes conocido; no se puede asignar un día desde este formulario');
+    }
+    if (current.tipo !== 'evento' && (dto.fecha !== undefined || dto.encuentro !== undefined)) {
+      const fecha = dto.fecha ?? current.fecha;
+      const duplicate = (await this.store.list(COL, { campus: current.campus, start: fecha, end: `${fecha}T23:59:59.999Z` }))
+        .find((r) => r.id !== id && r.fechaPrecision !== 'mes' && r.tipo !== 'evento' && sameEncuentroLabel(r.encuentro, dto.encuentro ?? current.encuentro));
+      if (current.fechaPrecision !== 'mes' && duplicate) throw new ConflictException('Ya existe un reporte de ese encuentro y fecha');
+    }
 
     const data: any = {
       editadoPor:   { uid: user.sub, email: user.email },
@@ -166,13 +213,73 @@ export class PostgresEncuentrosService {
       data.totalVoluntarios = sumCounts(dto.voluntarios);
     }
 
-    await this.store.update(COL,id,data);
+    // Un reporte observado que corrige quien lo envió vuelve a quedar por revisar.
+    const resubmitted = !reviewer && current.estado === 'observado';
+    if (resubmitted) Object.assign(data, { estado: 'enviado', observacion: null });
+    await this.store.update(COL,id,data,current);
+    const updated = await this.findOne(id);
+    if (resubmitted) {
+      await this.notify(() => this.notifications?.createForCampusPermission(Number(campus.id), 'encuentros:review', campus.adminIds ?? [], {
+        title: 'Reporte corregido por revisar',
+        body: `${updated.encuentro} del ${updated.fecha} (${campus.name}) fue corregido y espera tu revisión.`,
+        link: '/dashboard/produccion-general/estadisticas/revisar',
+      }));
+    }
+    return updated;
+  }
+
+  async remove(id: string, user: RecordUser) {
+    const current = await this.findOne(id);
+    const campus = await this.campuses.findOne(Number(current.campusId));
+    const denied = canDeleteReport(user, current, canReview(user, campus));
+    if (denied) throw new ForbiddenException(denied);
+    await this.store.remove(COL,id,current);
+    return { id };
+  }
+
+  // ── Revisión del administrador del campus ────────────────────────────────
+
+  /** Reportes por revisar u observados de los campus que el usuario puede revisar. */
+  async revision(user: RecordUser) {
+    const campuses = (await this.campuses.findAll()).filter((c: any) => c.isActive !== false && canReview(user, c));
+    if (!campuses.length) return { campusIds: [], items: [] };
+    const all = campuses.length > 1;
+    // Un pendiente no caduca por la fecha del encuentro; incluye cargas tardías.
+    const rows = await this.store.list(COL, all ? {} : { campus: campuses[0].name });
+    const ids = new Set(campuses.map((c: any) => String(c.id)));
+    const items = rows
+      .map((r) => this.withEstado(mapId<any>(r)))
+      .filter((r) => r.estado !== 'subido' && ids.has(String(r.campusId)))
+      .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    return { campusIds: campuses.map((c: any) => Number(c.id)), items };
+  }
+
+  private async reviewable(id: string, user: RecordUser) {
+    const current = await this.findOne(id);
+    const campus = await this.campuses.findOne(Number(current.campusId));
+    if (!canReview(user, campus)) throw new ForbiddenException('Solo el administrador del campus puede revisar este reporte');
+    return { current, campus };
+  }
+
+  async subir(id: string, user: RecordUser) {
+    const { current } = await this.reviewable(id, user);
+    await this.store.update(COL, id, { estado: 'subido', observacion: null, revisadoPor: { uid: user.sub, email: user.email }, fechaRevision: new Date().toISOString() }, current);
     return this.findOne(id);
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
-    await this.store.remove(COL,id);
-    return { id };
+  async observar(id: string, observacion: string, user: RecordUser) {
+    const { current, campus } = await this.reviewable(id, user);
+    const text = observacion.trim();
+    if (!text) throw new BadRequestException('Escribe qué hay que corregir');
+    await this.store.update(COL, id, { estado: 'observado', observacion: text, revisadoPor: { uid: user.sub, email: user.email }, fechaRevision: new Date().toISOString() }, current);
+    const author = Number(current.registradoPor?.uid);
+    if (Number.isFinite(author) && String(author) !== String(user.sub)) {
+      await this.notify(() => this.notifications?.create({
+        userId: author, title: 'Tu reporte tiene observaciones',
+        body: `${current.encuentro} del ${current.fecha} (${campus.name}): ${text}`,
+        link: `/dashboard/produccion-general/estadisticas/registrar?editar=${encodeURIComponent(id)}`,
+      }, Number(user.sub)));
+    }
+    return this.findOne(id);
   }
 }

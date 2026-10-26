@@ -24,10 +24,11 @@ export function sumCounts(obj?: Record<string, any>): number {
 }
 
 /** ¿La fecha (string) cae dentro del período pedido? Filtrado en memoria. */
-export function inPeriodo(fecha: string | undefined, periodo: Periodo = 'todo'): boolean {
+export function inPeriodo(fecha: string | undefined, periodo: Periodo = 'todo', precision?: string): boolean {
   if (periodo === 'todo') return true;
   if (!fecha) return false;
-  const f = new Date(fecha);
+  if (precision === 'mes' && periodo === 'semana') return false;
+  const f = new Date(/^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T12:00:00` : fecha);
   if (isNaN(f.getTime())) return false;
   const now = new Date();
   const ny = now.getFullYear();
@@ -54,7 +55,8 @@ export function inPeriodo(fecha: string | undefined, periodo: Periodo = 'todo'):
 /** ¿La fecha cae en el año (y mes opcional, 1-12) pedido? Filtrado en memoria, mismo estilo que inPeriodo. */
 export function inMonth(fecha: string | undefined, year: number, month?: number): boolean {
   if (!fecha) return false;
-  const f = new Date(fecha);
+  // Las fechas de calendario no son instantes UTC: el día 1 no debe caer en el mes anterior en Chile.
+  const f = new Date(/^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T12:00:00` : fecha);
   if (isNaN(f.getTime())) return false;
   if (f.getFullYear() !== year) return false;
   if (month !== undefined && f.getMonth() + 1 !== month) return false;

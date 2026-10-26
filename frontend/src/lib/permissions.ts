@@ -157,6 +157,7 @@ export const PERMISSION_CATALOG = {
       create: 'Registrar nuevos encuentros',
       edit:   'Editar encuentros existentes',
       delete: 'Eliminar encuentros',
+      review: 'Revisar y subir los reportes de su campus (administrador de campus)',
     },
   },
   finanzas: {
@@ -260,7 +261,13 @@ export const PERMISSION_UI_CONFIG: Record<string, PermissionUiSection> = {
   },
   content:   { breadcrumb: ['Noticias'],                             viewActions: ['view'], editActions: ['create', 'publish', 'delete'] },
   finanzas:   { breadcrumb: ['Producción General', 'Finanzas'],      viewActions: ['view'], editActions: [] },
-  encuentros: { breadcrumb: ['App móvil', 'Encuentros'],             viewActions: ['view'], editActions: ['create', 'edit', 'delete'] },
+  encuentros: {
+    breadcrumb: ['Producción', 'Estadísticas'],
+    viewActions: ['view'], editActions: ['create', 'edit', 'delete'],
+    extra: [
+      { key: 'review', label: 'Revisar y subir los reportes de su campus (administrador de campus)', actions: ['review'] },
+    ],
+  },
   siembra:    { breadcrumb: ['App móvil', 'Siembra'],                viewActions: ['view'], editActions: ['create', 'edit', 'delete'] },
   kiloamor:   { breadcrumb: ['App móvil', 'Kilo de Amor'],           viewActions: ['view'], editActions: ['create', 'edit', 'delete'] },
   tecnicos:  {

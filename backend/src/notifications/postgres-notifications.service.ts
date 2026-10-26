@@ -33,6 +33,16 @@ export class PostgresNotificationsService {
       return result;
     });
   }
+  /** Avisa a quienes revisan los reportes de un campus: permiso en ese campus o administradores listados en él. */
+  async createForCampusPermission(campusId: number,permission: string,extraUserIds: number[],dto: Omit<CreateNotificationDto,'userId'>) {
+    const candidates=apiRows(await this.db.query(`SELECT u.id,u."campusId",r.permissions FROM arm_app.users u JOIN arm_app.roles r ON r.id=u."roleId" WHERE u.status='active' AND r."isActive" IS DISTINCT FROM false`));
+    const ids=new Set<number>(extraUserIds.map(Number).filter(Number.isFinite));
+    for(const u of candidates) if(String(u.campusId)===String(campusId) && hasPermission(u.permissions??[],permission)) ids.add(Number(u.id));
+    const active=new Set(candidates.map(u=>Number(u.id)));
+    return this.db.transaction(async client => {
+      for(const userId of ids) if(active.has(userId)) await insertIdentity(client,'notifications',{...dto,userId,channel:dto.channel??'in_app',read:false,createdAt:new Date(),updatedAt:new Date()});
+    });
+  }
   update(id: number,dto: Partial<CreateNotificationDto>) {
     return updateIdentity(this.db,'notifications',id,{title:dto.title,body:dto.body,link:dto.link,channel:dto.channel,updatedAt:new Date()});
   }

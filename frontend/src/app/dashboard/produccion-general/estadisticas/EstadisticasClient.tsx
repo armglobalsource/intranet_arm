@@ -421,7 +421,7 @@ export function EstadisticasClient() {
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
           <span>{totalMeetings} registros incluidos · {data.meta.days} días</span>
           <span>{data.meta.legacyReports} registros históricos incluidos</span>
-          {data.meta.excludedReports > 0 && <span className="text-amber-800">{data.meta.excludedReports} reportes pendientes o no aprobados excluidos</span>}
+          {data.meta.excludedReports > 0 && <span className="text-amber-800">{data.meta.excludedReports} {data.meta.excludedReports === 1 ? 'reporte no cuenta' : 'reportes no cuentan'}: esperan que el administrador del campus los suba</span>}
         </div>
         {(data.meta.monthOnly?.reports ?? 0) > 0 && <p role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
           Incluye {number(data.meta.monthOnly.reports)} reportes históricos de los que solo se conoce el mes ({number(data.meta.monthOnly.metrics.asistencia)} asistencias). Suman en los totales, por campus y por mes; no aparecen en las semanas. Solo se incluyen cuando el rango cubre el mes completo.
@@ -447,7 +447,7 @@ export function EstadisticasClient() {
           </section>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Servicios registrados" value={totalMeetings} detail={number(totals.encuentros) + ' encuentros · ' + number(totals.eventos) + ' eventos'} icon={CalendarDays} />
-            <MetricCard label="Espectadores online" value={totals.espectadoresOnline} detail="Suma de conteos reportados por encuentro" icon={Wifi} accent="#0891b2" />
+            <MetricCard label="Espectadores online" value={totals.espectadoresOnline} detail="Suma de espectadores a la vez por transmisión; no personas únicas" icon={Wifi} accent="#0891b2" />
             <MetricCard label="Kilo de Amor" value={totals.kiloAmorCajas} detail={number(totals.kiloAmorRegistros) + ' registros · independiente del tipo de encuentro'} icon={Globe2} accent="#e11d48" />
             <MetricCard label="Reportes completos" value={data.quality.complete} detail={data.quality.completeness + '% con todos los campos clave'} icon={ClipboardCheck} accent="#16a34a" />
           </div>

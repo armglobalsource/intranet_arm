@@ -63,3 +63,4 @@ frontend/tsconfig.tsbuildinfo
 
 # Vínculo Vercel de la raíz (despliegue frontend + API)
 .vercel/
+__pycache__/

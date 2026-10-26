@@ -1,4 +1,4 @@
-import { Injectable,NotFoundException } from '@nestjs/common';
+import { ConflictException,Injectable,NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DatabaseService } from './database.service';
 type Table='encuentros'|'siembra'|'kiloamor'|'anuncios'|'events';
@@ -21,6 +21,16 @@ export class ArmRecordStore {
    return this.row((await db.query(`INSERT INTO ${name}(document_id,data) VALUES ($1,$2) RETURNING document_id,data`,[id,JSON.stringify(data)])).rows[0]);
   });
  }
- async update(table:Table,id:string,data:any){const row=(await this.db.query(`UPDATE ${this.table(table)} SET data=data||$2::jsonb WHERE document_id=$1 RETURNING document_id,data`,[id,JSON.stringify(data)])).rows[0];if(!row)throw new NotFoundException('Registro no encontrado');return this.row(row);}
- async remove(table:Table,id:string){const result=await this.db.query(`DELETE FROM ${this.table(table)} WHERE document_id=$1`,[id]);if(!result.rowCount)throw new NotFoundException('Registro no encontrado');return {id};}
+ async update(table:Table,id:string,data:any,version?:{fechaEdicion?:string;fechaRevision?:string}){
+  const guard=version?' AND (data->>\'fechaEdicion\') IS NOT DISTINCT FROM $3::text AND (data->>\'fechaRevision\') IS NOT DISTINCT FROM $4::text':'';
+  const args:any[]=[id,JSON.stringify(data)];if(version)args.push(version.fechaEdicion??null,version.fechaRevision??null);
+  const row=(await this.db.query(`UPDATE ${this.table(table)} SET data=data||$2::jsonb WHERE document_id=$1${guard} RETURNING document_id,data`,args)).rows[0];
+  if(!row){if(version)throw new ConflictException('El reporte cambió durante la operación. Recarga antes de continuar');throw new NotFoundException('Registro no encontrado');}return this.row(row);
+ }
+ async remove(table:Table,id:string,version?:{fechaEdicion?:string;fechaRevision?:string}){
+  const guard=version?' AND (data->>\'fechaEdicion\') IS NOT DISTINCT FROM $2::text AND (data->>\'fechaRevision\') IS NOT DISTINCT FROM $3::text':'';
+  const args:any[]=[id];if(version)args.push(version.fechaEdicion??null,version.fechaRevision??null);
+  const result=await this.db.query(`DELETE FROM ${this.table(table)} WHERE document_id=$1${guard}`,args);
+  if(!result.rowCount){if(version)throw new ConflictException('El reporte cambió durante la operación. Recarga antes de continuar');throw new NotFoundException('Registro no encontrado');}return {id};
+ }
 }

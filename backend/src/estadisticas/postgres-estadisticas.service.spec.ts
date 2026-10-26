@@ -139,10 +139,10 @@ describe('PostgresEstadisticasService', () => {
     const monthOnly = (id: string, periodo: string, asistencia: number) => ({
       id, campusId: 7, campus: 'Montevideo', fecha: `${periodo}-01`, fechaPrecision: 'mes', periodo, tipo: 'encuentro',
       encuentro: 'Encuentro Jueves 20:00 hrs', asistencia: { auditorio: asistencia }, voluntarios: { servicio: 3 },
-      totalAsistencia: asistencia, totalVoluntarios: 3, presencial: { acepto: 1 }, online: {}, estado: 'enviado',
+      totalAsistencia: asistencia, totalVoluntarios: 3, presencial: { acepto: 1 }, online: {}, estado: 'subido',
     });
     const dated = { id: 'd1', campusId: 7, campus: 'Montevideo', fecha: '2021-09-09', tipo: 'encuentro', encuentro: 'Encuentro Jueves 20:00 hrs',
-      asistencia: { auditorio: 10 }, voluntarios: {}, totalAsistencia: 10, totalVoluntarios: 0, presencial: {}, online: {}, estado: 'enviado' };
+      asistencia: { auditorio: 10 }, voluntarios: {}, totalAsistencia: 10, totalVoluntarios: 0, presencial: {}, online: {}, estado: 'subido' };
     const service = () => new EstadisticasService(recordStoreWith([monthOnly('m1', '2021-09', 40), monthOnly('m2', '2021-09', 25), dated], []) as any, campuses as any, catalogs as any);
     const wide = { year: 2021, type: 'all' as const, canViewAll: true, from: '2021-01-01', to: '2021-12-31' };
 
@@ -185,7 +185,7 @@ describe('PostgresEstadisticasService', () => {
     const catalogs = { findAll: async () => [] };
     const report = (campusId: number, campus: string, fecha: string, modalidad: string, espectadores: number, acepto = 0, extra: any = {}) => ({
       id: `${campus}-${fecha}-${modalidad}`, campusId, campus, fecha, tipo: 'encuentro', encuentro: 'Encuentro Domingo 11:00 hrs', modalidad,
-      asistencia: { auditorio: 100 }, voluntarios: {}, totalAsistencia: 100, totalVoluntarios: 0, presencial: {}, online: { espectadores, acepto }, estado: 'enviado', ...extra,
+      asistencia: { auditorio: 100 }, voluntarios: {}, totalAsistencia: 100, totalVoluntarios: 0, presencial: {}, online: { espectadores, acepto }, estado: 'subido', ...extra,
     });
     const rows = [
       report(1, 'Santiago', '2026-03-01', 'Presencial+Online', 300, 4),
@@ -229,6 +229,15 @@ describe('PostgresEstadisticasService', () => {
     it('no atribuye nada si el catálogo no tiene un único campus Virtual', async () => {
       const none = new EstadisticasService(recordStoreWith(rows, []) as any, { findAll: async () => campuses.findAll().then((c) => c.filter((x) => x.id !== 3)) } as any, catalogs as any);
       expect((await none.dashboard({ ...base, canViewAll: true })).virtual).toBeNull();
+    });
+
+    it('identifica Virtual como Global y no atribuye emisiones de otros campus', async () => {
+      const extended = { findAll: async () => [...await campuses.findAll(), { id: 4, name: 'Katy', country: 'Estados Unidos', isActive: true }] };
+      const api = new EstadisticasService(recordStoreWith([...rows, report(4, 'Katy', '2026-03-01', 'Online', 999)], []) as any, extended as any, catalogs as any);
+      const result = await api.dashboard({ ...base, canViewAll: true, country: 'Global' });
+      expect(result.byCampus.map((c) => c.campusName)).toEqual(['Virtual']);
+      expect(result.virtual?.espectadoresOnline).toBe(380);
+      expect(result.totals.espectadoresOnline).toBe(500);
     });
   });
 });

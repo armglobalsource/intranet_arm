@@ -51,4 +51,12 @@ node --test scripts/asana-import/apply.test.cjs
 
 La búsqueda de coincidencias online compara fecha y hora entre Virtual y Santiago/Puente Alto. Es una detección de candidatos, no una prueba exhaustiva de ausencia de duplicados ni una regla automática para redistribuir audiencias.
 
-**Atribución al campus Virtual.** No modifica registros ni necesita importación: el servicio de estadísticas la calcula al leer. Se atribuyen a Virtual las cifras online (espectadores y decisiones online) de los reportes de otros campus cuya `modalidad` o nombre dicen explícitamente «Online» o «Virtual» (hoy `Presencial+Online`), conservando el campus emisor. Se muestra como una vista aparte y no se suma a los totales ni a la tarjeta del campus emisor, por lo que el global cuenta cada cifra una sola vez. Los reportes de modalidad `Presencial` con espectadores no se atribuyen.
+**Atribución al campus Virtual.** No modifica registros ni necesita importación: el servicio de estadísticas la calcula al leer. Se atribuyen a Virtual las cifras online (espectadores y decisiones online) de los reportes de Santiago y Puente Alto cuya `modalidad` o nombre dicen explícitamente «Online» o «Virtual» (hoy `Presencial+Online`), conservando el campus emisor. Se muestra como una vista aparte y no se suma a los totales ni a la tarjeta del campus emisor, por lo que el global cuenta cada cifra una sola vez. Los reportes de modalidad `Presencial` con espectadores no se atribuyen.
+
+## Revisión de reportes del ecosistema
+
+Los reportes nuevos se crean como `enviado` y esperan revisión. El administrador listado en el campus, o quien tenga `encuentros:review` en ese campus, puede subirlos (`subido`) o devolverlos (`observado`) con un comentario. El autor puede corregir un observado y reenviarlo; un reporte subido solo lo modifica el revisor. La revisión no elimina pendientes por antigüedad. Los cambios concurrentes de revisión/edición se rechazan para evitar sobrescribir una aprobación.
+
+Estadísticas y el resumen de encuentros usan el mismo criterio: cuentan subidos, validados y el legado sin estado. Los importados de Asana se consideran ya registrados; una observación explícita los excluye hasta nueva aprobación. Los avisos son internos, al revisor o al autor, y un fallo de notificación no impide guardar.
+
+Conciliación del lote mensual: 66 reportes con 767 asistencias, 446 participaciones de voluntarios y 12 decisiones presenciales. La tarea restante de las 67 está Sin iniciar/Pendiente y no contiene cifras. El plan completo tiene 4.440 reportes preparados y 173 tareas retenidas; no se deben sumar automáticamente los retenidos, incluidos resúmenes anuales sin campus.

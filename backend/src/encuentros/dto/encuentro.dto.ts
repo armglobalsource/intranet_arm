@@ -1,46 +1,48 @@
 import {
-  IsString, IsOptional, IsIn, IsNumber, Min, ValidateNested, IsNotEmpty,
+  IsString, IsOptional, IsIn, IsInt, Max, Min, ValidateNested, IsNotEmpty, MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // ── Sub-objetos (todos los conteos opcionales; faltantes = 0) ────────────────
 
 export class PresencialDto {
-  @IsOptional() @IsNumber() @Min(0) acepto?: number;
-  @IsOptional() @IsNumber() @Min(0) total?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) acepto?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) total?: number;
 }
 
 export class OnlineDto {
-  @IsOptional() @IsNumber() @Min(0) acepto?: number;
-  @IsOptional() @IsNumber() @Min(0) espectadores?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) acepto?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) espectadores?: number;
 }
 
 export class AsistenciaDto {
-  @IsOptional() @IsNumber() @Min(0) auditorio?: number;
-  @IsOptional() @IsNumber() @Min(0) kids?: number;
-  @IsOptional() @IsNumber() @Min(0) tweens?: number;
-  @IsOptional() @IsNumber() @Min(0) bebe?: number;
-  @IsOptional() @IsNumber() @Min(0) sensorial?: number;
-  @IsOptional() @IsNumber() @Min(0) cambios?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) auditorio?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) kids?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) tweens?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) bebe?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) sensorial?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) cambios?: number;
 }
 
 export class VoluntariosDto {
-  @IsOptional() @IsNumber() @Min(0) servicio?: number;
-  @IsOptional() @IsNumber() @Min(0) tecnica?: number;
-  @IsOptional() @IsNumber() @Min(0) kids?: number;
-  @IsOptional() @IsNumber() @Min(0) tweens?: number;
-  @IsOptional() @IsNumber() @Min(0) worship?: number;
-  @IsOptional() @IsNumber() @Min(0) cocina?: number;
-  @IsOptional() @IsNumber() @Min(0) rrss?: number;
-  @IsOptional() @IsNumber() @Min(0) seguridad?: number;
-  @IsOptional() @IsNumber() @Min(0) sala_bebes?: number;
-  @IsOptional() @IsNumber() @Min(0) conexion?: number;
-  @IsOptional() @IsNumber() @Min(0) oracion?: number;
-  @IsOptional() @IsNumber() @Min(0) merch?: number;
-  @IsOptional() @IsNumber() @Min(0) amor?: number;
-  @IsOptional() @IsNumber() @Min(0) sensorial?: number;
-  @IsOptional() @IsNumber() @Min(0) siembra?: number;
-  @IsOptional() @IsNumber() @Min(0) cambios?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) servicio?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) tecnica?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) kids?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) tweens?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) worship?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) cocina?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) rrss?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) seguridad?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) sala_bebes?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) conexion?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) info?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) proyecto_educativo?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) oracion?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) merch?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) amor?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) sensorial?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) siembra?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) cambios?: number;
 }
 
 // ── DTO principal ────────────────────────────────────────────────────────────
@@ -85,6 +87,10 @@ export class CreateEncuentroDto {
 
   @IsOptional() @ValidateNested() @Type(() => VoluntariosDto)
   voluntarios?: VoluntariosDto;
+}
+
+export class ObservarEncuentroDto {
+  @IsString() @IsNotEmpty() @MaxLength(500) observacion: string;
 }
 
 export class UpdateEncuentroDto {

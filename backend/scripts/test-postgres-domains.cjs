@@ -172,7 +172,15 @@ async function main() {
     assert.throws(()=>assertRecordCampus(encounter,{...reporter,campusId:-1}),e=>e.getStatus()===403);
     assertRecordCampus(encounter,{...reporter,campusId:-1,permissions:['estadisticas:viewAll']});
     assert.equal(encounter.totalAsistencia,30);
-    await encounters.update(encounter.id,{asistencia:{auditorio:40}},actor);
+    assert.equal(encounter.estado,'enviado','a new report waits for the campus administrator');
+    const campusAdmin={...actor,sub:-77,campusId:a.id,permissions:['encuentros:review']};
+    await assert.rejects(encounters.subir(encounter.id,{...campusAdmin,campusId:-1}),e=>e.getStatus()===403,'only the administrator of that campus reviews');
+    assert.equal((await encounters.observar(encounter.id,'Falta Kids',campusAdmin)).estado,'observado');
+    assert.equal((await encounters.update(encounter.id,{asistencia:{auditorio:35}},reporter)).estado,'enviado','the author fixes it and it goes back to review');
+    assert.equal((await encounters.subir(encounter.id,campusAdmin)).estado,'subido');
+    await assert.rejects(encounters.update(encounter.id,{asistencia:{auditorio:1}},reporter),e=>e.getStatus()===403,'an uploaded report is locked for the author');
+    assert(!(await encounters.revision(campusAdmin)).items.some(r=>r.id===encounter.id));
+    await encounters.update(encounter.id,{asistencia:{auditorio:40}},campusAdmin);
     assert.equal((await encounters.resumen(a.name,2026,10)).encuentros.totalAsistencia,40);
     assert((await encounters.findMine(user.id)).some(r=>r.id===encounter.id));
     const kilo=await kilos.create({campus:a.name,fecha:'2026-10-21',cajas:3,idempotencyKey:marker},actor);
@@ -195,7 +203,7 @@ async function main() {
     assert(Object.values(roster).flat().some(r=>r.userId===user.id));
     const reconciliation=new PostgresReconciliationService(db,users,campuses);
     assert.equal((await reconciliation.match([{rowKey:'test',nombreCompleto:'Domain Test',campus:a.name}]))[0].resolvedCampusId,a.id);
-    await events.remove(event.id);await anuncios.remove(anuncio.id);await siembra.remove(contribution.id);await kilos.remove(kilo.id);await encounters.remove(encounter.id);
+    await events.remove(event.id);await anuncios.remove(anuncio.id);await siembra.remove(contribution.id);await kilos.remove(kilo.id);await encounters.remove(encounter.id,{...actor,permissions:['*']});
     console.log('PASS: catalogs, campus defaults, job title cascades, nested organigram, availability isolation/atomicity, technicians, shifts/idempotence/manual edits, songs, palettes, onboarding, content/document visibility, scoped search, feedback, visual catalog, currency, ARM records, retry keys, statistics, events, roster and reconciliation.');
   } finally {await client.query('ROLLBACK');client.release();await pool.end();}
 }

@@ -7,16 +7,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAllCampuses, type Campus } from '@/hooks/useCampus';
 import { useActiveArmCatalogos } from '@/hooks/useArmCatalogos';
 import {
-  useEliminarRegistro, useGuardarRegistro, usePendientesReporte, useRegistrosRecientes,
+  useEliminarRegistro, useGuardarRegistro, usePendientesReporte, useRegistrosRecientes, useRevision,
   type EncuentroPendiente, type RegistroEncuentro, type RegistroInput,
 } from '@/hooks/useRegistrosEncuentros';
 
@@ -119,12 +118,25 @@ function usePredicadorDeFicha(campusId: number | undefined, fecha: string, hora:
 }
 
 export function RegistrarEncuentroClient() {
-  const allowed = useRequirePermission('encuentros:create');
   const { isAdmin, can } = usePermissions();
   const user = useAuthStore((s) => s.user);
+  const router = useRouter();
+  // Entran los líderes que registran y los administradores de campus que revisan.
+  const canCreate = isAdmin || can('encuentros:create');
+  const revision = useRevision();
+  const reviewCampuses = revision.data?.campusIds ?? [];
+  const allowed = canCreate || reviewCampuses.length > 0;
+  useEffect(() => {
+    if (!canCreate && revision.isSuccess && !reviewCampuses.length) router.replace('/dashboard');
+  }, [canCreate, revision.isSuccess, reviewCampuses.length, router]);
   const allCampus = isAdmin || can('estadisticas:viewAll');
   const canEdit = isAdmin || can('encuentros:edit');
   const canDelete = isAdmin || can('encuentros:delete');
+  const isReviewer = (r: RegistroEncuentro) => r.campusId != null && reviewCampuses.includes(Number(r.campusId));
+  const isOwn = (r: RegistroEncuentro) => r.registradoPor?.uid != null && String(r.registradoPor.uid) === String(user?.id);
+  /** Lo subido solo lo toca el administrador; antes, quien edita en el campus o quien lo envió. */
+  const puedeEditar = (r: RegistroEncuentro) => isReviewer(r) || (r.estado !== 'subido' && (canEdit || isOwn(r)));
+  const puedeEliminar = (r: RegistroEncuentro) => isReviewer(r) || (r.estado !== 'subido' && canDelete);
 
   const { data: campuses = [] } = useAllCampuses();
   const activeCampuses = campuses.filter((c) => c.isActive);
@@ -150,7 +162,7 @@ export function RegistrarEncuentroClient() {
   }, [sugerido?.predicador]);
 
   const registros = useRegistrosRecientes(allCampus ? campus?.name : undefined);
-  const pendientesQ = usePendientesReporte(allowed);
+  const pendientesQ = usePendientesReporte(canCreate);
   const pendientes = (pendientesQ.data?.pendientes ?? []).filter((p) => !allCampus || !campus || p.campusId === campus.id);
   const revisar = (pendientesQ.data?.revisar ?? []).filter((r) => !allCampus || !campus || r.campusId === campus.id);
 
@@ -171,7 +183,9 @@ export function RegistrarEncuentroClient() {
   useEffect(() => {
     if (appliedParams.current || !campuses.length) return;
     const fecha = params?.get('fecha'), encuentro = params?.get('encuentro'), campusParam = Number(params?.get('campus'));
-    if (fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) && encuentro) {
+    const editarId = params?.get('editar');
+    if (editarId) void editarPorId(editarId);
+    else if (fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) && encuentro) {
       reportar({ fecha, encuentro, campusId: Number.isFinite(campusParam) && campusParam > 0 ? campusParam : Number(user?.campusId) });
     }
     appliedParams.current = true;
@@ -190,15 +204,21 @@ export function RegistrarEncuentroClient() {
   const guardar = useGuardarRegistro();
   const eliminar = useEliminarRegistro();
 
-  const online = form.modalidad.includes('Online');
+  const online = /online|virtual/i.test(form.modalidad);
   const encuentroLabel = form.encuentroSel === OTRO ? form.encuentroOtro.trim() : form.encuentroSel;
   const eventoLabel = form.eventoNombre.trim() ? `${form.eventoNombre.trim()}${form.eventoHora ? ` ${form.eventoHora} hrs` : ''}` : '';
   const yaRegistrado = form.tipo === 'encuentro' && !form.id && (registros.data ?? []).some((r) =>
     r.tipo !== 'evento' && String(r.fecha).slice(0, 10) === form.fecha && r.encuentro.trim().toLowerCase() === encuentroLabel.toLowerCase());
 
   function editar(r: RegistroEncuentro) {
+    if (r.fechaPrecision === 'mes') {
+      setNotice({ ok: false, text: 'Este reporte histórico solo tiene mes conocido. No se edita como un encuentro con día exacto.' });
+      return;
+    }
+    const recordCampus = campuses.find((c) => c.id === Number(r.campusId));
+    if (recordCampus) setCampusId(recordCampus.id);
     const fecha = String(r.fecha).slice(0, 10);
-    const known = encuentrosDelDia(campus, fecha).some((o) => o.label === r.encuentro);
+    const known = encuentrosDelDia(recordCampus ?? campus, fecha).some((o) => o.label === r.encuentro);
     const horaEvento = /(\d{2}:\d{2}) hrs$/.exec(r.eventoNombre ?? '')?.[1] ?? '';
     setForm({
       ...emptyForm(fecha), id: r.id, tipo: r.tipo, fecha,
@@ -245,19 +265,20 @@ export function RegistrarEncuentroClient() {
     };
     try {
       await guardar.mutateAsync({ ...payload, id: form.id });
-      setNotice({ ok: true, text: `${form.id ? 'Cambios guardados' : 'Registro guardado'}: ${form.tipo === 'encuentro' ? encuentroLabel : eventoLabel} · ${shortDate(form.fecha)}.` });
+      const nombre = `${form.tipo === 'encuentro' ? encuentroLabel : eventoLabel} · ${shortDate(form.fecha)}`;
+      setNotice({ ok: true, text: form.id ? `Cambios guardados: ${nombre}.` : `Reporte enviado: ${nombre}. Queda por revisar hasta que el administrador del campus lo suba.` });
       setForm(emptyForm(form.fecha));
     } catch (err) {
       setNotice({ ok: false, text: apiErrorMessage(err, 'No se pudo guardar el registro') });
     }
   }
 
-  if (!allowed) return null;
+  if (!allowed) return revision.isError ? <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">No se pudieron verificar los permisos. <button onClick={() => void revision.refetch()} className="underline">Reintentar</button></p> : null;
 
   const numberInput = (value: string, onChange: (v: string) => void, label: string) => (
     <label className={labelCls}>
       {label}
-      <input type="number" inputMode="numeric" min={0} step={1} value={value} onChange={(e) => onChange(e.target.value)} placeholder="0" className={inputCls} />
+      <input type="number" inputMode="numeric" min={0} step={1} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Sin dato" className={inputCls} />
     </label>
   );
 
@@ -268,7 +289,7 @@ export function RegistrarEncuentroClient() {
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{form.id ? 'Editar registro' : 'Registrar encuentro'}</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600">Ingresa la asistencia, los voluntarios y las decisiones de cada encuentro o evento. Aparecen al instante en el panel de Estadísticas.</p>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600">Ingresa la asistencia, los voluntarios y las decisiones. El administrador revisa el reporte y lo sube para incorporarlo a Estadísticas.</p>
           </div>
           <Link href="/dashboard/produccion-general/estadisticas" className="rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700">Ver estadísticas</Link>
         </div>
@@ -313,6 +334,9 @@ export function RegistrarEncuentroClient() {
         </div>
       )}
 
+      {!canCreate && !form.id ? (
+        <p className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Para registrar encuentros necesitas el permiso «Registrar nuevos encuentros». Revisa los reportes del campus en <Link href="/dashboard/produccion-general/estadisticas/revisar" className="font-semibold text-violet-700 underline">Revisar reportes</Link>.</p>
+      ) : (
       <form onSubmit={enviar} className="space-y-5">
         <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Tipo de registro">
@@ -378,6 +402,9 @@ export function RegistrarEncuentroClient() {
               </label>
             )}
           </div>
+          {form.id && (registros.data ?? []).find((r) => r.id === form.id)?.estado === 'observado' && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800"><strong>Observación:</strong> {(registros.data ?? []).find((r) => r.id === form.id)?.observacion}. Al guardar, el reporte vuelve a quedar por revisar.</p>
+          )}
           {yaRegistrado && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Este encuentro ya está registrado. Edítalo en la lista de abajo en vez de crear otro.</p>
           )}
@@ -421,11 +448,13 @@ export function RegistrarEncuentroClient() {
           </button>
         </div>
       </form>
+      )}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-label="Registros recientes">
         <h2 className="font-bold text-slate-900">Registros recientes{campus ? ` · ${campus.name}` : ''}</h2>
         <p className="mb-3 text-xs text-slate-500">Últimos tres meses.</p>
-        {registros.isLoading ? <p className="text-sm text-slate-500">Cargando…</p>
+        {registros.isError ? <p role="alert" className="text-sm text-red-700">No se pudieron cargar los registros. <button onClick={() => void registros.refetch()} className="underline">Reintentar</button></p>
+          : registros.isLoading ? <p className="text-sm text-slate-500">Cargando…</p>
           : !(registros.data ?? []).length ? <p className="text-sm text-slate-500">Todavía no hay registros en este período.</p>
           : (
             <ul className="divide-y divide-slate-100">
@@ -437,10 +466,16 @@ export function RegistrarEncuentroClient() {
                     {r.tipo === 'evento' && <span className="ml-2 rounded-full bg-amber-50 px-2 text-[10px] font-bold uppercase text-amber-700">Evento</span>}
                   </span>
                   <span className="text-xs text-slate-600">{r.totalAsistencia ?? 0} asistentes · {r.totalVoluntarios ?? 0} voluntarios · {(r.presencial?.acepto ?? 0) + (r.online?.acepto ?? 0)} aceptaron</span>
-                  <span className="flex gap-1">
-                    {canEdit && <button type="button" onClick={() => editar(r)} className="rounded-lg px-2 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-50">Editar</button>}
-                    {canDelete && <button type="button" onClick={() => borrar(r)} className="rounded-lg px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Eliminar</button>}
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${r.estado === 'subido' ? 'bg-emerald-50 text-emerald-700' : r.estado === 'observado' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'}`}>
+                    {r.estado === 'subido' ? 'Subido' : r.estado === 'observado' ? 'Observado' : 'Por revisar'}
                   </span>
+                  <span className="flex gap-1">
+                    {puedeEditar(r) && <button type="button" onClick={() => editar(r)} className="rounded-lg px-2 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-50">{r.estado === 'observado' && !isReviewer(r) ? 'Corregir' : 'Editar'}</button>}
+                    {puedeEliminar(r) && <button type="button" onClick={() => borrar(r)} className="rounded-lg px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Eliminar</button>}
+                  </span>
+                  {r.estado === 'observado' && r.observacion && (
+                    <p className="w-full rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-800"><strong>Observación del administrador:</strong> {r.observacion}</p>
+                  )}
                 </li>
               ))}
             </ul>

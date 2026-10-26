@@ -210,6 +210,7 @@ const NAV: NavGroup[] = [
   },
   { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas', section: 'Producción', icon: StatsIcon, permission: 'estadisticas:view' },
   { href: '/dashboard/produccion-general/estadisticas/registrar', label: 'Registrar encuentro', section: 'Producción', icon: TecnicosIcon, permission: 'encuentros:create' },
+  { href: '/dashboard/produccion-general/estadisticas/revisar',   label: 'Revisar reportes',    section: 'Producción', icon: TecnicosIcon, permission: 'encuentros:review' },
   { href: '/dashboard/produccion-general/finanzas',     label: 'Finanzas',     section: 'Producción', icon: SiembraIcon, permission: 'finanzas:view' },
   {
     href:    '/dashboard/ministerios',
