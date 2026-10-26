@@ -35,8 +35,8 @@ function timeAgo(raw: string): string {
 // ── Subcomponentes de UI (tema oscuro) ──────────────────────────────────────
 
 function Card({ children, className = '', href }: { children: React.ReactNode; className?: string; href?: string }) {
-  const cls = `rounded-2xl border transition-all ${href ? 'hover:border-white/20' : ''} ${className}`;
-  const style = { background: '#111', borderColor: '#1f1f1f' };
+  const cls = `rounded-xl border transition-all ${href ? 'hover:border-[#9ab9b1] hover:shadow-sm' : ''} ${className}`;
+  const style = { background: '#ffffff', borderColor: '#dce5e3' };
   if (href) {
     return <Link href={href} className={cls} style={style}>{children}</Link>;
   }
@@ -219,23 +219,23 @@ export function DashboardClient() {
     : '?';
 
   return (
-    <div className="dashboard-home min-h-screen -m-6 px-4 py-6 sm:px-6" style={{ background: '#0a0a0a' }}>
+    <div className="dashboard-home min-h-screen -m-6 px-4 py-6 sm:px-6 lg:px-8" style={{ background: '#f4f6f6' }}>
       <div className="space-y-5 max-w-6xl mx-auto">
 
         {/* Identidad compacta + bienvenida */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-[21px] font-bold text-white leading-tight">
+            <h1 className="text-2xl font-bold tracking-tight text-[#172326] leading-tight">
               Bienvenido a casa{firstName ? `, ${firstName}` : ''}
             </h1>
-            <p className="text-[13px] mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>
+            <p className="text-sm mt-1 text-[#526367]">
               Revisa tus pendientes y encuentra lo que necesitas para servir esta semana.
             </p>
           </div>
 
           <Link href="/dashboard/perfil"
-            className="flex items-center gap-2.5 pl-2 pr-3.5 py-2 rounded-full transition-all hover:border-white/20 flex-shrink-0"
-            style={{ background: '#111', border: '1px solid #1f1f1f' }}>
+            className="flex items-center gap-2.5 pl-2 pr-3.5 py-2 rounded-lg transition-all hover:border-[#9ab9b1] flex-shrink-0"
+            style={{ background: '#fff', border: '1px solid #dce5e3' }}>
             {user?.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={user.avatarUrl} alt="avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
@@ -246,7 +246,7 @@ export function DashboardClient() {
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-[12px] font-semibold text-white leading-none truncate max-w-[140px]">
+              <p className="text-[12px] font-semibold text-[#172326] leading-none truncate max-w-[140px]">
                 {user ? `${user.firstName} ${user.lastName}` : '—'}
               </p>
               <p className="text-xs mt-1 truncate max-w-[140px]" style={{ color: 'rgba(255,255,255,0.7)' }}>

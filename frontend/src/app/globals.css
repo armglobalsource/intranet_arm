@@ -4,11 +4,22 @@
 
 @layer base {
   :root {
-    --brand: #0d0d0d;
-    --brand-dark: #000000;
+    --brand: #153b42;
+    --brand-dark: #0d292f;
+    --surface-app: #f4f6f6;
+    --surface-panel: #ffffff;
+    --surface-subtle: #eef2f1;
+    --border-default: #dce5e3;
+    --text-primary: #172326;
+    --text-secondary: #526367;
+    --text-muted: #738184;
+    --focus-ring: #2b8a78;
   }
+  * { border-color: var(--border-default); }
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
+    background: var(--surface-app);
+    color: var(--text-primary);
   }
 }
 
