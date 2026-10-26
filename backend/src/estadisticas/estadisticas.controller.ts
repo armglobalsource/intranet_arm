@@ -27,14 +27,15 @@ export class EstadisticasController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('country') country?: string,
+    @Query('period') period?: string,
   ) {
     const year = Number(yearText);
     if (!Number.isInteger(year) || year < 2000 || year > 2100) {
       throw new BadRequestException('year inválido');
     }
 
-    const groupBy: GroupBy = groupByText === 'week' ? 'week' : 'month';
-    if (groupByText && !['week', 'month'].includes(groupByText)) {
+    const groupBy: GroupBy = groupByText === 'year' ? 'year' : groupByText === 'week' ? 'week' : 'month';
+    if (groupByText && !['week', 'month', 'year'].includes(groupByText)) {
       throw new BadRequestException('groupBy inválido');
     }
 
@@ -58,7 +59,9 @@ export class EstadisticasController {
       throw new BadRequestException('No puedes consultar otro campus');
     }
 
-    statisticsRange(year, from, to);
+    if (period !== undefined && period !== 'history') throw new BadRequestException('Período inválido');
+    const history = period === 'history';
+    statisticsRange(year, from, to, history);
     if (country && country.length > 100) throw new BadRequestException('País inválido');
     return this.estadisticas.dashboard({
       year,
@@ -66,7 +69,7 @@ export class EstadisticasController {
       type,
       campusId: canViewAll ? requestedCampusId : Number(user.campusId),
       canViewAll,
-      from, to, country,
+      from, to, country, history,
     });
   }
 }

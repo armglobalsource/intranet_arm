@@ -1,8 +1,9 @@
-export type StatsPreset = 'week' | 'month' | 'year' | 'custom';
+export type StatsPreset = 'history' | 'week' | 'month' | 'year' | 'custom';
 const key = (d: Date) => d.toISOString().slice(0, 10);
 export function statsPreset(preset: Exclude<StatsPreset, 'custom'>, now = new Date()) {
   // A single business date for cross-campus reporting, independent of Vercel's timezone.
   const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  if (preset === 'history') return { from: '2020-01-01', to: today };
   if (preset === 'month') return { from: today.slice(0, 7) + '-01', to: today };
   if (preset === 'year') return { from: today.slice(0, 4) + '-01-01', to: today };
   const monday = new Date(`${today}T12:00:00Z`);

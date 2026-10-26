@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { statisticsRange, countryName } from './statistics-range';
 
 describe('statistics date ranges', () => {
+  it('allows complete history since 2020 with a server-controlled cutoff in Chile', () => {
+    const range = statisticsRange(2026, undefined, undefined, true, new Date('2026-10-26T01:00:00Z'));
+    expect(range).toMatchObject({ start: '2020-01-01', end: '2026-10-25', previousStart: '2020-01-01' });
+    expect(range.days).toBeGreaterThan(366);
+    expect(() => statisticsRange(2026, '2010-01-01', '2026-10-25', true)).toThrow();
+  });
   it('compares adjacent equal periods across year boundaries', () => {
     expect(statisticsRange(2026, '2026-01-01', '2026-01-07')).toEqual({ start: '2026-01-01', end: '2026-01-07', days: 7, previousStart: '2025-12-25', previousEnd: '2025-12-31' });
   });

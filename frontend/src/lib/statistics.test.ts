@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { statsPreset, statsChange, validStatsRange } from './statistics';
 describe('statistics filters and comparisons', () => {
+  it('selects all history through today in Chile', () => {
+    expect(statsPreset('history', new Date('2026-10-26T01:00:00Z'))).toEqual({ from: '2020-01-01', to: '2026-10-25' });
+  });
   it('selects a complete Monday–Sunday week, including across years', () => {
     expect(statsPreset('week', new Date('2026-01-05T15:00:00Z'))).toEqual({ from: '2025-12-29', to: '2026-01-04' });
   });

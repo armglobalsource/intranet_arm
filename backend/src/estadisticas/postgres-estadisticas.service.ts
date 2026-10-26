@@ -6,7 +6,7 @@ import { sumCounts } from '../common/arm-records.util';
 import { isUploaded } from '../encuentros/encuentros.review';
 import { countryName, statisticsRange, validDay } from './statistics-range';
 
-export type GroupBy = 'week' | 'month';
+export type GroupBy = 'week' | 'month' | 'year';
 export type RecordType = 'all' | 'encuentro' | 'evento';
 
 interface DashboardOptions {
@@ -18,6 +18,7 @@ interface DashboardOptions {
   from?: string;
   to?: string;
   country?: string;
+  history?: boolean;
 }
 
 export interface Metrics {
@@ -154,7 +155,7 @@ export class PostgresEstadisticasService {
 
   async dashboard(options: DashboardOptions) {
     if (!options.canViewAll && (!Number.isSafeInteger(options.campusId) || options.campusId! <= 0)) throw new BadRequestException('Campus requerido');
-    const range = statisticsRange(options.year, options.from, options.to);
+    const range = statisticsRange(options.year, options.from, options.to, options.history);
     const allCampuses = await this.campuses.findAll();
     // Resolve legacy names against the FULL catalog, never a filtered subset.
     // This prevents homonymous campuses from crossing an authorization boundary.
@@ -315,6 +316,7 @@ export class PostgresEstadisticasService {
       meta: {
         year: options.year,
         from: start, to: end, days: range.days,
+        history: options.history === true,
         monthOnly: { reports: monthOnlyReports, metrics: this.withDerived(monthOnlyMetrics) },
         country: options.country ? countryName(options.country) : null,
         excludedReports: scopedRows.filter((row) => inRange(row, start, end) && !eligible(row)).length,
@@ -332,7 +334,7 @@ export class PostgresEstadisticasService {
         country: campusCountry(campus),
         isActive: campus.isActive !== false,
       })),
-      comparison: { from: range.previousStart, to: range.previousEnd, totals: this.withDerived(previous) },
+      comparison: options.history ? null : { from: range.previousStart, to: range.previousEnd, totals: this.withDerived(previous) },
       totals: this.withDerived(totals),
       periods: periods.map((period) => ({
         ...period,
@@ -442,12 +444,17 @@ export class PostgresEstadisticasService {
   }
 
   private periodKey(key: string, groupBy: GroupBy) {
+    if (groupBy === 'year') return key.slice(0, 4);
     return groupBy === 'month'
       ? key.slice(0, 7)
       : isoKey(startOfWeek(key));
   }
 
   private buildPeriods(year: number, groupBy: GroupBy) {
+    if (groupBy === 'year') return [{
+      key: String(year), label: String(year), start: `${year}-01-01`, end: `${year}-12-31`,
+      metrics: emptyMetrics(), quality: emptyQuality(),
+    }];
     if (groupBy === 'month') {
       return Array.from({ length: 12 }, (_, index) => {
         const month = index + 1;

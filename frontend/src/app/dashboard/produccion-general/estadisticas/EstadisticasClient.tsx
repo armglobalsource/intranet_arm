@@ -13,7 +13,7 @@ import { statsPreset, statsChange, validStatsRange, type StatsPreset } from '@/l
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/lib/store/auth.store';
 
-type GroupBy = 'month' | 'week';
+type GroupBy = 'month' | 'week' | 'year';
 type RecordType = 'all' | 'encuentro' | 'evento';
 
 interface Metrics {
@@ -43,6 +43,7 @@ interface Quality {
 interface StatsResponse {
   meta: {
     year: number;
+    history?: boolean;
     from: string; to: string; days: number; country: string | null;
     excludedReports: number; legacyReports: number;
     monthOnly: { reports: number; metrics: Metrics };
@@ -54,7 +55,7 @@ interface StatsResponse {
   };
   countries: string[];
   campuses: { id: number; name: string; country: string; isActive: boolean }[];
-  comparison: { from: string; to: string; totals: Metrics };
+  comparison: { from: string; to: string; totals: Metrics } | null;
   totals: Metrics;
   periods: {
     key: string;
@@ -187,16 +188,16 @@ function TrendChart({ periods, groupBy }: { periods: StatsResponse['periods']; g
         <div>
           <h2 className="font-bold text-gray-900">Evolución de asistencia</h2>
           <p className="mt-1 text-xs text-gray-500">
-            {groupBy === 'month' ? 'Asistencias acumuladas por mes dentro del rango' : 'Comportamiento semana a semana'}
+            {groupBy === 'year' ? 'Asistencias acumuladas por año; el año actual llega hasta hoy' : groupBy === 'month' ? 'Asistencias acumuladas por mes dentro del rango' : 'Comportamiento semana a semana'}
           </p>
         </div>
         <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-500">
-          {`${periods.length} ${groupBy === 'month' ? 'meses' : 'semanas'}`}
+          {`${periods.length} ${groupBy === 'year' ? 'años' : groupBy === 'month' ? 'meses' : 'semanas'}`}
         </span>
       </div>
 
       <div className="overflow-x-auto pb-2">
-        <div className={`flex h-64 items-end gap-2 ${groupBy === 'week' ? 'min-w-[1450px]' : 'min-w-[680px]'}`}>
+        <div className="flex h-64 items-end gap-2" style={{ minWidth: Math.max(320, periods.length * 58) }}>
           {periods.map((period, index) => {
             const height = hasData
               ? Math.max(period.metrics.asistencia > 0 ? 8 : 2, (period.metrics.asistencia / max) * 190)
@@ -324,11 +325,12 @@ export function EstadisticasClient() {
   const { can, isAdmin } = usePermissions();
   const canView = isAdmin || can('estadisticas:view');
   const canViewAll = isAdmin || can('estadisticas:viewAll');
-  const [range, setRange] = useState(() => statsPreset('week'));
+  const [range, setRange] = useState(() => statsPreset('history'));
   const [draft, setDraft] = useState(range);
-  const [preset, setPreset] = useState<StatsPreset>('week');
+  const [preset, setPreset] = useState<StatsPreset>('history');
+  const [history, setHistory] = useState(true);
   const [rangeError, setRangeError] = useState('');
-  const [groupBy, setGroupBy] = useState<GroupBy>('week');
+  const [groupBy, setGroupBy] = useState<GroupBy>('year');
   const [type, setType] = useState<RecordType>('all');
   const [country, setCountry] = useState('');
   const [campusId, setCampusId] = useState('');
@@ -338,9 +340,10 @@ export function EstadisticasClient() {
 
   useEffect(() => { if (!canView) router.replace('/dashboard'); }, [canView, router]);
   const { data, isLoading, isFetching, isError, refetch } = useQuery<StatsResponse>({
-    queryKey: ['estadisticas', scopeKey, range.from, range.to, groupBy, type, country, campusId],
+    queryKey: ['estadisticas', scopeKey, history, range.from, range.to, groupBy, type, country, campusId],
     queryFn: () => api.get('/estadisticas', { params: {
-      year: Number(range.from.slice(0, 4)), from: range.from, to: range.to, groupBy, type,
+      year: Number(range.from.slice(0, 4)), groupBy, type,
+      ...(history ? { period: 'history' } : { from: range.from, to: range.to }),
       ...(country ? { country } : {}), ...(campusId ? { campusId } : {}),
     } }).then((response) => response.data),
     enabled: canView, staleTime: 60_000, retry: false,
@@ -353,9 +356,10 @@ export function EstadisticasClient() {
   function applyPreset(value: StatsPreset) {
     setPreset(value); setRangeError('');
     if (value !== 'custom') {
+      setHistory(value === 'history');
       const selected = statsPreset(value); setRange(selected); setDraft(selected);
-      setGroupBy(value === 'year' ? 'month' : 'week');
-    }
+      setGroupBy(value === 'history' ? 'year' : value === 'year' ? 'month' : 'week');
+    } else setDraft(history ? statsPreset('year') : range);
   }
   const totals = data?.totals ?? EMPTY_METRICS;
   const totalMeetings = totals.encuentros + totals.eventos;
@@ -366,7 +370,7 @@ export function EstadisticasClient() {
   }, [data?.records, search]);
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
   const visibleRecords = filteredRecords.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const periodLabel = formatDate(range.from) + ' — ' + formatDate(range.to);
+  const periodLabel = formatDate(data?.meta.from ?? range.from) + ' — ' + formatDate(data?.meta.to ?? range.to);
   const inputClass = 'min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-violet-500';
   if (!canView) return null;
   return <div className="mx-auto min-w-0 max-w-[1600px] space-y-5 pb-10">
@@ -386,7 +390,7 @@ export function EstadisticasClient() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Período
           <select aria-label="Período" className={inputClass} value={preset} onChange={(e) => applyPreset(e.target.value as StatsPreset)}>
-            <option value="week">Última semana completa</option><option value="month">Este mes hasta hoy</option><option value="year">Este año hasta hoy</option><option value="custom">Fechas personalizadas</option>
+            <option value="history">Histórico completo · 2020 hasta hoy</option><option value="week">Última semana completa</option><option value="month">Este mes hasta hoy</option><option value="year">Este año hasta hoy</option><option value="custom">Fechas personalizadas</option>
           </select>
         </label>
         {canViewAll && <label className="grid gap-1.5 text-xs font-semibold text-slate-600">País
@@ -403,7 +407,7 @@ export function EstadisticasClient() {
           <select aria-label="Registros" className={inputClass} value={type} onChange={(e) => setType(e.target.value as RecordType)}><option value="all">Encuentros y eventos</option><option value="encuentro">Solo encuentros</option><option value="evento">Solo eventos</option></select>
         </label>
       </div>
-      {preset === 'custom' && <form onSubmit={(e) => { e.preventDefault(); if (!validStatsRange(draft.from, draft.to)) { setRangeError('Selecciona fechas válidas, en orden y con un máximo de 366 días.'); return; } setRangeError(''); setRange({ ...draft }); }} className="flex flex-wrap items-end gap-3">
+      {preset === 'custom' && <form onSubmit={(e) => { e.preventDefault(); if (!validStatsRange(draft.from, draft.to)) { setRangeError('Selecciona fechas válidas, en orden y con un máximo de 366 días.'); return; } setRangeError(''); setHistory(false); setRange({ ...draft }); }} className="flex flex-wrap items-end gap-3">
         <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-slate-600">Desde<input type="date" required min="2000-01-01" max="2100-12-31" className={inputClass} value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} /></label>
         <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-slate-600">Hasta<input type="date" required min="2000-01-01" max="2100-12-31" className={inputClass} value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} /></label>
         <button className="min-h-[42px] rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white">Aplicar fechas</button>
@@ -424,9 +428,10 @@ export function EstadisticasClient() {
           {data.meta.excludedReports > 0 && <span className="text-amber-800">{data.meta.excludedReports} {data.meta.excludedReports === 1 ? 'reporte no cuenta' : 'reportes no cuentan'}: esperan que el administrador del campus los suba</span>}
         </div>
         {(data.meta.monthOnly?.reports ?? 0) > 0 && <p role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          Incluye {number(data.meta.monthOnly.reports)} reportes históricos de los que solo se conoce el mes ({number(data.meta.monthOnly.metrics.asistencia)} asistencias). Suman en los totales, por campus y por mes; no aparecen en las semanas. Solo se incluyen cuando el rango cubre el mes completo.
+          Incluye {number(data.meta.monthOnly.reports)} reportes históricos de los que solo se conoce el mes ({number(data.meta.monthOnly.metrics.asistencia)} asistencias). Suman en los totales, por campus, por año y por mes; no aparecen en las semanas. Solo se incluyen cuando el rango cubre el mes completo.
         </p>}
         {totalMeetings === 0 && <p role="status" className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">No hay encuentros incluidos en este período. Prueba otras fechas o revisa los filtros.</p>}
+        {data.meta.history && <p className="text-sm text-slate-600">Histórico desde 2020: incluye los reportes disponibles y aprobados hasta hoy. Los datos históricos pendientes de revisión todavía no forman parte de estos totales.</p>}
         {tab === 'summary' && <section aria-label="Resumen de estadísticas" className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Asistencias" value={totals.asistencia} detail="Participaciones acumuladas, no personas únicas" icon={Users} accent="#7c3aed" />
@@ -434,7 +439,7 @@ export function EstadisticasClient() {
             <MetricCard label="Decisiones de fe" value={totals.manitosTotal} detail={number(totals.manitosPresencial) + ' presenciales · ' + number(totals.manitosOnline) + ' online'} icon={Hand} accent="#059669" />
             <MetricCard label="Voluntarios" value={totals.voluntarios} detail="Participaciones de servicio acumuladas" icon={HeartHandshake} accent="#d97706" />
           </div>
-          <section aria-label="Comparación de períodos" className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4 sm:p-5">
+          {data.comparison && <section aria-label="Comparación de períodos" className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4 sm:p-5">
             <h2 className="font-bold text-slate-900">Comparado con el período anterior</h2>
             <p className="mt-1 text-sm text-slate-600">{formatDate(data.comparison.from)} — {formatDate(data.comparison.to)} · {data.meta.days} días de igual duración, inmediatamente anteriores.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -444,7 +449,7 @@ export function EstadisticasClient() {
               <ComparisonCard label="Encuentros y eventos" current={totalMeetings} previous={data.comparison.totals.encuentros + data.comparison.totals.eventos} />
             </div>
             <p className="mt-3 text-xs text-slate-600">Una variación también puede reflejar reportes faltantes. Revisa la calidad de los datos antes de interpretarla.</p>
-          </section>
+          </section>}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Servicios registrados" value={totalMeetings} detail={number(totals.encuentros) + ' encuentros · ' + number(totals.eventos) + ' eventos'} icon={CalendarDays} />
             <MetricCard label="Espectadores online" value={totals.espectadoresOnline} detail="Suma de espectadores a la vez por transmisión; no personas únicas" icon={Wifi} accent="#0891b2" />
@@ -453,9 +458,9 @@ export function EstadisticasClient() {
           </div>
         </section>}
         {tab === 'trends' && <section aria-label="Evolución de estadísticas" className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2"><span className="mr-2 text-sm text-slate-600">Agrupar por</span>{([['week', 'Semana'], ['month', 'Mes']] as const).map(([value, label]) => <button key={value} aria-pressed={groupBy === value} onClick={() => setGroupBy(value)} className={'rounded-xl px-4 py-2 text-sm font-semibold ' + (groupBy === value ? 'bg-violet-700 text-white' : 'bg-white text-slate-600 border border-slate-200')}>{label}</button>)}</div>
+          <div className="flex flex-wrap items-center gap-2"><span className="mr-2 text-sm text-slate-600">Agrupar por</span>{([['year', 'Año'], ['month', 'Mes'], ['week', 'Semana']] as const).map(([value, label]) => <button key={value} aria-pressed={groupBy === value} onClick={() => setGroupBy(value)} className={'rounded-xl px-4 py-2 text-sm font-semibold ' + (groupBy === value ? 'bg-violet-700 text-white' : 'bg-white text-slate-600 border border-slate-200')}>{label}</button>)}</div>
           <TrendChart periods={data.periods} groupBy={groupBy} />
-          <p className="text-xs text-slate-500">Los extremos del gráfico se limitan a las fechas seleccionadas; pueden ser semanas o meses parciales.</p>
+          <p className="text-xs text-slate-500">Los extremos del gráfico se limitan a las fechas seleccionadas; pueden ser años, meses o semanas parciales.</p>
           <div className="grid gap-5 xl:grid-cols-3"><BreakdownCard title="Asistencia por categoría" subtitle="Distribución acumulada del período" rows={data.attendanceBreakdown} color="#7c3aed" /><BreakdownCard title="Voluntarios por área" subtitle="Participaciones por equipo de servicio" rows={data.volunteerBreakdown} color="#059669" /><QualityCard quality={data.quality} /></div>
         </section>}
         {tab === 'campuses' && <section aria-label="Resultados por campus" className="space-y-5">

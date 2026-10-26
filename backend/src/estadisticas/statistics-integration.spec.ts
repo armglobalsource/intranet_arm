@@ -14,6 +14,33 @@ function service(rows: any[]) {
 }
 const options = { year: 2026, from: '2026-01-01', to: '2026-01-07', groupBy: 'week' as const, type: 'all' as const, canViewAll: true };
 describe('integrated statistics', () => {
+  it('aggregates 2020 through today by year, includes monthly history and preserves campus scope', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-26T01:00:00Z'));
+    try {
+      const { api, list } = service([
+        row('before', '2019-12-31', 1, 999), row('first', '2020-01-01', 1, 10),
+        { ...row('month', '2021-09-01', 1, 30), fechaPrecision: 'mes', periodo: '2021-09' },
+        row('today', '2026-10-25', 1, 20), row('future', '2026-10-26', 1, 999),
+        row('other', '2026-10-25', 2, 40), row('waiting', '2026-10-25', 1, 999, 'enviado'),
+      ]);
+      const historical = { year: 2020, history: true, groupBy: 'year' as const, type: 'all' as const, canViewAll: true };
+      const result = await api.dashboard(historical);
+      expect(result.totals.asistencia).toBe(100);
+      expect(result.comparison).toBeNull();
+      expect(result.periods.map((p) => p.key)).toEqual(['2020','2021','2022','2023','2024','2025','2026']);
+      expect(result.periods.reduce((n,p) => n+p.metrics.asistencia, 0)).toBe(100);
+      expect(result.meta.monthOnly).toMatchObject({ reports: 1, metrics: { asistencia: 30 } });
+      expect(result.periods.at(-1)?.end).toBe('2026-10-25');
+      expect(list).toHaveBeenCalledWith('encuentros', { start: '2020-01-01', end: '2026-10-25T23:59:59.999Z' });
+      const scoped = await api.dashboard({ ...historical, campusId: 1, canViewAll: false });
+      expect(scoped.totals.asistencia).toBe(60);
+      expect(scoped.records.every((r) => r.campusId === 1)).toBe(true);
+      const controller = new EstadisticasController({ dashboard: async (o: any) => o } as any);
+      expect(await controller.dashboard('2020', 'year', undefined, 'all', { permissions: ['*'] }, undefined, undefined, undefined, 'history')).toMatchObject({ history: true, groupBy: 'year' });
+      await expect(controller.dashboard('2020', 'year', undefined, 'all', { permissions: ['*'] }, undefined, undefined, undefined, 'bad')).rejects.toThrow();
+    } finally { vi.useRealTimers(); }
+  });
   it('includes validated and legacy reports, excludes pending, compares previous dates, and never accumulates on reread', async () => {
     const { api, list } = service([row('prev', '2025-12-31', 1, 50, 'validado'), row('legacy', '2026-01-01', 1, 100), row('valid', '2026-01-07T00:00:00.000Z', 1, 60, 'validado'), row('pending', '2026-01-02', 1, 999, 'pendiente'), row('future', '2026-01-08', 1, 999)]);
     const result = await api.dashboard(options);

@@ -15,13 +15,14 @@ async function fixture(page: Page, options: { limited?: boolean; denied?: boolea
     requests.push(url);
     if (options.error) return route.fulfill({ status: 500, json: { message: 'Error de prueba' } });
     const p = url.searchParams;
+    const history = p.get('period') === 'history';
     const authorized = options.limited ? campuses.slice(0, 1) : campuses;
     const visible = authorized.filter((c) => (!p.get('country') || c.country === p.get('country')) && (!p.get('campusId') || String(c.id) === p.get('campusId')));
     return route.fulfill({ json: {
-      meta: { year: 2026, from: p.get('from'), to: p.get('to'), days: 7, legacyReports: 2, excludedReports: 1, canViewAll: !options.limited, generatedAt: '2026-10-24T15:00:00Z' },
+      meta: { year: 2026, history, from: history ? '2020-01-01' : p.get('from'), to: history ? '2026-10-24' : p.get('to'), days: history ? 2489 : 7, legacyReports: 2, excludedReports: 1, canViewAll: !options.limited, generatedAt: '2026-10-24T15:00:00Z' },
       countries: options.limited ? ['Chile'] : ['Chile', 'Uruguay'], campuses: authorized, totals: metrics, quality,
-      comparison: { from: '2026-10-05', to: '2026-10-11', totals: { ...metrics, asistencia: 0 } },
-      periods: [{ key: '2026-10-12', label: '12 oct', start: '2026-10-12', end: '2026-10-18', metrics, quality }],
+      comparison: history ? null : { from: '2026-10-05', to: '2026-10-11', totals: { ...metrics, asistencia: 0 } },
+      periods: history ? Array.from({ length: 7 }, (_, i) => ({ key: String(2020+i), label: String(2020+i), start: `${2020+i}-01-01`, end: `${2020+i}-12-31`, metrics, quality })) : [{ key: '2026-10-12', label: '12 oct', start: '2026-10-12', end: '2026-10-18', metrics, quality }],
       byCampus: visible.map((c) => ({ campusId: c.id, campusName: c.name, country: c.country, isActive: c.isActive, metrics, quality })),
       attendanceBreakdown: [{ key: 'auditorio', label: 'Auditorio', value: 100 }], volunteerBreakdown: [{ key: 'servicio', label: 'Servicio', value: 30 }],
       records: visible.map((c) => ({ id: String(c.id), fecha: '2026-10-18', campusId: c.id, campusName: c.name, tipo: 'encuentro', encuentro: 'Domingo 11:00', predicador: 'José Pérez', mensaje: 'Esperanza', asistencia: 120, voluntarios: 30, manitosPresencial: 5, manitosOnline: 2, espectadoresOnline: 80, completeness: 67 })),
@@ -34,8 +35,10 @@ async function fixture(page: Page, options: { limited?: boolean; denied?: boolea
 test('envía una semana completa y combina país/campus sin perder las opciones', async ({ page }) => {
   const requests = await fixture(page);
   await expect(page.getByRole('region', { name: 'Resumen de estadísticas' })).toBeVisible();
-  expect(requests[0].searchParams.get('from')).toBe('2026-10-12');
-  expect(requests[0].searchParams.get('to')).toBe('2026-10-18');
+  await page.getByLabel('Período', { exact: true }).selectOption('week');
+  await expect.poll(() => requests.at(-1)?.searchParams.get('from')).toBe('2026-10-12');
+  expect(requests.at(-1)?.searchParams.get('to')).toBe('2026-10-18');
+  expect(requests.at(-1)?.searchParams.has('period')).toBe(false);
   await expect(page.getByText(/Sin base porcentual/)).toBeVisible();
   await page.getByLabel('País', { exact: true }).selectOption('Chile');
   await page.getByLabel('Campus', { exact: true }).selectOption('1');
@@ -109,4 +112,22 @@ test('vista clara en escritorio y móvil', async ({ page }) => {
   await expect(page.getByRole('region', { name: 'Resumen de estadísticas' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/stats-mobile.png' });
+});
+
+
+test('abre todo el histórico desde 2020, con evolución anual y sin comparación anterior ficticia', async ({ page }) => {
+  const requests = await fixture(page);
+  await expect(page.getByRole('region', { name: 'Resumen de estadísticas' })).toBeVisible();
+  await expect(page.getByLabel('Período', { exact: true })).toHaveValue('history');
+  expect(requests[0].searchParams.get('period')).toBe('history');
+  expect(requests[0].searchParams.get('groupBy')).toBe('year');
+  expect(requests[0].searchParams.has('from')).toBe(false);
+  await expect(page.getByRole('region', { name: 'Comparación de períodos' })).toHaveCount(0);
+  await page.getByRole('navigation', { name: 'Vistas de estadísticas' }).getByRole('button', { name: 'Evolución' }).click();
+  await expect(page.getByText('7 años', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Año', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const count = requests.length;
+  await page.getByLabel('Período', { exact: true }).selectOption('custom');
+  await expect(page.getByLabel('Desde', { exact: true })).toHaveValue('2026-01-01');
+  expect(requests.length).toBe(count);
 });
