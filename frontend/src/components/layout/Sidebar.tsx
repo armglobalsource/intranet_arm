@@ -11,6 +11,7 @@ import { useSystemRoles } from '@/hooks/useRoles';
 import { useImpersonation } from '@/hooks/useImpersonation';
 import { useNotifications } from '@/hooks/useNotifications';
 import { api } from '@/lib/api';
+import { STATS_ROOT, STATS_VIEWS, statsHref } from '@/lib/statistics-navigation';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -208,10 +209,14 @@ const NAV: NavGroup[] = [
       { href: '/dashboard/produccion-general/tecnicos/disponibilidad',  label: 'Disponibilidad técnica',  icon: TecnicosIcon, permission: 'tecnicos:submit' },
     ],
   },
-  { href: '/dashboard/produccion-general/estadisticas', label: 'Estadísticas', section: 'Producción', icon: StatsIcon, permission: 'estadisticas:view' },
-  { href: '/dashboard/produccion-general/estadisticas/registrar', label: 'Registrar encuentro', section: 'Producción', icon: TecnicosIcon, permission: 'encuentros:create' },
-  { href: '/dashboard/produccion-general/estadisticas/revisar',   label: 'Revisar reportes',    section: 'Producción', icon: TecnicosIcon, permission: 'encuentros:review' },
-  { href: '/dashboard/produccion-general/finanzas',     label: 'Finanzas',     section: 'Producción', icon: SiembraIcon, permission: 'finanzas:view' },
+  { href: '/dashboard/produccion-general/finanzas', label: 'Finanzas', section: 'Producción', icon: SiembraIcon, permission: 'finanzas:view' },
+  { href: STATS_ROOT, label: 'Estadísticas', section: 'Análisis y operación', icon: StatsIcon,
+    children: [
+      ...STATS_VIEWS.map(view => ({ href: statsHref(view.slug), label: view.label, icon: MinisterioSubIcon, permission: 'estadisticas:view' })),
+      { href: `${STATS_ROOT}/registrar`, label: 'Registrar encuentro', icon: TecnicosIcon, permission: 'encuentros:create' },
+      { href: `${STATS_ROOT}/revisar`, label: 'Revisar reportes', icon: FichaIcon, permission: 'encuentros:review' },
+    ],
+  },
   {
     href:    '/dashboard/ministerios',
     label:   'Ministerios',
@@ -416,7 +421,7 @@ export function Sidebar() {
               {/* Ítem principal */}
               <div className="relative">
                 <Link
-                  href={href}
+                  href={href === STATS_ROOT ? children?.[0]?.href ?? href : href}
                   aria-current={active && !children ? 'page' : undefined}
                   data-active={active}
                   className={`nav-item ${children ? 'pr-10' : ''}`}
@@ -442,7 +447,7 @@ export function Sidebar() {
               {children && isExpanded && (
                 <div className="nav-submenu space-y-0.5">
                   {children.map(({ href: chref, label: clabel, icon: CIcon }) => {
-                    const cActive = pathname.startsWith(chref);
+                    const cActive = pathname.startsWith(chref) && !children.some(other => other.href.length > chref.length && pathname.startsWith(other.href));
                     return (
                       <Link
                         key={chref}

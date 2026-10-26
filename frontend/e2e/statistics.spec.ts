@@ -5,10 +5,10 @@ const campuses = [{ id: 1, name: 'Santiago', country: 'Chile', isActive: true },
 const metrics = { auditorio: 100, encuentros: 2, eventos: 1, asistencia: 120, voluntarios: 30, manitosPresencial: 5, manitosOnline: 2, manitosTotal: 7, espectadoresOnline: 80, kiloAmorCajas: 8, kiloAmorRegistros: 1, promedioAsistencia: 40, promedioVoluntarios: 10 };
 const quality = { total: 3, complete: 2, incomplete: 1, completeness: 67, missing: { predicador: 1 } };
 
-async function fixture(page: Page, options: { limited?: boolean; denied?: boolean; error?: boolean } = {}) {
+async function fixture(page: Page, options: { limited?: boolean; denied?: boolean; error?: boolean; planning?: boolean; authorOnly?: boolean } = {}) {
   const requests: URL[] = [];
   await page.clock.setFixedTime(new Date('2026-10-24T15:00:00Z'));
-  await page.addInitScript((options) => localStorage.setItem('auth-storage', JSON.stringify({ version: 0, state: { user: { id: 1, firstName: 'Demo', lastName: 'ARM', campusId: 1, permissions: options.denied ? [] : options.limited ? ['estadisticas:view'] : ['*'], role: { name: 'usuario' }, status: 'active' }, accessToken: 'local-fixture', isAuthenticated: true } })), options);
+  await page.addInitScript((options) => localStorage.setItem('auth-storage', JSON.stringify({ version: 0, state: { user: { id: 1, firstName: 'Demo', lastName: 'ARM', campusId: 1, permissions: options.denied ? [] : options.authorOnly ? ['encuentros:create'] : options.limited ? ['estadisticas:view'] : ['*'], role: { name: 'usuario' }, status: 'active' }, accessToken: 'local-fixture', isAuthenticated: true } })), options);
   await page.route('**/api/v1/**', (route) => {
     const url = new URL(route.request().url());
     if (!url.pathname.endsWith('/estadisticas')) return route.fulfill({ json: [] });
@@ -25,7 +25,7 @@ async function fixture(page: Page, options: { limited?: boolean; denied?: boolea
       periods: history ? Array.from({ length: 7 }, (_, i) => ({ key: String(2020+i), label: String(2020+i), start: `${2020+i}-01-01`, end: `${2020+i}-12-31`, metrics, quality })) : [{ key: '2026-10-12', label: '12 oct', start: '2026-10-12', end: '2026-10-18', metrics, quality }],
       byCampus: visible.map((c) => ({ campusId: c.id, campusName: c.name, country: c.country, isActive: c.isActive, metrics, quality })),
       attendanceBreakdown: [{ key: 'auditorio', label: 'Auditorio', value: 100 }], volunteerBreakdown: [{ key: 'servicio', label: 'Servicio', value: 30 }],
-      records: visible.map((c) => ({ id: String(c.id), fecha: '2026-10-18', campusId: c.id, campusName: c.name, tipo: 'encuentro', encuentro: 'Domingo 11:00', predicador: 'José Pérez', mensaje: 'Esperanza', asistencia: 120, voluntarios: 30, manitosPresencial: 5, manitosOnline: 2, espectadoresOnline: 80, completeness: 67 })),
+      records: visible.flatMap((c) => Array.from({ length: options.planning ? 8 : 1 }, (_, i) => ({ id: `${c.id}-${i}`, fecha: options.planning ? new Date(Date.UTC(2026, 7, 30 + 7*i)).toISOString().slice(0,10) : '2026-10-18', fechaPrecision: 'dia', campusId: c.id, campusName: c.name, tipo: 'encuentro', encuentro: 'Domingo 11:00', predicador: 'José Pérez', mensaje: 'Esperanza', asistencia: 120, voluntarios: 30, manitosPresencial: 5, manitosOnline: 2, espectadoresOnline: 80, completeness: 67 }))),
     } });
   });
   await page.goto('/dashboard/produccion-general/estadisticas');
@@ -130,4 +130,60 @@ test('abre todo el histórico desde 2020, con evolución anual y sin comparació
   await page.getByLabel('Período', { exact: true }).selectOption('custom');
   await expect(page.getByLabel('Desde', { exact: true })).toHaveValue('2026-01-01');
   expect(requests.length).toBe(count);
+});
+
+test('agrupa Estadísticas, activa solo el submenú correcto y conserva la ruta al recargar', async ({ page }) => {
+  await fixture(page);
+  const mainNav = page.getByRole('navigation', { name: 'Navegación principal' });
+  await expect(mainNav.getByRole('button', { name: 'Contraer Estadísticas' })).toBeVisible();
+  await mainNav.getByRole('link', { name: 'Calidad de datos', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Cobertura de datos' })).toBeVisible();
+  await expect(mainNav.getByRole('link', { name: 'Calidad de datos', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(mainNav.getByRole('link', { name: 'Resumen', exact: true })).not.toHaveAttribute('aria-current', 'page');
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Cobertura de datos' })).toBeVisible();
+  await mainNav.getByRole('link', { name: 'Operación semanal', exact: true }).click();
+  await expect(page.getByLabel('Período', { exact: true })).toHaveValue('week');
+  await expect(page.getByRole('region', { name: 'Operación de estadísticas' })).toBeVisible();
+});
+
+test('proyecta con semanas cerradas, escenarios explícitos y filtros de campus', async ({ page }) => {
+  const requests = await fixture(page, { planning: true });
+  await page.getByRole('navigation', { name: 'Vistas de estadísticas' }).getByRole('button', { name: 'Proyecciones' }).click();
+  const section = page.getByRole('region', { name: 'Proyecciones por campus' });
+  await expect(section).toBeVisible();
+  await expect.poll(() => requests.at(-1)?.searchParams.get('from')).toBe('2026-08-24');
+  expect(requests.at(-1)?.searchParams.get('to')).toBe('2026-10-18');
+  expect(requests.at(-1)?.searchParams.get('type')).toBe('encuentro');
+  await expect(page.getByLabel('Período', { exact: true })).toHaveCount(0);
+  await expect(section.getByText('480', { exact: true })).toHaveCount(2);
+  await page.getByLabel('Variación de escenarios').selectOption('20');
+  await expect(section.getByText('576', { exact: true })).toHaveCount(2);
+  await page.getByLabel('Campus', { exact: true }).selectOption('1');
+  await expect(section.getByRole('heading', { name: 'Montevideo', exact: true })).toHaveCount(0);
+  await expect(section.getByRole('heading', { name: 'Santiago', exact: true })).toBeVisible();
+  await section.screenshot({ path: 'test-results/stats-projections-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await section.screenshot({ path: 'test-results/stats-projections-mobile.png' });
+});
+
+test('no inventa proyecciones ni ofrece revisión a quien solo puede ver su campus', async ({ page }) => {
+  await fixture(page, { limited: true });
+  const nav = page.getByRole('navigation', { name: 'Vistas de estadísticas' });
+  await nav.getByRole('button', { name: 'Proyecciones' }).click();
+  await expect(page.getByText('Sin estimación disponible.', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Campus', { exact: true })).toHaveCount(0);
+  await nav.getByRole('button', { name: 'Operación semanal' }).click();
+  await expect(page.getByRole('link', { name: 'Abrir revisión de reportes' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Registrar un encuentro' })).toHaveCount(0);
+});
+
+test('el grupo lleva al registro cuando el usuario solo tiene permiso para registrar', async ({ page }) => {
+  const requests = await fixture(page, { authorOnly: true });
+  await expect(page).toHaveURL(/\/dashboard$/);
+  const nav = page.getByRole('navigation', { name: 'Navegación principal' });
+  await expect(nav.getByRole('link', { name: 'Estadísticas', exact: true })).toHaveAttribute('href', '/dashboard/produccion-general/estadisticas/registrar');
+  expect(requests.length).toBe(0);
 });

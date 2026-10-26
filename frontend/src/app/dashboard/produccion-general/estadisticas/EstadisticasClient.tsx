@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Activity, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight,
   ClipboardCheck, Globe2, Hand, HeartHandshake, Search, Users, Wifi,
@@ -12,6 +12,9 @@ import { api } from '@/lib/api';
 import { statsPreset, statsChange, validStatsRange, type StatsPreset } from '@/lib/statistics';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { STATS_VIEWS, statsHref, statsView } from '@/lib/statistics-navigation';
+import { planningRange } from '@/lib/statistics-planning';
+import { OperationsPanel, ProjectionsPanel, CoveragePanel } from './PlanningPanels';
 
 type GroupBy = 'month' | 'week' | 'year';
 type RecordType = 'all' | 'encuentro' | 'evento';
@@ -40,7 +43,7 @@ interface Quality {
   missing: Record<string, number>;
 }
 
-interface StatsResponse {
+export interface StatsResponse {
   meta: {
     year: number;
     history?: boolean;
@@ -320,30 +323,37 @@ function ComparisonCard({ label, current, previous }: { label: string; current: 
 
 export function EstadisticasClient() {
   const router = useRouter();
+  const pathname = usePathname() ?? '';
+  const view = statsView(pathname);
+  const tab = view.id;
   const user = useAuthStore((state) => state.user);
   const scopeKey = JSON.stringify([user?.id, user?.campusId, user?.permissions]);
   const { can, isAdmin } = usePermissions();
   const canView = isAdmin || can('estadisticas:view');
   const canViewAll = isAdmin || can('estadisticas:viewAll');
-  const [range, setRange] = useState(() => statsPreset('history'));
+  const initialPreset = tab === 'operations' ? 'week' : 'history';
+  const [range, setRange] = useState(() => statsPreset(initialPreset));
   const [draft, setDraft] = useState(range);
-  const [preset, setPreset] = useState<StatsPreset>('history');
-  const [history, setHistory] = useState(true);
+  const [preset, setPreset] = useState<StatsPreset>(initialPreset);
+  const [history, setHistory] = useState(initialPreset === 'history');
   const [rangeError, setRangeError] = useState('');
   const [groupBy, setGroupBy] = useState<GroupBy>('year');
   const [type, setType] = useState<RecordType>('all');
   const [country, setCountry] = useState('');
   const [campusId, setCampusId] = useState('');
-  const [tab, setTab] = useState<'summary' | 'trends' | 'campuses' | 'records'>('summary');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
   useEffect(() => { if (!canView) router.replace('/dashboard'); }, [canView, router]);
+  const queryRange = tab === 'projections' ? planningRange() : range;
+  const queryHistory = tab === 'projections' ? false : history;
+  const queryType = tab === 'projections' ? 'encuentro' : type;
+  const queryGroup = tab === 'projections' ? 'week' : groupBy;
   const { data, isLoading, isFetching, isError, refetch } = useQuery<StatsResponse>({
-    queryKey: ['estadisticas', scopeKey, history, range.from, range.to, groupBy, type, country, campusId],
+    queryKey: ['estadisticas', scopeKey, queryHistory, queryRange.from, queryRange.to, queryGroup, queryType, country, campusId],
     queryFn: () => api.get('/estadisticas', { params: {
-      year: Number(range.from.slice(0, 4)), groupBy, type,
-      ...(history ? { period: 'history' } : { from: range.from, to: range.to }),
+      year: Number(queryRange.from.slice(0, 4)), groupBy: queryGroup, type: queryType,
+      ...(queryHistory ? { period: 'history' } : { from: queryRange.from, to: queryRange.to }),
       ...(country ? { country } : {}), ...(campusId ? { campusId } : {}),
     } }).then((response) => response.data),
     enabled: canView, staleTime: 60_000, retry: false,
@@ -370,14 +380,14 @@ export function EstadisticasClient() {
   }, [data?.records, search]);
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
   const visibleRecords = filteredRecords.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const periodLabel = formatDate(data?.meta.from ?? range.from) + ' — ' + formatDate(data?.meta.to ?? range.to);
+  const periodLabel = formatDate(data?.meta.from ?? queryRange.from) + ' — ' + formatDate(data?.meta.to ?? queryRange.to);
   const inputClass = 'min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-violet-500';
   if (!canView) return null;
   return <div className="mx-auto min-w-0 max-w-[1600px] space-y-5 pb-10">
     <header className="rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-emerald-50 p-5 sm:p-7">
       <p className="text-xs font-bold uppercase tracking-widest text-violet-700">ARM Global · Nuestra comunidad en cifras</p>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-        <div><h1 className="text-3xl font-bold text-slate-900">Estadísticas</h1><p className="mt-2 max-w-2xl text-sm text-slate-600">Comprende cada encuentro, acompaña a los campus y revisa cómo vamos creciendo juntos.</p></div>
+        <div><h1 className="text-3xl font-bold text-slate-900">Estadísticas</h1><h2 className="mt-2 text-lg font-semibold text-violet-800">{view.label}</h2><p className="mt-2 max-w-2xl text-sm text-slate-600">{view.description}</p></div>
         <div className="flex flex-wrap gap-2">
           {(isAdmin || can('encuentros:create')) && <Link href="/dashboard/produccion-general/estadisticas/registrar" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white">Registrar encuentro</Link>}
           <button onClick={() => void refetch()} disabled={isFetching} className="rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 disabled:opacity-50">{isFetching ? 'Actualizando…' : 'Actualizar datos'}</button>
@@ -388,11 +398,11 @@ export function EstadisticasClient() {
 
     <section aria-label="Filtros de estadísticas" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Período
+        {tab !== 'projections' && <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Período
           <select aria-label="Período" className={inputClass} value={preset} onChange={(e) => applyPreset(e.target.value as StatsPreset)}>
-            <option value="history">Histórico completo · 2020 hasta hoy</option><option value="week">Última semana completa</option><option value="month">Este mes hasta hoy</option><option value="year">Este año hasta hoy</option><option value="custom">Fechas personalizadas</option>
+            <option value="history">Histórico disponible · 2020 hasta hoy</option><option value="week">Última semana completa</option><option value="month">Este mes hasta hoy</option><option value="year">Este año hasta hoy</option><option value="custom">Fechas personalizadas</option>
           </select>
-        </label>
+        </label>}
         {canViewAll && <label className="grid gap-1.5 text-xs font-semibold text-slate-600">País
           <select aria-label="País" className={inputClass} value={country} onChange={(e) => { setCountry(e.target.value); setCampusId(''); }}>
             <option value="">Todos los países</option>{catalog.countries.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -403,11 +413,11 @@ export function EstadisticasClient() {
             <option value="">Todos los campus</option>{catalog.campuses.filter((c) => !country || c.country === country).map((c) => <option key={c.id} value={c.id}>{c.name} · {c.country}{c.isActive ? '' : ' (inactivo)'}</option>)}
           </select>
         </label>}
-        <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Registros
+        {tab !== 'projections' && <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Registros
           <select aria-label="Registros" className={inputClass} value={type} onChange={(e) => setType(e.target.value as RecordType)}><option value="all">Encuentros y eventos</option><option value="encuentro">Solo encuentros</option><option value="evento">Solo eventos</option></select>
-        </label>
+        </label>}
       </div>
-      {preset === 'custom' && <form onSubmit={(e) => { e.preventDefault(); if (!validStatsRange(draft.from, draft.to)) { setRangeError('Selecciona fechas válidas, en orden y con un máximo de 366 días.'); return; } setRangeError(''); setHistory(false); setRange({ ...draft }); }} className="flex flex-wrap items-end gap-3">
+      {tab !== 'projections' && preset === 'custom' && <form onSubmit={(e) => { e.preventDefault(); if (!validStatsRange(draft.from, draft.to)) { setRangeError('Selecciona fechas válidas, en orden y con un máximo de 366 días.'); return; } setRangeError(''); setHistory(false); setRange({ ...draft }); }} className="flex flex-wrap items-end gap-3">
         <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-slate-600">Desde<input type="date" required min="2000-01-01" max="2100-12-31" className={inputClass} value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} /></label>
         <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-slate-600">Hasta<input type="date" required min="2000-01-01" max="2100-12-31" className={inputClass} value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} /></label>
         <button className="min-h-[42px] rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white">Aplicar fechas</button>
@@ -417,7 +427,10 @@ export function EstadisticasClient() {
     </section>
 
     <nav aria-label="Vistas de estadísticas" className="flex flex-wrap gap-2">
-      {([['summary', 'Resumen'], ['trends', 'Evolución'], ['campuses', 'Campus'], ['records', 'Registros']] as const).map(([value, label]) => <button key={value} aria-pressed={tab === value} onClick={() => setTab(value)} className={'rounded-xl px-4 py-2.5 text-sm font-semibold ' + (tab === value ? 'bg-violet-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-violet-50')}>{label}</button>)}
+      {STATS_VIEWS.map(item => <button key={item.id} aria-pressed={tab === item.id} onClick={() => {
+        if (item.id === 'operations') applyPreset('week');
+        window.history.pushState(null, '', statsHref(item.slug));
+      }} className={'rounded-xl px-4 py-2.5 text-sm font-semibold ' + (tab === item.id ? 'bg-violet-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-violet-50')}>{item.label}</button>)}
     </nav>
     {isError ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">No fue posible cargar las estadísticas. <button onClick={() => void refetch()} className="ml-2 min-h-[44px] font-semibold underline">Reintentar</button></div>
       : isLoading || !data ? <p role="status" className="rounded-2xl bg-white p-10 text-center text-sm text-slate-600">Cargando indicadores…</p>
@@ -482,6 +495,9 @@ export function EstadisticasClient() {
           </section>)}
           {data.byCampus.length === 0 && <p className="text-sm text-slate-500">No hay campus para esta selección.</p>}
         </section>}
+        {tab === 'operations' && <OperationsPanel data={data} canRegister={isAdmin || can('encuentros:create')} canReview={isAdmin || can('encuentros:review')} />}
+        {tab === 'projections' && <ProjectionsPanel data={data} />}
+        {tab === 'quality' && <div className="space-y-5"><QualityCard quality={data.quality} /><CoveragePanel data={data} /></div>}
         {tab === 'records' && (
           <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div className="flex flex-col justify-between gap-4 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center">
