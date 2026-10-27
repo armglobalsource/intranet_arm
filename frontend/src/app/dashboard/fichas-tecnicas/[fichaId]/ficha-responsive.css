@@ -7,6 +7,21 @@
   .ficha-doc-root .ficha-date-area { min-width: 0; flex-shrink: 1 !important; }
   .ficha-doc-root .ficha-sortable-row { min-width: 0; }
 
+  /* El cargo se reconoce primero; la asignación conserva su aspecto de campo. */
+  .ficha-doc-root .ficha-doc .ficha-role-row > .ficha-editable-label,
+  .ficha-doc-root .ficha-doc .ficha-role-row > span,
+  .ficha-doc-root .ficha-doc .ficha-role-row > input {
+    color: #214f3b !important;
+    font-weight: 700 !important;
+    background: #edf5ef !important;
+    border-radius: 4px;
+  }
+  .ficha-doc-root .ficha-doc .ficha-matrix-label { background: #edf5ef; border-left: 3px solid #3c8060; }
+  .ficha-doc-root .ficha-doc .ficha-matrix-label > .ficha-editable-label,
+  .ficha-doc-root .ficha-doc .ficha-matrix-label > span,
+  .ficha-doc-root .ficha-doc .ficha-matrix-label > input { color: #214f3b !important; font-weight: 700 !important; }
+  .ficha-doc-root .ficha-doc .ficha-person-cell { color: #334155 !important; font-weight: 500 !important; }
+
   @container (max-width: 600px) {
     .ficha-doc-root .ficha-hdr-top { flex-wrap: wrap; gap: 12px; }
     .ficha-doc-root .ficha-date-area { flex: 1 1 200px; }
