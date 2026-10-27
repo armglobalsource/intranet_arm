@@ -33,7 +33,7 @@ test('país, campus y estado combinan resultados y resumen sin incluir archivada
   await expect(page.getByRole('region', { name: 'Fichas de Uruguay' })).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Campus' }).selectOption('campus:1');
   await expect(page.getByRole('button', { name: 'Fichas activas: 2', exact: true })).toBeVisible();
-  await page.getByRole('region', { name: 'Buscar y filtrar fichas' }).getByRole('button', { name: 'En progreso', exact: true }).click();
+  await page.getByRole('region', { name: 'Resumen de la selección' }).getByRole('button', { name: 'En progreso: 1', exact: true }).click();
   await expect(page.getByText('Noche de oración', { exact: true })).toBeVisible();
   await expect(page.getByText('Domingo Santiago', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Ficha archivada', { exact: true })).toHaveCount(0);
