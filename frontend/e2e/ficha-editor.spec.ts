@@ -57,16 +57,18 @@ test('filas: arrastrar, guardar y recargar conserva el nuevo orden', async ({ pa
   await expect.poll(() => writes.find((w) => w.path.endsWith('/sections/pastoral'))?.body.rows.map((r: any) => r.id)).toEqual(['preach', 'prayer', 'welcome']);
   await page.reload();
   await expect(pastoral.locator('[data-row-id]').first()).toHaveAttribute('data-row-id', 'preach');
-  await expect(page.locator('.ficha-doc')).toHaveCSS('background-color', 'rgb(244, 246, 249)');
+  await expect(page.locator('.ficha-doc')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await page.screenshot({ path: 'test-results/ficha-clara-desktop.png', fullPage: true });
 });
 
 test('bloques: mover entre columnas persiste después de recargar', async ({ page }) => {
   const { writes } = await fixture(page);
   await page.goto(url);
+  await page.getByRole('button', { name: 'Personalizar orden de bloques' }).click();
   await drag(page, page.getByRole('button', { name: 'Mover bloque Equipo Pastoral' }), page.getByRole('button', { name: 'Mover bloque AR Worship / Banda' }));
   await expect.poll(() => writes.find((w) => w.body.sectionLayout)?.body.sectionLayout.right).toContain('pastoral');
   await page.reload();
+  await page.getByRole('button', { name: 'Personalizar orden de bloques' }).click();
   await expect(page.locator('.ficha-drop-column').nth(1).locator('[data-block-id="pastoral"]')).toBeVisible();
 });
 
@@ -119,6 +121,7 @@ test('un fallo al guardar el bloque permite reintentar sin perder el orden elegi
     return route.fallback();
   });
   await page.goto(url);
+  await page.getByRole('button', { name: 'Personalizar orden de bloques' }).click();
   await drag(page, page.getByRole('button', { name: 'Mover bloque Equipo Pastoral' }), page.getByRole('button', { name: 'Mover bloque AR Worship / Banda' }));
   await expect(page.getByText('No se pudo guardar el orden. Pulsa Guardar para reintentar.')).toBeVisible();
   await page.getByRole('button', { name: 'Error al guardar' }).click();
@@ -132,8 +135,11 @@ test('impresión clara conserva contenido y oculta las asas', async ({ page }) =
   await expect(page.locator('[data-block-id="pastoral"]')).toBeVisible();
   await page.emulateMedia({ media: 'print' });
   await expect(page.locator('.ficha-doc')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
-  await expect(page.getByRole('button', { name: 'Mover bloque Equipo Pastoral' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Mover fila' }).first()).toBeHidden();
   await expect(page.getByRole('button', { name: 'Bienvenida', exact: true })).toBeVisible();
+  await expect(page.getByText('Equipo de la ficha', { exact: true })).toBeHidden();
+  await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeHidden();
+  await page.pdf({ path: 'test-results/ficha-estructura.pdf', format: 'A4', printBackground: true });
 });
 
 
@@ -183,12 +189,25 @@ test('bloque AM: cambiar la asignación compartida conserva el encuentro PM', as
   ficha.type = 'multi';
   ficha.encuentros = ['09:00', '11:00', '17:00'].map((time, i) => ({ id: `e${i}`, label: `Encuentro ${time}`, time, color: '#6554C0' }));
   await page.goto(url);
-  await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).click();
+  await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).first().click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('checkbox').nth(0).check();
+  await expect(page.locator('.ficha-matrix-head')).toContainText('09:00');
+  await expect(page.locator('.ficha-matrix-head')).toContainText('17:00');
   await dialog.getByLabel('Aplicar a').selectOption('block');
   await dialog.getByRole('button', { name: 'Aplicar asignación' }).click();
   await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/pastoral')).at(-1)?.body.rows[0].values).toEqual({ e0: 'Ana Pérez', e1: 'Ana Pérez', e2: 'María González' });
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true })).toContainText('Ana Pérez');
+  await expect(page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).first()).toContainText('Ana Pérez');
+});
+
+
+test('estructura de referencia: secciones siguen el orden del PDF y conserva las asignaciones', async ({ page }) => {
+  const { ficha } = await fixture(page);
+  ficha.hiddenSections = [];
+  await page.goto(url);
+  await expect(page.locator('.ficha-pdf-order')).toBeVisible();
+  await expect(page.locator('.ficha-pdf-order > [data-ficha-slot]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-ficha-slot')))).resolves.toEqual(['pastoral', 'streaming', 'produccion', 'media', 'anuncios', 'worship', 'horarios', 'voluntarios']);
+  await expect(page.getByRole('button', { name: 'Asignar personas: Bienvenida' })).toBeVisible();
+  await expect(page.locator('.ficha-worship-columns')).toHaveCSS('display', 'grid');
 });

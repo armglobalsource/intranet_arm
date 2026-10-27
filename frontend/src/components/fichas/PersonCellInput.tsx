@@ -25,7 +25,7 @@ export function PersonCellInput({ value, onChange, row, style, placeholder }: {
       title={saved ? 'Editar asignación vinculada al directorio' : value ? 'Nombre anterior sin vínculo: selecciona el usuario correspondiente' : 'Seleccionar personas'}
       style={{ width: '100%', whiteSpace: 'normal', overflowWrap: 'anywhere', border: '1px dashed #CBD5E1', borderRadius: 7, background: saved ? '#F0FDF9' : '#F8FAFC', color: '#334155', padding: '5px 7px', cursor: 'pointer', textAlign: 'inherit', font: 'inherit', ...style }}>
       {value || placeholder || 'Seleccionar persona…'}
-      <span aria-hidden="true" style={{ marginLeft: 5, color: saved ? '#047857' : '#64748B', fontSize: 10 }}>{saved ? '●' : '+'}</span>
+      <span className="ficha-no-print" aria-hidden="true" style={{ marginLeft: 5, color: saved ? '#047857' : '#64748B', fontSize: 10 }}>{saved ? '●' : '+'}</span>
     </button>
     {open && createPortal(<AssignmentDialog row={row} value={value} saved={saved} context={context} onClose={() => setOpen(false)} onSave={edit => { onChange(assignmentText(edit.assignment), edit); setOpen(false); }} />, document.body)}
   </>;

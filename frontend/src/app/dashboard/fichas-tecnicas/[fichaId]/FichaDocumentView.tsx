@@ -15,7 +15,6 @@ const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
   oracion: ['pastoral', 'escena', 'produccion', 'media', 'streaming', 'setList', 'horarios', 'outfit'],
 };
 import { useChangelog, useUpdateFicha } from '@/hooks/useFichas';
-import { FichaQuickView } from '@/components/fichas/FichaQuickView';
 import { FichaCompareView } from '@/components/fichas/FichaCompareView';
 import { EncuentrosEditor, type EncuentroDraft } from '@/components/fichas/EncuentrosEditor';
 import { sameLocalDay } from '@/lib/ficha-summary';
@@ -452,7 +451,7 @@ function RoleCard({
         {displayed.map((row, i) => (
           <SortableRow key={row.id} id={row.id} editable={editable}>
             {(handle) => (
-              <div style={{
+              <div className="ficha-role-row" style={{
                 ...S.roleRow,
                 ...(i === displayed.length - 1 ? { borderBottom: 'none', paddingBottom: 0 } : {}),
               }}>
@@ -483,6 +482,28 @@ function RoleCard({
       <SectionFooter sectionName={title} editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
     </div>
   );
+}
+
+// En fichas con varios encuentros, plataforma se lee como la hoja de Santiago.
+function PastoralMatrix({ rows, encuentros, fichaId, editable, forceShowAll, onCellChange, onDeleteRow, onAddRow, onLabelChange, onReorderRow, isCompleted, onComplete }: { rows: Row[]; encuentros: Encuentro[]; fichaId: string } & EditProps) {
+  const displayed = editable || forceShowAll ? allRows(rows) : allRows(rows).filter(row => encuentros.some(e => val(row, e.id)));
+  if (!displayed.length && !editable) return null;
+  const columns = `minmax(115px, 1.2fr) repeat(${encuentros.length}, minmax(0, 1fr))`;
+  return <div className="ficha-card ficha-pastoral-matrix" style={S.card}>
+    <div style={S.cardTitle}>Encuentro · Plataforma</div>
+    <div className="ficha-matrix-head" style={{ gridTemplateColumns: columns }}><span>Asignación</span>{encuentros.map(e => <span key={e.id}>{e.time} {e.isLive && <strong>● En vivo</strong>}</span>)}</div>
+    <SortableSection items={displayed} onReorder={editable ? onReorderRow : undefined}>
+      {displayed.map(row => <SortableRow key={row.id} id={row.id} editable={editable}>{handle =>
+        <div className="ficha-matrix-row" style={{ gridTemplateColumns: columns }}>
+          <div className="ficha-matrix-label">{handle}<EditableLabel value={row.label} editable={editable} onChange={onLabelChange ? v => onLabelChange(row.id, v) : undefined} style={S.roleLabel} />{editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}</div>
+          {encuentros.map(e => <div className="ficha-matrix-value" data-time={e.time} key={e.id}>
+            {editable ? <FichaPeopleContext.Provider value={{ fichaId, encuentros, currentId: e.id }}><PersonCellInput row={row} value={rawVal(row, e.id)} onChange={(v, assignment) => onCellChange?.(row.id, effectiveColId(row, e.id), v, assignment)} style={{ textAlign: 'left', fontSize: 12 }} /></FichaPeopleContext.Provider> : <span>{val(row, e.id) || '—'}</span>}
+          </div>)}
+        </div>
+      }</SortableRow>)}
+    </SortableSection>
+    <SectionFooter sectionName="pastoral" editable={editable} isCompleted={isCompleted} onAddRow={onAddRow} onComplete={onComplete} />
+  </div>;
 }
 
 // ── StreamingCard ─────────────────────────────────────────────────────────────
@@ -1433,7 +1454,7 @@ function WorshipSetListCard({
   }
 
   return (
-    <div className="ficha-card" style={S.card}>
+    <div className="ficha-card ficha-worship" style={S.card}>
       {/* Header */}
       <div style={S.cardTitle}>
         AR Worship / Banda{(!editable && vio) ? ` — VIO: ${val(vio, colId)}` : ''}
@@ -1499,13 +1520,16 @@ function WorshipSetListCard({
                 );
               })}
               {editable && escena.onAddRow && (
-                <AddPositionBtn
+                <span className="ficha-no-print"><AddPositionBtn
                   onAdd={(name) => escena.onAddRow!(`Posición ${name}`, 'person', true)}
-                />
+                /></span>
               )}
             </div>
             </SortableSection>
           )}
+        </>
+      )}
+      <div className="ficha-worship-columns"><div className="ficha-worship-musicians">
           {musicians.length > 0 && (
             <SortableSection items={musicians} onReorder={editable ? escena.onReorderRow : undefined}>
             <div>
@@ -1541,8 +1565,6 @@ function WorshipSetListCard({
             </div>
             </SortableSection>
           )}
-        </>
-      )}
 
       {/* Banda mini-footer */}
       {!hideEscena && editable && (
@@ -1562,6 +1584,7 @@ function WorshipSetListCard({
         </div>
       )}
 
+      </div><div className="ficha-worship-setlist">
       {/* ── Set List ── */}
       {!hideSetList && (
         <>
@@ -1588,6 +1611,7 @@ function WorshipSetListCard({
         </>
       )}
 
+      </div></div>
       {/* ── Outfit / Paleta ── */}
       {showOutfit && (
         <>
@@ -1619,7 +1643,7 @@ function WorshipSetListCard({
 
       {/* ── Comentarios del Productor ── */}
       {(editable || commentValue) && (
-        <>
+        <div className={commentValue ? undefined : 'ficha-no-print'}>
           <SubDivider label="Comentarios del Productor" />
           {editable ? (
             <textarea
@@ -1649,7 +1673,7 @@ function WorshipSetListCard({
               {commentValue}
             </p>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -2332,6 +2356,7 @@ export function FichaDocumentView({
   const isLayoutView = selectedId === 'layout';
   const isCompareView = selectedId === 'compare';
   const [encuentrosOpen, setEncuentrosOpen] = useState(false);
+  const [customLayout, setCustomLayout] = useState(false);
   // Si se quita el encuentro abierto (o queda uno solo), volver al primero.
   useEffect(() => {
     const list = encuentros ?? [];
@@ -2559,6 +2584,31 @@ export function FichaDocumentView({
           .ficha-grid { grid-template-columns: minmax(0, 1fr) !important; }
         }
 
+
+        .ficha-pdf-order { display: flex; flex-direction: column; gap: 12px; }
+        .ficha-pdf-order .ficha-card { padding: 0 !important; margin: 0 !important; border: 1px solid #aeb9c4 !important; border-radius: 3px !important; box-shadow: none !important; overflow: hidden; }
+        .ficha-pdf-order .ficha-card > div:first-child { background: #e9edf0; color: #273745 !important; padding: 9px 12px !important; margin: 0 !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: .04em !important; border-bottom: 1px solid #c9d1d7; }
+        .ficha-pdf-order .ficha-role-row { padding: 0 !important; min-height: 37px; gap: 0 !important; align-items: stretch !important; }
+        .ficha-pdf-order .ficha-role-row > span, .ficha-pdf-order .ficha-role-row > input { flex: 0 0 32%; padding: 10px 12px !important; font-weight: 600 !important; color: #344454 !important; border-right: 1px solid #e1e6eb !important; white-space: normal; }
+        .ficha-pdf-order .ficha-role-row > div { padding: 5px 12px; justify-content: flex-start !important; }
+        .ficha-pdf-order .ficha-role-row > div > span, .ficha-pdf-order .ficha-role-row .ficha-person-cell { text-align: left !important; }
+        .ficha-pdf-order .ficha-card > .ficha-no-print { margin: 0 12px 10px; }
+        .ficha-pdf-order [data-ficha-slot="streaming"] .ficha-card, .ficha-pdf-order [data-ficha-slot="anuncios"] .ficha-card, .ficha-pdf-order [data-ficha-slot="horarios"] .ficha-card, .ficha-pdf-order .ficha-worship { padding-bottom: 12px !important; }
+        .ficha-pdf-order [data-ficha-slot="streaming"] .ficha-card > :not(:first-child), .ficha-pdf-order [data-ficha-slot="anuncios"] .ficha-card > :not(:first-child), .ficha-pdf-order [data-ficha-slot="horarios"] .ficha-card > :not(:first-child), .ficha-worship > :not(:first-child) { margin-left: 12px; margin-right: 12px; }
+        .ficha-matrix-head, .ficha-matrix-row { display: grid; align-items: stretch; }
+        .ficha-matrix-head { background: #f5f7f8; border-bottom: 1px solid #d4dde4; }
+        .ficha-matrix-head > span { padding: 8px 10px; font-size: 11px; font-weight: 700; color: #526476; border-right: 1px solid #dfe5e9; }
+        .ficha-matrix-head strong { color: #b43838; white-space: nowrap; }
+        .ficha-matrix-row { border-bottom: 1px solid #e1e6eb; }
+        .ficha-matrix-label, .ficha-matrix-value { display: flex; align-items: center; min-width: 0; gap: 5px; padding: 7px 10px; border-right: 1px solid #e1e6eb; font-size: 12px; overflow-wrap: anywhere; }
+        .ficha-matrix-label { font-weight: 600; color: #344454; }
+        .ficha-matrix-value:last-child, .ficha-matrix-head > span:last-child { border-right: none; }
+        .ficha-worship-columns { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 20px; align-items: start; }
+        .ficha-worship-setlist { border-left: 1px solid #e1e6eb; padding-left: 20px; }
+        .ficha-layout-option { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+        .ficha-layout-option button { color: #52647a; font-size: 12px; padding: 6px 10px; border: 1px solid #d7e0e7; border-radius: 6px; background: #fff; }
+        @container (max-width: 600px) { .ficha-matrix-head { display: none; } .ficha-matrix-row { display: flex !important; flex-direction: column; } .ficha-matrix-label { background: #f5f7f8; } .ficha-matrix-value::before { content: attr(data-time); flex: 0 0 48px; font-weight: 700; color: #64748b; } .ficha-matrix-value { border-right: 0; border-bottom: 1px solid #eff2f4; } .ficha-worship-columns { grid-template-columns: minmax(0,1fr); gap: 8px; } .ficha-worship-setlist { border-left: 0; border-top: 1px solid #e1e6eb; padding: 8px 0 0; } .ficha-pdf-order .ficha-role-row > span, .ficha-pdf-order .ficha-role-row > input { flex-basis: 38%; } }
+        @media print { .ficha-pdf-order { gap: 5px !important; } .ficha-pdf-order .ficha-card { break-inside: auto !important; page-break-inside: auto !important; } .ficha-pdf-order .ficha-card > div:first-child { padding: 4px 6px !important; } .ficha-pdf-order .ficha-role-row { min-height: 21px; } .ficha-pdf-order .ficha-role-row > span, .ficha-pdf-order .ficha-role-row > input { padding: 3px 6px !important; } .ficha-pdf-order .ficha-role-row > div { padding: 2px 6px; } }
         @page {
           size: A4 portrait;
           margin: 6mm 8mm;
@@ -2575,6 +2625,11 @@ export function FichaDocumentView({
             background: white !important;
           }
 
+          /* Imprimir solo la ficha: excluir navegación y paneles del editor. */
+          body:has(.ficha-doc-root) *:not(:has(.ficha-doc-root)):not(.ficha-doc-root):not(.ficha-doc-root *) { display: none !important; }
+          body:has(.ficha-doc-root) *:has(.ficha-doc-root) { display: block !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; border: 0 !important; overflow: visible !important; }
+          .ficha-doc-root textarea::placeholder, .ficha-doc-root input::placeholder { color: transparent !important; }
+          .ficha-doc-root .ficha-person-cell { background: transparent !important; border: 0 !important; padding: 0 !important; }
           /* Ocultar controles */
           .ficha-no-print { display: none !important; }
 
@@ -2693,10 +2748,10 @@ export function FichaDocumentView({
       {/* Documento */}
       <div
         ref={docRef}
-        className="ficha-doc"
+        className="ficha-doc ficha-sheet"
         style={{
-          background: D.bg,
-          borderRadius: 16,
+          background: '#FFFFFF',
+          borderRadius: 10,
           border: `0.5px solid ${D.cardBorder}`,
           overflow: 'hidden',
         }}
@@ -2777,6 +2832,7 @@ export function FichaDocumentView({
           }}>
             {/* Campus + título */}
             <div className="ficha-title-area" style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#405568', marginBottom: 4 }}>FICHA DE PRODUCCIÓN</div>
               <div style={{ fontSize: 10, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600, marginBottom: 4 }}>
                 {/^(campus|arm)\s/i.test(campusName ?? '') ? campusName : `Campus ${campusName}`}
               </div>
@@ -3099,20 +3155,6 @@ export function FichaDocumentView({
           </div>
         )}
 
-        {/* ── Primera vista: lo esencial en 15 segundos ── */}
-        {!isLayoutView && !isCompareView && (
-          <FichaQuickView
-            ficha={ficha}
-            rowsFor={sec}
-            colId={colId}
-            encuentro={selectedEncuentro}
-            hiddenSections={hiddenSections ?? ficha.hiddenSections ?? []}
-            changes={showHistory ? changelog : undefined}
-            onOpenLayout={() => setSelectedId('layout')}
-            onJump={(slot) => document.querySelector(`[data-ficha-slot="${slot}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          />
-        )}
-
         {isCompareView && (
           <FichaCompareView
             encuentros={encuentros ?? []}
@@ -3131,13 +3173,19 @@ export function FichaDocumentView({
           className={`ficha-body ficha-view-body ${isLayoutView ? 'ficha-view-hidden' : 'ficha-view-active'}`}
           style={{ padding: '1.5rem 2rem', display: isLayoutView || isCompareView ? 'none' : 'block' }}
         >
+          {editable && onUpdateLayout && <div className="ficha-no-print ficha-layout-option"><button type="button" onClick={() => setCustomLayout(v => !v)}>{customLayout ? 'Volver a estructura PDF' : 'Personalizar orden de bloques'}</button></div>}
           {editable && (
             <div className="ficha-editor-help ficha-no-print">
               <span aria-hidden="true">⠿</span>
-              <span>Arrastra las asas para ordenar filas o mover bloques entre columnas. Los cambios se guardan automáticamente.</span>
+              <span>Selecciona cada puesto para asignar personas. Arrastra las filas para ordenarlas; los cambios se guardan automáticamente.</span>
             </div>
           )}
           {(() => {
+            // La estructura del PDF separa responsables y equipo técnico.
+            const allProduction = sec('produccion');
+            const isResponsible = (r: Row) => ['pr1', 'pr2', 'pr3'].includes(r.id) || /productor general|responsable t[eé]cnico|encargado t[eé]cnico|productor (del |de los )?encuentro/i.test(r.label);
+            const responsibilities = allProduction.filter(isResponsible);
+            const technical = allProduction.filter(r => !isResponsible(r));
             // Función que renderiza una slot de sección
             const renderSlot = (slot: LayoutSlot) => {
               switch (slot) {
@@ -3188,14 +3236,23 @@ export function FichaDocumentView({
             const visibleLeft  = resolvedLayout.left.filter((s) => !slotIsHidden(s));
             const visibleRight = resolvedLayout.right.filter((s) => !slotIsHidden(s));
 
-            return (
-              <SortableFichaLayout
-                layout={resolvedLayout}
-                visible={{ left: visibleLeft, right: visibleRight }}
+            return customLayout ? (
+              <SortableFichaLayout layout={resolvedLayout} visible={{ left: visibleLeft, right: visibleRight }}
                 onChange={editable ? onUpdateLayout : undefined}
                 renderSlot={(slot) => <div data-ficha-slot={slot} style={{ scrollMarginTop: 72 }}>{renderSlot(slot as LayoutSlot)}</div>}
-                label={(slot) => slotLabel(slot as LayoutSlot)}
-              />
+                label={(slot) => slotLabel(slot as LayoutSlot)} />
+            ) : (
+              <div className="ficha-pdf-order">
+                {!hidden('pastoral') && <div data-ficha-slot="pastoral" data-block-id="pastoral">{(encuentros?.length ?? 0) > 1 ? <PastoralMatrix rows={sec('pastoral')} encuentros={encuentros} fichaId={ficha.fichaId} {...editProps('pastoral')} /> : <RoleCard title="Encuentro · Plataforma" rows={sec('pastoral')} {...editProps('pastoral')} />}</div>}
+                {!hidden('produccion') && responsibilities.length > 0 && <div data-ficha-slot="responsables" data-block-id="responsables"><RoleCard title="Responsables" rows={responsibilities} {...editProps('produccion')} onAddRow={undefined} onComplete={undefined} /></div>}
+                {!hidden('streaming') && <div data-ficha-slot="streaming" data-block-id="streaming">{renderSlot('streaming')}</div>}
+                {!hidden('produccion') && <div data-ficha-slot="produccion" data-block-id="produccion"><RoleCard title="Equipo técnico" rows={technical} {...editProps('produccion')} /></div>}
+                {!hidden('media') && <div data-ficha-slot="media" data-block-id="media">{renderSlot('media')}</div>}
+                {!hidden('anuncios') && <div data-ficha-slot="anuncios" data-block-id="anuncios">{renderSlot('anuncios')}</div>}
+                {(!hidden('escena') || !hidden('setList') || !hidden('outfit')) && <div data-ficha-slot="worship" data-block-id="worship">{renderSlot('worship')}</div>}
+                {!hidden('horarios') && <div data-ficha-slot="horarios" data-block-id="horarios">{renderSlot('horarios')}</div>}
+                {!hidden('voluntarios') && <div data-ficha-slot="voluntarios" data-block-id="voluntarios">{renderSlot('voluntarios')}</div>}
+              </div>
             );
           })()}
         </div>
