@@ -362,7 +362,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ficha?.hiddenSections]);
 
-  const [localLayout, setLocalLayout] = useState<{ left: string[]; right: string[]; leftRatio?: number } | undefined>(undefined);
+  const [localLayout, setLocalLayout] = useState<FichaColumns | undefined>(undefined);
   // Mismo patrón de contador en vuelo que localHidden, para que clicks
   // encadenados de ▲/▼ no se pisen entre sí ni con el snapshot del servidor.
   const layoutInflight = useRef(0);

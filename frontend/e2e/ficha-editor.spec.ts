@@ -53,6 +53,35 @@ async function drag(page: Page, from: Locator, to: Locator) {
 
 test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1720, height: 1100 }); });
 
+test('secciones PDF: mover con botones y arrastrar conserva el orden al recargar', async ({ page }) => {
+  const { writes } = await fixture(page);
+  await page.goto(url);
+  const blocks = page.locator('.ficha-pdf-order > [data-block-id]');
+  await expect(blocks.first()).toHaveAttribute('data-block-id', 'pastoral');
+  await page.getByRole('button', { name: 'Bajar sección Encuentro · Plataforma' }).click();
+  await expect.poll(() => writes.filter(w => w.body.sectionLayout).at(-1)?.body.sectionLayout.pdfOrder.indexOf('pastoral')).toBeGreaterThan(0);
+  await expect(blocks.first()).toHaveAttribute('data-block-id', 'produccion');
+  await page.reload();
+  await expect(blocks.first()).toHaveAttribute('data-block-id', 'produccion');
+  await drag(page, page.getByRole('button', { name: 'Mover sección Encuentro · Plataforma' }), page.getByRole('button', { name: 'Mover sección Equipo técnico' }));
+  await expect(blocks.first()).toHaveAttribute('data-block-id', 'pastoral');
+  await page.reload();
+  await expect(blocks.first()).toHaveAttribute('data-block-id', 'pastoral');
+  expect(writes.filter(w => w.body.sectionLayout).at(-1)?.body.sectionLayout.pdfOrder).toContain('streaming');
+});
+
+test('secciones PDF: flechas disponibles en móvil y orden persistente', async ({ page }) => {
+  const { writes } = await fixture(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(url);
+  await page.getByRole('button', { name: 'Bajar sección Encuentro · Plataforma' }).click();
+  await expect(page.locator('.ficha-pdf-order > [data-block-id]').first()).toHaveAttribute('data-block-id', 'produccion');
+  await expect.poll(() => writes.some(w => Array.isArray(w.body.sectionLayout?.pdfOrder))).toBe(true);
+  await page.reload();
+  await expect(page.locator('.ficha-pdf-order > [data-block-id]').first()).toHaveAttribute('data-block-id', 'produccion');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test('personas manuales: crear, asignar tratamiento y reutilizar en otra fila', async ({ page }) => {
   const { writes } = await fixture(page);
   await page.goto(url);

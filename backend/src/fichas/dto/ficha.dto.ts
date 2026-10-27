@@ -1,7 +1,7 @@
 import {
   ArrayMaxSize, ArrayMinSize, IsInt, IsString, IsOptional, IsIn, IsArray, ValidateNested,
   IsBoolean, IsNumber, IsObject, IsDateString, IsNotEmpty, MaxLength,
-  Min, Max, Matches,
+  Min, Max, Matches, ArrayUnique,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -10,6 +10,7 @@ const SECTION_NAMES = [
   'setList', 'horarios', 'anuncios', 'voluntarios', 'outfit',
 ] as const;
 const LAYOUT_SLOTS = ['pastoral', 'produccion', 'media', 'streaming', 'horarios', 'worship', 'voluntarios', 'anuncios'] as const;
+const PDF_SLOTS = ['pastoral', 'responsables', 'produccion', 'media', 'streaming', 'horarios', 'worship', 'voluntarios', 'anuncios'] as const;
 
 export class EncuentroDto {
   @IsString() @IsNotEmpty() @MaxLength(40) id: string;
@@ -50,6 +51,9 @@ export class SectionLayoutDto {
   // Proporción del ancho de la columna izquierda (0.2–0.8). Default: 0.5 (50/50)
   @IsOptional() @IsNumber() @Min(0.2) @Max(0.8)
   leftRatio?: number;
+
+  @IsOptional() @IsArray() @ArrayMaxSize(PDF_SLOTS.length) @ArrayUnique() @IsIn(PDF_SLOTS, { each: true })
+  pdfOrder?: string[];
 }
 
 export class UpdateFichaDto {

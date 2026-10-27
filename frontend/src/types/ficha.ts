@@ -165,7 +165,7 @@ export interface Ficha {
   publishedByName?:   string | null;
   publishedAt?:       any | null;
   hiddenSections?:    SectionName[];
-  sectionLayout?:     { left: string[]; right: string[]; leftRatio?: number };
+  sectionLayout?:     { left: string[]; right: string[]; leftRatio?: number; pdfOrder?: string[] };
   layoutVisual?:      LayoutVisual;
   /** Quién responde por la ficha y quién la actualiza (Etapa 4). */
   equipo?:            FichaEquipo;

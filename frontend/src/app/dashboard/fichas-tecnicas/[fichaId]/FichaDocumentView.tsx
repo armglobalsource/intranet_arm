@@ -8,7 +8,7 @@ import { SongLibraryDialog } from '@/components/fichas/SongLibraryDialog';
 import { SongInput } from '@/components/fichas/SongInput';
 import { LayoutVisualView } from './LayoutVisualView';
 import { PersonCellInput, FichaPeopleContext } from '@/components/fichas/PersonCellInput';
-import { SortableSection, SortableRow, SortableFichaLayout } from '@/components/fichas/FichaSortable';
+import { SortableSection, SortableRow, SortableFichaLayout, SortablePdfSections } from '@/components/fichas/FichaSortable';
 
 // Secciones disponibles por tipo de ficha (para el panel de módulos)
 const SECTIONS_BY_TYPE: Record<string, SectionName[]> = {
@@ -2288,15 +2288,16 @@ function slotSectionNames(slot: LayoutSlot): SectionName[] {
  *  de que 'media' existiera como slot no lo tienen guardado). */
 function resolveSectionLayout(
   fichaType: string,
-  sectionLayoutProp?: { left: string[]; right: string[]; leftRatio?: number },
-): { left: LayoutSlot[]; right: LayoutSlot[]; leftRatio: number } {
+  sectionLayoutProp?: { left: string[]; right: string[]; leftRatio?: number; pdfOrder?: string[] },
+): { left: LayoutSlot[]; right: LayoutSlot[]; leftRatio: number; pdfOrder?: string[] } {
   const defaultLayout = fichaType === 'oracion' ? DEFAULT_LAYOUT_ORACION : DEFAULT_LAYOUT;
-  const storedLayout = (sectionLayoutProp ?? defaultLayout) as { left: LayoutSlot[]; right: LayoutSlot[]; leftRatio?: number };
+  const storedLayout = (sectionLayoutProp ?? defaultLayout) as { left: LayoutSlot[]; right: LayoutSlot[]; leftRatio?: number; pdfOrder?: string[] };
   const layoutHasMedia = [...storedLayout.left, ...storedLayout.right].includes('media');
   return {
     left:  layoutHasMedia ? storedLayout.left  : [...storedLayout.left],
     right: layoutHasMedia ? storedLayout.right : [...storedLayout.right, 'media'],
     leftRatio: Math.min(0.8, Math.max(0.2, storedLayout.leftRatio ?? 0.5)),
+    pdfOrder: storedLayout.pdfOrder,
   };
 }
 
@@ -2333,8 +2334,8 @@ export interface FichaDocumentViewProps {
   modulesPanelOpen?: boolean;
   onToggleModulesPanel?: () => void;
   onToggleSection?: (section: SectionName | SectionName[]) => void;
-  sectionLayout?: { left: string[]; right: string[]; leftRatio?: number };
-  onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
+  sectionLayout?: { left: string[]; right: string[]; leftRatio?: number; pdfOrder?: string[] };
+  onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number; pdfOrder?: string[] }) => void;
   /** Persistir el bloque layoutVisual completo (vista alternativa por canción). */
   onUpdateLayoutVisual?: (patch: { slots: LayoutVisualSlot[] }) => void;
   /** Mostrar el historial de cambios en la primera vista (requiere sesión). */
@@ -2605,6 +2606,13 @@ export function FichaDocumentView({
         .ficha-section-list button { display: flex; justify-content: space-between; gap: 8px; align-items: center; text-align: left; padding: 9px 10px; border: 1px solid #e0e8e6; background: white; color: #344454; border-radius: 6px; font-size: 12px; }
         .ficha-section-list button span:last-child { color: #187b5b; font-weight: 700; }
         .ficha-pdf-order { display: flex; flex-direction: column; gap: 10px; }
+        .ficha-pdf-block-tools { display: flex; justify-content: flex-end; gap: 4px; margin-bottom: 4px; }
+        .ficha-pdf-block-tools button { min-height: 32px; min-width: 32px; border: 1px solid #d3e0d7; border-radius: 7px; background: #f5f9f6; color: #315e49; cursor: pointer; font-size: 13px; }
+        .ficha-pdf-block-tools button:hover { background: #e5f0e8; }
+        .ficha-pdf-block-tools button:disabled { opacity: .35; cursor: default; }
+        .ficha-pdf-block-tools button:focus-visible { outline: 2px solid #315e49; outline-offset: 2px; }
+        .ficha-pdf-block-tools .ficha-pdf-move { display: inline-flex; align-items: center; gap: 4px; padding: 0 9px; font-size: 11px; font-weight: 600; cursor: grab; touch-action: none; }
+        .ficha-pdf-block-tools .ficha-pdf-move:active { cursor: grabbing; }
         .ficha-body { padding: 20px 24px !important; }
         .ficha-hdr-top { padding: 18px 24px 12px !important; }
         .ficha-hdr > div:last-child { padding: 12px 24px 16px !important; gap: 8px !important; }
@@ -3208,7 +3216,7 @@ export function FichaDocumentView({
           {editable && (
             <div className="ficha-editor-help ficha-no-print">
               <span aria-hidden="true">⠿</span>
-              <span>Selecciona cada puesto para asignar personas. Arrastra las filas para ordenarlas; los cambios se guardan automáticamente.</span>
+              <span>Selecciona cada puesto para asignar personas. Arrastra las filas o usa los controles de cada sección para ordenarlas; los cambios se guardan automáticamente.</span>
             </div>
           )}
           {(() => {
@@ -3269,23 +3277,37 @@ export function FichaDocumentView({
 
             const remove = (name: SectionName | SectionName[], label: string) => editable && onToggleSection ? <button type="button" className="ficha-no-print ficha-section-remove" aria-label={`Quitar sección ${label}`} title="Quitar de esta ficha; se conservará su información" onClick={() => onToggleSection(name)}>Quitar sección</button> : null;
 
+            const pdfDefaults = ['pastoral', 'responsables', 'streaming', 'produccion', 'media', 'anuncios', 'worship', 'horarios', 'voluntarios'];
+            const pdfSlots: Record<string, React.ReactNode> = {
+              pastoral: !hidden('pastoral') ? (<div className="ficha-section-wrap" data-ficha-slot="pastoral">{remove('pastoral', 'Equipo Pastoral')}{(encuentros?.length ?? 0) > 1 ? <PastoralMatrix rows={sec('pastoral')} encuentros={encuentros} fichaId={ficha.fichaId} {...editProps('pastoral')} /> : <RoleCard title="Encuentro · Plataforma" rows={sec('pastoral')} {...editProps('pastoral')} />}</div>) : null,
+              responsables: !hidden('produccion') && responsibilities.length > 0 ? (<div data-ficha-slot="responsables"><RoleCard title="Responsables" rows={responsibilities} {...editProps('produccion')} onAddRow={undefined} onComplete={undefined} /></div>) : null,
+              streaming: !hidden('streaming') ? (<div className="ficha-section-wrap" data-ficha-slot="streaming">{remove('streaming', 'Streaming')}{renderSlot('streaming')}</div>) : null,
+              produccion: !hidden('produccion') ? (<div className="ficha-section-wrap" data-ficha-slot="produccion">{remove('produccion', 'Producción')}<RoleCard title="Equipo técnico" rows={technical} {...editProps('produccion')} /></div>) : null,
+              media: !hidden('media') ? (<div className="ficha-section-wrap" data-ficha-slot="media">{remove('media', 'Media')}{renderSlot('media')}</div>) : null,
+              anuncios: !hidden('anuncios') ? (<div className="ficha-section-wrap" data-ficha-slot="anuncios">{remove('anuncios', 'Info Encuentro')}{renderSlot('anuncios')}</div>) : null,
+              worship: (!hidden('escena') || !hidden('setList') || !hidden('outfit')) ? (<div className="ficha-section-wrap" data-ficha-slot="worship">{remove(['escena', 'setList', 'outfit'], 'Worship y Set List')}{renderSlot('worship')}</div>) : null,
+              horarios: !hidden('horarios') ? (<div className="ficha-section-wrap" data-ficha-slot="horarios">{remove('horarios', 'Timing')}{renderSlot('horarios')}</div>) : null,
+              voluntarios: !hidden('voluntarios') ? (<div className="ficha-section-wrap" data-ficha-slot="voluntarios">{remove('voluntarios', 'Voluntarios de Servicio')}{renderSlot('voluntarios')}</div>) : null,
+            };
+            // Reinsert any newly introduced sections, without discarding hidden ones.
+            const savedOrder = (resolvedLayout.pdfOrder ?? []).filter((id, i, all) => pdfDefaults.includes(id) && all.indexOf(id) === i);
+            const pdfOrder = [...savedOrder, ...pdfDefaults.filter(id => !savedOrder.includes(id))];
+            const visiblePdf = pdfOrder.filter(id => !!pdfSlots[id]);
+            const movePdf = (from: string, to: string) => {
+              const next = [...pdfOrder];
+              const source = next.indexOf(from), target = next.indexOf(to);
+              if (source < 0 || target < 0 || source === target) return;
+              next.splice(source, 1); next.splice(target, 0, from);
+              onUpdateLayout?.({ ...resolvedLayout, pdfOrder: next });
+            };
             return customLayout ? (
               <SortableFichaLayout layout={resolvedLayout} visible={{ left: visibleLeft, right: visibleRight }}
                 onChange={editable ? onUpdateLayout : undefined}
                 renderSlot={(slot) => <div data-ficha-slot={slot} style={{ scrollMarginTop: 72 }}>{renderSlot(slot as LayoutSlot)}</div>}
                 label={(slot) => slotLabel(slot as LayoutSlot)} />
             ) : (
-              <div className="ficha-pdf-order">
-                {!hidden('pastoral') && <div className="ficha-section-wrap" data-ficha-slot="pastoral" data-block-id="pastoral">{remove('pastoral', 'Equipo Pastoral')}{(encuentros?.length ?? 0) > 1 ? <PastoralMatrix rows={sec('pastoral')} encuentros={encuentros} fichaId={ficha.fichaId} {...editProps('pastoral')} /> : <RoleCard title="Encuentro · Plataforma" rows={sec('pastoral')} {...editProps('pastoral')} />}</div>}
-                {!hidden('produccion') && responsibilities.length > 0 && <div data-ficha-slot="responsables" data-block-id="responsables"><RoleCard title="Responsables" rows={responsibilities} {...editProps('produccion')} onAddRow={undefined} onComplete={undefined} /></div>}
-                {!hidden('streaming') && <div className="ficha-section-wrap" data-ficha-slot="streaming" data-block-id="streaming">{remove('streaming', 'Streaming')}{renderSlot('streaming')}</div>}
-                {!hidden('produccion') && <div className="ficha-section-wrap" data-ficha-slot="produccion" data-block-id="produccion">{remove('produccion', 'Producción')}<RoleCard title="Equipo técnico" rows={technical} {...editProps('produccion')} /></div>}
-                {!hidden('media') && <div className="ficha-section-wrap" data-ficha-slot="media" data-block-id="media">{remove('media', 'Media')}{renderSlot('media')}</div>}
-                {!hidden('anuncios') && <div className="ficha-section-wrap" data-ficha-slot="anuncios" data-block-id="anuncios">{remove('anuncios', 'Info Encuentro')}{renderSlot('anuncios')}</div>}
-                {(!hidden('escena') || !hidden('setList') || !hidden('outfit')) && <div className="ficha-section-wrap" data-ficha-slot="worship" data-block-id="worship">{remove(['escena', 'setList', 'outfit'], 'Worship y Set List')}{renderSlot('worship')}</div>}
-                {!hidden('horarios') && <div className="ficha-section-wrap" data-ficha-slot="horarios" data-block-id="horarios">{remove('horarios', 'Timing')}{renderSlot('horarios')}</div>}
-                {!hidden('voluntarios') && <div className="ficha-section-wrap" data-ficha-slot="voluntarios" data-block-id="voluntarios">{remove('voluntarios', 'Voluntarios de Servicio')}{renderSlot('voluntarios')}</div>}
-              </div>
+              <SortablePdfSections items={visiblePdf} onReorder={editable ? onUpdateLayout ? movePdf : undefined : undefined}
+                renderSlot={slot => pdfSlots[slot]} label={slot => ({ pastoral: 'Encuentro · Plataforma', responsables: 'Responsables', produccion: 'Equipo técnico', worship: 'Worship y Set List', anuncios: 'Info Encuentro' } as Record<string,string>)[slot] ?? slotLabel(slot as LayoutSlot)} />
             );
           })()}
         </div>
@@ -3380,8 +3402,8 @@ export interface ModulesEditPanelProps {
   /** Acepta un nombre o varios (el slot 'worship' agrupa 3 secciones que se
    *  togglean juntas, como una sola fila en la lista). */
   onToggleModule:  (name: SectionName | SectionName[]) => void;
-  sectionLayout?:  { left: string[]; right: string[]; leftRatio?: number };
-  onUpdateLayout:  (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
+  sectionLayout?:  { left: string[]; right: string[]; leftRatio?: number; pdfOrder?: string[] };
+  onUpdateLayout:  (layout: { left: string[]; right: string[]; leftRatio?: number; pdfOrder?: string[] }) => void;
   onClose:         () => void;
 }
 
@@ -3402,6 +3424,7 @@ export function ModulesEditPanel({
       left:  column === 'left'  ? source : resolvedLayout.left,
       right: column === 'right' ? source : resolvedLayout.right,
       leftRatio: resolvedLayout.leftRatio,
+      pdfOrder: resolvedLayout.pdfOrder,
     });
   }
 
@@ -3414,6 +3437,7 @@ export function ModulesEditPanel({
       left:  column === 'left' ? fromArr : toArr,
       right: column === 'left' ? toArr   : fromArr,
       leftRatio: resolvedLayout.leftRatio,
+      pdfOrder: resolvedLayout.pdfOrder,
     });
   }
 

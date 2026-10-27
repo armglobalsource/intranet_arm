@@ -1,6 +1,6 @@
 import type { Row } from '@/types/ficha';
 
-export type FichaColumns = { left: string[]; right: string[]; leftRatio?: number };
+export type FichaColumns = { left: string[]; right: string[]; leftRatio?: number; pdfOrder?: string[] };
 
 /** Move by identity: filtered views must never reorder unrelated row indices. */
 export function reorderFichaRows(rows: Row[], activeId: string, overId: string): Row[] {

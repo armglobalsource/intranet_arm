@@ -2,7 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from 'react';
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter, useDroppable, type DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, useSortable, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, useSortable, sortableKeyboardCoordinates, rectSortingStrategy, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 import { moveFichaBlock, type FichaColumns } from '@/lib/ficha-order';
@@ -105,5 +105,31 @@ export function SortableFichaLayout({ layout, visible, onChange, renderSlot, lab
   }
   return <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} accessibility={accessibility}>
     {grid(true)}
+  </DndContext>;
+}
+
+function PdfBlock({ id, label, index, count, onMove, children }: { id: string; label: string; index: number; count: number; onMove: (from: number, to: number) => void; children: ReactNode }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return <div ref={setNodeRef} data-block-id={id} style={{ transform: CSS.Transform.toString(transform), transition, position: 'relative', zIndex: isDragging ? 20 : undefined, opacity: isDragging ? 0.7 : 1 }}>
+    <div className="ficha-pdf-block-tools ficha-no-print">
+      <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} className="ficha-pdf-move" aria-label={`Mover sección ${label}`} title="Arrastrar sección para cambiar su posición"><GripVertical size={15} aria-hidden="true" /> <span>Mover sección</span></button>
+      <button type="button" onClick={() => onMove(index, index - 1)} disabled={index === 0} aria-label={`Subir sección ${label}`} title="Subir sección">↑</button>
+      <button type="button" onClick={() => onMove(index, index + 1)} disabled={index === count - 1} aria-label={`Bajar sección ${label}`} title="Bajar sección">↓</button>
+    </div>
+    {children}
+  </div>;
+}
+
+export function SortablePdfSections({ items, onReorder, renderSlot, label }: {
+  items: string[]; onReorder?: (activeId: string, overId: string) => void;
+  renderSlot: (id: string) => ReactNode; label: (id: string) => string;
+}) {
+  const sensors = useDragSensors();
+  if (!onReorder) return <div className="ficha-pdf-order">{items.map(id => <div key={id} data-block-id={id}>{renderSlot(id)}</div>)}</div>;
+  const move = (from: number, to: number) => { if (to >= 0 && to < items.length) onReorder(items[from], items[to]); };
+  return <DndContext sensors={sensors} collisionDetection={closestCenter} accessibility={accessibility} onDragEnd={({ active, over }) => { if (over && active.id !== over.id) onReorder(String(active.id), String(over.id)); }}>
+    <SortableContext items={items} strategy={verticalListSortingStrategy}>
+      <div className="ficha-pdf-order">{items.map((id, index) => <PdfBlock key={id} id={id} label={label(id)} index={index} count={items.length} onMove={move}>{renderSlot(id)}</PdfBlock>)}</div>
+    </SortableContext>
   </DndContext>;
 }
