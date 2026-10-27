@@ -31,7 +31,7 @@ export default function LoginPage() {
       router.replace(res.data.user.status === 'pending' || res.data.needsProfileCompletion ? '/auth/complete-profile' : '/dashboard');
     } catch (err) { setError('root', { message: apiErrorMessage(err, 'No pudimos iniciar sesión. Revisa tu conexión e inténtalo nuevamente.') }); }
   };
-  return <AuthShell title="Qué bueno verte." description="Ingresa a tu cuenta y conecta con la vida de ARM.">
+  return <AuthShell title="Iniciar sesión" description="Ingresa a tu cuenta para acceder al ecosistema ARM.">
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5" aria-busy={isSubmitting}>
       <div><label htmlFor="email" className="mb-2 block text-sm font-medium">Correo electrónico</label>
         <input {...register('email')} id="email" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="tu@correo.com" className={authInput} aria-invalid={!!errors.email} aria-describedby={errors.email ? 'email-error' : undefined} />
@@ -42,7 +42,7 @@ export default function LoginPage() {
         {errors.password && <p id="password-error" role="alert" className="mt-2 text-sm text-red-700">{errors.password.message}</p>}
       </div>
       {errors.root && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{errors.root.message}</p>}
-      <button disabled={isSubmitting} className={authButton}>{isSubmitting ? <><Loader2 size={18} className="animate-spin" aria-hidden="true" />Ingresando…</> : <>Entrar a mi comunidad<ArrowRight size={17} aria-hidden="true" /></>}</button>
+      <button disabled={isSubmitting} className={authButton}>{isSubmitting ? <><Loader2 size={18} className="animate-spin" aria-hidden="true" />Ingresando…</> : <>Ingresar<ArrowRight size={17} aria-hidden="true" /></>}</button>
     </form>
     <p className="mt-7 text-center text-sm text-[#607068]">¿Es tu primera vez? <Link href="/auth/register" className={authLink}>Crea tu cuenta</Link></p>
     <p className="mt-7 border-t border-[#e1e7dd] pt-6 text-center text-xs leading-5 text-[#607068]">Si ya estás en el directorio y aún no tienes contraseña,<br className="hidden sm:block" /> puedes <Link href="/auth/forgot-password" className={authLink}>activar tu acceso por correo</Link>.</p>
