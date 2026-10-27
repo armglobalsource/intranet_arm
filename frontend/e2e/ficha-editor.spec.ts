@@ -15,6 +15,7 @@ async function fixture(page: Page, permissions = ['*']) {
   sections.escena.rows = [makeRow('vio', 'VIO', 0), makeRow('left', 'Posición Izquierda', 1, 'María González Fernández'), makeRow('center', 'Posición Centro', 2, 'Carlos Rodríguez'), makeRow('right', 'Posición Derecha', 3, 'Andrés Martínez'), makeRow('piano', 'Piano', 4), makeRow('voice', 'Voz', 5)] as any;
   const ficha = { fichaId: 'ui-fixture', title: 'Encuentro de domingo', campusName: 'Santiago', campusId: '1', type: 'unico', date: '2026-10-25', encuentros: [{ id: 'unico', label: 'Encuentro', time: '11:00', color: '#6554C0' }], sections, published: true, completionStatus: {}, status: 'in_progress', hiddenSections: ['streaming', 'horarios', 'media', 'voluntarios', 'anuncios', 'outfit', 'setList'], sectionLayout: { left: ['pastoral', 'produccion', 'streaming', 'horarios'], right: ['worship', 'media', 'voluntarios', 'anuncios'] } };
   const writes: { path: string; body: any }[] = [];
+  const song = { cancionId: 'song-1', titulo: 'See the light', tonalidad: 'G', hasLetra: true, letra: 'Letra de prueba del equipo', revision: '2026-10-27T09:00:00.123456Z', usageCount: 1 };
   await page.addInitScript((user) => localStorage.setItem('auth-storage', JSON.stringify({ state: { user, accessToken: 'local-ui-fixture', isAuthenticated: true, needsProfileCompletion: false }, version: 0 })), user);
   // Every API call is intercepted. These tests never read or modify live data.
   await page.route('**/api/v1/**', async (route) => {
@@ -23,17 +24,18 @@ async function fixture(page: Page, permissions = ['*']) {
     if (route.request().method() === 'PATCH') {
       const body = route.request().postDataJSON();
       writes.push({ path, body });
-      if (path.includes('/sections/')) {
+      if (path.endsWith('/canciones/song-1')) Object.assign(song, body, { revision: '2026-10-27T09:00:01.123456Z' });
+      else if (path.includes('/sections/')) {
         const section = path.split('/').pop()!;
         Object.assign(sections[section], body, { revision: sections[section].revision + 1 });
       } else Object.assign(ficha, body);
     }
-    const data = path.endsWith('/changelog') ? [] : path.endsWith('/people') ? [{ userId: 10, name: 'Ana Pérez', campusName: 'Santiago' }, { userId: 11, name: 'Ana Pérez', campusName: 'Puente Alto' }] : path.includes('/fichas/ui-fixture') ? ficha
+    const data = path.endsWith('/canciones/song-1') ? song : path.endsWith('/canciones') ? (route.request().method() === 'POST' ? song : [song]) : path.endsWith('/changelog') ? [] : path.endsWith('/people') ? [{ userId: 10, name: 'Ana Pérez', campusName: 'Santiago' }, { userId: 11, name: 'Ana Pérez', campusName: 'Puente Alto' }] : path.includes('/fichas/ui-fixture') ? ficha
       : path.endsWith('/equipo-roster') ? { worship: [], tecnico: [], ninguno: [] }
       : path.endsWith('/auth/me') ? user : [];
     await route.fulfill({ json: data });
   });
-  return { ficha, writes };
+  return { ficha, writes, song };
 }
 
 async function drag(page: Page, from: Locator, to: Locator) {
@@ -210,4 +212,29 @@ test('estructura de referencia: secciones siguen el orden del PDF y conserva las
   await expect(page.locator('.ficha-pdf-order > [data-ficha-slot]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-ficha-slot')))).resolves.toEqual(['pastoral', 'streaming', 'produccion', 'media', 'anuncios', 'worship', 'horarios', 'voluntarios']);
   await expect(page.getByRole('button', { name: 'Asignar personas: Bienvenida' })).toBeVisible();
   await expect(page.locator('.ficha-worship-columns')).toHaveCSS('display', 'grid');
+});
+
+
+test('canciones: seleccionar carga el tono y permite guardar letra en catálogo privado', async ({ page }) => {
+  const { ficha, writes, song } = await fixture(page);
+  ficha.hiddenSections = ficha.hiddenSections.filter(s => s !== 'setList');
+  ficha.sections.setList.rows = [{ id: 'songrow', label: 'Canción 1', order: 0, type: 'song', shared: false, required: false, values: {} }] as any;
+  await page.goto(url);
+  const input = page.getByPlaceholder('Nombre de la canción…').first();
+  await input.fill('See the light');
+  await expect(page.getByRole('button', { name: /See the light/ })).toBeVisible();
+  await input.press('Enter');
+  await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/setList')).at(-1)?.body.rows[0].values.unico).toContain('"tonalidad":"G"');
+  await page.getByRole('button', { name: 'Letra y catálogo' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Letra de prueba del equipo')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Editar catálogo' }).click();
+  await dialog.getByLabel('Tono de referencia').fill('D');
+  await dialog.locator('textarea').fill('Letra editada de prueba');
+  await dialog.getByRole('button', { name: 'Guardar en catálogo' }).click();
+  await expect(dialog.getByText('Letra editada de prueba')).toBeVisible();
+  expect(song.tonalidad).toBe('D');
+  await dialog.getByRole('button', { name: 'Usar tono en esta ficha' }).click();
+  await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/setList')).at(-1)?.body.rows[0].values.unico).toContain('"tonalidad":"D"');
+  expect(writes.filter(w => w.path.endsWith('/sections/setList')).at(-1)?.body.rows[0].values.unico).not.toContain('Letra editada');
 });

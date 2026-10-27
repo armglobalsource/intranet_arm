@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSlot, FichaPermisos, AssignmentEdit } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
+import { useAuthStore } from '@/lib/store/auth.store';
+import { SongLibraryDialog } from '@/components/fichas/SongLibraryDialog';
 import { SongInput } from '@/components/fichas/SongInput';
 import { LayoutVisualView } from './LayoutVisualView';
 import { PersonCellInput, FichaPeopleContext } from '@/components/fichas/PersonCellInput';
@@ -93,6 +95,7 @@ interface SongData {
   titulo:    string;
   tonalidad: string;
   cantante:  string;
+  cancionId?: string;
   tipo?:     string;
   bpm?:      number;
 }
@@ -102,7 +105,7 @@ function parseSongData(raw: string): SongData {
   try {
     const p = JSON.parse(raw);
     if (p && typeof p === 'object' && 'titulo' in p) {
-      return { titulo: p.titulo || '', tonalidad: p.tonalidad || '', cantante: p.cantante || '', tipo: p.tipo, bpm: p.bpm };
+      return { titulo: p.titulo || '', tonalidad: p.tonalidad || '', cantante: p.cantante || '', cancionId: p.cancionId, tipo: p.tipo, bpm: p.bpm };
     }
   } catch {}
   // Retrocompatibilidad: el valor era solo el título (texto plano)
@@ -115,6 +118,7 @@ function encodeSongData(data: SongData): string {
     titulo:    data.titulo,
     tonalidad: data.tonalidad,
     cantante:  data.cantante,
+    ...(data.cancionId ? { cancionId: data.cancionId } : {}),
     ...(data.tipo ? { tipo: data.tipo } : {}),
     ...(data.bpm  ? { bpm:  data.bpm  } : {}),
   });
@@ -732,6 +736,8 @@ function SongRowCell({
   const eColId = effectiveColId(row, colId);
 
   const [editingKey, setEditingKey] = useState(false);
+  const [showSong, setShowSong] = useState(false);
+  const signedIn = useAuthStore(state => state.isAuthenticated);
   const [keyDraft,   setKeyDraft]   = useState(data.tonalidad);
 
   useEffect(() => { setKeyDraft(data.tonalidad); }, [data.tonalidad]);
@@ -745,6 +751,7 @@ function SongRowCell({
   if (!editable) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+        {signedIn && data.cancionId && <><button className="ficha-no-print" type="button" onClick={() => setShowSong(true)} style={{fontSize: 11, color: '#276b62', textDecoration: 'underline'}}>Ver canción</button>{showSong && <SongLibraryDialog id={data.cancionId} onClose={() => setShowSong(false)} />}</>}
         <span style={{ fontSize: 13, fontWeight: 500, color: data.titulo ? D.textPrimary : D.textMuted }}>
           {data.titulo || '—'}
         </span>
@@ -775,8 +782,8 @@ function SongRowCell({
         <div style={{ flex: 1, minWidth: 0 }}>
           <SongInput
             value={data.titulo}
-            onChange={(titulo) => update({ titulo })}
-            onSongSelect={(c) => { if (c) update({ titulo: c.titulo, tipo: c.tipo, bpm: c.bpm }); }}
+            onChange={(titulo) => update({ titulo, cancionId: titulo === data.titulo ? data.cancionId : undefined, ...(titulo === data.titulo ? {} : {tonalidad: '', tipo: undefined, bpm: undefined}) })}
+            onSongSelect={(c) => { if (c) update({ titulo: c.titulo, cancionId: c.cancionId, tonalidad: c.tonalidad || '', tipo: c.tipo, bpm: c.bpm }); }}
             placeholder="Nombre de la canción…"
           />
         </div>
@@ -824,6 +831,7 @@ function SongRowCell({
         )}
       </div>
 
+      {signedIn && data.cancionId && <div className="ficha-no-print"><button type="button" onClick={() => setShowSong(true)} style={{fontSize: 11, color: '#276b62', textDecoration: 'underline'}}>Letra y catálogo</button>{showSong && <SongLibraryDialog id={data.cancionId} onClose={() => setShowSong(false)} onUseKey={tonalidad => update({tonalidad})} />}</div>}
       <PersonCellInput row={row} value={data.cantante} placeholder="Seleccionar cantante…"
         onChange={(v, assignment) => onCellChange?.(row.id, eColId, encodeSongData({ ...data, cantante: v }), assignment)}
         style={{ fontSize: 11, textAlign: 'left' }} />
@@ -2585,7 +2593,14 @@ export function FichaDocumentView({
         }
 
 
-        .ficha-pdf-order { display: flex; flex-direction: column; gap: 12px; }
+        .ficha-pdf-order { display: flex; flex-direction: column; gap: 10px; }
+        .ficha-body { padding: 20px 24px !important; }
+        .ficha-hdr-top { padding: 18px 24px 12px !important; }
+        .ficha-hdr > div:last-child { padding: 12px 24px 16px !important; gap: 8px !important; }
+        .ficha-pdf-order .ficha-card { min-width: 0; }
+        .ficha-pdf-order .ficha-role-row > div { min-width: 0; }
+        .ficha-pdf-order .ficha-role-row .ficha-person-cell { box-sizing: border-box; }
+        @container (max-width: 530px) { .ficha-body { padding: 14px 12px !important; } .ficha-hdr-top { padding: 14px 16px !important; } .ficha-hdr > div:last-child { padding: 12px 16px 16px !important; } }
         .ficha-pdf-order .ficha-card { padding: 0 !important; margin: 0 !important; border: 1px solid #aeb9c4 !important; border-radius: 3px !important; box-shadow: none !important; overflow: hidden; }
         .ficha-pdf-order .ficha-card > div:first-child { background: #e9edf0; color: #273745 !important; padding: 9px 12px !important; margin: 0 !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: .04em !important; border-bottom: 1px solid #c9d1d7; }
         .ficha-pdf-order .ficha-role-row { padding: 0 !important; min-height: 37px; gap: 0 !important; align-items: stretch !important; }

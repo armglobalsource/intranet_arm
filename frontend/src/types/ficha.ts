@@ -217,6 +217,10 @@ export interface Cancion {
   bpm?:        number;
   compas?:     string;   // '4/4' | '6/8' | '12/8'
   usageCount:  number;
+  letra?: string | null;
+  hasLetra?: boolean;
+  updatedAt?: string | null;
+  revision?: string | null;
   createdAt:   any;
 }
 

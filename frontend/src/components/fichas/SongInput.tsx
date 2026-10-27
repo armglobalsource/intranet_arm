@@ -53,10 +53,13 @@ export function SongInput({ value, onChange, onSongSelect, readOnly = false, pla
   const confirm = useCallback(
     (text: string, cancion?: Cancion) => {
       const titulo = text.trim();
-      onChange(titulo);
+      // Seleccionar con Enter una coincidencia exacta carga los mismos datos que un clic.
+      const match = cancion ?? suggestions.find(c => c.titulo.trim().toLocaleLowerCase('es') === titulo.toLocaleLowerCase('es'));
+      // Una sola actualización: el título y sus metadatos deben guardarse juntos.
+      if (match && onSongSelect) onSongSelect(match);
+      else { onChange(titulo); onSongSelect?.(null); }
       setQuery(titulo);
       setOpen(false);
-      onSongSelect?.(cancion ?? null);
       if (titulo && !confirmedRef.current) {
         confirmedRef.current = true;
         upsert({ titulo }, {
@@ -64,7 +67,7 @@ export function SongInput({ value, onChange, onSongSelect, readOnly = false, pla
         });
       }
     },
-    [onChange, onSongSelect, upsert],
+    [onChange, onSongSelect, suggestions, upsert],
   );
 
   // ── Cerrar dropdown si se hace click fuera ───────────────────────────────
@@ -185,6 +188,7 @@ export function SongInput({ value, onChange, onSongSelect, readOnly = false, pla
                 {cancion.bpm && (
                   <span className="text-[10px] font-medium" style={{ color: D.textSecond }}>{cancion.bpm} BPM</span>
                 )}
+                {cancion.hasLetra && <span className="text-[10px] text-emerald-700">Letra</span>}
                 {cancion.tonalidad && (
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
                     style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
