@@ -64,13 +64,18 @@ export function deriveFichaStatus(
 }
 
 export function missingRequiredRows(
-  rows: Array<{ label?: string; required?: boolean; shared?: boolean; values?: Record<string, string> }>,
+  rows: Array<{ label?: string; required?: boolean; shared?: boolean; values?: Record<string, string>; assignments?: Record<string, {mode: string; people: unknown[]}> }>,
   encuentroIds: string[],
 ): string[] {
   return rows
     .filter((row) => row.required)
     .filter((row) => {
       const values = row.values ?? {};
+      const assignmentMissing = (key: string) => {
+        const a = row.assignments?.[key];
+        return a?.mode === 'pending' || (a?.mode === 'people' && a.people.length === 0);
+      };
+      if ((row.shared ? ['shared'] : encuentroIds).some(assignmentMissing)) return true;
       if (row.shared) {
         return !Object.values(values).some((value) => String(value ?? '').trim().length > 0);
       }

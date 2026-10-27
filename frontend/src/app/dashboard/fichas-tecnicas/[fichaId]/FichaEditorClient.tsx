@@ -1,4 +1,6 @@
 'use client';
+import { editAssignmentCell } from '@/lib/ficha-assignments';
+import type { AssignmentEdit } from '@/types/ficha';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
@@ -539,18 +541,18 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
   // ── Cambio de celda ────────────────────────────────────────────────────────
   const handleCellChange = useCallback(
-    (sectionName: SectionName, rowId: string, colId: string, value: string) => {
+    (sectionName: SectionName, rowId: string, colId: string, value: string, assignment?: AssignmentEdit) => {
       setLocalSections((prev) => {
         const rows = prev[sectionName] ?? [];
         const updated = rows.map((r) =>
-          r.id === rowId ? { ...r, values: { ...r.values, [colId]: value } } : r,
+          r.id === rowId ? editAssignmentCell(r, sectionName, colId, value, ficha?.encuentros ?? [], assignment) : r,
         );
         // Capturamos `updated` en el closure del debounce
         scheduleSave(sectionName, updated);
         return { ...prev, [sectionName]: updated };
       });
     },
-    [scheduleSave],
+    [scheduleSave, ficha?.encuentros],
   );
 
   // ── Agregar fila ───────────────────────────────────────────────────────────

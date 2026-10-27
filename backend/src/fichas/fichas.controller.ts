@@ -47,6 +47,11 @@ export class FichasController {
     return this.fichasService.findPublic(fichaId);
   }
 
+  @Get(':fichaId/people')
+  findPeople(@Param('fichaId') id: string, @CurrentUser() user: any, @Query('search') search?: string) {
+    return this.fichasService.findPeople(id, user, search);
+  }
+
   // Quién puede ver cada ficha (publicada o no) lo decide el servicio según su rol en ella.
   @Get(':fichaId')
   findOne(@Param('fichaId') fichaId: string, @CurrentUser() user: any) {

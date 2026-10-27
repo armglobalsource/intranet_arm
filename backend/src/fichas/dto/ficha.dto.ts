@@ -25,6 +25,7 @@ export class EncuentroUpdateDto extends EncuentroDto {
 }
 
 export class CreateFichaDto {
+  @IsOptional() @IsIn(['standard', 'santiago', 'legacy']) template?: 'standard' | 'santiago' | 'legacy';
   @IsString() @IsNotEmpty() @MaxLength(80) campusId: string;
   @IsString() @IsNotEmpty() @MaxLength(120) campusName: string;
   @IsIn(['unico', 'multi', 'oracion']) type: 'unico' | 'multi' | 'oracion';
@@ -84,6 +85,7 @@ export class RowDto {
   @IsIn(['text', 'person', 'song']) type: 'text' | 'person' | 'song';
   @IsBoolean() shared: boolean;
   @IsObject()  values: Record<string, string>;
+  @IsOptional() @IsObject() assignments?: Record<string, import('../fichas.people').RowAssignment>;
   @IsNumber()  order: number;
   @IsBoolean() required: boolean;
   /** Horarios: id del momento principal del que esta fila es un sub-momento. */

@@ -98,6 +98,7 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
   );
 
   const [campusId, setCampusId] = useState('');
+  const [template, setTemplate] = useState<'standard' | 'santiago' | 'legacy'>('standard');
   const [diaIdx,   setDiaIdx]   = useState<number>(0);
   const [type,     setType]     = useState<FichaType>('multi');
   const [title,    setTitle]    = useState('');
@@ -157,6 +158,7 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
     setCampusId(id);
     setDiaIdx(0);
     const campus = campuses.find((c) => String(c.id) === id);
+    setTemplate(campus?.name.toLowerCase().includes('santiago') ? 'santiago' : 'standard');
     if (campus) {
       const config = buildEncuentrosConfig(campus);
       const primer = config[0];
@@ -200,6 +202,7 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
       campusId:   String(campus.id),
       campusName: campus.name,
       type:       finalType,
+      template,
       title,
       date,
       encuentros,
@@ -245,6 +248,17 @@ function CreateFichaForm({ onCreated }: { onCreated: (fichaId: string) => void }
           ))}
         </select>
       </div>
+
+      {campusId && type !== 'oracion' && <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+        <label htmlFor="ficha-template" className="block text-sm font-semibold text-slate-800">Estructura de la ficha</label>
+        <select id="ficha-template" className="input mt-2 text-sm" value={template} onChange={e => setTemplate(e.target.value as typeof template)}>
+          <option value="standard">Estándar · Puente Alto y otros campus</option>
+          <option value="santiago">Santiago · Global / bloque AM o PM</option>
+          <option value="legacy">Estructura anterior</option>
+        </select>
+        <p className="mt-2 text-xs text-slate-600">Crea una ficha por bloque. El equipo se comparte dentro de ese bloque; plataforma y timing se completan por encuentro. Los horarios corresponden a la configuración de tu campus.</p>
+        <p className="mt-1 text-xs text-slate-600">Los puestos se crean vacíos: selecciona personas del directorio, sin copiar nombres de los PDF.</p>
+      </div>}
 
       {/* Día de servicio */}
       {campusId && (

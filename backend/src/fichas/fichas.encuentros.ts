@@ -60,15 +60,23 @@ export function applyEncuentros(f: any, input: EncuentroInput[]): { change: Encu
   const touched = new Set<string>();
   for (const [name, section] of Object.entries<any>(f.sections ?? {})) {
     for (const row of section?.rows ?? []) {
+      const originalValues = { ...row.values };
+      const originalAssignments = { ...row.assignments };
       const values = row.values ?? {};
       for (const e of removed) {
         if (e.id in values) { delete values[e.id]; touched.add(name); }
       }
       for (const e of added) {
-        const source = e.copyFrom ? values[e.copyFrom] : undefined;
+        const source = e.copyFrom ? originalValues[e.copyFrom] : undefined;
         if (!row.shared && source) { values[e.id] = source; touched.add(name); }
       }
       row.values = values;
+      if (row.assignments) {
+        for (const e of removed) if (e.id in row.assignments) { delete row.assignments[e.id]; touched.add(name); }
+        for (const e of added) if (!row.shared && e.copyFrom && originalAssignments[e.copyFrom]) {
+          row.assignments[e.id] = JSON.parse(JSON.stringify(originalAssignments[e.copyFrom])); touched.add(name);
+        }
+      }
     }
   }
 

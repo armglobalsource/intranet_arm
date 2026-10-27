@@ -10,6 +10,9 @@ import { ChangelogEntry, CHANGELOG_MERGE_WINDOW_MS, capRowChanges, diffRows, mer
 import { applyEncuentros } from './fichas.encuentros';
 import { fichaPermisos, FichaUser } from './fichas.access';
 
+import { normalizeRowAssignments } from './fichas.people';
+import { buildTemplateSections } from './fichas.templates';
+
 type Log = (seccion: string | null, entry: ChangelogEntry) => void;
 /** Qué exige cada escritura: ver fichas.access.ts. */
 type Need = 'structure' | 'content' | 'publish' | 'layout' | 'designate' | { section: string };
@@ -125,6 +128,20 @@ export class PostgresFichasService {
   }
   findOne(id: string) { return this.read(id,this.db); }
   async findOneForUser(id: string, u: FichaUser) { const f=await this.findOne(id);return {...f,permisos:this.access(f,u)}; }
+  async findPeople(id: string, u: FichaUser, search = '') {
+    const f = await this.findOne(id);
+    const p = this.access(f, u);
+    if (!p.sections.length) throw new ForbiddenException('Solo los editores de esta ficha pueden consultar su directorio');
+    const query = search.trim().slice(0, 100).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const tokens = query.split(/\s+/).filter(Boolean).map(t => `%${t.replace(/[\\%_]/g, '\\$&')}%`);
+    return apiRows(await this.db.query(`SELECT u.id AS "userId", btrim(concat_ws(' ',u."firstName",u."lastName")) AS name,
+      u."campusId", c.name AS "campusName"
+      FROM arm_app.users u LEFT JOIN arm_app.campuses c ON c.id=u."campusId"
+      WHERE u.status='active' AND ($1 OR u."campusId"::text=$2 OR u."campusId" IS NULL)
+      AND translate(lower(concat_ws(' ',u."firstName",u."lastName")), 'áéíóúüñ', 'aeiouun') LIKE ALL($3::text[])
+      ORDER BY (u."campusId"::text=$2) DESC NULLS LAST,u."firstName",u."lastName",u.id LIMIT 30`,
+      [this.global(u), String(f.campusId), tokens]));
+  }
   async findPublic(id: string) {
     const f=await this.findOne(id);
     if (!f.published || f.archived) throw new ForbiddenException('Esta ficha no está publicada');
@@ -132,6 +149,7 @@ export class PostgresFichasService {
     if (f.equipo) f.equipo = Object.fromEntries(Object.entries(f.equipo).map(([k,v]:[string,any])=>[k,v?{name:v.name}:null]));
     for (const section of Object.values(f.sections ?? {}) as any[]) {
       delete section.assignedTo; delete section.completedBy; delete section.revision;
+      for (const row of section.rows ?? []) delete row.assignments;
     }
     if(f.layoutVisual) delete f.layoutVisual.updatedBy;
     const paletteIds = [...new Set((f.sections?.outfit?.rows ?? []).flatMap((r:any)=>Object.values(r.values ?? {})).filter((v:any)=>typeof v==='string' && v.trim()))];
@@ -144,8 +162,9 @@ export class PostgresFichasService {
   async create(dto: CreateFichaDto, u: FichaUser) {
     this.manage({campusId:dto.campusId},u);
     if(dto.type==='oracion' && dto.encuentros.length!==1) throw new BadRequestException('La ficha de oración requiere un solo horario');
+    applyEncuentros({type:dto.type,encuentros:[],sections:{}},dto.encuentros);
     const id=randomUUID();
-    return this.save(this.db,id,{...dto,date:parseFichaDate(dto.date),sections:buildDefaultSections(dto.type),completionStatus:buildDefaultCompletion(dto.type),hiddenSections:[],status:'draft',published:false,archived:false,createdBy:u.sub,createdByName:u.email,createdAt:new Date(),...this.stamp(u)},true);
+    return this.save(this.db,id,{...dto,date:parseFichaDate(dto.date),sections:buildTemplateSections(dto.type,dto.template),completionStatus:buildDefaultCompletion(dto.type),hiddenSections:[],status:'draft',published:false,archived:false,createdBy:u.sub,createdByName:u.email,createdAt:new Date(),...this.stamp(u)},true);
   }
   update(id: string, dto: UpdateFichaDto, u: FichaUser) {
     return this.change(id,u,(f,_db,log)=>{
@@ -194,7 +213,7 @@ export class PostgresFichasService {
     const f=await this.findOneForUser(id,u);this.manage(f,u);
     if(f.type==='oracion' && f.encuentros?.length>1) throw new BadRequestException('Separa primero los encuentros de esta ficha');
     for(const s of Object.values(f.sections ?? {}) as any[]) {
-      Object.assign(s,{revision:0,isCompleted:false,completedBy:null,completedAt:null,rows:(s.rows??[]).map((r:any)=>({...r,values:{}}))});
+      Object.assign(s,{revision:0,isCompleted:false,completedBy:null,completedAt:null,rows:(s.rows??[]).map((r:any)=>({...r,values:{},assignments:{}}))});
       if(!dto.keepAssignees) Object.assign(s,{assignedTo:null,assignedName:null});
     }
     const newId=randomUUID();
@@ -235,6 +254,7 @@ export class PostgresFichasService {
         if(incoming.size!==sectionDto.rows.length) throw new BadRequestException('La sección contiene filas duplicadas');
         if((s.rows??[]).some((r:any)=>r.required && (incoming.get(r.id) as any)?.required!==true)) throw new BadRequestException('No puedes eliminar ni volver opcional una fila obligatoria');
       }
+      if(changed) await normalizeRowAssignments(sectionDto.rows,s.rows??[],(f.encuentros??[]).map((e:any)=>e.id),name,String(f.campusId),this.global(u),db);
       if(changed) log(name,{kind:'rows',changes:diffRows(s.rows??[],sectionDto.rows,f.encuentros??[])});
       if('assignedTo' in sectionDto && sectionDto.assignedTo!==s.assignedTo && !fichaPermisos(f,u).content) throw new ForbiddenException('Solo quien responde por la ficha puede asignar responsables de sección');
       if('assignedTo' in sectionDto && sectionDto.assignedTo!==s.assignedTo) log(name,{kind:'assign',before:s.assignedName??null,after:sectionDto.assignedName??null});

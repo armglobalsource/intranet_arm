@@ -293,7 +293,11 @@ export function migrateMediaData(ficha: any) {
       const existingValues = Object.values(target.values ?? {}).some(
         (value) => String(value ?? '').trim().length > 0,
       );
-      if (!existingValues) target.values = { ...(legacyRow.values ?? {}) };
+      if (!existingValues) {
+        target.values = { ...(legacyRow.values ?? {}) };
+        target.shared = legacyRow.shared;
+        if (legacyRow.assignments) target.assignments = JSON.parse(JSON.stringify(legacyRow.assignments));
+      }
     }
   }
 
@@ -344,6 +348,7 @@ export function rowsForSingleEncounter(rows: any[] = [], encounterId: string): a
     const value = encounterValue(row, encounterId);
     return {
       ...row,
+      ...(row.assignments ? {assignments: row.assignments[row.shared ? 'shared' : encounterId] ? {[row.shared ? 'shared' : 'unico']: row.assignments[row.shared ? 'shared' : encounterId]} : {}} : {}),
       values: row.shared
         ? (value ? { shared: value } : {})
         : (value ? { unico: value } : {}),
@@ -391,6 +396,8 @@ export function buildGlobalSectionsFromMixedFicha(
         (row: any) => String(row.label ?? '').trim().toLocaleLowerCase('es') === normalizedLabel,
       );
       if (equivalent) {
+        const assignment = sourceRow.assignments?.[sourceRow.shared ? 'shared' : encounterId];
+        if (assignment) equivalent.assignments = {[equivalent.shared ? 'shared' : 'unico']: assignment};
         equivalent.values = equivalent.shared ? { shared: value } : { unico: value };
         continue;
       }
@@ -402,6 +409,7 @@ export function buildGlobalSectionsFromMixedFicha(
         id,
         label: sourceRow.label || `Dato conservado ${index + 1}`,
         type: sourceRow.type ?? 'text',
+        ...(sourceRow.assignments?.[sourceRow.shared ? 'shared' : encounterId] ? {assignments: {[sourceRow.shared ? 'shared' : 'unico']: sourceRow.assignments[sourceRow.shared ? 'shared' : encounterId]}} : {}),
         shared: Boolean(sourceRow.shared),
         values: sourceRow.shared ? { shared: value } : { unico: value },
         order: targetSection.rows.length,

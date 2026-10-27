@@ -1,14 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSlot, FichaPermisos } from '@/types/ficha';
+import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSlot, FichaPermisos, AssignmentEdit } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
 import { SongInput } from '@/components/fichas/SongInput';
 import { LayoutVisualView } from './LayoutVisualView';
-import { useUsers } from '@/hooks/useUsers';
-import { displayName } from '@/types/user';
-import { useRosterStatus } from '@/components/fichas/RosterStatusContext';
-import type { RosterStatus } from '@/types/disponibilidad';
+import { PersonCellInput, FichaPeopleContext } from '@/components/fichas/PersonCellInput';
 import { SortableSection, SortableRow, SortableFichaLayout } from '@/components/fichas/FichaSortable';
 
 // Secciones disponibles por tipo de ficha (para el panel de módulos)
@@ -184,176 +181,6 @@ function CellInput({ value, onChange, placeholder, style }: {
         ...style,
       }}
     />
-  );
-}
-
-// ── PersonCellInput ───────────────────────────────────────────────────────────
-// Mismo contrato que CellInput (drop-in), pero con autocomplete: al escribir
-// 3+ caracteres busca entre todas las personas registradas y permite
-// seleccionarlas. Si la persona no está en el sistema, se puede seguir
-// escribiendo el nombre a mano igual que antes — no obliga a elegir de la lista.
-
-const PERSON_SEARCH_MIN_CHARS = 3;
-
-const ROSTER_DOT_COLOR: Record<RosterStatus, string> = {
-  disponible:     '#1D9E75',
-  no_disponible:  '#D14343',
-  sin_responder:  '#6b6b6b',
-};
-
-const ROSTER_DOT_TITLE: Record<RosterStatus, string> = {
-  disponible:    'Disponible esta semana',
-  no_disponible: 'No disponible esta semana',
-  sin_responder: 'Sin respuesta esta semana',
-};
-
-function RosterDot({ status }: { status?: RosterStatus }) {
-  if (!status) return null;
-  return (
-    <span
-      title={ROSTER_DOT_TITLE[status]}
-      style={{
-        display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-        background: ROSTER_DOT_COLOR[status], flexShrink: 0,
-      }}
-    />
-  );
-}
-
-function PersonCellInput({ value, onChange, placeholder, style, multiline, rows }: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  style?: React.CSSProperties;
-  multiline?: boolean;
-  rows?: number;
-}) {
-  const { data: users = [] } = useUsers();
-  const rosterStatus = useRosterStatus();
-  const [open, setOpen] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Las tarjetas de posiciones son deliberadamente compactas. Un textarea
-  // con altura fija termina mostrando la barra nativa del navegador apenas el
-  // nombre ocupa dos líneas. Ajustamos su alto al contenido para mantener la
-  // lectura limpia y evitar que el control parezca un selector antiguo.
-  useEffect(() => {
-    if (!multiline || !textareaRef.current) return;
-    const textarea = textareaRef.current;
-    const resize = () => {
-      textarea.style.height = 'auto';
-      textarea.style.height = `${textarea.scrollHeight + 1}px`;
-    };
-    resize();
-    let width = textarea.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (textarea.clientWidth !== width) {
-        width = textarea.clientWidth;
-        resize();
-      }
-    });
-    observer.observe(textarea);
-    return () => observer.disconnect();
-  }, [multiline, value]);
-
-  const suggestions = useMemo(() => {
-    const q = value.trim().toLowerCase();
-    if (q.length < PERSON_SEARCH_MIN_CHARS) return [];
-    return users
-      .filter((u) => displayName(u).toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [value, users]);
-
-  const showDrop = open && suggestions.length > 0;
-
-  const sharedProps = {
-    value,
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { onChange(e.target.value); setOpen(true); },
-    onFocus: () => setOpen(true),
-    onBlur: () => setTimeout(() => setOpen(false), 150),
-    placeholder: placeholder ?? '—',
-    className: 'ficha-cell-input',
-    style: {
-      border: 'none',
-      borderBottom: `1px dashed ${D.inputBorder}`,
-      outline: 'none',
-      background: 'transparent',
-      padding: '1px 2px',
-      font: 'inherit',
-      color: 'inherit',
-      width: '100%',
-      minWidth: 0,
-      caretColor: C.purple,
-      ...style,
-    },
-  };
-
-  return (
-    <div style={{ position: 'relative', width: '100%' }}>
-      {multiline ? (
-        <textarea
-          ref={textareaRef}
-          rows={rows ?? 2}
-          {...sharedProps}
-          onInput={(e) => {
-            const textarea = e.currentTarget;
-            textarea.style.height = 'auto';
-            textarea.style.height = `${textarea.scrollHeight + 1}px`;
-          }}
-          style={{
-            ...sharedProps.style,
-            display: 'block',
-            boxSizing: 'border-box',
-            minHeight: '2.9em',
-            overflow: 'hidden',
-            resize: 'none',
-          }}
-        />
-      ) : (
-        <input type="text" {...sharedProps} />
-      )}
-      {showDrop && (
-        <div
-          className="ficha-no-print"
-          style={{
-            position: 'absolute', zIndex: 50, left: 0, right: 0, top: '100%', marginTop: 3,
-            background: D.cardBg, border: `1px solid ${D.cardBorder}`, borderRadius: 8,
-            boxShadow: '0 8px 20px rgba(0,0,0,0.35)', maxHeight: 180, overflowY: 'auto', textAlign: 'left',
-          }}
-        >
-          {suggestions.map((u) => {
-            const blocked = rosterStatus[u.id] === 'no_disponible';
-            return (
-              <button
-                key={u.id}
-                type="button"
-                disabled={blocked}
-                title={blocked ? 'No disponible esta semana — no se puede seleccionar' : undefined}
-                onMouseDown={(e) => {
-                  if (blocked) { e.preventDefault(); return; }
-                  onChange(displayName(u)); setOpen(false);
-                }}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  padding: '6px 10px', background: 'transparent', border: 'none',
-                  cursor: blocked ? 'not-allowed' : 'pointer',
-                  opacity: blocked ? 0.45 : 1,
-                  borderBottom: `1px solid ${D.divider}`,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <RosterDot status={rosterStatus[u.id]} />
-                  <div style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, textDecoration: blocked ? 'line-through' : 'none' }}>
-                    {displayName(u)}
-                  </div>
-                </div>
-                {u.email && <div style={{ fontSize: 10, color: D.textMuted, marginLeft: 13 }}>{u.email}</div>}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -596,7 +423,7 @@ interface EditProps {
   editable?: boolean;
   forceShowAll?: boolean;   // Siempre mostrar la card aunque las filas estén vacías
   colId: string;
-  onCellChange?: (rowId: string, colId: string, value: string) => void;
+  onCellChange?: (rowId: string, colId: string, value: string, assignment?: AssignmentEdit) => void;
   onDeleteRow?: (rowId: string) => void;
   onAddRow?: (label: string, type: Row['type'], shared: boolean) => void;
   /** Renombra el label (título) de una fila. */
@@ -638,9 +465,9 @@ function RoleCard({
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                   {editable ? (
-                    <PersonCellInput
+                    <PersonCellInput row={row}
                       value={rawVal(row, colId)}
-                      onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                      onChange={(v, assignment) => onCellChange?.(row.id, effectiveColId(row, colId), v, assignment)}
                       style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
                     />
                   ) : (
@@ -692,9 +519,9 @@ function StreamingCard({
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                   {editable ? (
-                    <PersonCellInput
+                    <PersonCellInput row={row}
                       value={rawVal(row, colId)}
-                      onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                      onChange={(v, assignment) => onCellChange?.(row.id, effectiveColId(row, colId), v, assignment)}
                       style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
                     />
                   ) : (
@@ -725,9 +552,9 @@ function StreamingCard({
                       {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                     </div>
                     {editable ? (
-                      <PersonCellInput
+                      <PersonCellInput row={row}
                         value={rawVal(row, colId)}
-                        onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                        onChange={(v, assignment) => onCellChange?.(row.id, effectiveColId(row, colId), v, assignment)}
                         style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, marginTop: 2 }}
                       />
                     ) : (
@@ -774,9 +601,9 @@ function EscenaCard({
                 {handle}
                 <span style={S.roleLabel}>VIO</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-                  <PersonCellInput
+                  <PersonCellInput row={vio}
                     value={rawVal(vio, colId)}
-                    onChange={(v) => onCellChange?.(vio.id, effectiveColId(vio, colId), v)}
+                    onChange={(v, assignment) => onCellChange?.(vio.id, effectiveColId(vio, colId), v, assignment)}
                     style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
                   />
                   {onDeleteRow && <DeleteBtn onClick={() => onDeleteRow(vio.id)} />}
@@ -808,9 +635,9 @@ function EscenaCard({
                         {editable && onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                       </div>
                       {editable ? (
-                        <PersonCellInput
+                        <PersonCellInput row={row}
                           value={rawVal(row, colId)}
-                          onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                          onChange={(v, assignment) => onCellChange?.(row.id, effectiveColId(row, colId), v, assignment)}
                           style={{ fontSize: 12, fontWeight: 600, color: D.textPrimary, textAlign: 'center', marginTop: 2 }}
                         />
                       ) : (
@@ -845,9 +672,9 @@ function EscenaCard({
                     />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                       {editable ? (
-                        <PersonCellInput
+                        <PersonCellInput row={row}
                           value={rawVal(row, colId)}
-                          onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                          onChange={(v, assignment) => onCellChange?.(row.id, effectiveColId(row, colId), v, assignment)}
                           style={{ fontSize: 12, fontWeight: 500, color: D.textPrimary, textAlign: 'right' }}
                         />
                       ) : (
@@ -876,7 +703,7 @@ function SongRowCell({
   row: Row;
   colId: string;
   editable?: boolean;
-  onCellChange?: (rowId: string, colId: string, value: string) => void;
+  onCellChange?: (rowId: string, colId: string, value: string, assignment?: AssignmentEdit) => void;
   singers?: string[];
 }) {
   const raw    = rawVal(row, colId);
@@ -976,21 +803,10 @@ function SongRowCell({
         )}
       </div>
 
-      {/* Selector de cantante */}
-      {singers.length > 0 && (
-        <select
-          value={data.cantante}
-          onChange={(e) => update({ cantante: e.target.value })}
-          style={{
-            fontSize: 11, width: '100%',
-            background: 'rgba(255,255,255,0.04)', border: `0.5px solid ${D.cardBorder}`,
-            borderRadius: 5, color: data.cantante ? D.textSecond : D.textMuted,
-            padding: '3px 7px', outline: 'none', cursor: 'pointer',
-          }}>
-          <option value="">— Sin cantante asignado —</option>
-          {singers.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      )}
+      <PersonCellInput row={row} value={data.cantante} placeholder="Seleccionar cantante…"
+        onChange={(v, assignment) => onCellChange?.(row.id, eColId, encodeSongData({ ...data, cantante: v }), assignment)}
+        style={{ fontSize: 11, textAlign: 'left' }} />
+
     </div>
   );
 }
@@ -1633,9 +1449,9 @@ function WorshipSetListCard({
                   {handle}
                   <span style={S.roleLabel}>VIO</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-                    <PersonCellInput
+                    <PersonCellInput row={vio}
                       value={rawVal(vio, colId)}
-                      onChange={(v) => escena.onCellChange?.(vio.id, effectiveColId(vio, colId), v)}
+                      onChange={(v, assignment) => escena.onCellChange?.(vio.id, effectiveColId(vio, colId), v, assignment)}
                       style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
                     />
                     {escena.onDeleteRow && <DeleteBtn onClick={() => escena.onDeleteRow!(vio.id)} />}
@@ -1661,9 +1477,9 @@ function WorshipSetListCard({
                           {editable && escena.onDeleteRow && !row.required && <DeleteBtn onClick={() => escena.onDeleteRow!(row.id)} />}
                         </div>
                         {editable ? (
-                          <PersonCellInput
+                          <PersonCellInput row={row}
                             value={rawVal(row, colId)}
-                            onChange={(v) => escena.onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                            onChange={(v, assignment) => escena.onCellChange?.(row.id, effectiveColId(row, colId), v, assignment)}
                             placeholder="Nombre…"
                             multiline
                             rows={2}
@@ -1706,9 +1522,9 @@ function WorshipSetListCard({
                       />
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                         {editable ? (
-                          <PersonCellInput
+                          <PersonCellInput row={row}
                             value={rawVal(row, colId)}
-                            onChange={(v) => escena.onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                            onChange={(v, assignment) => escena.onCellChange?.(row.id, effectiveColId(row, colId), v, assignment)}
                             style={{ fontSize: 13, fontWeight: 500, color: D.textPrimary, textAlign: 'right' }}
                           />
                         ) : (
@@ -1889,8 +1705,8 @@ function TimingCard({
     const roots = displayed.filter((r) => !isChild(r));
     const hasChildren = (id: string) => displayed.some((r) => r.parentId === id);
 
-    const write = (p: ParsedMoment, patch: Partial<MomentValue>) => {
-      onCellChange?.(p.row.id, effectiveColId(p.row, colId), encodeMoment({ ...p.value, ...patch }));
+    const write = (p: ParsedMoment, patch: Partial<MomentValue>, assignment?: AssignmentEdit) => {
+      onCellChange?.(p.row.id, effectiveColId(p.row, colId), encodeMoment({ ...p.value, ...patch }), assignment);
       // Al pasar al formato nuevo, el rango escrito en el nombre ya no hace falta.
       if (p.legacy && p.label !== p.row.label && (p.row.shared || encuentros.length <= 1)) onLabelChange?.(p.row.id, p.label);
     };
@@ -1951,9 +1767,9 @@ function TimingCard({
                         {MOMENT_KINDS.map((m) => <option key={m.kind} value={m.kind}>{m.label}</option>)}
                       </select>
                       <div style={{ width: 170 }}>
-                        <PersonCellInput
+                        <PersonCellInput row={p.row}
                           value={p.value.responsable ?? ''} placeholder="Responsable"
-                          onChange={(v) => write(p, { responsable: v })}
+                          onChange={(v, assignment) => write(p, { responsable: v }, assignment)}
                           style={{ fontSize: 11.5 }}
                         />
                       </div>
@@ -2301,9 +2117,9 @@ function VoluntariosCard({
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
                   {editable ? (
-                    <PersonCellInput
+                    <PersonCellInput row={row}
                       value={rawVal(row, colId)}
-                      onChange={(v) => onCellChange?.(row.id, effectiveColId(row, colId), v)}
+                      onChange={(v, assignment) => onCellChange?.(row.id, effectiveColId(row, colId), v, assignment)}
                       style={{ ...S.roleValue, textAlign: 'right', width: '100%' }}
                     />
                   ) : (
@@ -2469,7 +2285,7 @@ export interface FichaDocumentViewProps {
   /** Cuando true, muestra todos los módulos habilitados aunque sus filas estén vacías (contexto editor) */
   forceShowAll?: boolean;
   localSections?: Partial<Record<SectionName, Row[]>>;
-  onCellChange?: (section: SectionName, rowId: string, colId: string, value: string) => void;
+  onCellChange?: (section: SectionName, rowId: string, colId: string, value: string, assignment?: AssignmentEdit) => void;
   onAddRow?: (section: SectionName, label: string, type: Row['type'], shared: boolean) => void;
   onDeleteRow?: (section: SectionName, rowId: string) => void;
   onLabelChange?: (section: SectionName, rowId: string, newLabel: string) => void;
@@ -2538,7 +2354,7 @@ export function FichaDocumentView({
     editable: editable && canEditSection(name),
     forceShowAll,
     colId,
-    onCellChange:  onCellChange  ? (rowId, cId, value) => onCellChange(name, rowId, cId, value)      : undefined,
+    onCellChange:  onCellChange  ? (rowId, cId, value, assignment) => onCellChange(name, rowId, cId, value, assignment)      : undefined,
     onDeleteRow:   onDeleteRow   ? (rowId) => onDeleteRow(name, rowId)                                : undefined,
     onAddRow:      onAddRow      ? (label, type, shared) => onAddRow(name, label, type, shared)       : undefined,
     onLabelChange: onLabelChange ? (rowId, newLabel) => onLabelChange(name, rowId, newLabel)          : undefined,
@@ -2668,6 +2484,7 @@ export function FichaDocumentView({
   const isSaveError = saveState === 'error';
 
   return (
+    <FichaPeopleContext.Provider value={{fichaId: ficha.fichaId, encuentros, currentId: colId}}>
     <div
       className="ficha-doc-root"
       style={{ maxWidth: 980, margin: '0 auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
@@ -3454,6 +3271,7 @@ export function FichaDocumentView({
 
       </div>
     </div>
+    </FichaPeopleContext.Provider>
   );
 }
 

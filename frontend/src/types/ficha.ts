@@ -59,7 +59,15 @@ export const FICHA_ROLE_LABELS: Record<FichaRole, string> = {
   lector:      'Consulta',
 };
 
+export interface RowAssignment {
+  mode: 'people' | 'pending' | 'fixed' | 'sequence' | 'not_applicable' | 'team';
+  people: { userId: number; name: string }[];
+  note: string;
+}
+export type AssignmentEdit = { assignment: RowAssignment; scope: 'current' | 'block' | 'all'; encounterId: string };
+
 export interface Row {
+  assignments?: Record<string, RowAssignment>;
   id:       string;
   label:    string;
   type:     'text' | 'person' | 'song';
@@ -188,6 +196,7 @@ export interface FichaListItem {
 }
 
 export type CreateFichaPayload = {
+  template?: 'standard' | 'santiago' | 'legacy';
   campusId:    string;
   campusName:  string;
   type:        FichaType;

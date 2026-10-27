@@ -7,6 +7,7 @@ const names = ['pastoral', 'produccion', 'streaming', 'horarios', 'escena', 'set
 const makeRow = (id: string, label: string, order: number, value = 'María González') => ({ id, label, order, type: 'person', shared: true, required: false, values: { shared: value } });
 
 async function fixture(page: Page, permissions = ['*']) {
+  page.on('pageerror', error => console.error('Browser error:', error.message, error.stack));
   const user = { id: 1, firstName: 'Usuario', lastName: 'Demo', email: 'demo@example.test', permissions, role: { name: 'admin' }, status: 'active' };
   const sections = Object.fromEntries(names.map((name) => [name, { rows: [], revision: 0, isCompleted: false }]));
   sections.pastoral.rows = [makeRow('welcome', 'Bienvenida', 0), makeRow('preach', 'Predicación', 1), makeRow('prayer', 'Oración', 2)] as any;
@@ -27,7 +28,7 @@ async function fixture(page: Page, permissions = ['*']) {
         Object.assign(sections[section], body, { revision: sections[section].revision + 1 });
       } else Object.assign(ficha, body);
     }
-    const data = path.includes('/fichas/ui-fixture') ? ficha
+    const data = path.endsWith('/changelog') ? [] : path.endsWith('/people') ? [{ userId: 10, name: 'Ana Pérez', campusName: 'Santiago' }, { userId: 11, name: 'Ana Pérez', campusName: 'Puente Alto' }] : path.includes('/fichas/ui-fixture') ? ficha
       : path.endsWith('/equipo-roster') ? { worship: [], tecnico: [], ninguno: [] }
       : path.endsWith('/auth/me') ? user : [];
     await route.fulfill({ json: data });
@@ -74,9 +75,9 @@ test('posiciones: arrastre horizontal conserva VIO y músicos; campo sin scroll'
   await page.goto(url);
   await drag(page, page.locator('[data-row-id="left"]').getByRole('button', { name: 'Mover fila' }), page.locator('[data-row-id="right"]'));
   await expect.poll(() => writes.find((w) => w.path.endsWith('/sections/escena'))?.body.rows.map((r: any) => r.id)).toEqual(['vio', 'center', 'right', 'left', 'piano', 'voice']);
-  const textarea = page.locator('[data-row-id="left"] textarea');
-  await expect(textarea).toHaveCSS('overflow-y', 'hidden');
-  await expect(textarea).toHaveValue('María González Fernández');
+  const cell = page.locator('[data-row-id="left"] .ficha-person-cell');
+  await expect(cell).toContainText('María González Fernández');
+  expect(await cell.evaluate(el => el.scrollHeight <= el.clientHeight)).toBe(true);
 });
 
 test('vista móvil: agregar visible, sin desbordamiento y teclado para ordenar', async ({ page }) => {
@@ -133,4 +134,61 @@ test('impresión clara conserva contenido y oculta las asas', async ({ page }) =
   await expect(page.locator('.ficha-doc')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(page.getByRole('button', { name: 'Mover bloque Equipo Pastoral' })).toBeHidden();
   await expect(page.getByRole('button', { name: 'Bienvenida', exact: true })).toBeVisible();
+});
+
+
+test('personas: conserva dos homónimos por ID al guardar y recargar', async ({ page }) => {
+  const { writes } = await fixture(page);
+  await page.goto(url);
+  await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Dato anterior:', { exact: false })).toBeVisible();
+  await dialog.getByRole('checkbox').nth(0).check();
+  await dialog.getByRole('checkbox').nth(1).check();
+  await dialog.getByLabel('Nota opcional').fill('Coordinación');
+  await page.screenshot({ path: 'test-results/ficha-personas-selector.png' });
+  await dialog.getByRole('button', { name: 'Aplicar asignación' }).click();
+  await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/pastoral')).at(-1)?.body.rows[0].assignments?.shared?.people.map((p:any) => p.userId)).toEqual([10, 11]);
+  await page.reload();
+  await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).click();
+  await expect(dialog.getByRole('checkbox').nth(0)).toBeChecked();
+  await expect(dialog.getByRole('checkbox').nth(1)).toBeChecked();
+  await dialog.getByRole('checkbox').nth(0).uncheck();
+  await dialog.getByRole('button', { name: 'Aplicar asignación' }).click();
+  await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/pastoral')).at(-1)?.body.rows[0].assignments?.shared?.people.map((p:any) => p.userId)).toEqual([11]);
+});
+
+test('selector móvil: cancelar conserva texto anterior; un recurso no crea usuarios', async ({ page }) => {
+  const { writes } = await fixture(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(url);
+  await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Tipo de asignación').selectOption('pending');
+  await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true })).toContainText('María González');
+  expect(writes).toHaveLength(0);
+  await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).click();
+  await dialog.getByLabel('Tipo de asignación').selectOption('fixed');
+  await dialog.getByLabel('Nota opcional').fill('Cámara 4');
+  await page.screenshot({ path: 'test-results/ficha-personas-mobile.png' });
+  expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await dialog.getByRole('button', { name: 'Aplicar asignación' }).click();
+  await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/pastoral')).at(-1)?.body.rows[0].values.shared).toBe('Fija · Cámara 4');
+});
+
+
+test('bloque AM: cambiar la asignación compartida conserva el encuentro PM', async ({ page }) => {
+  const { ficha, writes } = await fixture(page);
+  ficha.type = 'multi';
+  ficha.encuentros = ['09:00', '11:00', '17:00'].map((time, i) => ({ id: `e${i}`, label: `Encuentro ${time}`, time, color: '#6554C0' }));
+  await page.goto(url);
+  await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('checkbox').nth(0).check();
+  await dialog.getByLabel('Aplicar a').selectOption('block');
+  await dialog.getByRole('button', { name: 'Aplicar asignación' }).click();
+  await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/pastoral')).at(-1)?.body.rows[0].values).toEqual({ e0: 'Ana Pérez', e1: 'Ana Pérez', e2: 'María González' });
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true })).toContainText('Ana Pérez');
 });
