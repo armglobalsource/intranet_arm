@@ -89,4 +89,30 @@
   .ficha-selected-person button { grid-column: 2; grid-row: 1 / 3; }
   .ficha-dialog-actions { position: sticky; bottom: -16px; background: white; padding: 12px 0 max(12px, env(safe-area-inset-bottom)); flex-wrap: wrap; }
   .ficha-dialog-actions button { flex: 1 1 120px; }
+
+  /* Compact phone reading without shrinking editable inputs or touch targets. */
+  .ficha-doc-root .ficha-encuentro-tabs { gap: 6px !important; margin-bottom: 10px !important; }
+  .ficha-doc-root .ficha-encuentro-tabs button { font-size: 11px !important; padding: 6px 8px !important; }
+  .ficha-doc-root .ficha-body { padding: 10px 8px !important; }
+  .ficha-doc-root .ficha-hdr-top { padding: 10px 12px !important; gap: 8px; }
+  .ficha-doc-root .ficha-hdr > div:last-child { padding: 10px 12px !important; }
+  .ficha-doc-root .ficha-date-area button { font-size: 13px !important; line-height: 1.35; }
+  .ficha-doc-root .ficha-title-text { font-size: 17px !important; line-height: 1.3 !important; }
+  .ficha-doc-root .ficha-action-bar { gap: 5px; padding: 5px; }
+  .ficha-doc-root .ficha-action-bar button { font-size: 11px !important; padding: 6px !important; }
+  .ficha-doc-root .ficha-editor-help { font-size: 11px; line-height: 1.4; padding: 8px; margin-bottom: 10px; }
+  .ficha-doc-root .ficha-pdf-order { gap: 8px; }
+  .ficha-doc-root .ficha-person-cell { font-size: 13px !important; line-height: 1.35; padding: 6px !important; }
+  .ficha-doc-root .ficha-doc .ficha-role-row { padding: 4px 8px !important; gap: 2px 4px !important; }
+  .ficha-doc-root .ficha-doc .ficha-role-row > .ficha-editable-label,
+  .ficha-doc-root .ficha-doc .ficha-role-row > span { font-size: 12px !important; padding: 2px 0 !important; }
+  .ficha-doc-root .ficha-doc .ficha-role-row > .ficha-drag-handle { grid-column: 1; grid-row: 1 / 3; align-self: center; }
+  .ficha-doc-root .ficha-doc .ficha-role-row > div { padding: 0 !important; }
+  .ficha-doc-root .ficha-doc .ficha-role-row:has(> .ficha-drag-handle) > div { grid-column: 2; }
+  .ficha-doc-root .ficha-doc .ficha-role-row > div > span { font-size: 13px !important; line-height: 1.35; }
+  .ficha-doc-root .ficha-matrix-label { padding: 3px 6px; font-size: 12px; }
+  .ficha-doc-root .ficha-matrix-value { flex-wrap: nowrap; padding: 4px 6px; }
+  .ficha-doc-root .ficha-matrix-value::before { flex: 0 0 42px; font-size: 11px; }
+  .ficha-doc-root .layout-visual-row { gap: 10px !important; padding: 10px !important; }
+  .ficha-doc-root .layout-visual-row > [data-label]::before { margin-bottom: 4px; font-size: 11px; }
 }

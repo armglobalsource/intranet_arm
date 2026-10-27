@@ -53,7 +53,7 @@ async function drag(page: Page, from: Locator, to: Locator) {
 
 test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1720, height: 1100 }); });
 
-for (const width of [320, 390, 430, 768, 1024, 1366]) {
+for (const width of [320, 393, 430, 768, 1024, 1366]) {
   test(`responsive ${width}px: ficha completa, asignación y layout visual`, async ({ page }) => {
     const { ficha, writes } = await fixture(page);
     ficha.type = 'multi';
@@ -62,7 +62,7 @@ for (const width of [320, 390, 430, 768, 1024, 1366]) {
     ficha.sections.streaming.rows = [makeRow('tv', 'Director de televisión', 0), makeRow('cam1', 'CAM 1', 1), makeRow('cam2', 'CAM 2', 2)] as any;
     ficha.sections.horarios.rows = [{ id: 'h1', label: 'Inicio encuentro', order: 0, type: 'text', shared: true, required: false, values: { shared: JSON.stringify({ inicio: '11:00', nota: 'Abrir puertas' }) } }] as any;
     ficha.sections.setList.rows = [{ id: 'songrow', label: 'Canción 1', order: 0, type: 'song', shared: true, required: false, values: { shared: JSON.stringify({ titulo: 'See the light', tonalidad: 'G', cancionId: 'song-1' }) } }] as any;
-    await page.setViewportSize({ width, height: 900 });
+    await page.setViewportSize({ width, height: width === 393 ? 852 : 900 });
     await page.goto(url);
     await expect(page.locator('.ficha-pdf-order')).toBeVisible();
     const overflow = () => page.locator('.ficha-doc').evaluate(root => {
@@ -80,6 +80,10 @@ for (const width of [320, 390, 430, 768, 1024, 1366]) {
       await expect(page.locator('.ficha-person-cell').first()).toHaveCSS('min-height', '44px');
     }
     await page.screenshot({ path: `test-results/ficha-responsive-${width}-header.png` });
+    if (width === 393) {
+      await page.locator('[data-ficha-slot="pastoral"]').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: 'test-results/ficha-iphone-compacta.png' });
+    }
     await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).first().click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('checkbox').first().check();
