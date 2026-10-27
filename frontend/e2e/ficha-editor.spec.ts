@@ -15,6 +15,7 @@ async function fixture(page: Page, permissions = ['*']) {
   sections.escena.rows = [makeRow('vio', 'VIO', 0), makeRow('left', 'Posición Izquierda', 1, 'María González Fernández'), makeRow('center', 'Posición Centro', 2, 'Carlos Rodríguez'), makeRow('right', 'Posición Derecha', 3, 'Andrés Martínez'), makeRow('piano', 'Piano', 4), makeRow('voice', 'Voz', 5)] as any;
   const ficha = { fichaId: 'ui-fixture', title: 'Encuentro de domingo', campusName: 'Santiago', campusId: '1', type: 'unico', date: '2026-10-25', encuentros: [{ id: 'unico', label: 'Encuentro', time: '11:00', color: '#6554C0' }], sections, published: true, completionStatus: {}, status: 'in_progress', hiddenSections: ['streaming', 'horarios', 'media', 'voluntarios', 'anuncios', 'outfit', 'setList'], sectionLayout: { left: ['pastoral', 'produccion', 'streaming', 'horarios'], right: ['worship', 'media', 'voluntarios', 'anuncios'] } };
   const writes: { path: string; body: any }[] = [];
+  const manualPeople: { manualId: string; name: string; campusName: string }[] = [];
   const song = { cancionId: 'song-1', titulo: 'See the light', tonalidad: 'G', hasLetra: true, letra: 'Letra de prueba del equipo', revision: '2026-10-27T09:00:00.123456Z', usageCount: 1 };
   await page.addInitScript((user) => localStorage.setItem('auth-storage', JSON.stringify({ state: { user, accessToken: 'local-ui-fixture', isAuthenticated: true, needsProfileCompletion: false }, version: 0 })), user);
   // Every API call is intercepted. These tests never read or modify live data.
@@ -30,7 +31,8 @@ async function fixture(page: Page, permissions = ['*']) {
         Object.assign(sections[section], body, { revision: sections[section].revision + 1 });
       } else Object.assign(ficha, body);
     }
-    const data = path.endsWith('/canciones/song-1') ? song : path.endsWith('/canciones') ? (route.request().method() === 'POST' ? song : [song]) : path.endsWith('/changelog') ? [] : path.endsWith('/people') ? [{ userId: 10, name: 'Ana Pérez', campusName: 'Santiago' }, { userId: 11, name: 'Ana Pérez', campusName: 'Puente Alto' }] : path.includes('/fichas/ui-fixture') ? ficha
+    if (path.endsWith('/people/manual') && route.request().method() === 'POST') manualPeople.push({ manualId: '86ae332e-7b26-41cf-94f0-352284b090d8', name: route.request().postDataJSON().name, campusName: 'Santiago' });
+    const data = path.endsWith('/people/manual') ? manualPeople.at(-1) : path.endsWith('/canciones/song-1') ? song : path.endsWith('/canciones') ? (route.request().method() === 'POST' ? song : [song]) : path.endsWith('/changelog') ? [] : path.endsWith('/people') ? [...[{ userId: 10, name: 'Ana Pérez', campusName: 'Santiago' }, { userId: 11, name: 'Ana Pérez', campusName: 'Puente Alto' }], ...manualPeople].filter(p => p.name.toLowerCase().includes((new URL(route.request().url()).searchParams.get('search') ?? '').toLowerCase())) : path.includes('/fichas/ui-fixture') ? ficha
       : path.endsWith('/equipo-roster') ? { worship: [], tecnico: [], ninguno: [] }
       : path.endsWith('/auth/me') ? user : [];
     await route.fulfill({ json: data });
@@ -50,6 +52,23 @@ async function drag(page: Page, from: Locator, to: Locator) {
 }
 
 test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1720, height: 1100 }); });
+
+test('personas manuales: crear, asignar tratamiento y reutilizar en otra fila', async ({ page }) => {
+  const { writes } = await fixture(page);
+  await page.goto(url);
+  await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).click();
+  await page.getByLabel('Buscar personas').fill('Eve');
+  await page.getByRole('button', { name: 'Agregar «Eve» sin cuenta' }).click();
+  await page.getByLabel('Tratamiento de Eve').fill('Pastora');
+  await page.getByRole('button', { name: 'Aplicar asignación' }).click();
+  await expect.poll(() => writes.find(w => w.path.endsWith('/sections/pastoral'))?.body.rows[0].values.shared).toBe('Pastora Eve');
+  await page.getByRole('button', { name: 'Asignar personas: Predicación', exact: true }).click();
+  await page.getByLabel('Buscar personas').fill('Eve');
+  await expect(page.getByText('Persona sin cuenta', { exact: false })).toBeVisible();
+  await page.getByRole('checkbox').last().check();
+  await page.getByRole('button', { name: 'Aplicar asignación' }).click();
+  await expect(page.getByRole('button', { name: 'Asignar personas: Predicación', exact: true })).toContainText('Eve');
+});
 
 test('filas: arrastrar, guardar y recargar conserva el nuevo orden', async ({ page }) => {
   const { writes } = await fixture(page);

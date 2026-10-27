@@ -134,13 +134,29 @@ export class PostgresFichasService {
     if (!p.sections.length) throw new ForbiddenException('Solo los editores de esta ficha pueden consultar su directorio');
     const query = search.trim().slice(0, 100).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     const tokens = query.split(/\s+/).filter(Boolean).map(t => `%${t.replace(/[\\%_]/g, '\\$&')}%`);
-    return apiRows(await this.db.query(`SELECT u.id AS "userId", btrim(concat_ws(' ',u."firstName",u."lastName")) AS name,
+    const users = apiRows(await this.db.query(`SELECT u.id AS "userId", btrim(concat_ws(' ',u."firstName",u."lastName")) AS name,
       u."campusId", c.name AS "campusName"
       FROM arm_app.users u LEFT JOIN arm_app.campuses c ON c.id=u."campusId"
       WHERE u.status='active' AND ($1 OR u."campusId"::text=$2 OR u."campusId" IS NULL)
       AND translate(lower(concat_ws(' ',u."firstName",u."lastName")), 'áéíóúüñ', 'aeiouun') LIKE ALL($3::text[])
       ORDER BY (u."campusId"::text=$2) DESC NULLS LAST,u."firstName",u."lastName",u.id LIMIT 30`,
       [this.global(u), String(f.campusId), tokens]));
+    const manual = apiRows(await this.db.query(`SELECT m.id AS "manualId", m.name, c.name AS "campusName"
+      FROM arm_app.ficha_manual_people m JOIN arm_app.campuses c ON c.id=m.campus_id
+      WHERE ($1 OR m.campus_id::text=$2)
+      AND translate(lower(m.name), 'áéíóúüñ', 'aeiouun') LIKE ALL($3::text[])
+      ORDER BY (m.campus_id::text=$2) DESC, m.name, m.id LIMIT 30`, [this.global(u), String(f.campusId), tokens]));
+    return [...users, ...manual];
+  }
+  async createManualPerson(id: string, u: FichaUser, name: unknown) {
+    const f = await this.findOne(id);
+    const p = this.access(f, u);
+    if (!p.sections.length) throw new ForbiddenException('Solo los editores de esta ficha pueden agregar personas');
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 160 || /[\r\n]/.test(name)) throw new BadRequestException('Ingresa un nombre válido de hasta 160 caracteres');
+    if (f.campusId == null) throw new BadRequestException('La ficha necesita un campus para agregar personas');
+    const result = await this.db.query(`INSERT INTO arm_app.ficha_manual_people(id, name, campus_id, created_by)
+      VALUES ($1,$2,$3,$4) RETURNING id AS "manualId", name`, [randomUUID(), name.trim().replace(/\s+/g, ' '), f.campusId, u.sub]);
+    return apiRows(result)[0];
   }
   async findPublic(id: string) {
     const f=await this.findOne(id);

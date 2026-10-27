@@ -5,7 +5,7 @@ export const ASSIGNMENT_LABELS: Record<RowAssignment['mode'], string> = {
   sequence: 'Secuencia', not_applicable: 'No aplica', team: 'Equipo',
 };
 export function assignmentText(a: RowAssignment) {
-  return [a.mode === 'people' ? a.people.map(p => p.name).join(' / ') : ASSIGNMENT_LABELS[a.mode], a.note].filter(Boolean).join(' · ');
+  return [a.mode === 'people' ? a.people.map(p => [p.title, p.name].filter(Boolean).join(' ')).join(' / ') : ASSIGNMENT_LABELS[a.mode], a.note].filter(Boolean).join(' · ');
 }
 function personValue(value: string, section: SectionName, row: Row) {
   if (section !== 'horarios' && row.type !== 'song') return value;

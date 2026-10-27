@@ -83,7 +83,7 @@ export function diffRows(oldRows: any[], newRows: any[], encuentros: { id: strin
     for (const key of keys) {
       const a = displayValue(prev?.values?.[key]), b = displayValue(row.values?.[key]);
       if (a === b && JSON.stringify(prev?.assignments?.[key] ?? null) !== JSON.stringify(row.assignments?.[key] ?? null)) {
-        const describe = (v:any) => v ? (v.people ?? []).map((p:any) => `${p.name} (#${p.userId})`).join(' / ') || v.mode : 'Sin vínculo';
+        const describe = (v:any) => v ? (v.people ?? []).map((p:any) => `${[p.title, p.name].filter(Boolean).join(' ')} (${p.userId ? `#${p.userId}` : 'manual'})`).join(' / ') || v.mode : 'Sin vínculo';
         changes.push({ kind: 'value', rowId: `${id}#people`, label, encuentro: encuentroLabel(key, encuentros), before: describe(prev?.assignments?.[key]), after: describe(row.assignments?.[key]) });
       }
       if (a !== b) changes.push({ kind: 'value', rowId: id, label, encuentro: encuentroLabel(key, encuentros), before: a, after: b });

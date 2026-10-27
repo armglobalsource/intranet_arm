@@ -14,6 +14,16 @@ const normalize = (rows: any[], old: any[] = [], conn: any = db(), global = fals
 const enc = (id: string) => ({ id, label: id, time: '11:00', isLive: false, color: '#111' });
 
 describe('asignaciones vinculadas', () => {
+  it('valida personas manuales por campus y guarda el tratamiento con el nombre confiable', async () => {
+    const id = '86ae332e-7b26-41cf-94f0-352284b090d8';
+    const conn = { query: vi.fn().mockResolvedValue({ rows: [{ id, name: 'Eve', campus_id: 1 }] }) };
+    const rows = [row({ mode: 'people', people: [{ manualId: id, name: 'Nombre falso', title: 'Pastora' }], note: '' })];
+    await normalize(rows, [], conn);
+    expect(rows[0].values.shared).toBe('Pastora Eve');
+    expect(rows[0].assignments.shared.people[0]).toEqual({ manualId: id, name: 'Eve', title: 'Pastora' });
+    await expect(normalize([row({ mode: 'people', people: [{ manualId: id, name: 'Eve' }], note: '' })], [], { query: vi.fn().mockResolvedValue({ rows: [{ id, name: 'Eve', campus_id: 2 }] }) })).rejects.toThrow('persona manual');
+    await expect(normalize([row({ mode: 'people', people: [{ manualId: id, userId: 10, name: 'Eve' }], note: '' })])).rejects.toThrow();
+  });
   it('usa IDs y nombres canónicos, admite homónimos y conserva orden', async () => {
     const rows = [row({ ...assignment(), people: [person(11), person(10)] })];
     await normalize(rows, [], db([10, 11].map(id => ({ id: String(id), name: 'Ana Pérez', status: 'active', campusId: 1 }))));

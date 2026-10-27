@@ -52,6 +52,11 @@ export class FichasController {
     return this.fichasService.findPeople(id, user, search);
   }
 
+  @Post(':fichaId/people/manual')
+  createManualPerson(@Param('fichaId') id: string, @CurrentUser() user: any, @Body() body: { name?: unknown }) {
+    return this.fichasService.createManualPerson(id, user, body?.name);
+  }
+
   // Quién puede ver cada ficha (publicada o no) lo decide el servicio según su rol en ella.
   @Get(':fichaId')
   findOne(@Param('fichaId') fichaId: string, @CurrentUser() user: any) {

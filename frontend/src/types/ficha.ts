@@ -61,7 +61,7 @@ export const FICHA_ROLE_LABELS: Record<FichaRole, string> = {
 
 export interface RowAssignment {
   mode: 'people' | 'pending' | 'fixed' | 'sequence' | 'not_applicable' | 'team';
-  people: { userId: number; name: string }[];
+  people: ({ userId: number; manualId?: never; name: string; title?: string } | { manualId: string; userId?: never; name: string; title?: string })[];
   note: string;
 }
 export type AssignmentEdit = { assignment: RowAssignment; scope: 'current' | 'block' | 'all'; encounterId: string };

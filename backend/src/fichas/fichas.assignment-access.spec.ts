@@ -29,6 +29,7 @@ describe('directorio y persistencia desde fichas', () => {
     const { service, query } = fixture();
     for (const user of [reader, { ...reader, campusId: 2, permissions: ['fichas:edit'] }]) {
       await expect(service.findPeople('f1', user, 'Ana')).rejects.toThrow();
+      await expect(service.createManualPerson('f1', user, 'Eve')).rejects.toThrow();
       await expect(service.updateSection('f1', 'pastoral', { rows: [] }, user)).rejects.toThrow();
     }
     expect(query.mock.calls.every(([sql]) => sql.startsWith('SELECT * FROM arm_app.fichas'))).toBe(true);
