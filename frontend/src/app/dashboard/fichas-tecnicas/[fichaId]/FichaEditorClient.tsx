@@ -338,10 +338,15 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   // soportar clicks rápidos encadenados: cada uno dispara su propia mutación
   // y solo cuando TODAS terminan sincronizamos con el snapshot de Firestore.
   const hiddenInflight = useRef(0);
+  const hiddenQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const hiddenCurrent = useRef<SectionName[]>([]);
+  const hiddenConfirmed = useRef<SectionName[]>([]);
 
   useEffect(() => {
     if (hiddenInflight.current !== 0) return;
     const serverHidden = ficha?.hiddenSections ?? [];
+    hiddenCurrent.current = serverHidden;
+    hiddenConfirmed.current = serverHidden;
     // Comparación por contenido (no por referencia). Firestore snapshots
     // devuelven arrays con nueva referencia aunque el contenido sea el
     // mismo — si no comparamos por contenido, setLocalHidden dispara un
@@ -375,7 +380,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const { mutateAsync: reopenSection } = useReopenSection();
   const { mutate: archiveFicha } = useArchiveFicha();
   const { mutate: unarchiveFicha } = useUnarchiveFicha();
-  const { mutate: updateFicha, mutateAsync: updateFichaAsync } = useUpdateFicha();
+  const { mutateAsync: updateFichaAsync } = useUpdateFicha();
   const { mutate: updateLayoutVisual } = useUpdateLayoutVisual();
   const { mutate: publishFicha,   isPending: isPublishing  } = usePublishFicha();
   const { mutate: unpublishFicha, isPending: isUnpublishing } = useUnpublishFicha();
@@ -384,42 +389,31 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
 
   function handleToggleModule(name: SectionName | SectionName[]) {
     if (!ficha) return;
-    // Acepta uno o varios nombres a la vez (el slot 'worship' agrupa 3
-    // secciones que togglean juntas, como una sola fila en la lista) —
-    // siempre en UNA sola pasada para no perder toggles por condición de
-    // carrera entre clicks encadenados.
     const names = Array.isArray(name) ? name : [name];
-    // Toggle contra localHidden (estado optimista), no contra ficha.hiddenSections
-    // — así clicks encadenados componen bien sin esperar el roundtrip.
-    const allHidden = names.every((n) => localHidden.includes(n));
-    const next = allHidden
-      ? localHidden.filter((s) => !names.includes(s))
-      : Array.from(new Set([...localHidden, ...names]));
+    const current = hiddenCurrent.current;
+    const allHidden = names.every(n => current.includes(n));
+    const next = allHidden ? current.filter(s => !names.includes(s)) : Array.from(new Set([...current, ...names]));
+    hiddenCurrent.current = next;
     setLocalHidden(next);
+    setActionError(null);
     hiddenInflight.current += 1;
     setSaveState('saving');
-    updateFicha(
-      { fichaId: ficha.fichaId, hiddenSections: next },
-      {
-        onSuccess: () => {
-          hiddenInflight.current = Math.max(0, hiddenInflight.current - 1);
-          if (hiddenInflight.current === 0) {
-            setSaveState('saved');
-            setTimeout(() => setSaveState('idle'), 800);
-          }
-        },
-        onError: () => {
-          hiddenInflight.current = Math.max(0, hiddenInflight.current - 1);
-          // En error, revertimos al estado del servidor solo si ya no hay
-          // otros toggles en vuelo (para no pisar clicks posteriores válidos).
-          if (hiddenInflight.current === 0) {
-            setLocalHidden(ficha.hiddenSections ?? []);
-            setSaveState('error');
-            setTimeout(() => setSaveState('idle'), 3000);
-          }
-        },
-      },
-    );
+    // Las escrituras se envían en orden; cada respuesta confirma su propio estado.
+    const task = hiddenQueue.current.catch(() => undefined).then(() => updateFichaAsync({ fichaId: ficha.fichaId, hiddenSections: next }));
+    hiddenQueue.current = task;
+    task.then((saved: Ficha) => {
+      hiddenConfirmed.current = saved.hiddenSections ?? next;
+      hiddenInflight.current -= 1;
+      if (!hiddenInflight.current) { setSaveState('saved'); setTimeout(() => setSaveState('idle'), 800); }
+    }).catch((err) => {
+      hiddenInflight.current -= 1;
+      if (!hiddenInflight.current) {
+        hiddenCurrent.current = hiddenConfirmed.current;
+        setLocalHidden(hiddenConfirmed.current);
+        setSaveState('error');
+        setActionError(apiErrorMessage(err, 'No se pudo actualizar la sección. Inténtalo nuevamente.'));
+      }
+    });
   }
 
   const handleUpdateLayout = useCallback((layout: FichaColumns) => {
@@ -936,6 +930,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
             hiddenSections={localHidden}
             modulesPanelOpen={modulesOpen}
             onToggleModulesPanel={canStructure ? () => setModulesOpen((o) => !o) : undefined}
+            onToggleSection={canStructure ? handleToggleModule : undefined}
             sectionLayout={localLayout}
             onUpdateLayout={canStructure ? handleUpdateLayout : undefined}
             onUpdateLayoutVisual={(permisos ? permisos.layoutVisual : canEdit) ? handleUpdateLayoutVisual : undefined}

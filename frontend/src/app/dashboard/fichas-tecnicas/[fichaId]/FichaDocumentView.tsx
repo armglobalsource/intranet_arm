@@ -2332,6 +2332,7 @@ export interface FichaDocumentViewProps {
    *  Equipo por <ModulesEditPanel/> en su lugar. */
   modulesPanelOpen?: boolean;
   onToggleModulesPanel?: () => void;
+  onToggleSection?: (section: SectionName | SectionName[]) => void;
   sectionLayout?: { left: string[]; right: string[]; leftRatio?: number };
   onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number }) => void;
   /** Persistir el bloque layoutVisual completo (vista alternativa por canción). */
@@ -2348,7 +2349,7 @@ export function FichaDocumentView({
   ficha, onEdit, onSave, onArchive, onUnarchive, canArchive,
   onPublish, onUnpublish, canPublish, isPublishing,
   editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onRowPatch, onSectionComplete,
-  sectionStatus, saveState, hiddenSections, modulesPanelOpen, onToggleModulesPanel,
+  sectionStatus, saveState, hiddenSections, modulesPanelOpen, onToggleModulesPanel, onToggleSection,
   sectionLayout: sectionLayoutProp, onUpdateLayout, onUpdateLayoutVisual, showHistory, onUpdateEncuentros, permisos,
 }: FichaDocumentViewProps) {
   const { sections, encuentros, campusName, title, date } = ficha;
@@ -2593,6 +2594,16 @@ export function FichaDocumentView({
         }
 
 
+        .ficha-section-wrap { position: relative; min-width: 0; }
+        .ficha-section-remove { position: absolute; z-index: 4; top: 5px; right: 8px; background: #fff; border: 1px solid #d6dfe5; color: #596a78; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
+        .ficha-section-remove:hover { color: #a33b3b; border-color: #e8b8b8; }
+        .ficha-pdf-order .ficha-section-wrap .ficha-card > div:first-child { padding-right: 110px !important; }
+        .ficha-section-manager { position: relative; margin-bottom: 12px; }
+        .ficha-section-manager summary { display: inline-flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; border: 1px solid #b8d8ce; background: #f0faf6; color: #176c54; border-radius: 7px; padding: 8px 12px; font-size: 12px; font-weight: 700; }
+        .ficha-section-manager summary::-webkit-details-marker { display: none; }
+        .ficha-section-list { margin-top: 8px; display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 6px; padding: 12px; border: 1px solid #dbe5e4; border-radius: 8px; background: #f8fbfa; }
+        .ficha-section-list button { display: flex; justify-content: space-between; gap: 8px; align-items: center; text-align: left; padding: 9px 10px; border: 1px solid #e0e8e6; background: white; color: #344454; border-radius: 6px; font-size: 12px; }
+        .ficha-section-list button span:last-child { color: #187b5b; font-weight: 700; }
         .ficha-pdf-order { display: flex; flex-direction: column; gap: 10px; }
         .ficha-body { padding: 20px 24px !important; }
         .ficha-hdr-top { padding: 18px 24px 12px !important; }
@@ -2977,7 +2988,7 @@ export function FichaDocumentView({
                     <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
                     <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
                   </svg>
-                  Módulos
+                  Secciones y orden
                 </button>
               )}
 
@@ -3188,6 +3199,11 @@ export function FichaDocumentView({
           className={`ficha-body ficha-view-body ${isLayoutView ? 'ficha-view-hidden' : 'ficha-view-active'}`}
           style={{ padding: '1.5rem 2rem', display: isLayoutView || isCompareView ? 'none' : 'block' }}
         >
+          {editable && onToggleSection && <details className="ficha-no-print ficha-section-manager">
+            <summary>＋ Agregar o quitar secciones</summary>
+            <p style={{ fontSize: 12, color: '#64748b', margin: '8px 0 0' }}>Al quitar una sección de la vista, su información se conserva y puedes volver a agregarla.</p>
+            <div className="ficha-section-list">{(SECTIONS_BY_TYPE[ficha.type] ?? SECTIONS_BY_TYPE.multi).map(name => <button key={name} type="button" onClick={() => onToggleSection(name)} aria-label={`${hidden(name) ? 'Agregar' : 'Quitar'} sección ${SECTION_LABELS[name]}`}><span>{SECTION_LABELS[name]}</span><span>{hidden(name) ? '＋ Agregar' : '✓ Visible'}</span></button>)}</div>
+          </details>}
           {editable && onUpdateLayout && <div className="ficha-no-print ficha-layout-option"><button type="button" onClick={() => setCustomLayout(v => !v)}>{customLayout ? 'Volver a estructura PDF' : 'Personalizar orden de bloques'}</button></div>}
           {editable && (
             <div className="ficha-editor-help ficha-no-print">
@@ -3251,6 +3267,8 @@ export function FichaDocumentView({
             const visibleLeft  = resolvedLayout.left.filter((s) => !slotIsHidden(s));
             const visibleRight = resolvedLayout.right.filter((s) => !slotIsHidden(s));
 
+            const remove = (name: SectionName | SectionName[], label: string) => editable && onToggleSection ? <button type="button" className="ficha-no-print ficha-section-remove" aria-label={`Quitar sección ${label}`} title="Quitar de esta ficha; se conservará su información" onClick={() => onToggleSection(name)}>Quitar sección</button> : null;
+
             return customLayout ? (
               <SortableFichaLayout layout={resolvedLayout} visible={{ left: visibleLeft, right: visibleRight }}
                 onChange={editable ? onUpdateLayout : undefined}
@@ -3258,15 +3276,15 @@ export function FichaDocumentView({
                 label={(slot) => slotLabel(slot as LayoutSlot)} />
             ) : (
               <div className="ficha-pdf-order">
-                {!hidden('pastoral') && <div data-ficha-slot="pastoral" data-block-id="pastoral">{(encuentros?.length ?? 0) > 1 ? <PastoralMatrix rows={sec('pastoral')} encuentros={encuentros} fichaId={ficha.fichaId} {...editProps('pastoral')} /> : <RoleCard title="Encuentro · Plataforma" rows={sec('pastoral')} {...editProps('pastoral')} />}</div>}
+                {!hidden('pastoral') && <div className="ficha-section-wrap" data-ficha-slot="pastoral" data-block-id="pastoral">{remove('pastoral', 'Equipo Pastoral')}{(encuentros?.length ?? 0) > 1 ? <PastoralMatrix rows={sec('pastoral')} encuentros={encuentros} fichaId={ficha.fichaId} {...editProps('pastoral')} /> : <RoleCard title="Encuentro · Plataforma" rows={sec('pastoral')} {...editProps('pastoral')} />}</div>}
                 {!hidden('produccion') && responsibilities.length > 0 && <div data-ficha-slot="responsables" data-block-id="responsables"><RoleCard title="Responsables" rows={responsibilities} {...editProps('produccion')} onAddRow={undefined} onComplete={undefined} /></div>}
-                {!hidden('streaming') && <div data-ficha-slot="streaming" data-block-id="streaming">{renderSlot('streaming')}</div>}
-                {!hidden('produccion') && <div data-ficha-slot="produccion" data-block-id="produccion"><RoleCard title="Equipo técnico" rows={technical} {...editProps('produccion')} /></div>}
-                {!hidden('media') && <div data-ficha-slot="media" data-block-id="media">{renderSlot('media')}</div>}
-                {!hidden('anuncios') && <div data-ficha-slot="anuncios" data-block-id="anuncios">{renderSlot('anuncios')}</div>}
-                {(!hidden('escena') || !hidden('setList') || !hidden('outfit')) && <div data-ficha-slot="worship" data-block-id="worship">{renderSlot('worship')}</div>}
-                {!hidden('horarios') && <div data-ficha-slot="horarios" data-block-id="horarios">{renderSlot('horarios')}</div>}
-                {!hidden('voluntarios') && <div data-ficha-slot="voluntarios" data-block-id="voluntarios">{renderSlot('voluntarios')}</div>}
+                {!hidden('streaming') && <div className="ficha-section-wrap" data-ficha-slot="streaming" data-block-id="streaming">{remove('streaming', 'Streaming')}{renderSlot('streaming')}</div>}
+                {!hidden('produccion') && <div className="ficha-section-wrap" data-ficha-slot="produccion" data-block-id="produccion">{remove('produccion', 'Producción')}<RoleCard title="Equipo técnico" rows={technical} {...editProps('produccion')} /></div>}
+                {!hidden('media') && <div className="ficha-section-wrap" data-ficha-slot="media" data-block-id="media">{remove('media', 'Media')}{renderSlot('media')}</div>}
+                {!hidden('anuncios') && <div className="ficha-section-wrap" data-ficha-slot="anuncios" data-block-id="anuncios">{remove('anuncios', 'Info Encuentro')}{renderSlot('anuncios')}</div>}
+                {(!hidden('escena') || !hidden('setList') || !hidden('outfit')) && <div className="ficha-section-wrap" data-ficha-slot="worship" data-block-id="worship">{remove(['escena', 'setList', 'outfit'], 'Worship y Set List')}{renderSlot('worship')}</div>}
+                {!hidden('horarios') && <div className="ficha-section-wrap" data-ficha-slot="horarios" data-block-id="horarios">{remove('horarios', 'Timing')}{renderSlot('horarios')}</div>}
+                {!hidden('voluntarios') && <div className="ficha-section-wrap" data-ficha-slot="voluntarios" data-block-id="voluntarios">{remove('voluntarios', 'Voluntarios de Servicio')}{renderSlot('voluntarios')}</div>}
               </div>
             );
           })()}

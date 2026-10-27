@@ -238,3 +238,58 @@ test('canciones: seleccionar carga el tono y permite guardar letra en catálogo 
   await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/setList')).at(-1)?.body.rows[0].values.unico).toContain('"tonalidad":"D"');
   expect(writes.filter(w => w.path.endsWith('/sections/setList')).at(-1)?.body.rows[0].values.unico).not.toContain('Letra editada');
 });
+
+
+test('secciones: quitar y recuperar Timing conserva sus datos después de recargar', async ({ page }) => {
+  const { ficha, writes } = await fixture(page);
+  ficha.hiddenSections = ficha.hiddenSections.filter(s => s !== 'horarios');
+  ficha.sections.horarios.rows = [{ id: 'h1', label: 'Inicio encuentro', order: 0, type: 'text', shared: false, required: false, values: { unico: JSON.stringify({ inicio: '11:00', nota: 'Abrir puertas' }) } }] as any;
+  await page.goto(url);
+  const timing = page.locator('[data-ficha-slot="horarios"]');
+  await expect(timing).toContainText('Inicio encuentro');
+  await timing.getByRole('button', { name: 'Quitar sección Timing' }).click();
+  await expect(timing).toHaveCount(0);
+  await expect.poll(() => writes.filter(w => Array.isArray(w.body.hiddenSections)).at(-1)?.body.hiddenSections).toContain('horarios');
+  await page.reload();
+  await expect(timing).toHaveCount(0);
+  await page.getByText('Agregar o quitar secciones').click();
+  await page.getByRole('button', { name: 'Agregar sección Timing' }).click();
+  await expect(timing).toContainText('Inicio encuentro');
+  await expect.poll(() => writes.filter(w => Array.isArray(w.body.hiddenSections)).at(-1)?.body.hiddenSections).not.toContain('horarios');
+  await page.reload();
+  await expect(timing).toContainText('Inicio encuentro');
+  expect(ficha.sections.horarios.rows[0].values.unico).toContain('Abrir puertas');
+});
+
+test('secciones: los cambios rápidos se guardan en orden', async ({ page }) => {
+  const { ficha, writes } = await fixture(page);
+  ficha.hiddenSections = ficha.hiddenSections.filter(s => s !== 'horarios');
+  let delayed = true;
+  await page.route('**/api/v1/fichas/ui-fixture', async route => {
+    if (route.request().method() === 'PATCH' && delayed && route.request().postDataJSON().hiddenSections) {
+      delayed = false; await new Promise(resolve => setTimeout(resolve, 400));
+    }
+    await route.fallback();
+  });
+  await page.goto(url);
+  await page.locator('[data-ficha-slot="horarios"]').getByRole('button', { name: 'Quitar sección Timing' }).click();
+  await page.getByText('Agregar o quitar secciones').click();
+  await page.getByRole('button', { name: 'Agregar sección Timing' }).click();
+  await expect.poll(() => writes.filter(w => Array.isArray(w.body.hiddenSections)).length).toBe(2);
+  expect(ficha.hiddenSections).not.toContain('horarios');
+  await page.reload();
+  await expect(page.locator('[data-ficha-slot="horarios"]')).toBeVisible();
+});
+
+test('secciones: si falla el guardado se restaura la vista y se informa', async ({ page }) => {
+  const { ficha } = await fixture(page);
+  ficha.hiddenSections = ficha.hiddenSections.filter(s => s !== 'horarios');
+  await page.route('**/api/v1/fichas/ui-fixture', async route => {
+    if (route.request().method() === 'PATCH' && route.request().postDataJSON().hiddenSections) return route.fulfill({ status: 503, json: {} });
+    await route.fallback();
+  });
+  await page.goto(url);
+  await page.locator('[data-ficha-slot="horarios"]').getByRole('button', { name: 'Quitar sección Timing' }).click();
+  await expect(page.getByText('No se pudo actualizar la sección. Inténtalo nuevamente.')).toBeVisible();
+  await expect(page.locator('[data-ficha-slot="horarios"]')).toBeVisible();
+});
