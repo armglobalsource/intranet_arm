@@ -24,24 +24,24 @@ export function AvailabilityTask({ campusId, channel }: {
   const href = channel === 'worship' ? '/dashboard/worship/disponibilidad'
     : '/dashboard/produccion-general/tecnicos/disponibilidad';
   return (
-    <article className="rounded-2xl border border-white/15 bg-[#141414] p-5">
-      <h3 className="text-base font-semibold text-white">Disponibilidad {channel === 'worship' ? 'Worship' : 'técnica'}</h3>
-      <p className="mt-1 text-sm text-slate-300">Esta semana · {formatWeekLabel(week)}</p>
+    <article className="rounded-2xl border border-[#dce5df] bg-white p-5">
+      <h3 className="text-base font-semibold text-[#182d25]">Disponibilidad {channel === 'worship' ? 'Worship' : 'técnica'}</h3>
+      <p className="mt-1 text-sm text-[#607068]">Esta semana · {formatWeekLabel(week)}</p>
       {!campusId ? <>
-        <p className="my-4 text-sm text-slate-300">Necesitas un campus asignado para enviar tu disponibilidad. Revisa tu perfil o contacta a tu responsable.</p>
+        <p className="my-4 text-sm text-[#607068]">Necesitas un campus asignado para enviar tu disponibilidad. Revisa tu perfil o contacta a tu responsable.</p>
         <Link href="/dashboard/perfil" className="dashboard-action">Revisar mi perfil →</Link>
-      </> : loading ? <p className="my-4 text-sm text-slate-300" role="status">Consultando disponibilidad…</p>
+      </> : loading ? <p className="my-4 text-sm text-[#607068]" role="status">Consultando disponibilidad…</p>
         : failed ? <>
-          <p className="my-4 text-sm text-amber-200" role="status">No pudimos consultar tu disponibilidad.</p>
+          <p className="my-4 text-sm text-amber-800" role="status">No pudimos consultar tu disponibilidad.</p>
           <button className="dashboard-action" onClick={() => { void query.refetch(); void slots.refetch(); }}>Reintentar</button>
         </> : <>
-          <p className={`my-4 text-sm ${remaining ? 'text-amber-200' : 'text-emerald-200'}`}>
+          <p className={`my-4 text-sm ${remaining ? 'text-amber-800' : 'text-emerald-800'}`}>
             {noSchedule ? 'Todavía no hay encuentros programados para esta semana.'
               : remaining ? `${remaining} encuentro${remaining === 1 ? '' : 's'} sin responder.`
                 : 'Respondiste todos los encuentros de esta semana.'}
           </p>
           <Link href={href} className="dashboard-action">{remaining ? 'Enviar disponibilidad' : 'Ver disponibilidad'} →</Link>
-          <p className="mt-3 text-xs leading-relaxed text-slate-400">Indicar disponibilidad no confirma una asignación a un turno.</p>
+          <p className="mt-3 text-xs leading-relaxed text-[#607068]">Indicar disponibilidad no confirma una asignación a un turno.</p>
         </>}
     </article>
   );

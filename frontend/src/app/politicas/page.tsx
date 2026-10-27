@@ -11,29 +11,29 @@ const LAST_UPDATED = '10 de septiembre de 2026';
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-8">
-      <h2 className="text-[15px] font-semibold text-white mb-2.5">{title}</h2>
-      <div className="space-y-3 text-[13.5px] text-white/65 leading-relaxed">{children}</div>
+      <h2 className="text-[15px] font-semibold text-[#182d25] mb-2.5">{title}</h2>
+      <div className="space-y-3 text-[13.5px] text-[#52655a] leading-relaxed">{children}</div>
     </section>
   );
 }
 
 export default function PoliticasPage() {
   return (
-    <div className="min-h-screen" style={{ background: '#0d0d0d' }}>
+    <div className="min-h-screen" style={{ background: '#f7f8f7', colorScheme: 'light' }}>
       <div className="max-w-2xl mx-auto px-6 py-10">
 
         <div className="flex items-center justify-between mb-10">
-          <Image src="/logo.png" alt="ARM Global" width={130} height={44} className="object-contain" priority />
-          <Link href="/" className="text-[12px] text-white/40 hover:text-white/70 transition-colors">
+          <Image src="/logo.png" alt="ARM Global" width={130} height={44} className="object-contain brightness-0" priority />
+          <Link href="/" className="text-[12px] text-[#607068] hover:text-[#204b39] transition-colors">
             ← Volver
           </Link>
         </div>
 
-        <p className="text-[11px] font-medium uppercase tracking-widest text-white/30 mb-2">Documento legal</p>
-        <h1 className="text-2xl font-bold text-white mb-1.5">Políticas de Privacidad y Seguridad</h1>
-        <p className="text-[12px] text-white/35 mb-10">Última actualización: {LAST_UPDATED}</p>
+        <p className="text-[11px] font-medium uppercase tracking-widest text-[#607068] mb-2">Documento legal</p>
+        <h1 className="text-2xl font-bold text-[#182d25] mb-1.5">Políticas de Privacidad y Seguridad</h1>
+        <p className="text-[12px] text-[#607068] mb-10">Última actualización: {LAST_UPDATED}</p>
 
-        <div className="rounded-xl p-4 mb-10 text-[12.5px] text-white/55 leading-relaxed" style={{ background: '#151515', border: '1px solid #232323' }}>
+        <div className="rounded-xl p-4 mb-10 text-[12.5px] text-[#52655a] leading-relaxed" style={{ background: '#fff', border: '1px solid #dce5df' }}>
           Esta política aplica a toda persona que se registra o utiliza la plataforma interna
           de ARM Global (&quot;la Plataforma&quot;), sin importar el país desde el que se conecte.
           Al marcar &quot;He leído y acepto las políticas de ARM Global&quot; durante el registro,
@@ -45,7 +45,7 @@ export default function PoliticasPage() {
             ARM Global (&quot;nosotros&quot;, &quot;la organización&quot;) es responsable del tratamiento de
             los datos personales que recopila a través de esta Plataforma. Puedes contactarnos
             para cualquier consulta relacionada con esta política escribiendo a{' '}
-            <a href="mailto:informatica@armglobal.org" className="text-white/80 underline underline-offset-2 hover:text-white">
+            <a href="mailto:informatica@armglobal.org" className="text-[#28563f] underline underline-offset-2 hover:text-[#204b39]">
               informatica@armglobal.org
             </a>.
           </p>
@@ -122,15 +122,15 @@ export default function PoliticasPage() {
         <Section title="8. Tus derechos (Derechos ARCO y Portabilidad)">
           <p>Sin importar el país desde el que te registres, puedes ejercer en cualquier momento los siguientes derechos sobre tus datos:</p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-white/80">Acceso:</strong> saber qué datos tuyos tenemos y cómo los usamos.</li>
-            <li><strong className="text-white/80">Rectificación:</strong> corregir datos inexactos o desactualizados.</li>
-            <li><strong className="text-white/80">Cancelación:</strong> solicitar la eliminación de tus datos cuando ya no sean necesarios.</li>
-            <li><strong className="text-white/80">Oposición:</strong> oponerte a un tratamiento específico de tus datos.</li>
-            <li><strong className="text-white/80">Portabilidad:</strong> solicitar una copia de tus datos en un formato estructurado.</li>
+            <li><strong className="text-[#28563f]">Acceso:</strong> saber qué datos tuyos tenemos y cómo los usamos.</li>
+            <li><strong className="text-[#28563f]">Rectificación:</strong> corregir datos inexactos o desactualizados.</li>
+            <li><strong className="text-[#28563f]">Cancelación:</strong> solicitar la eliminación de tus datos cuando ya no sean necesarios.</li>
+            <li><strong className="text-[#28563f]">Oposición:</strong> oponerte a un tratamiento específico de tus datos.</li>
+            <li><strong className="text-[#28563f]">Portabilidad:</strong> solicitar una copia de tus datos en un formato estructurado.</li>
           </ul>
           <p>
             Puedes ejercer estos derechos, sin costo, escribiendo a{' '}
-            <a href="mailto:informatica@armglobal.org" className="text-white/80 underline underline-offset-2 hover:text-white">
+            <a href="mailto:informatica@armglobal.org" className="text-[#28563f] underline underline-offset-2 hover:text-[#204b39]">
               informatica@armglobal.org
             </a>{' '}
             . Muchos de estos datos también puedes verlos y corregirlos tú mismo directamente
@@ -170,14 +170,14 @@ export default function PoliticasPage() {
         <Section title="12. Contacto">
           <p>
             Si tienes preguntas sobre esta política o sobre cómo tratamos tus datos, escríbenos a{' '}
-            <a href="mailto:informatica@armglobal.org" className="text-white/80 underline underline-offset-2 hover:text-white">
+            <a href="mailto:informatica@armglobal.org" className="text-[#28563f] underline underline-offset-2 hover:text-[#204b39]">
               informatica@armglobal.org
             </a>.
           </p>
         </Section>
 
         <div className="pt-6 mt-6" style={{ borderTop: '1px solid #1f1f1f' }}>
-          <Link href="/" className="text-[12px] text-white/40 hover:text-white/70 transition-colors">
+          <Link href="/" className="text-[12px] text-[#607068] hover:text-[#204b39] transition-colors">
             ← Volver a ARM Global
           </Link>
         </div>

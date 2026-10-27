@@ -17,27 +17,27 @@ export function ReportesPendientesTask() {
     `/dashboard/produccion-general/estadisticas/registrar?fecha=${p.fecha}&encuentro=${encodeURIComponent(p.encuentro)}&campus=${p.campusId}`;
 
   return (
-    <article className="rounded-2xl border border-white/15 bg-[#141414] p-5">
-      <h3 className="text-base font-semibold text-white">Encuentros por reportar</h3>
-      <p className="mt-1 text-sm text-slate-300">Encuentros de las últimas dos semanas que todavía no tienen estadísticas.</p>
-      {isLoading ? <p role="status" className="my-4 text-sm text-slate-300">Revisando los reportes…</p>
-        : isError ? <div className="my-4"><p className="mb-3 text-sm text-amber-200">No pudimos revisar los reportes.</p><button className="dashboard-action" onClick={() => void refetch()}>Reintentar</button></div>
-        : pendientes.length === 0 ? <p className="my-4 text-sm text-emerald-200">Todos los encuentros recientes están reportados.</p>
+    <article className="rounded-2xl border border-[#dce5df] bg-white p-5">
+      <h3 className="text-base font-semibold text-[#182d25]">Encuentros por reportar</h3>
+      <p className="mt-1 text-sm text-[#607068]">Encuentros de las últimas dos semanas que todavía no tienen estadísticas.</p>
+      {isLoading ? <p role="status" className="my-4 text-sm text-[#607068]">Revisando los reportes…</p>
+        : isError ? <div className="my-4"><p className="mb-3 text-sm text-amber-800">No pudimos revisar los reportes.</p><button className="dashboard-action" onClick={() => void refetch()}>Reintentar</button></div>
+        : pendientes.length === 0 ? <p className="my-4 text-sm text-emerald-800">Todos los encuentros recientes están reportados.</p>
         : <ul className="my-3 divide-y divide-white/10">
           {pendientes.slice(0, 4).map((p) => (
             <li key={`${p.campusId}-${p.fecha}-${p.hora}`}>
-              <Link href={href(p)} className="flex min-h-[56px] items-center justify-between gap-3 rounded-lg py-2.5 hover:bg-white/5">
+              <Link href={href(p)} className="flex min-h-[56px] items-center justify-between gap-3 rounded-lg py-2.5 hover:bg-[#f1f5f2]">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white">{p.encuentro}</p>
-                  <p className="mt-0.5 text-sm capitalize text-slate-300">{shortDate(p.fecha)} · {p.campus}</p>
+                  <p className="text-sm font-semibold text-[#182d25]">{p.encuentro}</p>
+                  <p className="mt-0.5 text-sm capitalize text-[#607068]">{shortDate(p.fecha)} · {p.campus}</p>
                 </div>
-                <span className="shrink-0 text-sm font-semibold text-emerald-300">Registrar →</span>
+                <span className="shrink-0 text-sm font-semibold text-emerald-800">Registrar →</span>
               </Link>
             </li>
           ))}
         </ul>}
       {revisar.length > 0 && (
-        <p className="mb-3 text-sm text-amber-200">{revisar.length === 1 ? 'Hay 1 registro' : `Hay ${revisar.length} registros`} con una fecha que no calza con el día del encuentro.</p>
+        <p className="mb-3 text-sm text-amber-800">{revisar.length === 1 ? 'Hay 1 registro' : `Hay ${revisar.length} registros`} con una fecha que no calza con el día del encuentro.</p>
       )}
       <Link href="/dashboard/produccion-general/estadisticas/registrar" className="dashboard-action">
         Registrar encuentro{pendientes.length > 4 ? ` (${pendientes.length} pendientes)` : ''} →

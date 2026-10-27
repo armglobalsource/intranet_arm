@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Image from 'next/image';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,6 +8,8 @@ import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { api, apiErrorMessage } from '@/lib/api';
+import { AuthShell, authInput, authButton, authLink } from '@/components/auth/AuthShell';
+import { PasswordField } from '@/components/auth/PasswordField';
 
 const schema = z.object({
   firstName:       z.string().min(1, 'Ingresa tu nombre'),
@@ -27,8 +28,6 @@ export default function RegisterPage() {
   const setSession      = useAuthStore((s) => s.setSession);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const hasHydrated     = useAuthStore((s) => s._hasHydrated);
-  const [showPwd, setShowPwd]         = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
 
   // Solo se evalúa al hidratar, no en cada cambio de isAuthenticated — si no,
   // el registro recién hecho en onSubmit (que también deja isAuthenticated=true)
@@ -63,154 +62,34 @@ export default function RegisterPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex" style={{ background: '#0d0d0d' }}>
-
-      {/* Panel izquierdo */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center p-12"
-        style={{ borderRight: '1px solid #1f1f1f' }}>
-        <Image src="/logo.png" alt="Logo" width={200} height={70} className="object-contain mb-10" priority />
-        <p className="text-white/30 text-sm text-center max-w-xs leading-relaxed">
-          Plataforma interna de ARM —<br />organigrama y directorio de personas
-        </p>
-      </div>
-
-      {/* Panel derecho */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-sm">
-
-          <div className="flex justify-center mb-10 lg:hidden">
-            <Image src="/logo.png" alt="Logo" width={140} height={48} className="object-contain" priority />
-          </div>
-
-          <h1 className="text-2xl font-semibold text-white mb-1">Crear cuenta</h1>
-          <p className="text-sm text-white/40 mb-8">Regístrate con tu cuenta corporativa</p>
-
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-
-            {/* Nombre y apellido */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">Nombre</label>
-                <input
-                  {...register('firstName')}
-                  type="text" autoComplete="given-name" placeholder="Juan"
-                  style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#fff' }}
-                  className="w-full px-3.5 py-2.5 rounded-lg text-sm placeholder-white/20 focus:outline-none focus:border-white/30 transition-colors"
-                />
-                {errors.firstName && <p className="text-red-400 text-xs mt-1">{errors.firstName.message}</p>}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">Apellido</label>
-                <input
-                  {...register('lastName')}
-                  type="text" autoComplete="family-name" placeholder="Pérez"
-                  style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#fff' }}
-                  className="w-full px-3.5 py-2.5 rounded-lg text-sm placeholder-white/20 focus:outline-none focus:border-white/30 transition-colors"
-                />
-                {errors.lastName && <p className="text-red-400 text-xs mt-1">{errors.lastName.message}</p>}
-              </div>
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">Email</label>
-              <input
-                {...register('email')}
-                type="email" autoComplete="email" placeholder="usuario@empresa.com"
-                style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#fff' }}
-                className="w-full px-3.5 py-2.5 rounded-lg text-sm placeholder-white/20 focus:outline-none focus:border-white/30 transition-colors"
-              />
-              {errors.email && <p className="text-red-400 text-xs mt-1.5">{errors.email.message}</p>}
-            </div>
-
-            {/* Contraseña */}
-            <div>
-              <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">Contraseña</label>
-              <div className="relative">
-                <input
-                  {...register('password')}
-                  type={showPwd ? 'text' : 'password'} autoComplete="new-password" placeholder="Mínimo 6 caracteres"
-                  style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#fff' }}
-                  className="w-full px-3.5 py-2.5 pr-10 rounded-lg text-sm placeholder-white/20 focus:outline-none focus:border-white/30 transition-colors"
-                />
-                <EyeToggle show={showPwd} onToggle={() => setShowPwd((v) => !v)} />
-              </div>
-              {errors.password && <p className="text-red-400 text-xs mt-1.5">{errors.password.message}</p>}
-            </div>
-
-            {/* Confirmar contraseña */}
-            <div>
-              <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">Confirmar contraseña</label>
-              <div className="relative">
-                <input
-                  {...register('confirmPassword')}
-                  type={showConfirm ? 'text' : 'password'} autoComplete="new-password" placeholder="Repite la contraseña"
-                  style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#fff' }}
-                  className="w-full px-3.5 py-2.5 pr-10 rounded-lg text-sm placeholder-white/20 focus:outline-none focus:border-white/30 transition-colors"
-                />
-                <EyeToggle show={showConfirm} onToggle={() => setShowConfirm((v) => !v)} />
-              </div>
-              {errors.confirmPassword && <p className="text-red-400 text-xs mt-1.5">{errors.confirmPassword.message}</p>}
-            </div>
-
-            {errors.root && (
-              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}
-                className="text-red-400 text-sm rounded-lg px-3.5 py-2.5">
-                {errors.root.message}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{ background: isSubmitting ? '#2a2a2a' : '#fff' }}
-              className="w-full mt-2 py-2.5 rounded-lg text-sm font-semibold text-gray-900
-                transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 active:scale-[0.98]"
-            >
-              {isSubmitting ? (
-                <span className="flex items-center justify-center gap-2" style={{ color: '#888' }}>
-                  <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-                  Creando cuenta...
-                </span>
-              ) : 'Crear cuenta'}
-            </button>
-
-          </form>
-
-          <p className="text-center text-sm text-white/30 mt-6">
-            ¿Ya tienes cuenta?{' '}
-            <Link href="/auth/login" className="text-white/60 hover:text-white transition-colors">
-              Inicia sesión
-            </Link>
-          </p>
-          <p className="text-center text-sm mt-4">
-            <Link href="/auth/forgot-password" className="text-white/70 underline underline-offset-4 hover:text-white">¿Ya estás en ARM? Recupera tu acceso por correo</Link>
-          </p>
-
+  return <AuthShell title="Crear cuenta" description="Regístrate para acceder al ecosistema ARM.">
+    <form onSubmit={handleSubmit(onSubmit)} noValidate aria-busy={isSubmitting} className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div><label htmlFor="firstName" className="mb-2 block text-sm font-medium">Nombre</label>
+          <input {...register('firstName')} id="firstName" autoComplete="given-name" placeholder="Tu nombre" className={authInput} aria-invalid={!!errors.firstName} aria-describedby={errors.firstName ? 'firstName-error' : undefined} />
+          {errors.firstName && <p id="firstName-error" role="alert" className="mt-2 text-sm text-red-700">{errors.firstName.message}</p>}
+        </div>
+        <div><label htmlFor="lastName" className="mb-2 block text-sm font-medium">Apellido</label>
+          <input {...register('lastName')} id="lastName" autoComplete="family-name" placeholder="Tu apellido" className={authInput} aria-invalid={!!errors.lastName} aria-describedby={errors.lastName ? 'lastName-error' : undefined} />
+          {errors.lastName && <p id="lastName-error" role="alert" className="mt-2 text-sm text-red-700">{errors.lastName.message}</p>}
         </div>
       </div>
-    </div>
-  );
-}
-
-function EyeToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button" onClick={onToggle} tabIndex={-1}
-      className="absolute inset-y-0 right-0 flex items-center px-3 text-white/30 hover:text-white/60 transition-colors"
-    >
-      {show ? (
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9-4-9-7s4-7 9-7a9.956 9.956 0 015.03 1.34M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
-        </svg>
-      ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-        </svg>
-      )}
-    </button>
-  );
+      <div><label htmlFor="email" className="mb-2 block text-sm font-medium">Correo electrónico</label>
+        <input {...register('email')} id="email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="tu@correo.com" className={authInput} aria-invalid={!!errors.email} aria-describedby={errors.email ? 'email-error' : undefined} />
+        {errors.email && <p id="email-error" role="alert" className="mt-2 text-sm text-red-700">{errors.email.message}</p>}
+      </div>
+      <div><label htmlFor="password" className="mb-2 block text-sm font-medium">Contraseña</label>
+        <PasswordField {...register('password')} id="password" autoComplete="new-password" placeholder="Mínimo 6 caracteres" aria-invalid={!!errors.password} aria-describedby={errors.password ? 'password-error' : undefined} />
+        {errors.password && <p id="password-error" role="alert" className="mt-2 text-sm text-red-700">{errors.password.message}</p>}
+      </div>
+      <div><label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium">Confirmar contraseña</label>
+        <PasswordField {...register('confirmPassword')} id="confirmPassword" autoComplete="new-password" placeholder="Repite tu contraseña" aria-invalid={!!errors.confirmPassword} aria-describedby={errors.confirmPassword ? 'confirm-error' : undefined} />
+        {errors.confirmPassword && <p id="confirm-error" role="alert" className="mt-2 text-sm text-red-700">{errors.confirmPassword.message}</p>}
+      </div>
+      {errors.root && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{errors.root.message}</p>}
+      <button type="submit" disabled={isSubmitting} className={authButton}>{isSubmitting ? 'Creando cuenta…' : 'Crear cuenta'}</button>
+    </form>
+    <p className="mt-7 text-center text-sm text-[#607068]">¿Ya tienes cuenta? <Link href="/auth/login" className={authLink}>Inicia sesión</Link></p>
+    <p className="mt-6 border-t border-[#e1e7dd] pt-6 text-center text-xs leading-5 text-[#607068]">¿Ya estás en ARM? <Link href="/auth/forgot-password" className={authLink}>Recupera tu acceso por correo</Link></p>
+  </AuthShell>;
 }

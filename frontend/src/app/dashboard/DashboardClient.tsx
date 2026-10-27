@@ -47,20 +47,20 @@ function Card({ children, className = '', href }: { children: React.ReactNode; c
 
 function NoticiaCard({ noticia }: { noticia: Noticia }) {
   return (
-    <div className="flex flex-col gap-1.5 py-3" style={{ borderBottom: '1px solid #1a1a1a' }}>
+    <div className="flex flex-col gap-1.5 py-3" style={{ borderBottom: '1px solid #e5ebe7' }}>
       {noticia.pinned && (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-400 w-fit">
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 w-fit">
           <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
           </svg>
           Destacado
         </span>
       )}
-      <p className="text-[13px] font-semibold text-white leading-snug">{noticia.title}</p>
+      <p className="text-[13px] font-semibold text-[#182d25] leading-snug">{noticia.title}</p>
       {noticia.excerpt && (
-        <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">{noticia.excerpt}</p>
+        <p className="text-xs text-[#607068] line-clamp-2 leading-relaxed">{noticia.excerpt}</p>
       )}
-      <p className="text-xs text-slate-300">{timeAgo(noticia.createdAt)}</p>
+      <p className="text-xs text-[#607068]">{timeAgo(noticia.createdAt)}</p>
     </div>
   );
 }
@@ -90,22 +90,22 @@ function NoticiasPanel({
   return (
     <Card className="p-5 flex flex-col">
       <div className="flex items-center justify-between mb-3.5">
-        <div className="flex items-center gap-1 p-0.5 rounded-lg" style={{ background: '#1a1a1a' }}>
+        <div className="flex items-center gap-1 p-0.5 rounded-lg" style={{ background: '#edf2ee' }}>
           {(['global', 'campus'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
               style={{
-                background: tab === t ? '#242424' : 'transparent',
-                color:      tab === t ? '#fff' : 'rgba(255,255,255,0.7)',
+                background: tab === t ? '#fff' : 'transparent',
+                color:      tab === t ? '#204b39' : '#607068',
               }}
             >
               {t === 'global' ? 'Global' : (campusName ?? 'Campus')}
             </button>
           ))}
         </div>
-        <span className="text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>
+        <span className="text-xs" style={{ color: '#607068' }}>
           {items.length} publicada{items.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -114,8 +114,8 @@ function NoticiasPanel({
         <div className="space-y-3">
           {[1, 2].map((i) => (
             <div key={i} className="space-y-1.5 py-2">
-              <div className="h-3 rounded animate-pulse w-3/4" style={{ background: '#1a1a1a' }} />
-              <div className="h-2.5 rounded animate-pulse w-1/2" style={{ background: '#1a1a1a' }} />
+              <div className="h-3 rounded animate-pulse w-3/4" style={{ background: '#edf2ee' }} />
+              <div className="h-2.5 rounded animate-pulse w-1/2" style={{ background: '#edf2ee' }} />
             </div>
           ))}
         </div>
@@ -128,7 +128,7 @@ function NoticiasPanel({
               <polyline points="7 4 7 8 15 8" />
             </svg>
           </div>
-          <p className="text-[12px] font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>
+          <p className="text-[12px] font-medium" style={{ color: '#607068' }}>
             {isGlobal ? 'No hay comunicados por ahora' : 'Aún no hay novedades de tu campus'}
           </p>
         </div>
@@ -149,8 +149,8 @@ function PendingUsersBanner({ enabled }: { enabled: boolean }) {
   const { data: users, isLoading, isError, refetch } = useUsers(undefined, { enabled });
   const pendingCount = users?.filter((u) => u.status === 'pending').length ?? 0;
 
-  if (enabled && isLoading) return <p role="status" className="text-sm text-slate-300">Consultando solicitudes de acceso…</p>;
-  if (enabled && isError) return <div className="rounded-xl border border-amber-300/30 p-4 text-sm text-amber-200">No pudimos consultar las solicitudes de acceso. <button onClick={() => void refetch()} className="ml-2 min-h-[44px] underline">Reintentar</button></div>;
+  if (enabled && isLoading) return <p role="status" className="text-sm text-[#607068]">Consultando solicitudes de acceso…</p>;
+  if (enabled && isError) return <div className="rounded-xl border border-amber-300/30 p-4 text-sm text-amber-800">No pudimos consultar las solicitudes de acceso. <button onClick={() => void refetch()} className="ml-2 min-h-[44px] underline">Reintentar</button></div>;
   if (!enabled || pendingCount === 0) return null;
 
   return (
@@ -166,10 +166,10 @@ function PendingUsersBanner({ enabled }: { enabled: boolean }) {
           </svg>
         </div>
         <div>
-          <p className="text-[13px] font-bold text-white">
+          <p className="text-[13px] font-bold text-[#182d25]">
             {pendingCount} {pendingCount === 1 ? 'usuario pendiente' : 'usuarios pendientes'} de tu revisión
           </p>
-          <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.7)' }}>
+          <p className="text-xs mt-0.5" style={{ color: '#607068' }}>
             {pendingCount === 1 ? 'Se registró y espera tu aprobación.' : 'Se registraron y esperan tu aprobación.'}
           </p>
         </div>
@@ -249,40 +249,40 @@ export function DashboardClient() {
               <p className="text-[12px] font-semibold text-[#172326] leading-none truncate max-w-[140px]">
                 {user ? `${user.firstName} ${user.lastName}` : '—'}
               </p>
-              <p className="text-xs mt-1 truncate max-w-[140px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
+              <p className="text-xs mt-1 truncate max-w-[140px]" style={{ color: '#607068' }}>
                 {user?.role?.name ?? 'Sin rol'}{user?.campus?.name ? ` · ${user.campus.name}` : ''}
               </p>
             </div>
           </Link>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
-          <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5">Mi campus: <strong className="text-white">{user?.campus?.name ?? 'Sin asignar'}</strong></span>
-          <Link href="/dashboard/perfil" className="px-2 py-2 underline underline-offset-4 hover:text-white">Ver mi perfil</Link>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-[#607068]">
+          <span className="rounded-full border border-[#dce5df] bg-[#f1f5f2] px-3 py-1.5">Mi campus: <strong className="text-[#182d25]">{user?.campus?.name ?? 'Sin asignar'}</strong></span>
+          <Link href="/dashboard/perfil" className="px-2 py-2 underline underline-offset-4 hover:text-[#204b39]">Ver mi perfil</Link>
         </div>
 
         <BirthdayPanel />
 
         <section aria-labelledby="pending-heading" className="space-y-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-300">Tu semana, en orden</p>
-            <h2 id="pending-heading" className="mt-1 text-xl font-bold text-white">Mis pendientes</h2>
-            <p className="mt-1 text-sm text-slate-300">Accesos directos según tus permisos y tus fichas.</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-800">Tu semana, en orden</p>
+            <h2 id="pending-heading" className="mt-1 text-xl font-bold text-[#182d25]">Mis pendientes</h2>
+            <p className="mt-1 text-sm text-[#607068]">Accesos directos según tus permisos y tus fichas.</p>
           </div>
           <PendingUsersBanner enabled={can('users:edit')} />
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <article className="rounded-2xl border border-white/15 bg-[#141414] p-5">
-              <h3 className="text-base font-semibold text-white">Fichas por revisar</h3>
-              <p className="mt-1 text-sm text-slate-300">Fichas próximas o sin fecha que aún no están completas.</p>
-              {fichasLoading ? <p role="status" className="my-4 text-sm text-slate-300">Consultando tus fichas…</p>
-                : fichasError ? <div className="my-4"><p className="mb-3 text-sm text-amber-200">No pudimos cargar tus pendientes.</p><button className="dashboard-action" onClick={() => void retryFichas()}>Reintentar</button></div>
-                : pendingFichas.length === 0 ? <p className="my-4 text-sm text-emerald-200">No tienes fichas pendientes próximas. Puedes consultar las anteriores en Mis fichas.</p>
+            <article className="rounded-2xl border border-[#dce5df] bg-white p-5">
+              <h3 className="text-base font-semibold text-[#182d25]">Fichas por revisar</h3>
+              <p className="mt-1 text-sm text-[#607068]">Fichas próximas o sin fecha que aún no están completas.</p>
+              {fichasLoading ? <p role="status" className="my-4 text-sm text-[#607068]">Consultando tus fichas…</p>
+                : fichasError ? <div className="my-4"><p className="mb-3 text-sm text-amber-800">No pudimos cargar tus pendientes.</p><button className="dashboard-action" onClick={() => void retryFichas()}>Reintentar</button></div>
+                : pendingFichas.length === 0 ? <p className="my-4 text-sm text-emerald-800">No tienes fichas pendientes próximas. Puedes consultar las anteriores en Mis fichas.</p>
                 : <ul className="my-3 divide-y divide-white/10">
                   {pendingFichas.slice(0, 3).map(ficha => {
                     const date = parseFichaDate(ficha.date);
-                    return <li key={ficha.fichaId}><Link href={`/dashboard/fichas-tecnicas/${encodeURIComponent(ficha.fichaId)}/view`} className="flex min-h-[64px] items-center justify-between gap-3 rounded-lg py-3 hover:bg-white/5">
-                      <div className="min-w-0"><p className="break-words text-sm font-semibold text-white">{ficha.title || 'Ficha sin título'}</p><p className="mt-1 text-sm text-slate-300">{Number.isNaN(date.getTime()) ? 'Sin fecha' : date.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })} · {ficha.campusName}</p></div>
-                      <span className="shrink-0 text-sm font-semibold text-emerald-300">Revisar →</span>
+                    return <li key={ficha.fichaId}><Link href={`/dashboard/fichas-tecnicas/${encodeURIComponent(ficha.fichaId)}/view`} className="flex min-h-[64px] items-center justify-between gap-3 rounded-lg py-3 hover:bg-[#f1f5f2]">
+                      <div className="min-w-0"><p className="break-words text-sm font-semibold text-[#182d25]">{ficha.title || 'Ficha sin título'}</p><p className="mt-1 text-sm text-[#607068]">{Number.isNaN(date.getTime()) ? 'Sin fecha' : date.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })} · {ficha.campusName}</p></div>
+                      <span className="shrink-0 text-sm font-semibold text-emerald-800">Revisar →</span>
                     </Link></li>;
                   })}
                 </ul>}
@@ -298,7 +298,7 @@ export function DashboardClient() {
           </div>
         </section>
 
-        <h2 className="text-lg font-semibold text-white">Mi espacio</h2>
+        <h2 className="text-lg font-semibold text-[#182d25]">Mi espacio</h2>
         {/* Tarjetas de stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Mis fichas */}
@@ -312,10 +312,10 @@ export function DashboardClient() {
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-[22px] font-bold text-white leading-none">
+              <p className="text-[22px] font-bold text-[#182d25] leading-none">
                 {fichasLoading ? '…' : fichasError ? '—' : String(miFichasCount)}
               </p>
-              <p className="text-[12px] mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>{fichasError ? 'No pudimos cargar tus fichas' : 'Mis fichas técnicas'}</p>
+              <p className="text-[12px] mt-1" style={{ color: '#607068' }}>{fichasError ? 'No pudimos cargar tus fichas' : 'Mis fichas técnicas'}</p>
               {!fichasLoading && fichasCompletadas > 0 && (
                 <p className="text-xs font-medium mt-1" style={{ color: '#5DCAA5' }}>
                   {fichasCompletadas} completa{fichasCompletadas !== 1 ? 's' : ''}
@@ -338,19 +338,19 @@ export function DashboardClient() {
             <div className="min-w-0 flex-1">
               {orgLoading ? (
                 <div className="space-y-1.5">
-                  <div className="h-6 w-8 rounded animate-pulse" style={{ background: '#1a1a1a' }} />
-                  <div className="h-3 w-32 rounded animate-pulse" style={{ background: '#1a1a1a' }} />
+                  <div className="h-6 w-8 rounded animate-pulse" style={{ background: '#edf2ee' }} />
+                  <div className="h-3 w-32 rounded animate-pulse" style={{ background: '#edf2ee' }} />
                 </div>
-              ) : orgError ? (<p className="text-sm text-amber-200">No pudimos cargar tus equipos. Intenta recargar la página.</p>) : myMemberships.length === 0 ? (
+              ) : orgError ? (<p className="text-sm text-amber-800">No pudimos cargar tus equipos. Intenta recargar la página.</p>) : myMemberships.length === 0 ? (
                 <>
-                  <p className="text-[22px] font-bold leading-none" style={{ color: 'rgba(255,255,255,0.7)' }}>—</p>
-                  <p className="text-[12px] mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Sin equipos asignados</p>
-                  <p className="text-sm text-slate-300 mt-2 leading-relaxed">Contacta al responsable de tu campus para revisar tu incorporación a un equipo.</p>
+                  <p className="text-[22px] font-bold leading-none" style={{ color: '#607068' }}>—</p>
+                  <p className="text-[12px] mt-1" style={{ color: '#607068' }}>Sin equipos asignados</p>
+                  <p className="text-sm text-[#607068] mt-2 leading-relaxed">Contacta al responsable de tu campus para revisar tu incorporación a un equipo.</p>
                 </>
               ) : (
                 <>
-                  <p className="text-[22px] font-bold text-white leading-none">{myMemberships.length}</p>
-                  <p className="text-[12px] mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  <p className="text-[22px] font-bold text-[#182d25] leading-none">{myMemberships.length}</p>
+                  <p className="text-[12px] mt-1" style={{ color: '#607068' }}>
                     {myMemberships.length === 1 ? 'Equipo o ministerio' : 'Equipos y ministerios'}
                   </p>
                   {myUniqueAreas.length > 0 && (
@@ -366,7 +366,7 @@ export function DashboardClient() {
                         </span>
                       ))}
                       {myUniqueAreas.length > 2 && (
-                        <span className="text-xs self-center font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                        <span className="text-xs self-center font-medium" style={{ color: '#607068' }}>
                           +{myUniqueAreas.length - 2}
                         </span>
                       )}

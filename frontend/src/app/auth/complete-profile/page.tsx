@@ -150,7 +150,7 @@ function computeServiceLevel(a: Answers): ServiceLevel {
 }
 
 const MATERIAL_COLOR: Record<ServiceLevel['material'], string> = {
-  none: '#4a4a4a', silver: '#c7c7c7', gold: '#e0b344', diamond: '#7dd3fc',
+  none: '#52675a', silver: '#64756b', gold: '#8a630c', diamond: '#176986',
 };
 const MATERIAL_LABEL: Record<ServiceLevel['material'], string> = {
   none: '', silver: 'Plata', gold: 'Oro', diamond: 'Diamante',
@@ -164,15 +164,15 @@ function Star({ color }: { color: string }) {
   );
 }
 
-// ── Estilos compartidos (tema oscuro consistente con /auth/*) ─────────────
+// ── Estilos compartidos de acceso ─────────────
 
-const inputStyle: React.CSSProperties = { background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#fff' };
-const inputClass = 'w-full px-3.5 py-2.5 rounded-lg text-sm placeholder-white/20 focus:outline-none focus:border-white/30 transition-colors';
+const inputStyle: React.CSSProperties = { background: '#fff', border: '1px solid #cdd6d0', color: '#182d25' };
+const inputClass = 'w-full px-3.5 py-2.5 rounded-lg text-sm min-h-[50px] text-base placeholder:text-[#77857e] focus:outline-none focus:border-[#315e49] focus:ring-2 focus:ring-[#315e49]/20 transition-colors';
 
 function FieldLabel({ children, optional }: { children: React.ReactNode; optional?: boolean }) {
   return (
-    <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
-      {children} {optional && <span className="text-white/25 normal-case font-normal">(opcional)</span>}
+    <label className="block text-xs font-medium text-[#607068] mb-1.5 uppercase tracking-wide">
+      {children} {optional && <span className="text-[#7a897e] normal-case font-normal">(opcional)</span>}
     </label>
   );
 }
@@ -183,10 +183,10 @@ function OptionCard({ selected, onClick, children }: { selected: boolean; onClic
       type="button"
       onClick={onClick}
       style={{
-        background: selected ? 'rgba(255,255,255,0.08)' : '#1a1a1a',
-        border: `1px solid ${selected ? 'rgba(255,255,255,0.5)' : '#2a2a2a'}`,
+        background: selected ? '#e9f2ec' : '#fff',
+        border: `1px solid ${selected ? '#315e49' : '#cdd6d0'}`,
       }}
-      className="w-full text-left px-3.5 py-2.5 rounded-lg text-sm text-white transition-all active:scale-[0.99]"
+      className="w-full text-left px-3.5 py-2.5 rounded-lg text-sm text-[#182d25] transition-all active:scale-[0.99]"
     >
       {children}
     </button>
@@ -194,8 +194,8 @@ function OptionCard({ selected, onClick, children }: { selected: boolean; onClic
 }
 
 const Spinner = () => (
-  <div className="min-h-screen flex items-center justify-center" style={{ background: '#0d0d0d' }}>
-    <span className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+  <div className="min-h-screen flex items-center justify-center" style={{ background: '#f7f8f7', colorScheme: 'light' }}>
+    <span className="w-6 h-6 border-2 border-[#b9d2c2] border-t-[#204b39] rounded-full animate-spin" />
   </div>
 );
 
@@ -329,33 +329,33 @@ function CompleteProfileInner() {
   const displayName = answers.preferredName.trim() || storeUser?.firstName || '';
 
   return (
-    <div className="min-h-screen flex" style={{ background: '#0d0d0d' }}>
+    <div className="min-h-screen flex" style={{ background: '#f7f8f7', colorScheme: 'light' }}>
 
       {/* Panel izquierdo */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center p-12" style={{ borderRight: '1px solid #1f1f1f' }}>
-        <Image src="/logo.png" alt="Logo" width={200} height={70} className="object-contain mb-10" priority />
-        <p className="text-white/30 text-sm text-center max-w-xs leading-relaxed">
+      <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center p-12" style={{ borderRight: '1px solid #e1e5e2', background: '#e9eeeb' }}>
+        <Image src="/logo.png" alt="Logo" width={200} height={70} className="object-contain mb-10 brightness-0" priority />
+        <p className="text-[#6b7b70] text-sm text-center max-w-xs leading-relaxed">
           Plataforma interna de ARM —<br />organigrama y directorio de personas
         </p>
       </div>
 
       {/* Panel derecho */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-sm">
+      <div className="flex-1 flex items-center justify-center px-5 py-10 sm:p-8">
+        <div className="w-full max-w-sm rounded-2xl border border-[#e1e7df] bg-white p-5 shadow-sm sm:p-8 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
 
           <div className="flex justify-center mb-8 lg:hidden">
-            <Image src="/logo.png" alt="Logo" width={140} height={48} className="object-contain" priority />
+            <Image src="/logo.png" alt="Logo" width={140} height={48} className="object-contain brightness-0" priority />
           </div>
 
           {/* Barra de progreso */}
           {!isIntro && !isResult && (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] text-white/30">Bienvenida</span>
-                <span className="text-[11px] text-white/30">{questionIndex + 1} / {steps.length}</span>
+                <span className="text-[11px] text-[#6b7b70]">Bienvenida</span>
+                <span className="text-[11px] text-[#6b7b70]">{questionIndex + 1} / {steps.length}</span>
               </div>
-              <div className="h-1 rounded-full overflow-hidden" style={{ background: '#1f1f1f' }}>
-                <div className="h-full rounded-full transition-all" style={{ width: `${((questionIndex + 1) / steps.length) * 100}%`, background: '#fff' }} />
+              <div className="h-1 rounded-full overflow-hidden" style={{ background: '#dce5df' }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${((questionIndex + 1) / steps.length) * 100}%`, background: '#315e49' }} />
               </div>
             </div>
           )}
@@ -363,9 +363,9 @@ function CompleteProfileInner() {
           {/* ── Intro ── */}
           {isIntro && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Bienvenida</p>
-              <h1 className="text-2xl font-semibold text-white mb-3">Queremos conocerte un poco mejor.</h1>
-              <p className="text-sm text-white/50 mb-8 leading-relaxed">
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Bienvenida</p>
+              <h1 className="text-2xl font-semibold text-[#182d25] mb-3">Queremos conocerte un poco mejor.</h1>
+              <p className="text-sm text-[#607068] mb-8 leading-relaxed">
                 Responderás una pregunta a la vez. Esto nos ayudará a personalizar tu experiencia y mantenernos conectados contigo.
               </p>
             </div>
@@ -374,9 +374,9 @@ function CompleteProfileInner() {
           {/* ── Name ── */}
           {currentKey === 'name' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Sobre ti</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿Cómo quieres que te llamemos?</h2>
-              <p className="text-sm text-white/50 mb-6">Usaremos este nombre dentro de la app.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Sobre ti</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">¿Cómo quieres que te llamemos?</h2>
+              <p className="text-sm text-[#607068] mb-6">Usaremos este nombre dentro de la app.</p>
               <FieldLabel>Nombre preferido</FieldLabel>
               <input
                 autoFocus
@@ -391,9 +391,9 @@ function CompleteProfileInner() {
           {/* ── Gender ── */}
           {currentKey === 'gender' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Sobre ti</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿Con qué género te identificas?</h2>
-              <p className="text-sm text-white/50 mb-6">Puedes omitir esta pregunta si prefieres no responder.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Sobre ti</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">¿Con qué género te identificas?</h2>
+              <p className="text-sm text-[#607068] mb-6">Puedes omitir esta pregunta si prefieres no responder.</p>
               <div className="flex flex-col gap-2">
                 {([['male', 'Masculino'], ['female', 'Femenino']] as const).map(([v, label]) => (
                   <OptionCard key={v} selected={answers.gender === v} onClick={() => patch({ gender: v })}>{label}</OptionCard>
@@ -405,9 +405,9 @@ function CompleteProfileInner() {
           {/* ── Birthday ── */}
           {currentKey === 'birthday' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Sobre ti</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿Cuál es tu fecha de nacimiento?</h2>
-              <p className="text-sm text-white/50 mb-6">La usaremos para mantener actualizada nuestra base de cumpleaños.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Sobre ti</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">¿Cuál es tu fecha de nacimiento?</h2>
+              <p className="text-sm text-[#607068] mb-6">La usaremos para mantener actualizada nuestra base de cumpleaños.</p>
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <FieldLabel>Día</FieldLabel>
@@ -437,9 +437,9 @@ function CompleteProfileInner() {
           {/* ── Phone ── */}
           {currentKey === 'phone' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Contacto</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿Cuál es tu número de teléfono?</h2>
-              <p className="text-sm text-white/50 mb-6">Es para mantener las comunicaciones por WhatsApp y que nunca perdamos el contacto.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Contacto</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">¿Cuál es tu número de teléfono?</h2>
+              <p className="text-sm text-[#607068] mb-6">Es para mantener las comunicaciones por WhatsApp y que nunca perdamos el contacto.</p>
               <div className="grid grid-cols-[auto_1fr] gap-2">
                 <div>
                   <FieldLabel>País</FieldLabel>
@@ -465,9 +465,9 @@ function CompleteProfileInner() {
           {/* ── Password ── */}
           {currentKey === 'password' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Acceso</p>
-              <h2 className="text-xl font-semibold text-white mb-2">Crea una contraseña.</h2>
-              <p className="text-sm text-white/50 mb-6">Así podrás entrar con tu email.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Acceso</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">Crea una contraseña.</h2>
+              <p className="text-sm text-[#607068] mb-6">Así podrás entrar con tu email.</p>
               <FieldLabel>Contraseña</FieldLabel>
               <div className="relative">
                 <input
@@ -479,7 +479,7 @@ function CompleteProfileInner() {
                   style={inputStyle} className={`${inputClass} pr-10`}
                 />
                 <button type="button" onClick={() => setShowPwd((v) => !v)} tabIndex={-1}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-white/30 hover:text-white/60 transition-colors">
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-[#6b7b70] hover:text-[#204b39] transition-colors">
                   {showPwd ? '🙈' : '👁️'}
                 </button>
               </div>
@@ -489,9 +489,9 @@ function CompleteProfileInner() {
           {/* ── Channel ── */}
           {currentKey === 'channel' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Tu historia</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿Cómo llegaste a ARM Global?</h2>
-              <p className="text-sm text-white/50 mb-6">Selecciona la opción que mejor representa tu historia.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Tu historia</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">¿Cómo llegaste a ARM Global?</h2>
+              <p className="text-sm text-[#607068] mb-6">Selecciona la opción que mejor representa tu historia.</p>
               <div className="flex flex-col gap-2">
                 {CHANNEL_OPTIONS.map((o) => (
                   <OptionCard key={o.value} selected={answers.referralChannel === o.value} onClick={() => patch({ referralChannel: o.value })}>{o.label}</OptionCard>
@@ -503,9 +503,9 @@ function CompleteProfileInner() {
           {/* ── Inviter ── */}
           {currentKey === 'inviter' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Tu historia</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿Quién te invitó?</h2>
-              <p className="text-sm text-white/50 mb-6">Es opcional. Nos ayuda a reconocer las conexiones que hacen crecer nuestra comunidad.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Tu historia</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">¿Quién te invitó?</h2>
+              <p className="text-sm text-[#607068] mb-6">Es opcional. Nos ayuda a reconocer las conexiones que hacen crecer nuestra comunidad.</p>
               <FieldLabel optional>Nombre de la persona</FieldLabel>
               <input
                 autoFocus
@@ -521,9 +521,9 @@ function CompleteProfileInner() {
           {/* ── Member since ── */}
           {currentKey === 'member-since' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Tu comunidad</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿Hace cuánto tiempo eres parte de ARM Global?</h2>
-              <p className="text-sm text-white/50 mb-6">Una fecha aproximada de cuándo llegaste a la iglesia es suficiente.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Tu comunidad</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">¿Hace cuánto tiempo eres parte de ARM Global?</h2>
+              <p className="text-sm text-[#607068] mb-6">Una fecha aproximada de cuándo llegaste a la iglesia es suficiente.</p>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <FieldLabel>Mes</FieldLabel>
@@ -546,9 +546,9 @@ function CompleteProfileInner() {
           {/* ── Campus ── */}
           {currentKey === 'campus' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Tu comunidad</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿Cuál es tu campus principal?</h2>
-              <p className="text-sm text-white/50 mb-6">La lista viene directo del mantenedor de campus.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Tu comunidad</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">¿Cuál es tu campus principal?</h2>
+              <p className="text-sm text-[#607068] mb-6">Selecciona el campus al que perteneces.</p>
               <FieldLabel>Campus</FieldLabel>
               <select value={answers.campusId} onChange={(e) => patch({ campusId: e.target.value })} style={inputStyle} className={inputClass}>
                 <option value="">Selecciona tu campus</option>
@@ -560,9 +560,9 @@ function CompleteProfileInner() {
           {/* ── Serving ── */}
           {currentKey === 'serving' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Ruta del servicio</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿Actualmente sirves en ARM Global?</h2>
-              <p className="text-sm text-white/50 mb-6">Tu respuesta nos permitirá reconocer correctamente tu camino de servicio.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Ruta del servicio</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">¿Actualmente sirves en ARM Global?</h2>
+              <p className="text-sm text-[#607068] mb-6">Tu respuesta nos permitirá reconocer correctamente tu camino de servicio.</p>
               <div className="flex flex-col gap-2">
                 {SERVING_OPTIONS.map((o) => (
                   <OptionCard key={o.value} selected={answers.servingStatus === o.value} onClick={() => patch({ servingStatus: o.value })}>{o.label}</OptionCard>
@@ -574,9 +574,9 @@ function CompleteProfileInner() {
           {/* ── Areas ── */}
           {currentKey === 'areas' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Participación</p>
-              <h2 className="text-xl font-semibold text-white mb-2">¿En qué área sirves?</h2>
-              <p className="text-sm text-white/50 mb-6">Puedes seleccionar más de una.</p>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Participación</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">¿En qué área sirves?</h2>
+              <p className="text-sm text-[#607068] mb-6">Puedes seleccionar más de una.</p>
               <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
                 {areaOptions.map((o) => (
                   <OptionCard key={o.key} selected={answers.interestAreas.includes(o.label)} onClick={() => toggleArea(o.label)}>{o.label}</OptionCard>
@@ -597,9 +597,9 @@ function CompleteProfileInner() {
           {/* ── Consent ── */}
           {currentKey === 'consent' && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Último paso</p>
-              <h2 className="text-xl font-semibold text-white mb-2">Confirma las políticas de uso.</h2>
-              <p className="text-sm text-white/50 mb-6 leading-relaxed">
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Último paso</p>
+              <h2 className="text-xl font-semibold text-[#182d25] mb-2">Confirma las políticas de uso.</h2>
+              <p className="text-sm text-[#607068] mb-6 leading-relaxed">
                 Incluyen el uso de la app, la política de voluntariado, el tratamiento de datos, las comunicaciones institucionales y las felicitaciones de cumpleaños.
               </p>
               <label className="flex items-start gap-2.5 cursor-pointer">
@@ -609,14 +609,14 @@ function CompleteProfileInner() {
                   onChange={(e) => patch({ consentAccepted: e.target.checked })}
                   className="mt-0.5"
                 />
-                <span className="text-sm text-white/70">
+                <span className="text-sm text-[#43574b]">
                   He leído y acepto las{' '}
                   <a
                     href="/politicas"
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-white underline underline-offset-2 hover:text-white/80"
+                    className="text-[#182d25] underline underline-offset-2 hover:text-[#204b39]"
                   >
                     políticas de ARM Global
                   </a>.
@@ -628,8 +628,8 @@ function CompleteProfileInner() {
           {/* ── Result ── */}
           {isResult && (
             <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Registro completado</p>
-              <h2 className="text-2xl font-semibold text-white mb-4">Bienvenido, {displayName}.</h2>
+              <p className="text-xs text-[#607068] mb-2 uppercase tracking-wide">Registro completado</p>
+              <h2 className="text-2xl font-semibold text-[#182d25] mb-4">Bienvenido, {displayName}.</h2>
               {level.stars > 0 && (
                 <div className="flex gap-1 mb-3">
                   {Array.from({ length: level.stars }).map((_, i) => <Star key={i} color={MATERIAL_COLOR[level.material]} />)}
@@ -638,14 +638,14 @@ function CompleteProfileInner() {
               <p className="text-sm font-semibold mb-2" style={{ color: MATERIAL_COLOR[level.material] }}>
                 {MATERIAL_LABEL[level.material] ? `${MATERIAL_LABEL[level.material]} · ${level.name}` : level.name}
               </p>
-              <p className="text-sm text-white/50 mb-8 leading-relaxed">{level.detail}</p>
+              <p className="text-sm text-[#607068] mb-8 leading-relaxed">{level.detail}</p>
 
               {storeUser?.status === 'pending' ? (
                 <div>
                   <div style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)' }}
                     className="rounded-lg px-3.5 py-3 mb-4">
-                    <p className="text-sm text-amber-300 font-medium mb-1">Tu cuenta está pendiente de aprobación</p>
-                    <p className="text-xs text-white/50 leading-relaxed">
+                    <p className="text-sm text-amber-800 font-medium mb-1">Tu cuenta está pendiente de aprobación</p>
+                    <p className="text-xs text-[#607068] leading-relaxed">
                       Ya guardamos tus datos. Un administrador debe aprobar tu registro antes de que puedas
                       entrar a la app — te avisaremos por correo apenas esté lista.
                     </p>
@@ -653,8 +653,8 @@ function CompleteProfileInner() {
                   <button
                     type="button"
                     onClick={() => { logout(); router.replace('/auth/login'); }}
-                    style={{ border: '1px solid #2a2a2a' }}
-                    className="w-full py-2.5 rounded-lg text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/20 transition-all active:scale-[0.98]"
+                    style={{ border: '1px solid #cdd6d0' }}
+                    className="w-full py-2.5 rounded-lg text-sm font-medium text-[#52675a] hover:text-[#182d25] hover:border-[#315e49] transition-all active:scale-[0.98]"
                   >
                     Ir al Login
                   </button>
@@ -663,8 +663,8 @@ function CompleteProfileInner() {
                 <button
                   type="button"
                   onClick={() => router.replace('/dashboard')}
-                  style={{ background: '#fff' }}
-                  className="w-full py-2.5 rounded-lg text-sm font-semibold text-gray-900 transition-all hover:bg-gray-100 active:scale-[0.98]"
+                  style={{ background: '#204b39' }}
+                  className="w-full min-h-[50px] py-2.5 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98]"
                 >
                   Ir a la app
                 </button>
@@ -674,7 +674,7 @@ function CompleteProfileInner() {
 
           {error && !isResult && (
             <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}
-              className="text-red-400 text-sm rounded-lg px-3.5 py-2.5 mt-5">
+              className="text-red-700 text-sm rounded-lg px-3.5 py-2.5 mt-5">
               {error}
             </div>
           )}
@@ -685,8 +685,8 @@ function CompleteProfileInner() {
                 <button
                   type="button"
                   onClick={() => move(-1)}
-                  style={{ border: '1px solid #2a2a2a' }}
-                  className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white/40 hover:text-white/70 hover:border-white/20 transition-all active:scale-[0.98]"
+                  style={{ border: '1px solid #cdd6d0' }}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-medium text-[#607068] hover:text-[#204b39] hover:border-[#315e49] transition-all active:scale-[0.98]"
                 >
                   Volver
                 </button>
@@ -695,12 +695,12 @@ function CompleteProfileInner() {
                 type="button"
                 onClick={() => move(1)}
                 disabled={submitting}
-                style={{ background: submitting ? '#2a2a2a' : '#fff' }}
-                className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-gray-900 transition-all disabled:opacity-50 hover:bg-gray-100 active:scale-[0.98]"
+                style={{ background: '#204b39' }}
+                className="flex-1 min-h-[50px] py-2.5 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-50 hover:opacity-90 active:scale-[0.98]"
               >
                 {submitting
-                  ? <span className="flex items-center justify-center gap-2" style={{ color: '#888' }}>
-                      <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" /> Guardando...
+                  ? <span className="flex items-center justify-center gap-2" style={{ color: '#fff' }}>
+                      <span className="w-3.5 h-3.5 border-2 border-[#b9d2c2] border-t-[#204b39] rounded-full animate-spin" /> Guardando...
                     </span>
                   : isIntro ? 'Comenzar' : currentKey === 'consent' ? 'Finalizar registro' : 'Continuar'}
               </button>
