@@ -107,11 +107,16 @@ test('vista clara en escritorio y móvil', async ({ page }) => {
   await fixture(page);
   await expect(page.getByRole('region', { name: 'Resumen de estadísticas' })).toBeVisible();
   await page.screenshot({ path: 'test-results/stats-desktop.png' });
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 393, height: 852 });
   await page.reload();
   await expect(page.getByRole('region', { name: 'Resumen de estadísticas' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/stats-mobile.png' });
+  await page.getByRole('navigation', { name: 'Vistas de estadísticas' }).getByRole('button', { name: 'Registros', exact: true }).click();
+  await expect(page.locator('.stats-records-table tbody tr')).toHaveCount(3);
+  await page.locator('.stats-records-table tbody tr').first().scrollIntoViewIfNeeded();
+  expect(await page.locator('.stats-records-table').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/stats-registros-iphone.png' });
 });
 
 

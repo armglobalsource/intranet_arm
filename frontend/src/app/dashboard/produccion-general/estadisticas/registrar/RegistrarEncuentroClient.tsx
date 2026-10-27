@@ -23,7 +23,7 @@ const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', '
 const MODALIDADES = ['Presencial', 'Presencial+Online', 'Online'] as const;
 const OTRO = '__otro__';
 
-const inputCls = 'w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-violet-500';
+const inputCls = 'w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-emerald-500';
 const labelCls = 'grid gap-1.5 text-xs font-semibold text-slate-600';
 
 function todayInSantiago() {
@@ -151,6 +151,13 @@ export function RegistrarEncuentroClient() {
 
   const [form, setForm] = useState<FormState>(() => emptyForm());
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (notice) {
+      noticeRef.current?.scrollIntoView({ block: 'center' });
+      noticeRef.current?.focus({ preventScroll: true });
+    }
+  }, [notice]);
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
 
   const opciones = useMemo(() => encuentrosDelDia(campus, form.fecha), [campus, form.fecha]);
@@ -276,22 +283,22 @@ export function RegistrarEncuentroClient() {
   if (!allowed) return revision.isError ? <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">No se pudieron verificar los permisos. <button onClick={() => void revision.refetch()} className="underline">Reintentar</button></p> : null;
 
   const numberInput = (value: string, onChange: (v: string) => void, label: string) => (
-    <label className={labelCls}>
-      {label}
+    <label key={label} className={`${labelCls} stats-number-field`}>
+      <span>{label}</span>
       <input type="number" inputMode="numeric" min={0} step={1} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Sin dato" className={inputCls} />
     </label>
   );
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 pb-10">
-      <header className="rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-emerald-50 p-5 sm:p-7">
-        <p className="text-xs font-bold uppercase tracking-widest text-violet-700">Estadísticas · {campus?.name ?? 'Tu campus'}</p>
+      <header className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50 p-5 sm:p-7">
+        <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Estadísticas · {campus?.name ?? 'Tu campus'}</p>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{form.id ? 'Editar registro' : 'Registrar encuentro'}</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600">Ingresa la asistencia, los voluntarios y las decisiones. El administrador revisa el reporte y lo sube para incorporarlo a Estadísticas.</p>
           </div>
-          <Link href="/dashboard/produccion-general/estadisticas" className="rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700">Ver estadísticas</Link>
+          <Link href="/dashboard/produccion-general/estadisticas" className="rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700">Ver estadísticas</Link>
         </div>
       </header>
 
@@ -307,7 +314,7 @@ export function RegistrarEncuentroClient() {
                     <span className="block font-semibold text-slate-800">{p.encuentro}</span>
                     <span className="block text-xs capitalize text-slate-500">{shortDate(p.fecha)}{allCampus ? ` · ${p.campus}` : ''}</span>
                   </span>
-                  <button type="button" onClick={() => reportar(p)} className="shrink-0 rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-semibold text-white">Registrar</button>
+                  <button type="button" onClick={() => reportar(p)} className="shrink-0 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white">Registrar</button>
                 </li>
               ))}
             </ul>
@@ -320,7 +327,7 @@ export function RegistrarEncuentroClient() {
               {revisar.slice(0, 6).map((r) => (
                 <li key={r.id ?? `${r.campusId}-${r.fecha}-${r.encuentro}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                   <span className="text-slate-700"><strong>{r.encuentro}</strong> con fecha {shortDate(r.fecha)} ({r.diaFecha.toLowerCase()}){allCampus ? ` · ${r.campus}` : ''}</span>
-                  {canEdit && r.id && <button type="button" onClick={() => void editarPorId(r.id)} className="rounded-lg px-2 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100">Corregir</button>}
+                  {canEdit && r.id && <button type="button" onClick={() => void editarPorId(r.id)} className="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">Corregir</button>}
                 </li>
               ))}
             </ul>
@@ -329,16 +336,17 @@ export function RegistrarEncuentroClient() {
       )}
 
       {notice && (
-        <div role={notice.ok ? 'status' : 'alert'} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${notice.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
+        <div ref={noticeRef} tabIndex={-1} role={notice.ok ? 'status' : 'alert'} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${notice.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
           {notice.text}
         </div>
       )}
 
       {!canCreate && !form.id ? (
-        <p className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Para registrar encuentros necesitas el permiso «Registrar nuevos encuentros». Revisa los reportes del campus en <Link href="/dashboard/produccion-general/estadisticas/revisar" className="font-semibold text-violet-700 underline">Revisar reportes</Link>.</p>
+        <p className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Para registrar encuentros necesitas el permiso «Registrar nuevos encuentros». Revisa los reportes del campus en <Link href="/dashboard/produccion-general/estadisticas/revisar" className="font-semibold text-emerald-700 underline">Revisar reportes</Link>.</p>
       ) : (
       <form onSubmit={enviar} className="space-y-5">
         <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+          <h2 className="font-bold text-slate-900">Datos del encuentro</h2>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Tipo de registro">
             {(['encuentro', 'evento'] as const).map((t) => (
               <button key={t} type="button" role="radio" aria-checked={form.tipo === t} disabled={!!form.id}
@@ -439,11 +447,12 @@ export function RegistrarEncuentroClient() {
           </div>
         </section>
 
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="stats-form-actions flex flex-wrap justify-end gap-2">
+          <p>Revisa las cifras antes de guardar. El administrador del campus revisará el reporte para incorporarlo a Estadísticas.</p>
           {form.id && (
             <button type="button" onClick={() => setForm(emptyForm(form.fecha))} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600">Cancelar edición</button>
           )}
-          <button type="submit" disabled={guardar.isPending} className="rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+          <button type="submit" disabled={guardar.isPending} className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
             {guardar.isPending ? 'Guardando…' : form.id ? 'Guardar cambios' : 'Guardar registro'}
           </button>
         </div>
@@ -459,7 +468,7 @@ export function RegistrarEncuentroClient() {
           : (
             <ul className="divide-y divide-slate-100">
               {(registros.data ?? []).slice(0, 40).map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5 text-sm">
+                <li key={r.id} className="stats-recent-row flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5 text-sm">
                   <span className="w-36 shrink-0 text-xs font-semibold capitalize text-slate-500">{shortDate(r.fecha)}</span>
                   <span className="min-w-0 flex-1 font-semibold text-slate-800">
                     {r.encuentro}
@@ -470,7 +479,7 @@ export function RegistrarEncuentroClient() {
                     {r.estado === 'subido' ? 'Subido' : r.estado === 'observado' ? 'Observado' : 'Por revisar'}
                   </span>
                   <span className="flex gap-1">
-                    {puedeEditar(r) && <button type="button" onClick={() => editar(r)} className="rounded-lg px-2 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-50">{r.estado === 'observado' && !isReviewer(r) ? 'Corregir' : 'Editar'}</button>}
+                    {puedeEditar(r) && <button type="button" onClick={() => editar(r)} className="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">{r.estado === 'observado' && !isReviewer(r) ? 'Corregir' : 'Editar'}</button>}
                     {puedeEliminar(r) && <button type="button" onClick={() => borrar(r)} className="rounded-lg px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Eliminar</button>}
                   </span>
                   {r.estado === 'observado' && r.observacion && (

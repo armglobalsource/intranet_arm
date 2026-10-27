@@ -206,7 +206,7 @@ function TrendChart({ periods, groupBy }: { periods: StatsResponse['periods']; g
               ? Math.max(period.metrics.asistencia > 0 ? 8 : 2, (period.metrics.asistencia / max) * 190)
               : 2;
             return (
-              <div key={period.key} tabIndex={0} aria-label={`${period.label}: ${number(period.metrics.asistencia)} asistencias, ${period.start} al ${period.end}`} className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end focus:outline-violet-500">
+              <div key={period.key} tabIndex={0} aria-label={`${period.label}: ${number(period.metrics.asistencia)} asistencias, ${period.start} al ${period.end}`} className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end focus:outline-emerald-500">
                 <div className="mb-2 text-[10px] font-semibold text-gray-600 opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100">
                   {number(period.metrics.asistencia)}
                 </div>
@@ -313,11 +313,11 @@ function QualityCard({ quality }: { quality: Quality }) {
 
 function ComparisonCard({ label, current, previous }: { label: string; current: number; previous: number }) {
   const { delta, percent } = statsChange(current, previous);
-  return <article className="rounded-2xl border border-violet-100 bg-white p-4">
+  return <article className="rounded-2xl border border-emerald-100 bg-white p-4">
     <p className="text-sm font-semibold text-slate-700">{label}</p>
     <p className="mt-2 text-2xl font-bold text-slate-900">{number(current)}</p>
     <p className="mt-1 text-xs text-slate-500">Anterior: {number(previous)}</p>
-    <p className="mt-3 text-sm font-semibold text-violet-700">{delta > 0 ? '+' : ''}{number(delta)} · {percent === null ? 'Sin base porcentual' : (percent > 0 ? '+' : '') + number(percent) + '%'}</p>
+    <p className="mt-3 text-sm font-semibold text-emerald-700">{delta > 0 ? '+' : ''}{number(delta)} · {percent === null ? 'Sin base porcentual' : (percent > 0 ? '+' : '') + number(percent) + '%'}</p>
   </article>;
 }
 
@@ -381,16 +381,16 @@ export function EstadisticasClient() {
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
   const visibleRecords = filteredRecords.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const periodLabel = formatDate(data?.meta.from ?? queryRange.from) + ' — ' + formatDate(data?.meta.to ?? queryRange.to);
-  const inputClass = 'min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-violet-500';
+  const inputClass = 'min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-emerald-500';
   if (!canView) return null;
   return <div className="mx-auto min-w-0 max-w-[1600px] space-y-5 pb-10">
-    <header className="rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-emerald-50 p-5 sm:p-7">
-      <p className="text-xs font-bold uppercase tracking-widest text-violet-700">ARM Global · Nuestra comunidad en cifras</p>
+    <header className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50 p-5 sm:p-7">
+      <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">ARM Global · Nuestra comunidad en cifras</p>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-        <div><h1 className="text-3xl font-bold text-slate-900">Estadísticas</h1><h2 className="mt-2 text-lg font-semibold text-violet-800">{view.label}</h2><p className="mt-2 max-w-2xl text-sm text-slate-600">{view.description}</p></div>
+        <div><h1 className="text-3xl font-bold text-slate-900">Estadísticas</h1><h2 className="mt-2 text-lg font-semibold text-emerald-800">{view.label}</h2><p className="mt-2 max-w-2xl text-sm text-slate-600">{view.description}</p></div>
         <div className="flex flex-wrap gap-2">
-          {(isAdmin || can('encuentros:create')) && <Link href="/dashboard/produccion-general/estadisticas/registrar" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white">Registrar encuentro</Link>}
-          <button onClick={() => void refetch()} disabled={isFetching} className="rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 disabled:opacity-50">{isFetching ? 'Actualizando…' : 'Actualizar datos'}</button>
+          {(isAdmin || can('encuentros:create')) && <Link href="/dashboard/produccion-general/estadisticas/registrar" className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white">Registrar encuentro</Link>}
+          <button onClick={() => void refetch()} disabled={isFetching} className="rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 disabled:opacity-50">{isFetching ? 'Actualizando…' : 'Actualizar datos'}</button>
         </div>
       </div>
       <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-slate-700"><CalendarDays size={17} aria-hidden="true" />{periodLabel}</p>
@@ -417,10 +417,10 @@ export function EstadisticasClient() {
           <select aria-label="Registros" className={inputClass} value={type} onChange={(e) => setType(e.target.value as RecordType)}><option value="all">Encuentros y eventos</option><option value="encuentro">Solo encuentros</option><option value="evento">Solo eventos</option></select>
         </label>}
       </div>
-      {tab !== 'projections' && preset === 'custom' && <form onSubmit={(e) => { e.preventDefault(); if (!validStatsRange(draft.from, draft.to)) { setRangeError('Selecciona fechas válidas, en orden y con un máximo de 366 días.'); return; } setRangeError(''); setHistory(false); setRange({ ...draft }); }} className="flex flex-wrap items-end gap-3">
+      {tab !== 'projections' && preset === 'custom' && <form onSubmit={(e) => { e.preventDefault(); if (!validStatsRange(draft.from, draft.to)) { setRangeError('Selecciona fechas válidas, en orden y con un máximo de 366 días.'); return; } setRangeError(''); setHistory(false); setRange({ ...draft }); }} className="stats-custom-dates flex flex-wrap items-end gap-3">
         <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-slate-600">Desde<input type="date" required min="2000-01-01" max="2100-12-31" className={inputClass} value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} /></label>
         <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-slate-600">Hasta<input type="date" required min="2000-01-01" max="2100-12-31" className={inputClass} value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} /></label>
-        <button className="min-h-[42px] rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white">Aplicar fechas</button>
+        <button className="min-h-[42px] rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white">Aplicar fechas</button>
         {rangeError && <p role="alert" className="w-full text-sm text-red-700">{rangeError}</p>}
       </form>}
       <p className="text-xs text-slate-500">{canViewAll ? 'Consulta global o por campus, incluidos sus registros históricos.' : 'Solo se muestran los registros de tu campus.'} Los períodos rápidos usan la fecha de Chile (America/Santiago).</p>
@@ -430,7 +430,7 @@ export function EstadisticasClient() {
       {STATS_VIEWS.map(item => <button key={item.id} aria-pressed={tab === item.id} onClick={() => {
         if (item.id === 'operations') applyPreset('week');
         window.history.pushState(null, '', statsHref(item.slug));
-      }} className={'rounded-xl px-4 py-2.5 text-sm font-semibold ' + (tab === item.id ? 'bg-violet-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-violet-50')}>{item.label}</button>)}
+      }} className={'rounded-xl px-4 py-2.5 text-sm font-semibold ' + (tab === item.id ? 'bg-emerald-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-emerald-50')}>{item.label}</button>)}
     </nav>
     {isError ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">No fue posible cargar las estadísticas. <button onClick={() => void refetch()} className="ml-2 min-h-[44px] font-semibold underline">Reintentar</button></div>
       : isLoading || !data ? <p role="status" className="rounded-2xl bg-white p-10 text-center text-sm text-slate-600">Cargando indicadores…</p>
@@ -452,7 +452,7 @@ export function EstadisticasClient() {
             <MetricCard label="Decisiones de fe" value={totals.manitosTotal} detail={number(totals.manitosPresencial) + ' presenciales · ' + number(totals.manitosOnline) + ' online'} icon={Hand} accent="#059669" />
             <MetricCard label="Voluntarios" value={totals.voluntarios} detail="Participaciones de servicio acumuladas" icon={HeartHandshake} accent="#d97706" />
           </div>
-          {data.comparison && <section aria-label="Comparación de períodos" className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4 sm:p-5">
+          {data.comparison && <section aria-label="Comparación de períodos" className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 sm:p-5">
             <h2 className="font-bold text-slate-900">Comparado con el período anterior</h2>
             <p className="mt-1 text-sm text-slate-600">{formatDate(data.comparison.from)} — {formatDate(data.comparison.to)} · {data.meta.days} días de igual duración, inmediatamente anteriores.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -471,7 +471,7 @@ export function EstadisticasClient() {
           </div>
         </section>}
         {tab === 'trends' && <section aria-label="Evolución de estadísticas" className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2"><span className="mr-2 text-sm text-slate-600">Agrupar por</span>{([['year', 'Año'], ['month', 'Mes'], ['week', 'Semana']] as const).map(([value, label]) => <button key={value} aria-pressed={groupBy === value} onClick={() => setGroupBy(value)} className={'rounded-xl px-4 py-2 text-sm font-semibold ' + (groupBy === value ? 'bg-violet-700 text-white' : 'bg-white text-slate-600 border border-slate-200')}>{label}</button>)}</div>
+          <div className="flex flex-wrap items-center gap-2"><span className="mr-2 text-sm text-slate-600">Agrupar por</span>{([['year', 'Año'], ['month', 'Mes'], ['week', 'Semana']] as const).map(([value, label]) => <button key={value} aria-pressed={groupBy === value} onClick={() => setGroupBy(value)} className={'rounded-xl px-4 py-2 text-sm font-semibold ' + (groupBy === value ? 'bg-emerald-700 text-white' : 'bg-white text-slate-600 border border-slate-200')}>{label}</button>)}</div>
           <TrendChart periods={data.periods} groupBy={groupBy} />
           <p className="text-xs text-slate-500">Los extremos del gráfico se limitan a las fechas seleccionadas; pueden ser años, meses o semanas parciales.</p>
           <div className="grid gap-5 xl:grid-cols-3"><BreakdownCard title="Asistencia por categoría" subtitle="Distribución acumulada del período" rows={data.attendanceBreakdown} color="#7c3aed" /><BreakdownCard title="Voluntarios por área" subtitle="Participaciones por equipo de servicio" rows={data.volunteerBreakdown} color="#059669" /><QualityCard quality={data.quality} /></div>
@@ -485,7 +485,7 @@ export function EstadisticasClient() {
             <p className="mt-3 text-xs text-slate-600">{data.virtual.criterion} Estas cifras se muestran aparte: no se suman otra vez al total del período ni a la tarjeta del campus emisor.</p>
           </section>}
           {Array.from(new Set(data.byCampus.map((c) => c.country))).sort((a, b) => a.localeCompare(b, 'es')).map((name) => <section key={name} className="space-y-3">
-            <h3 className="flex items-center gap-2 font-semibold text-slate-800"><Globe2 size={17} className="text-violet-600" />{name}</h3>
+            <h3 className="flex items-center gap-2 font-semibold text-slate-800"><Globe2 size={17} className="text-emerald-600" />{name}</h3>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.byCampus.filter((c) => c.country === name).map((c) => <article key={c.campusId} className="rounded-2xl border border-slate-200 bg-white p-5">
               <h4 className="font-bold text-slate-900">{c.campusName}{!c.isActive && <span className="ml-2 text-xs font-normal text-slate-500">Inactivo</span>}</h4>
               <p className="mt-1 text-xs text-slate-500">{c.metrics.encuentros + c.metrics.eventos} servicios registrados</p>
@@ -514,7 +514,7 @@ export function EstadisticasClient() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-left text-sm">
+              <table className="stats-records-table w-full min-w-[1100px] text-left text-sm">
                 <thead className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-400">
                   <tr>
                     <th className="px-5 py-3 font-semibold">Fecha</th>
@@ -536,23 +536,23 @@ export function EstadisticasClient() {
                     </tr>
                   ) : visibleRecords.map((record) => (
                     <tr key={record.id} className="hover:bg-gray-50/70">
-                      <td className="whitespace-nowrap px-5 py-3.5 font-medium text-gray-700">{record.fechaPrecision === 'mes'
+                      <td data-label="Fecha" className="whitespace-nowrap px-5 py-3.5 font-medium text-gray-700">{record.fechaPrecision === 'mes'
                         ? <>{MONTHS[Number((record.periodo ?? record.fecha).slice(5, 7)) - 1]} {(record.periodo ?? record.fecha).slice(0, 4)} <span className="ml-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800" title="El origen no registró el día de este reporte">solo mes</span></>
                         : formatDate(record.fecha)}</td>
-                      <td className="px-4 py-3.5 font-semibold text-gray-900">{record.campusName}</td>
-                      <td className="px-4 py-3.5">
+                      <td data-label="Campus" className="px-4 py-3.5 font-semibold text-gray-900">{record.campusName}</td>
+                      <td data-label="Encuentro" className="px-4 py-3.5">
                         <span className={`mr-2 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          record.tipo === 'evento' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'
+                          record.tipo === 'evento' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
                         }`}>
                           {record.tipo === 'evento' ? 'Evento' : 'Encuentro'}
                         </span>
                         <span className="text-gray-600">{record.encuentro || 'Sin horario'}</span>
                       </td>
-                      <td className="px-4 py-3.5 text-gray-600">{record.predicador || '—'}</td>
-                      <td className="px-4 py-3.5 text-right font-semibold text-gray-900">{number(record.asistencia)}</td>
-                      <td className="px-4 py-3.5 text-right text-gray-600">{number(record.manitosPresencial + record.manitosOnline)}</td>
-                      <td className="px-4 py-3.5 text-right text-gray-600">{number(record.voluntarios)}</td>
-                      <td className="px-5 py-3.5 text-right">
+                      <td data-label="Predicador" className="px-4 py-3.5 text-gray-600">{record.predicador || '—'}</td>
+                      <td data-label="Asistencia" className="px-4 py-3.5 text-right font-semibold text-gray-900">{number(record.asistencia)}</td>
+                      <td data-label="Decisiones" className="px-4 py-3.5 text-right text-gray-600">{number(record.manitosPresencial + record.manitosOnline)}</td>
+                      <td data-label="Voluntarios" className="px-4 py-3.5 text-right text-gray-600">{number(record.voluntarios)}</td>
+                      <td data-label="Campos completos" className="px-5 py-3.5 text-right">
                         <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
                           record.completeness === 100
                             ? 'bg-emerald-50 text-emerald-700'

@@ -68,7 +68,7 @@ function ReporteCard({ r, campusName, labels }: { r: RegistroEncuentro; campusNa
         <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800"><strong>Observación enviada:</strong> {r.observacion}</p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="stats-review-summary grid gap-3 sm:grid-cols-3">
         <Breakdown title="Asistencia" values={r.asistencia} labels={labels.asistencia} total={r.totalAsistencia} />
         <Breakdown title="Voluntarios" values={r.voluntarios} labels={labels.voluntarios} total={r.totalVoluntarios} />
         <div>
@@ -86,13 +86,13 @@ function ReporteCard({ r, campusName, labels }: { r: RegistroEncuentro; campusNa
         <label className="grid gap-1.5 text-xs font-semibold text-slate-600">
           ¿Qué hay que corregir?
           <textarea value={observacion} onChange={(e) => setObservacion(e.target.value)} rows={2} maxLength={500}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-violet-500"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-emerald-500"
             placeholder="Ej: falta la asistencia de Kids" />
         </label>
       )}
       {error && <p role="alert" className="text-xs font-semibold text-red-700">{error}</p>}
 
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="stats-review-actions flex flex-wrap justify-end gap-2">
         <Link href={`/dashboard/produccion-general/estadisticas/registrar?editar=${encodeURIComponent(r.id)}`} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600">Editar</Link>
         {devolviendo ? (
           <>
@@ -130,7 +130,7 @@ export function RevisarReportesClient() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 pb-10">
-      <header className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-violet-50 p-5 sm:p-7">
+      <header className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50 p-5 sm:p-7">
         <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Estadísticas · Administración de campus</p>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div>
