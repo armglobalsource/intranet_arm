@@ -58,15 +58,15 @@ function AssignmentDialog({ row, value, saved, context, onClose, onSave }: {
     mutationFn: (name: string) => api.post<Person>(`/fichas/${context.fichaId}/people/manual`, { name }).then(r => r.data),
     onSuccess: p => { choose(p); setSearch(''); queryClient.invalidateQueries({ queryKey: ['ficha-people', userId, context.fichaId] }); },
   });
-  return <dialog ref={dialog} aria-labelledby={titleId} onCancel={onClose} className="w-[calc(100%-2rem)] max-w-lg rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-slate-950/40" style={{ maxHeight: '90dvh' }}>
-    <div className="p-5 space-y-4">
+  return <dialog ref={dialog} aria-labelledby={titleId} onCancel={onClose} className="ficha-mobile-dialog w-[calc(100%-2rem)] max-w-lg rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-slate-950/40" style={{ maxHeight: '90dvh' }}>
+    <div className="ficha-dialog-body p-5 space-y-4">
       <div className="flex justify-between gap-3"><div><h2 id={titleId} className="text-lg font-bold">{row.label}</h2><p className="text-sm text-slate-500">Selecciona personas para este puesto.</p></div><button type="button" onClick={onClose} aria-label="Cerrar asignación" className="self-start rounded-lg px-3 py-1 hover:bg-slate-100">✕</button></div>
       {!saved && value && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Dato anterior: <strong>{value}</strong>. Conservado hasta que apliques una nueva asignación.</p>}
       <label className="block text-sm font-medium">Tipo de asignación<select value={draft.mode} onChange={e => setDraft(d => ({ ...d, mode: e.target.value as RowAssignment['mode'], people: [] }))} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2">
         {Object.entries(ASSIGNMENT_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
       </select></label>
       {draft.mode === 'people' && <div className="space-y-2">
-        {draft.people.map(p => <div key={personKey(p)} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
+        {draft.people.map(p => <div key={personKey(p)} className="ficha-selected-person flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
           <span className="flex-1 font-medium">{p.name}</span>
           <input aria-label={`Tratamiento de ${p.name}`} value={p.title ?? ''} maxLength={80} placeholder="Tratamiento: Pastor, Pastora…" onChange={e => setDraft(d => ({ ...d, people: d.people.map(x => personKey(x) === personKey(p) ? { ...x, title: e.target.value } : x) }))} className="w-48 rounded-md border border-slate-300 bg-white px-2 py-1" />
           <button type="button" onClick={() => choose(p)} aria-label={`Quitar ${p.name}`} className="px-2 text-slate-600">✕</button>
@@ -93,7 +93,7 @@ function AssignmentDialog({ row, value, saved, context, onClose, onSave }: {
         <option value="all">Todos los encuentros de esta ficha</option>
       </select></label>}
       <p className="text-xs text-slate-500">El tratamiento solo se muestra en esta asignación. Las personas sin cuenta no reciben acceso a la plataforma.</p>
-      <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={onClose} disabled={createPerson.isPending} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancelar</button><button type="button" onClick={() => onSave({ assignment: draft, scope, encounterId: context.currentId })} disabled={createPerson.isPending || (draft.mode === 'team' && !draft.note.trim())} className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Aplicar asignación</button></div>
+      <div className="ficha-dialog-actions flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={onClose} disabled={createPerson.isPending} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancelar</button><button type="button" onClick={() => onSave({ assignment: draft, scope, encounterId: context.currentId })} disabled={createPerson.isPending || (draft.mode === 'team' && !draft.note.trim())} className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Aplicar asignación</button></div>
     </div>
   </dialog>;
 }

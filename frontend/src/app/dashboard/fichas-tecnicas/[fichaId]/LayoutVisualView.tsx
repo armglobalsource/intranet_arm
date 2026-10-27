@@ -538,7 +538,7 @@ function LayoutSlotBody({
           overflow: 'hidden',
         }}>
           {/* Encabezado */}
-          <div style={{
+          <div className="layout-visual-head" style={{
             display: 'grid',
             gridTemplateColumns: '1.4fr 1fr 1.4fr 2fr',
             background: D.headerBg,
@@ -561,6 +561,7 @@ function LayoutSlotBody({
             return (
               <div
                 key={song.songRowId}
+                className="layout-visual-row"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1.4fr 1fr 1.4fr 2fr',
@@ -571,7 +572,7 @@ function LayoutSlotBody({
                 }}
               >
                 {/* Columna Canción */}
-                <div style={{ minWidth: 0 }}>
+                <div data-label="Canción" style={{ minWidth: 0 }}>
                   <div style={{
                     fontSize: 13, fontWeight: 600, color: D.textPrimary,
                     wordBreak: 'break-word', lineHeight: 1.35,
@@ -590,10 +591,11 @@ function LayoutSlotBody({
                 </div>
 
                 {/* Columna Iluminación */}
-                <div style={{ minWidth: 0 }}>
+                <div data-label="Iluminación" style={{ minWidth: 0 }}>
                   {editable ? (
                     <>
                       <textarea
+                        aria-label={`Iluminación de ${title.titulo || "canción"}`}
                         value={song.iluminacion}
                         onChange={(e) => onUpdateSong(song.songRowId, { iluminacion: e.target.value })}
                         placeholder="AZUL, LILA + NARANJO…"
@@ -632,10 +634,11 @@ function LayoutSlotBody({
                 </div>
 
                 {/* Columna Visuales */}
-                <div style={{ minWidth: 0 }}>
+                <div data-label="Visuales" style={{ minWidth: 0 }}>
                   {editable ? (
                     <>
                       <textarea
+                        aria-label={`Visuales de ${title.titulo || "canción"}`}
                         value={song.visualDescription}
                         onChange={(e) => onUpdateSong(song.songRowId, { visualDescription: e.target.value })}
                         placeholder="VISUALES LISTAS GLOBAL / 2026 / …"
@@ -670,7 +673,7 @@ function LayoutSlotBody({
                 </div>
 
                 {/* Columna Referencias */}
-                <div style={{ minWidth: 0 }}>
+                <div data-label="Referencias" style={{ minWidth: 0 }}>
                   <VisualReferencePicker
                     value={song.referenceIds}
                     onChange={(next) => onUpdateSong(song.songRowId, { referenceIds: next })}

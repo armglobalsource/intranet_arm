@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import './ficha-responsive.css';
 import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSlot, FichaPermisos, AssignmentEdit } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -194,7 +195,7 @@ function DeleteBtn({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       title="Eliminar fila"
-      className="ficha-no-print"
+      className="ficha-no-print ficha-delete-row"
       style={{
         flexShrink: 0, fontSize: 11, lineHeight: 1, color: D.textMuted,
         background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px',
@@ -531,7 +532,7 @@ function StreamingCard({
         {roleRows.map((row, i) => (
           <SortableRow key={row.id} id={row.id} editable={editable}>
             {(handle) => (
-              <div style={{
+              <div className="ficha-role-row" style={{
                 ...S.roleRow,
                 ...(!cameras.length && i === roleRows.length - 1 ? { borderBottom: 'none' } : {}),
               }}>
@@ -559,7 +560,7 @@ function StreamingCard({
           </SortableRow>
         ))}
         {cameras.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 10 }}>
+          <div className="ficha-camera-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 10 }}>
             {cameras.map((row) => (
               <SortableRow key={row.id} id={row.id} editable={editable}>
                 {(handle) => (
@@ -622,7 +623,7 @@ function EscenaCard({
         {editable && vio && (
           <SortableRow id={vio.id} editable={editable}>
             {(handle) => (
-              <div style={{ ...S.roleRow, marginBottom: 8 }}>
+              <div className="ficha-role-row" style={{ ...S.roleRow, marginBottom: 8 }}>
                 {handle}
                 <span style={S.roleLabel}>VIO</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
@@ -1474,7 +1475,7 @@ function WorshipSetListCard({
           {editable && vio && (
             <SortableRow id={vio.id} editable={editable}>
               {(handle) => (
-                <div style={{ ...S.roleRow, marginBottom: 8 }}>
+                <div className="ficha-role-row" style={{ ...S.roleRow, marginBottom: 8 }}>
                   {handle}
                   <span style={S.roleLabel}>VIO</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
@@ -1544,7 +1545,7 @@ function WorshipSetListCard({
               {musicians.map((row) => (
                 <SortableRow key={row.id} id={row.id} editable={editable}>
                   {(handle) => (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', gap: 8, borderBottom: `0.5px solid ${D.divider}` }}>
+                    <div className="ficha-role-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', gap: 8, borderBottom: `0.5px solid ${D.divider}` }}>
                       {handle}
                       <EditableLabel
                         value={row.label}
@@ -1771,7 +1772,8 @@ function TimingCard({
                       />
                       {onDeleteRow && !row.required && <DeleteBtn onClick={() => onDeleteRow(row.id)} />}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                    <div className="ficha-timing-times" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                      <label className="ficha-time-field"><span>Inicio</span>
                       <input
                         type="time" aria-label="Inicio" value={p.value.inicio ?? ''} style={timingTime}
                         onChange={(e) => {
@@ -1780,20 +1782,25 @@ function TimingCard({
                           write(p, dur != null && inicio ? withDuration({ ...p.value, inicio }, dur) : { inicio });
                         }}
                       />
-                      <span style={{ fontSize: 11, color: D.textMuted }}>a</span>
+                      </label>
+                      <span className="ficha-time-separator" style={{ fontSize: 11, color: D.textMuted }}>a</span>
+                      <label className="ficha-time-field"><span>Término</span>
                       <input
                         type="time" aria-label="Término" value={p.value.fin ?? ''} style={timingTime}
                         onChange={(e) => write(p, { fin: e.target.value || undefined })}
                       />
+                      </label>
+                      <label className="ficha-time-field ficha-time-duration"><span>Duración (min)</span>
                       <input
                         type="number" min={0} max={600} aria-label="Duración en minutos" placeholder="min"
                         value={dur ?? ''} disabled={!p.value.inicio}
                         onChange={(e) => write(p, withDuration(p.value, e.target.value === '' ? null : Number(e.target.value)))}
                         style={{ ...timingTime, width: 46, textAlign: 'right' }}
                       />
-                      <span style={{ fontSize: 11, color: D.textMuted }}>min</span>
+                      </label>
+                      <span className="ficha-time-separator" style={{ fontSize: 11, color: D.textMuted }}>min</span>
                     </div>
-                    <div className="ficha-no-print" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
+                    <div className="ficha-no-print ficha-timing-options" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
                       <select aria-label="Tipo" value={p.value.tipo ?? 'momento'} style={timingSelect}
                         onChange={(e) => write(p, { tipo: e.target.value as MomentKind })}>
                         {MOMENT_KINDS.map((m) => <option key={m.kind} value={m.kind}>{m.label}</option>)}
@@ -2136,7 +2143,7 @@ function VoluntariosCard({
         {displayed.map((row, i) => (
           <SortableRow key={row.id} id={row.id} editable={editable}>
             {(handle) => (
-              <div style={{
+              <div className="ficha-role-row" style={{
                 ...S.roleRow,
                 ...(i === displayed.length - 1 ? { borderBottom: 'none' } : {}),
               }}>
@@ -2191,7 +2198,7 @@ function EncuentroTabs({
   }
 
   return (
-    <div className="ficha-no-print" style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+    <div className="ficha-no-print ficha-encuentro-tabs" style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
       {showEncuentroPills && encuentros.map((e) => (
         <button
           key={e.id}
@@ -2814,7 +2821,7 @@ export function FichaDocumentView({
               className="ficha-logo"
               style={{ height: 40, width: 'auto', objectFit: 'contain', display: 'block', maxWidth: '40%' }}
             />
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div className="ficha-date-area" style={{ textAlign: 'right', flexShrink: 0 }}>
               {metaEditable && editingDate ? (
                 <input
                   ref={dateInputRef}

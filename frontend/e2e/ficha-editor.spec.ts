@@ -53,6 +53,55 @@ async function drag(page: Page, from: Locator, to: Locator) {
 
 test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1720, height: 1100 }); });
 
+for (const width of [320, 390, 430, 768, 1024, 1366]) {
+  test(`responsive ${width}px: ficha completa, asignación y layout visual`, async ({ page }) => {
+    const { ficha, writes } = await fixture(page);
+    ficha.type = 'multi';
+    ficha.encuentros = ['09:00', '11:00', '17:00'].map((time, i) => ({ id: `e${i}`, label: `Encuentro ${time}`, time, color: '#315e49' }));
+    ficha.hiddenSections = [];
+    ficha.sections.streaming.rows = [makeRow('tv', 'Director de televisión', 0), makeRow('cam1', 'CAM 1', 1), makeRow('cam2', 'CAM 2', 2)] as any;
+    ficha.sections.horarios.rows = [{ id: 'h1', label: 'Inicio encuentro', order: 0, type: 'text', shared: true, required: false, values: { shared: JSON.stringify({ inicio: '11:00', nota: 'Abrir puertas' }) } }] as any;
+    ficha.sections.setList.rows = [{ id: 'songrow', label: 'Canción 1', order: 0, type: 'song', shared: true, required: false, values: { shared: JSON.stringify({ titulo: 'See the light', tonalidad: 'G', cancionId: 'song-1' }) } }] as any;
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(url);
+    await expect(page.locator('.ficha-pdf-order')).toBeVisible();
+    const overflow = () => page.locator('.ficha-doc').evaluate(root => {
+      const bounds = root.getBoundingClientRect();
+      return Array.from(root.querySelectorAll('button, input, select, textarea, .ficha-card')).filter(el => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && (rect.left < bounds.left - 1 || rect.right > bounds.right + 1);
+      }).map(el => `${el.tagName}: ${el.getAttribute('aria-label') || el.textContent?.slice(0, 60)}`);
+    });
+    expect(await overflow()).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (width < 768) {
+      await expect(page.getByRole('button', { name: 'Equipo y responsables de la ficha' })).toBeVisible();
+      await expect(page.locator('#ficha-team-settings')).toBeHidden();
+      await expect(page.locator('.ficha-person-cell').first()).toHaveCSS('min-height', '44px');
+    }
+    await page.screenshot({ path: `test-results/ficha-responsive-${width}-header.png` });
+    await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('checkbox').first().check();
+    await dialog.getByLabel('Tratamiento de Ana Pérez').fill('Pastora');
+    expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await page.screenshot({ path: `test-results/ficha-responsive-${width}-dialog.png` });
+    await dialog.getByRole('button', { name: 'Aplicar asignación' }).click();
+    await expect.poll(() => writes.some(w => w.path.endsWith('/sections/pastoral'))).toBe(true);
+    const timing = page.locator('[data-ficha-slot="horarios"]');
+    await timing.getByLabel('Inicio', { exact: true }).fill('10:30');
+    await timing.getByLabel('Término', { exact: true }).click();
+    await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/horarios')).at(-1)?.body.rows[0].values.shared).toContain('10:30');
+    await timing.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `test-results/ficha-responsive-${width}-timing.png` });
+    await page.getByRole('button', { name: 'Layout Visual', exact: true }).click();
+    await expect(page.locator('.layout-visual-row').first()).toBeVisible();
+    expect(await overflow()).toEqual([]);
+    await page.locator('.layout-visual-row').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `test-results/ficha-responsive-${width}-layout.png` });
+  });
+}
+
 test('secciones PDF: mover con botones y arrastrar conserva el orden al recargar', async ({ page }) => {
   const { writes } = await fixture(page);
   await page.goto(url);
@@ -257,7 +306,7 @@ test('estructura de referencia: secciones siguen el orden del PDF y conserva las
   ficha.hiddenSections = [];
   await page.goto(url);
   await expect(page.locator('.ficha-pdf-order')).toBeVisible();
-  await expect(page.locator('.ficha-pdf-order > [data-ficha-slot]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-ficha-slot')))).resolves.toEqual(['pastoral', 'streaming', 'produccion', 'media', 'anuncios', 'worship', 'horarios', 'voluntarios']);
+  await expect(page.locator('.ficha-pdf-order > [data-block-id]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-block-id')))).resolves.toEqual(['pastoral', 'streaming', 'produccion', 'media', 'anuncios', 'worship', 'horarios', 'voluntarios']);
   await expect(page.getByRole('button', { name: 'Asignar personas: Bienvenida' })).toBeVisible();
   await expect(page.locator('.ficha-worship-columns')).toHaveCSS('display', 'grid');
 });
@@ -340,4 +389,32 @@ test('secciones: si falla el guardado se restaura la vista y se informa', async 
   await page.locator('[data-ficha-slot="horarios"]').getByRole('button', { name: 'Quitar sección Timing' }).click();
   await expect(page.getByText('No se pudo actualizar la sección. Inténtalo nuevamente.')).toBeVisible();
   await expect(page.locator('[data-ficha-slot="horarios"]')).toBeVisible();
+});
+
+test.describe('operación táctil', () => {
+  test.use({ hasTouch: true, isMobile: true });
+  test('asignar con pantalla reducida, guardar y volver a modo lectura', async ({ page }) => {
+    const { writes } = await fixture(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(url);
+    await page.getByRole('button', { name: 'Equipo y responsables de la ficha' }).tap();
+    await expect(page.getByRole('region', { name: 'Equipo de la ficha' })).toBeVisible();
+    await page.getByRole('button', { name: 'Ocultar equipo y responsables' }).tap();
+    await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).tap();
+    // Reduced visible height approximates the space remaining with a keyboard.
+    await page.setViewportSize({ width: 390, height: 440 });
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('checkbox').first().tap();
+    await dialog.getByLabel('Tratamiento de Ana Pérez').fill('Pastora');
+    expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await dialog.getByRole('button', { name: 'Aplicar asignación' }).tap();
+    await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/pastoral')).at(-1)?.body.rows[0].values.shared).toBe('Pastora Ana Pérez');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true })).toContainText('Pastora Ana Pérez');
+    await page.goto(url.split('?')[0]);
+    await expect(page.locator('.ficha-doc')).toContainText('Pastora Ana Pérez');
+    await expect(page.getByRole('button', { name: 'Mover fila' })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
 });

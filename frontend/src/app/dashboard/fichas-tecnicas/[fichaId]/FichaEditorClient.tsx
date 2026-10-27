@@ -331,6 +331,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   // Panel de edición de módulos: mientras está abierto, reemplaza la lista
   // de Equipo en el side panel. Se cierra al salir del modo edición.
   const [modulesOpen, setModulesOpen] = useState(false);
+  const [teamSettingsOpen, setTeamSettingsOpen] = useState(false);
   useEffect(() => { if (!isEditing) setModulesOpen(false); }, [isEditing]);
 
   const [localHidden, setLocalHidden] = useState<SectionName[]>([]);
@@ -787,7 +788,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   }
 
   return (
-    <div className="space-y-4" style={{ position: 'relative' }}>
+    <div className="ficha-editor-page space-y-4" style={{ position: 'relative' }}>
 
       {/* Overlay "Cargando editor…" al hacer clic en Editar */}
       {transitioningToEdit && (
@@ -881,11 +882,17 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         </div>
       )}
 
+      {editable && <button type="button" className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 md:hidden" aria-expanded={teamSettingsOpen} aria-controls="ficha-team-settings" onClick={() => setTeamSettingsOpen(open => !open)}>
+        {teamSettingsOpen ? 'Ocultar equipo y responsables' : 'Equipo y responsables de la ficha'}
+      </button>}
+      <div id="ficha-team-settings" className={`${teamSettingsOpen ? 'block' : 'hidden'} space-y-4 md:block`}>
       {editable && <FichaEquipoPanel ficha={ficha} onDesignate={handleDesignate} />}
 
       {editable && (!permisos || permisos.content) && (
         <SectionAssignments ficha={ficha} onAssign={handleAssignSection} />
       )}
+
+      </div>
 
       {/* Layout: ficha + panel lateral cuando está en edición. El panel va al
           lado solo en pantallas anchas; antes queda arriba a ancho completo para

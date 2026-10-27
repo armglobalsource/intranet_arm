@@ -24,8 +24,8 @@ export function SongLibraryDialog({ id, onClose, onUseKey }: { id: string; onClo
   });
   useEffect(() => { dialog.current?.showModal(); return () => dialog.current?.close(); }, []);
   function startEdit() { setKey(song.data?.tonalidad ?? ''); setLyrics(song.data?.letra ?? ''); setVersion(song.data?.revision ?? null); save.reset(); setEditing(true); }
-  return createPortal(<dialog ref={dialog} aria-labelledby={title} onCancel={onClose} className="w-[calc(100%-2rem)] max-w-xl rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-slate-950/40" style={{ maxHeight: '90dvh' }}>
-    <div className="space-y-4 p-5">
+  return createPortal(<dialog ref={dialog} aria-labelledby={title} onCancel={onClose} className="ficha-mobile-dialog w-[calc(100%-2rem)] max-w-xl rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-slate-950/40" style={{ maxHeight: '90dvh' }}>
+    <div className="ficha-dialog-body space-y-4 p-5">
       <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Biblioteca de Worship</p><h2 id={title} className="mt-1 text-xl font-bold">{song.data?.titulo ?? 'Canción'}</h2></div><button type="button" onClick={onClose} aria-label="Cerrar canción" className="rounded-lg px-3 py-1 hover:bg-slate-100">✕</button></div>
       {song.isPending ? <p role="status">Cargando canción…</p> : song.isError ? <div role="alert" className="text-sm text-red-700">{apiErrorMessage(song.error, 'No se pudo cargar la canción.')} <button type="button" className="underline" onClick={() => song.refetch()}>Reintentar</button></div> : editing ? <>
         <p className="text-sm text-slate-600">Los cambios se guardan en el catálogo compartido para futuras fichas. Las fichas existentes conservan su tono.</p>

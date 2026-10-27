@@ -75,7 +75,7 @@ export function EquipoRosterSideCard({ roster, isLoading, weekLabel, campusId }:
       </div>
 
       {!isLoading && roster && (
-        <div className="mx-4 mt-3 grid grid-cols-3 overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+        <div className={`${open ? 'grid' : 'hidden xl:grid'} mx-4 mt-3 grid-cols-3 overflow-hidden rounded-xl border border-slate-100 bg-slate-50`}>
           <StatusSummary label="Disponible" value={available} color={STATUS_COLOR.disponible} />
           <StatusSummary label="No puede" value={unavailable} color={STATUS_COLOR.no_disponible} bordered />
           <StatusSummary label="Pendiente" value={pending} color={STATUS_COLOR.sin_responder} bordered />

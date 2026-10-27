@@ -74,7 +74,7 @@ export function EncuentrosEditor({ encuentros, type, onSave, onClose }: Props) {
 
   return (
     <div className="ficha-no-print fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="encuentros-title">
-      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+      <div className="ficha-mobile-dialog max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
         <div className="mb-1 flex items-center justify-between">
           <h2 id="encuentros-title" className="text-base font-bold text-[#243047]">Encuentros de la ficha</h2>
           <button type="button" onClick={onClose} aria-label="Cerrar" className="text-[#69768B] hover:text-[#243047]">✕</button>
