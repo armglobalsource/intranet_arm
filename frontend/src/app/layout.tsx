@@ -13,10 +13,11 @@ export const metadata: Metadata = {
   description: 'Portal interno corporativo',
   icons: {
     icon: [
-      { url: '/favicon.png', type: 'image/png', sizes: '64x64' },
-      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/arm-brand-icon-64.png', type: 'image/png', sizes: '64x64' },
+      { url: '/arm-brand-icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/arm-brand-icon-512.png', type: 'image/png', sizes: '512x512' },
     ],
-    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    apple: [{ url: '/arm-brand-icon-180.png', sizes: '180x180', type: 'image/png' }],
   },
   robots: { index: false },
 };
