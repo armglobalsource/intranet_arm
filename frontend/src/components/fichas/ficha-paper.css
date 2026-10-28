@@ -71,6 +71,12 @@
 .sheet-song { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex: 1; min-width: 0; font-weight: 600; }
 .sheet-song small { display: block; color: #626c78; font-size: 9px; font-weight: 400; }
 .sheet-key { flex-shrink: 0; min-width: 22px; padding: 0 4px; border: 1px solid #cdd3da; border-radius: 3px; color: #3b4552; font-size: 9px; text-align: center; }
+.sheet-outfits { display: grid; gap: 8px; padding: 4px 0; }
+.sheet-outfit > strong { display: block; margin-bottom: 6px; font-size: 10px; color: #303944; }
+.sheet-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.sheet-swatches > div { flex: 1 1 65px; min-width: 0; text-align: center; font-size: 8px; color: #526071; }
+.sheet-swatches .sheet-swatch { display: block; height: 24px; margin-bottom: 4px; border: 1px solid #aeb6c0; border-radius: 3px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.published-sheet .sheet-outfit-title th { color: #2d6342; border-bottom-color: #b6d5bf; }
 
 @media screen {
   .ficha-document-mode .ficha-doc { box-shadow: 0 6px 24px rgba(31, 41, 55, .08); }

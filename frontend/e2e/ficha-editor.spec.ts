@@ -457,10 +457,14 @@ for (const width of [320, 393, 834, 1366]) {
   test(`ficha publicada ${width}px: hoja completa, zoom y columnas estables`, async ({ page }) => {
     const { ficha, writes } = await fixture(page);
     await page.addInitScript(() => localStorage.removeItem('auth-storage'));
-    Object.assign(ficha, { publicMeta: { paletas: [], visualRefs: [] } });
+    Object.assign(ficha, { publicMeta: { paletas: [{id: 'tierra', name: 'Tierra / Coral', colors: [
+      {name: 'Domino', hex: '#8A6045'}, {name: 'Stark White', hex: '#EBE5D8'}, {name: 'Coral', hex: '#E85D2A'},
+      {name: 'Cod Gray', hex: '#111111'}, {name: 'Zorba', hex: '#9B9170'},
+    ]}], visualRefs: [] } });
     ficha.type = 'multi';
     ficha.encuentros = ['09:00', '11:00'].map((time, i) => ({ id: `e${i}`, label: `Encuentro ${time}`, time, color: '#315e49' }));
-    ficha.hiddenSections = ['media', 'voluntarios', 'outfit'];
+    ficha.hiddenSections = ['media', 'voluntarios'];
+    ficha.sections.outfit.rows = [{...makeRow('outfit_palette', 'Paleta', 0, 'tierra'), type: 'text'}] as any;
     ficha.sections.produccion.rows = [makeRow('pr1', 'Productor General', 0), ...['Sonido', 'Stage', 'Iluminación', 'Visuales', 'ProPresenter'].map((label, i) => makeRow(`p${i}`, label, i + 1))] as any;
     ficha.sections.streaming.rows = [makeRow('tv', 'Director de televisión', 0), makeRow('cam1', 'CAM 1', 1), makeRow('cam2', 'CAM 2', 2)] as any;
     ficha.sections.anuncios.rows = [{ ...makeRow('news', 'Información del encuentro', 0, 'Reunión de equipos al terminar el encuentro. Ingreso por la puerta principal.'), type: 'text' }] as any;
@@ -473,6 +477,9 @@ for (const width of [320, 393, 834, 1366]) {
     const sheet = page.locator('.ficha-paper-content');
     await expect(sheet).toBeVisible();
     await expect(sheet).toHaveCSS('width', '794px');
+    await expect(page.getByLabel('Paleta de outfit: Tierra / Coral')).toBeVisible();
+    await expect(page.locator('.sheet-swatch')).toHaveCount(5);
+    await expect(page.getByRole('img', {name: 'Coral: #E85D2A'})).toHaveCSS('background-color', 'rgb(232, 93, 42)');
     await expect(page.locator('.published-sheet table').first()).toBeVisible();
     await expect(page.locator('.published-sheet table').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Mover fila', exact: true })).toHaveCount(0);
@@ -501,6 +508,7 @@ for (const width of [320, 393, 834, 1366]) {
     await expect(page.locator('.ficha-view-body')).toBeVisible();
     await page.emulateMedia({ media: 'print' });
     await expect(sheet).toHaveCSS('transform', 'none');
+    await expect(page.locator('.sheet-swatch').first()).toHaveCSS('print-color-adjust', 'exact');
     await expect(page.locator('.ficha-paper-toolbar')).toBeHidden();
     await expect(page.locator('.ficha-view-body')).toBeVisible();
     if (width === 393) await page.pdf({ path: 'test-results/ficha-publicada.pdf', format: 'A4', printBackground: true });

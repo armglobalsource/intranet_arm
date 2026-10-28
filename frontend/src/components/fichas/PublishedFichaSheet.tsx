@@ -26,7 +26,7 @@ export function PublishedFichaSheet({ ficha, colId, hidden, order, paletas }: {
   const positions = assigned('escena').filter(r => /posici[oó]n|izquierda|centro|derecha/i.test(r.label));
   const band = assigned('escena').filter(r => !positions.includes(r));
   const songs = rows('setList').filter(r => value(r,colId)).map(r => song(r,colId));
-  const outfit = rows('outfit').map(r => value(r,colId)).filter(Boolean).map(id => paletas.find(p => p.id === id)?.name ?? id);
+  const outfit = rows('outfit').map(r => value(r,colId)).filter(Boolean).map(id => ({id, palette: paletas.find(p => p.id === id)}));
   const moments = momentTree(rows('horarios'), colId, true).flatMap(n => [n, ...n.children]).filter(m => hasContent(m.value));
   const slots: Record<string, React.ReactNode> = {
     pastoral: (ficha.encuentros?.length ?? 0) > 1 && rows('pastoral').some(r => ficha.encuentros.some(e => value(r,e.id))) ? <table><caption>Encuentro · Plataforma</caption><colgroup><col style={{width: '27%'}} />{ficha.encuentros.map(e => <col key={e.id} />)}</colgroup><thead><tr><th scope="col">Asignación</th>{ficha.encuentros.map(e => <th scope="col" key={e.id}>{e.time || e.label}</th>)}</tr></thead><tbody>{rows('pastoral').filter(r => ficha.encuentros.some(e => value(r,e.id))).map(r => <tr key={r.id}><th scope="row">{r.label}</th>{ficha.encuentros.map(e => <td key={e.id}>{value(r,e.id)}</td>)}</tr>)}</tbody></table> : table('Encuentro · Plataforma', assigned('pastoral')),
@@ -40,7 +40,14 @@ export function PublishedFichaSheet({ ficha, colId, hidden, order, paletas }: {
       {positions.length > 0 && <tr><td colSpan={4}><div className="sheet-positions">{positions.map((r,i) => <div key={r.id}><b className="sheet-position-circle" aria-hidden="true">{i + 1}</b><b>{r.label}</b><span>{value(r,colId)}</span></div>)}</div></td></tr>}
       <tr className="sheet-subhead"><th colSpan={2}>Equipo</th><th colSpan={2}>Canciones · Set list</th></tr>
       {Array.from({length: Math.max(band.length,songs.length)}, (_, i) => <tr key={i}><th>{band[i]?.label ?? ''}</th><td>{band[i] ? value(band[i],colId) : ''}</td><td colSpan={2}>{songs[i] && <div className="sheet-song-row"><span className="sheet-song-number">{String(i+1).padStart(2,'0')}</span>{songs[i]}</div>}</td></tr>)}
-      {outfit.length > 0 && <tr><th>Outfit</th><td colSpan={3}>{outfit.join(' · ')}</td></tr>}
+      {outfit.length > 0 && <><tr className="sheet-subhead sheet-outfit-title"><th colSpan={4}>Outfit / Paleta de colores</th></tr>
+        <tr><td colSpan={4}><div className="sheet-outfits">{outfit.map(({id, palette}, i) => <div key={`${id}-${i}`} className="sheet-outfit" aria-label={`Paleta de outfit: ${palette?.name ?? id}`}>
+          <strong>{palette?.name ?? id}</strong>
+          {palette && <div className="sheet-swatches">{palette.colors.map((color, index) => <div key={`${color.hex}-${index}`}>
+            <span className="sheet-swatch" role="img" aria-label={`${color.name}: ${color.hex}`} style={{backgroundColor: /^#[0-9a-f]{3,8}$/i.test(color.hex) ? color.hex : '#fff'}} />
+            <span>{color.name}</span>
+          </div>)}</div>}
+        </div>)}</div></td></tr></>}
     </tbody></table> : null,
     horarios: moments.length ? <table><caption>Horarios</caption><colgroup><col style={{width:'10%'}} /><col style={{width:'10%'}} /><col style={{width:'30%'}} /><col /></colgroup><thead><tr><th scope="col">Inicio</th><th scope="col">Término</th><th scope="col">Momento</th><th scope="col">Responsable / Indicaciones</th></tr></thead><tbody>
       {moments.map(m => <tr key={m.row.id}><td className="sheet-time">{m.value.inicio || '—'}</td><td className="sheet-time">{m.value.fin || '—'}</td><th scope="row">{m.label}</th><td>{[m.value.responsable, m.value.nota].filter(Boolean).join(' · ')}</td></tr>)}

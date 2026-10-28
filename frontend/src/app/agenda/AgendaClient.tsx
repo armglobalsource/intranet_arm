@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { parseFichaDate } from '@/lib/ficha-date';
 import { isRecent, relativeTime, sameLocalDay } from '@/lib/ficha-summary';
 import { statusLabel, type FichaStatus } from '@/types/ficha';
+import './agenda.css';
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -13,14 +14,14 @@ const API_BASE =
     : '/api/v1');
 
 const D = {
-  bg:           '#0d0d0d',
-  cardBg:       '#151515',
-  cardBorder:   'rgba(255,255,255,0.09)',
-  divider:      'rgba(255,255,255,0.06)',
-  textPrimary:  '#f0efec',
-  textSecond:   '#c4c1bc',
-  textMuted:    '#7a7773',
-  accent:       '#7F77DD',
+  bg:           '#f5f6f8',
+  cardBg:       '#ffffff',
+  cardBorder:   '#dce1e7',
+  divider:      '#e1e5eb',
+  textPrimary:  '#263140',
+  textSecond:   '#526071',
+  textMuted:    '#687587',
+  accent:       '#3f536b',
 };
 
 type Encuentro = {
@@ -79,7 +80,7 @@ function formatCardDate(raw: any): string {
 }
 
 function typeBadge(type: FichaLite['type']): { label: string; bg: string; color: string } | null {
-  if (type === 'oracion') return { label: 'Oración', bg: 'rgba(127,119,221,0.15)', color: '#B7B0F0' };
+  if (type === 'oracion') return { label: 'Oración', bg: '#edf1f5', color: '#44586f' };
   return null;
 }
 
@@ -95,27 +96,18 @@ function FichaCard({ ficha }: { ficha: FichaLite }) {
   return (
     <Link
       href={`/ficha/${ficha.fichaId}`}
+      className={`agenda-card${today ? ' agenda-card-today' : ''}`}
       style={{
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
-        padding: 16,
+        padding: 20,
         background: D.cardBg,
         border: `0.5px solid ${today ? D.accent : D.cardBorder}`,
-        borderRadius: 12,
+        borderRadius: 16,
         textDecoration: 'none',
         color: 'inherit',
         transition: 'border-color 0.15s, background 0.15s',
-      }}
-      onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.borderColor = 'rgba(255,255,255,0.18)';
-        el.style.background = '#1a1a1a';
-      }}
-      onMouseLeave={(e) => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.borderColor = today ? D.accent : D.cardBorder;
-        el.style.background = D.cardBg;
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -136,8 +128,8 @@ function FichaCard({ ficha }: { ficha: FichaLite }) {
           {ficha.status && (
             <span style={{
               fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', padding: '2px 8px', borderRadius: 999,
-              background: ficha.status === 'complete' ? 'rgba(29,158,117,0.15)' : 'rgba(255,255,255,0.08)',
-              color: ficha.status === 'complete' ? '#5DCAA5' : D.textSecond, textTransform: 'uppercase', flexShrink: 0,
+              background: ficha.status === 'complete' ? '#edf4ef' : '#f1f3f6',
+              color: ficha.status === 'complete' ? '#3f6650' : D.textSecond, textTransform: 'uppercase', flexShrink: 0,
             }}>
               {statusLabel(ficha.status)}
             </span>
@@ -145,9 +137,9 @@ function FichaCard({ ficha }: { ficha: FichaLite }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 16, fontWeight: 600, color: D.textPrimary, lineHeight: 1.25 }}>
+      <h3 style={{ fontSize: 18, fontWeight: 700, color: D.textPrimary, lineHeight: 1.35, margin: 0 }}>
         {ficha.title || 'Sin título'}
-      </div>
+      </h3>
 
       {ficha.encuentros.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
@@ -155,7 +147,7 @@ function FichaCard({ ficha }: { ficha: FichaLite }) {
             <div key={enc.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
               <span style={{
                 display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
-                background: enc.color || D.accent, flexShrink: 0,
+                background: D.accent, flexShrink: 0,
               }} />
               <span style={{ color: D.textPrimary, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                 {enc.time}
@@ -167,13 +159,13 @@ function FichaCard({ ficha }: { ficha: FichaLite }) {
       )}
 
       {ficha.lastModifiedAt && (
-        <div style={{ fontSize: 11, color: changedAfterPublish ? '#F5C26B' : D.textMuted }}>
+        <div style={{ fontSize: 11, color: changedAfterPublish ? '#856018' : D.textMuted }}>
           {changedAfterPublish ? '● Cambios recientes · ' : ''}Actualizada {relativeTime(ficha.lastModifiedAt)}
         </div>
       )}
 
       <div style={{
-        marginTop: 6, fontSize: 11, color: D.accent, fontWeight: 600,
+        marginTop: 'auto', paddingTop: 12, borderTop: `1px solid ${D.divider}`, fontSize: 13, color: D.accent, fontWeight: 600,
         display: 'flex', alignItems: 'center', gap: 4,
       }}>
         Ver ficha
@@ -203,7 +195,7 @@ function CampusSection({ campusName, fichas }: { campusName: string; fichas: Fic
       </div>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
         gap: 12,
       }}>
         {fichas.map((f) => <FichaCard key={f.fichaId} ficha={f} />)}
@@ -220,6 +212,7 @@ export function AgendaClient() {
   const [error, setError]     = useState<string | null>(null);
   const [offset, setOffset]   = useState(0);
   const [campus, setCampus]   = useState('');
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     try { setCampus(localStorage.getItem(CAMPUS_KEY) ?? ''); } catch { /* sin almacenamiento */ }
@@ -234,15 +227,17 @@ export function AgendaClient() {
   const startParam = `${week.start.getFullYear()}-${String(week.start.getMonth() + 1).padStart(2, '0')}-${String(week.start.getDate()).padStart(2, '0')}`;
 
   useEffect(() => {
+    const controller = new AbortController();
     setLoading(true); setError(null);
-    fetch(`${API_BASE}/fichas/public/week?start=${startParam}`)
+    fetch(`${API_BASE}/fichas/public/week?start=${startParam}`, {signal: controller.signal})
       .then(async (r) => {
         if (!r.ok) throw new Error(`Error ${r.status}`);
         return r.json();
       })
-      .then((data: FichaLite[]) => { setFichas(data); setLoading(false); })
-      .catch((e) => { setError(e.message); setLoading(false); });
-  }, [startParam]);
+      .then((data: FichaLite[]) => { if (!controller.signal.aborted) { setFichas(data); setLoading(false); } })
+      .catch((e) => { if (!controller.signal.aborted) { setError(e.message); setLoading(false); } });
+    return () => controller.abort();
+  }, [startParam, retry]);
 
   const campusOptions = useMemo(
     () => Array.from(new Set((fichas ?? []).map((f) => f.campusName || 'Sin campus'))).sort((a, b) => a.localeCompare(b, 'es')),
@@ -269,12 +264,12 @@ export function AgendaClient() {
   }, [fichas, campus]);
 
   const navBtn: React.CSSProperties = {
-    minHeight: 36, padding: '0 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-    background: 'rgba(255,255,255,0.06)', color: D.textPrimary, border: `0.5px solid ${D.cardBorder}`,
+    minHeight: 44, padding: '0 12px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+    background: '#fff', color: D.textPrimary, border: `1px solid ${D.cardBorder}`,
   };
 
   return (
-    <div style={{
+    <div className="public-agenda" style={{
       minHeight: '100vh',
       background: D.bg,
       color: D.textPrimary,
@@ -291,11 +286,11 @@ export function AgendaClient() {
         padding: '32px 20px 20px',
         display: 'flex', flexDirection: 'column', gap: 8,
       }}>
-        <img
-          src="/logo2.png"
+        <div className="agenda-brand"><img
+          src="/logo.png"
           alt="ARM Global"
-          style={{ height: 34, width: 'auto', objectFit: 'contain', display: 'block' }}
-        />
+          style={{ width: 148, height: 'auto', objectFit: 'contain', display: 'block', filter: 'brightness(0)' }}
+        /><Link href="/auth/login">Ingresar al ecosistema →</Link></div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 12 }}>
           <div style={{
             fontSize: 11, color: D.textMuted, textTransform: 'uppercase',
@@ -305,21 +300,22 @@ export function AgendaClient() {
           </div>
           <h1 style={{
             fontSize: 26, fontWeight: 700, color: D.textPrimary,
-            letterSpacing: '-0.02em', margin: 0, textTransform: 'capitalize',
+            letterSpacing: '-0.02em', margin: 0,
           }}>
             {weekLabel}
           </h1>
+          <p style={{fontSize: 13, lineHeight: 1.6, color: D.textSecond, margin: '8px 0 0'}}>Encuentra tu campus y abre la ficha para consultar equipos, horarios y outfit.</p>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center' }}>
+        <div className="agenda-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16, alignItems: 'center' }}>
           <button type="button" style={navBtn} onClick={() => setOffset((o) => o - 1)} aria-label="Semana anterior">← Anterior</button>
           <button type="button" style={{ ...navBtn, opacity: offset === 0 ? 0.5 : 1 }} disabled={offset === 0} onClick={() => setOffset(0)}>Esta semana</button>
           <button type="button" style={navBtn} onClick={() => setOffset((o) => o + 1)} aria-label="Semana siguiente">Siguiente →</button>
-          <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: D.textSecond }}>
+          <label className="agenda-campus-filter" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: D.textSecond }}>
             Campus
             <select
               value={campus}
               onChange={(e) => chooseCampus(e.target.value)}
-              style={{ ...navBtn, cursor: 'pointer', colorScheme: 'dark' }}
+              style={{ ...navBtn, cursor: 'pointer', colorScheme: 'light', minWidth: 140 }}
             >
               <option value="">Todos</option>
               {(campus && !campusOptions.includes(campus) ? [campus, ...campusOptions] : campusOptions).map((c) => <option key={c} value={c}>{c}</option>)}
@@ -330,7 +326,7 @@ export function AgendaClient() {
 
       <main style={{ maxWidth: 960, margin: '0 auto', padding: '16px 20px 60px' }}>
         {loading && (
-          <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
+          <div role="status" aria-label="Cargando agenda" style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
             <svg style={{ animation: 'agenda-spin 1s linear infinite', color: D.textMuted }}
               width="24" height="24" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2">
@@ -340,13 +336,14 @@ export function AgendaClient() {
         )}
 
         {!loading && error && (
-          <div style={{
+          <div role="alert" style={{
             padding: 20, borderRadius: 12,
             background: 'rgba(239,68,68,0.08)',
             border: '0.5px solid rgba(239,68,68,0.25)',
-            color: '#FCA5A5', fontSize: 13,
+            color: '#9b2c2c', fontSize: 13,
           }}>
             No pudimos cargar la agenda. Intenta de nuevo en unos segundos.
+            <button type="button" style={{...navBtn, display: 'block', marginTop: 12}} onClick={() => setRetry(r => r + 1)}>Reintentar</button>
           </div>
         )}
 
