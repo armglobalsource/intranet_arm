@@ -2,8 +2,9 @@ import { test, expect, type Page } from '@playwright/test';
 
 test.use({ baseURL: process.env.FICHA_UI_BASE_URL ?? 'http://localhost:3000', channel: process.env.FICHA_UI_BROWSER });
 
-async function fixture(page: Page, ownOnly = false) {
+async function fixture(page: Page, ownOnly = false, overrides: Record<string, unknown> = {}) {
   const report = { id: 'fixture-report', campusId: 1, campus: 'Santiago', tipo: 'encuentro', fecha: '2026-10-18', encuentro: 'Encuentro Domingo 11:00 hrs', modalidad: 'Presencial+Online', estado: 'enviado', observacion: '', asistencia: { auditorio: 35 }, totalAsistencia: 35, totalVoluntarios: 4, registradoPor: { uid: 7, email: 'author@example.test' } };
+  Object.assign(report, overrides);
   const calls: { method: string; path: string; body: any }[] = [];
   await page.addInitScript((ownOnly) => localStorage.setItem('auth-storage', JSON.stringify({ version: 0, state: { user: { id: ownOnly ? 7 : 8, firstName: 'Demo', lastName: 'ARM', campusId: ownOnly ? 1 : 2, permissions: ownOnly ? ['encuentros:create'] : [], status: 'active' }, accessToken: 'test-only', isAuthenticated: true } })), ownOnly);
   await page.route('**/api/v1/**', async (route) => {
@@ -74,6 +75,61 @@ for (const width of [320, 393, 834]) {
     expect(sent.online).toEqual({ acepto: 2, espectadores: 80 });
   });
 }
+
+for (const width of [320, 393, 834]) {
+  test(`oración ${width}px: formulario específico, totales y responsables`, async ({page}) => {
+    const calls = await fixture(page, true);
+    await page.clock.setFixedTime(new Date('2026-10-28T15:00:00Z'));
+    await page.route('**/api/v1/campus', route => route.fulfill({json: [{id: 1, name: 'Santiago', isActive: true, schedules: [{dia: 'Miércoles', hora: '06:00', fichaType: 'oracion'}]}]}));
+    await page.setViewportSize({width, height: 852});
+    await page.goto('/dashboard/produccion-general/estadisticas/registrar');
+    await page.getByLabel('Fecha', {exact: true}).fill('2026-10-21');
+    await page.getByRole('combobox', {name: 'Encuentro', exact: true}).selectOption('Encuentro Oración Miércoles 06:00 hrs');
+    await expect(page.getByRole('region', {name: 'Formato de oración'})).toBeVisible();
+    await expect(page.getByLabel('Predicador', {exact: true})).toHaveCount(0);
+    await expect(page.getByLabel('Niños y niñas de Kids', {exact: true})).toHaveCount(0);
+    await expect(page.getByRole('heading', {name: 'Decisiones', exact: true})).toHaveCount(0);
+    await page.getByRole('combobox', {name: 'Modalidad', exact: true}).selectOption('Presencial+Online');
+    await page.getByLabel('Auditorio', {exact: true}).fill('21');
+    for (const [label, count] of [['Oradores',5],['Servicio',7],['Técnica',18],['Worship',4],['Cocina',1],['Redes sociales',2],['Seguridad',2]] as const) {
+      await page.getByLabel(label, {exact: true}).fill(String(count));
+    }
+    await page.getByLabel('Total online (espectadores)', {exact: true}).fill('362');
+    await page.getByLabel('Líderes de voluntarios', {exact: true}).fill('Iván Cifuentes y Nattaly Medina');
+    await page.getByRole('textbox', {name: 'Administradores de campus', exact: true}).fill('Miguel Castros & Paula Muñoz; Ghislaine Rivera & César Letelier');
+    const summary = page.getByRole('region', {name: 'Resumen del reporte'});
+    await expect(summary.locator('div').filter({has: page.locator('dt', {hasText: /^Total presencial$/})}).locator('dd')).toHaveText('60');
+    await expect(summary.locator('div').filter({has: page.locator('dt', {hasText: /^Total online$/})}).locator('dd')).toHaveText('362');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({path: `test-results/stats-oracion-${width}.png`, fullPage: true});
+    await page.getByRole('button', {name: 'Guardar registro', exact: true}).click();
+    await expect(page.getByRole('status').filter({hasText: 'Reporte enviado:'})).toBeVisible();
+    const sent = calls.find(c => c.method === 'POST' && c.path === '/encuentros')?.body;
+    expect(sent.asistencia).toEqual({auditorio: 21});
+    expect(sent.voluntarios).toEqual({oradores: 5, servicio: 7, tecnica: 18, worship: 4, cocina: 1, rrss: 2, seguridad: 2});
+    expect(sent.online.espectadores).toBe(362);
+    expect(sent.lideres).toContain('Nattaly Medina');
+    expect(sent.adm).toContain('Ghislaine Rivera');
+  });
+}
+
+test('oración: editar un reporte conserva datos adicionales y responsables ya registrados', async ({page}) => {
+  const calls = await fixture(page, true, {fecha: '2026-10-21', encuentro: 'Encuentro Oración Miércoles 06:00 hrs',
+    asistencia: {auditorio: 21, kids: 4}, presencial: {acepto: 2}, lideres: 'Líder anterior', adm: 'Administrador anterior'});
+  await page.goto('/dashboard/produccion-general/estadisticas/registrar?editar=fixture-report');
+  await expect(page.getByRole('heading', {name: 'Editar registro'})).toBeVisible();
+  await expect(page.getByLabel('Niños y niñas de Kids', {exact: true})).toHaveValue('4');
+  await expect(page.getByLabel('Aceptaron a Jesús (presencial)', {exact: true})).toHaveValue('2');
+  await expect(page.getByLabel('Líderes de voluntarios', {exact: true})).toHaveValue('Líder anterior');
+  await page.getByRole('textbox', {name: 'Administradores de campus', exact: true}).fill('Administrador actualizado');
+  await page.getByRole('button', {name: 'Guardar cambios', exact: true}).click();
+  await expect(page.getByRole('status').filter({hasText: 'Cambios guardados:'})).toBeVisible();
+  const sent = calls.find(c => c.method === 'PATCH' && c.path === '/encuentros/fixture-report')?.body;
+  expect(sent.asistencia).toEqual({auditorio: 21, kids: 4});
+  expect(sent.presencial.acepto).toBe(2);
+  expect(sent.lideres).toBe('Líder anterior');
+  expect(sent.adm).toBe('Administrador actualizado');
+});
 
 test('editar desde revisión muestra el campus del reporte aunque el revisor pertenezca a otro', async ({ page }) => {
   await fixture(page);

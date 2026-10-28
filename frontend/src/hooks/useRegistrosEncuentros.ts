@@ -18,6 +18,8 @@ export interface RegistroEncuentro {
   modalidad?: string;
   predicador?: string;
   mensaje?: string;
+  lideres?: string;
+  adm?: string;
   eventoNombre?: string;
   eventoDesc?: string;
   eventoHorario?: string;

@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { apiErrorMessage } from '@/lib/api';
 import { useAllCampuses } from '@/hooks/useCampus';
 import { useActiveArmCatalogos } from '@/hooks/useArmCatalogos';
+import { isPrayerReport } from '@/lib/encuentro-report';
 import { useRevisarRegistro, useRevision, type RegistroEncuentro } from '@/hooks/useRegistrosEncuentros';
 
 function longDate(fecha: string) {
@@ -23,7 +24,7 @@ function Breakdown({ title, values, labels, total }: { title: string; values?: R
       <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">{title} · {total ?? 0}</p>
       {entries.length ? (
         <ul className="flex flex-wrap gap-1.5">
-          {entries.map(([k, v]) => <li key={k} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{labels.get(k) ?? k}: <strong>{v}</strong></li>)}
+          {entries.map(([k, v]) => <li key={k} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{labels.get(k) ?? (k === 'oradores' ? 'Oradores' : k)}: <strong>{v}</strong></li>)}
         </ul>
       ) : <p className="text-xs text-slate-400">Sin datos</p>}
     </div>
@@ -36,6 +37,7 @@ function ReporteCard({ r, campusName, labels }: { r: RegistroEncuentro; campusNa
   const [observacion, setObservacion] = useState('');
   const [error, setError] = useState<string | null>(null);
   const aceptaron = (r.presencial?.acepto ?? 0) + (r.online?.acepto ?? 0);
+  const prayer = isPrayerReport(r.tipo, r.encuentro);
 
   async function accion(tipo: 'subir' | 'observar') {
     setError(null);
@@ -72,14 +74,16 @@ function ReporteCard({ r, campusName, labels }: { r: RegistroEncuentro; campusNa
         <Breakdown title="Asistencia" values={r.asistencia} labels={labels.asistencia} total={r.totalAsistencia} />
         <Breakdown title="Voluntarios" values={r.voluntarios} labels={labels.voluntarios} total={r.totalVoluntarios} />
         <div>
-          <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Decisiones · {aceptaron}</p>
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">{prayer ? 'Totales del reporte' : `Decisiones · ${aceptaron}`}</p>
+          {prayer ? <p className="text-xs text-slate-700">Total presencial: <strong>{(r.totalAsistencia ?? 0) + (r.totalVoluntarios ?? 0)}</strong>{/online|virtual/i.test(r.modalidad ?? '') && <> · Total online: <strong>{r.online?.espectadores ?? 0}</strong></>}{aceptaron > 0 && <> · Aceptaron: <strong>{aceptaron}</strong></>}</p> :
           <p className="text-xs text-slate-700">
             Presencial: <strong>{r.presencial?.acepto ?? 0}</strong>
             {(r.online?.acepto || r.online?.espectadores) ? <> · Online: <strong>{r.online?.acepto ?? 0}</strong> · Espectadores: <strong>{r.online?.espectadores ?? 0}</strong></> : null}
-          </p>
+          </p>}
         </div>
       </div>
 
+      {(r.lideres || r.adm) && <div className="space-y-1 text-xs text-slate-600">{r.lideres && <p><strong>Líderes de voluntarios:</strong> {r.lideres}</p>}{r.adm && <p><strong>Administradores de campus:</strong> {r.adm}</p>}</div>}
       {r.registradoPor?.email && <p className="text-[11px] text-slate-400">Enviado por {r.registradoPor.email}</p>}
 
       {devolviendo && (

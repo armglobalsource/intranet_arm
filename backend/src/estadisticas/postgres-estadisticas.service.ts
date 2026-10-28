@@ -497,7 +497,7 @@ export class PostgresEstadisticasService {
     const labels = new Map(catalog.map((item) => [item.key, item.label]));
     const order = new Map(catalog.map((item, index) => [item.key, item.sortOrder ?? index]));
     return Object.entries(values)
-      .map(([key, value]) => ({ key, label: labels.get(key) ?? key, value }))
+      .map(([key, value]) => ({ key, label: labels.get(key) ?? (key === 'oradores' ? 'Oradores' : key), value }))
       .sort((a, b) => (order.get(a.key) ?? 999) - (order.get(b.key) ?? 999));
   }
 }

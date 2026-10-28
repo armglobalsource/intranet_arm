@@ -14,6 +14,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAllCampuses, type Campus } from '@/hooks/useCampus';
 import { useActiveArmCatalogos } from '@/hooks/useArmCatalogos';
+import { isPrayerReport, PRAYER_VOLUNTEERS, mergeReportFields } from '@/lib/encuentro-report';
 import {
   useEliminarRegistro, useGuardarRegistro, usePendientesReporte, useRegistrosRecientes, useRevision,
   type EncuentroPendiente, type RegistroEncuentro, type RegistroInput,
@@ -74,6 +75,9 @@ interface FormState {
   modalidad: string;
   predicador: string;
   mensaje: string;
+  lideres: string;
+  adm: string;
+  extra: boolean;
   eventoNombre: string;
   eventoHora: string;
   eventoDesc: string;
@@ -86,7 +90,7 @@ interface FormState {
 
 const emptyForm = (fecha = todayInSantiago()): FormState => ({
   key: newKey(), tipo: 'encuentro', fecha, encuentroSel: '', encuentroOtro: '', modalidad: 'Presencial',
-  predicador: '', mensaje: '', eventoNombre: '', eventoHora: '', eventoDesc: '',
+  predicador: '', mensaje: '', lideres: '', adm: '', extra: false, eventoNombre: '', eventoHora: '', eventoDesc: '',
   aceptoPresencial: '', aceptoOnline: '', espectadores: '', asistencia: {}, voluntarios: {},
 });
 
@@ -162,9 +166,17 @@ export function RegistrarEncuentroClient() {
 
   const opciones = useMemo(() => encuentrosDelDia(campus, form.fecha), [campus, form.fecha]);
   const horaSel = opciones.find((o) => o.label === form.encuentroSel)?.hora;
-  const sugerido = usePredicadorDeFicha(form.tipo === 'encuentro' ? campus?.id : undefined, form.fecha, horaSel);
+  const encuentroLabel = form.encuentroSel === OTRO ? form.encuentroOtro.trim() : form.encuentroSel;
+  const prayer = isPrayerReport(form.tipo, encuentroLabel);
+  const savedExtras = !!(form.predicador || form.mensaje || Number(form.aceptoPresencial) || Number(form.aceptoOnline)
+    || Object.entries(form.asistencia).some(([k,v]) => k !== 'auditorio' && Number(v) > 0)
+    || Object.entries(form.voluntarios).some(([k,v]) => !PRAYER_VOLUNTEERS.some(c => c.key === k) && Number(v) > 0));
+  const fullReport = !prayer || form.extra || savedExtras;
+  const displayedAsistencia = prayer ? (fullReport ? mergeReportFields([{key: 'auditorio', label: 'Auditorio'}], asistenciaKeys) : [{key: 'auditorio', label: 'Auditorio'}]) : asistenciaKeys;
+  const displayedVoluntarios = prayer ? (fullReport ? mergeReportFields(voluntariosKeys, PRAYER_VOLUNTEERS) : PRAYER_VOLUNTEERS) : voluntariosKeys;
+  const sugerido = usePredicadorDeFicha(form.tipo === 'encuentro' && !prayer ? campus?.id : undefined, form.fecha, horaSel);
   useEffect(() => {
-    if (sugerido && !form.predicador) set({ predicador: sugerido.predicador });
+    if (sugerido && !form.predicador && !prayer) set({ predicador: sugerido.predicador });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sugerido?.predicador]);
 
@@ -212,7 +224,6 @@ export function RegistrarEncuentroClient() {
   const eliminar = useEliminarRegistro();
 
   const online = /online|virtual/i.test(form.modalidad);
-  const encuentroLabel = form.encuentroSel === OTRO ? form.encuentroOtro.trim() : form.encuentroSel;
   const eventoLabel = form.eventoNombre.trim() ? `${form.eventoNombre.trim()}${form.eventoHora ? ` ${form.eventoHora} hrs` : ''}` : '';
   const yaRegistrado = form.tipo === 'encuentro' && !form.id && (registros.data ?? []).some((r) =>
     r.tipo !== 'evento' && String(r.fecha).slice(0, 10) === form.fecha && r.encuentro.trim().toLowerCase() === encuentroLabel.toLowerCase());
@@ -232,6 +243,7 @@ export function RegistrarEncuentroClient() {
       encuentroSel: r.tipo === 'encuentro' ? (known ? r.encuentro : OTRO) : '',
       encuentroOtro: r.tipo === 'encuentro' && !known ? r.encuentro : '',
       modalidad: r.modalidad || 'Presencial', predicador: r.predicador ?? '', mensaje: r.mensaje ?? '',
+      lideres: r.lideres ?? '', adm: r.adm ?? '',
       eventoNombre: (r.eventoNombre ?? '').replace(/\s*\d{2}:\d{2} hrs$/, ''), eventoHora: horaEvento, eventoDesc: r.eventoDesc ?? '',
       aceptoPresencial: String(r.presencial?.acepto ?? ''), aceptoOnline: String(r.online?.acepto ?? ''), espectadores: String(r.online?.espectadores ?? ''),
       asistencia: asText(r.asistencia), voluntarios: asText(r.voluntarios),
@@ -261,6 +273,7 @@ export function RegistrarEncuentroClient() {
     const payload: RegistroInput = {
       tipo: form.tipo, campus: campus.name, fecha: form.fecha,
       modalidad: form.modalidad, predicador: form.predicador.trim(), mensaje: form.mensaje.trim(),
+      lideres: form.lideres.trim(), adm: form.adm.trim(),
       ...(form.tipo === 'encuentro'
         ? { encuentro: encuentroLabel }
         : { encuentro: eventoLabel, eventoNombre: eventoLabel, eventoHorario: eventoLabel, eventoDesc: form.eventoDesc.trim() }),
@@ -397,13 +410,13 @@ export function RegistrarEncuentroClient() {
                 {MODALIDADES.map((m) => <option key={m} value={m}>{m === 'Presencial+Online' ? 'Presencial + Online' : m}</option>)}
               </select>
             </label>
-            <label className={labelCls}>Predicador
+            {fullReport && <><label className={labelCls}>Predicador
               <input className={inputCls} value={form.predicador} onChange={(e) => set({ predicador: e.target.value })} />
               {sugerido && <span className="text-[11px] font-normal text-slate-500">Según la ficha «{sugerido.ficha}»</span>}
             </label>
             <label className={labelCls}>Mensaje
               <input className={inputCls} value={form.mensaje} onChange={(e) => set({ mensaje: e.target.value })} placeholder="Título del mensaje" />
-            </label>
+            </label></>}
             {form.tipo === 'evento' && (
               <label className={`${labelCls} sm:col-span-2 lg:col-span-3`}>Descripción
                 <input className={inputCls} value={form.eventoDesc} onChange={(e) => set({ eventoDesc: e.target.value })} />
@@ -418,24 +431,36 @@ export function RegistrarEncuentroClient() {
           )}
         </section>
 
+        {prayer && <section aria-label="Formato de oración" className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <h2 className="font-bold text-slate-900">Reporte de oración</h2>
+          <p className="text-xs text-slate-600">Auditorio, voluntarios, participación online y responsables del campus.</p>
+          <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={fullReport} disabled={savedExtras} onChange={e => set({extra: e.target.checked})} />Mostrar campos adicionales</label>
+          {savedExtras && <p className="text-xs text-slate-500">Hay datos adicionales ingresados; se mantienen visibles para que puedas revisarlos.</p>}
+        </section>}
+
         <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-bold text-slate-900">Asistencia</h2>
             <span className="text-sm font-semibold text-slate-600">Total: {sum(form.asistencia)}</span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {asistenciaKeys.map((c) => numberInput(form.asistencia[c.key] ?? '', (v) => set({ asistencia: { ...form.asistencia, [c.key]: v } }), c.label))}
+            {displayedAsistencia.map((c) => numberInput(form.asistencia[c.key] ?? '', (v) => set({ asistencia: { ...form.asistencia, [c.key]: v } }), c.label))}
           </div>
+          <p className="text-xs text-slate-500">Cuenta aquí a los asistentes. Los voluntarios se registran por separado para no duplicarlos.</p>
         </section>
 
-        <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+        {fullReport && <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <h2 className="font-bold text-slate-900">Decisiones</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {numberInput(form.aceptoPresencial, (v) => set({ aceptoPresencial: v }), 'Aceptaron a Jesús (presencial)')}
             {online && numberInput(form.aceptoOnline, (v) => set({ aceptoOnline: v }), 'Aceptaron a Jesús (online)')}
-            {online && numberInput(form.espectadores, (v) => set({ espectadores: v }), 'Espectadores online')}
           </div>
-        </section>
+        </section>}
+
+        {online && <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+          <h2 className="font-bold text-slate-900">Participación online</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{numberInput(form.espectadores, v => set({espectadores: v}), prayer ? 'Total online (espectadores)' : 'Espectadores online')}</div>
+        </section>}
 
         <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <div className="flex items-baseline justify-between gap-3">
@@ -443,7 +468,27 @@ export function RegistrarEncuentroClient() {
             <span className="text-sm font-semibold text-slate-600">Total: {sum(form.voluntarios)}</span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-            {voluntariosKeys.map((c) => numberInput(form.voluntarios[c.key] ?? '', (v) => set({ voluntarios: { ...form.voluntarios, [c.key]: v } }), c.label))}
+            {displayedVoluntarios.map((c) => numberInput(form.voluntarios[c.key] ?? '', (v) => set({ voluntarios: { ...form.voluntarios, [c.key]: v } }), c.label))}
+          </div>
+        </section>
+
+        <section aria-label="Resumen del reporte" className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+          <h2 className="font-bold text-slate-900">Resumen del reporte</h2>
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              ['Asistentes', sum(form.asistencia)], ['Voluntarios', sum(form.voluntarios)],
+              ['Total presencial', sum(form.asistencia) + sum(form.voluntarios)],
+              ...(online ? [['Total online', toNum(form.espectadores) ?? 0]] : []),
+            ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white p-3"><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{value}</dd></div>)}
+          </dl>
+          <p className="text-xs text-slate-600">Total presencial = asistentes + voluntarios. Registra a cada voluntario una sola vez, en su área principal. La participación online se muestra por separado.</p>
+        </section>
+
+        <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+          <h2 className="font-bold text-slate-900">Responsables del campus</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={labelCls}>Líderes de voluntarios<input className={inputCls} value={form.lideres} onChange={e => set({lideres: e.target.value})} placeholder="Nombres de los líderes" /></label>
+            <label className={labelCls}>Administradores de campus<textarea className={inputCls} value={form.adm} onChange={e => set({adm: e.target.value})} placeholder="Nombres de los administradores" rows={2} /></label>
           </div>
         </section>
 

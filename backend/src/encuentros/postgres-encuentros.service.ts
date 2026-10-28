@@ -147,7 +147,7 @@ export class PostgresEncuentrosService {
       eventoHorario:    isEvento ? (dto.eventoHorario ?? '') : '',
       // Objetos planos: los DTO anidados son instancias de clase (class-transformer)
       // y Firestore no serializa objetos con prototipo custom.
-      presencial:       { acepto: dto.presencial?.acepto ?? 0, total: dto.presencial?.total ?? 0 },
+      presencial:       { acepto: dto.presencial?.acepto ?? 0, total: sumCounts(dto.asistencia) + sumCounts(dto.voluntarios) },
       online:           { acepto: dto.online?.acepto ?? 0, espectadores: dto.online?.espectadores ?? 0 },
       asistencia:       { ...(dto.asistencia ?? {}) },
       voluntarios:      { ...(dto.voluntarios ?? {}) },
@@ -211,6 +211,13 @@ export class PostgresEncuentrosService {
     if (dto.voluntarios !== undefined) {
       data.voluntarios = { ...dto.voluntarios };
       data.totalVoluntarios = sumCounts(dto.voluntarios);
+    }
+    if (dto.presencial !== undefined || dto.asistencia !== undefined || dto.voluntarios !== undefined) {
+      data.presencial = {
+        ...(current.presencial ?? {}), ...(data.presencial ?? {}),
+        total: (data.totalAsistencia ?? current.totalAsistencia ?? sumCounts(current.asistencia))
+          + (data.totalVoluntarios ?? current.totalVoluntarios ?? sumCounts(current.voluntarios)),
+      };
     }
 
     // Un reporte observado que corrige quien lo envió vuelve a quedar por revisar.

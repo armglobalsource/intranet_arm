@@ -25,6 +25,7 @@ export class AsistenciaDto {
 }
 
 export class VoluntariosDto {
+  @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) oradores?: number;
   @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) servicio?: number;
   @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) tecnica?: number;
   @IsOptional() @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) kids?: number;

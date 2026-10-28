@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PostgresEncuentrosService } from './postgres-encuentros.service';
 import { inMonth, inPeriodo } from '../common/arm-records.util';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { CreateEncuentroDto } from './dto/encuentro.dto';
 
 const author = { sub: 7, email: 'author@example.test', campusId: 1, permissions: ['encuentros:create'] };
 const reviewer = { sub: 8, email: 'reviewer@example.test', campusId: 1, permissions: ['encuentros:review'] };
@@ -8,13 +11,28 @@ const campus = { id: 1, name: 'Santiago', isActive: true, adminIds: [8] };
 function fixture(extra = {}) {
   const record: any = { id: 'r1', fichaId: 'r1', campusId: 1, campus: 'Santiago', fecha: '2021-09-05', tipo: 'encuentro', encuentro: 'Domingo 11:00', estado: 'enviado', registradoPor: { uid: 7 }, totalAsistencia: 30, ...extra };
   const store = { find: vi.fn(async () => ({ ...record })), list: vi.fn(async () => [{ ...record }]),
-    update: vi.fn(async (_table, _id, data) => Object.assign(record, data)), remove: vi.fn() };
+    update: vi.fn(async (_table, _id, data) => Object.assign(record, data)), remove: vi.fn(),
+    create: vi.fn(async (_table, data) => { Object.assign(record, data); return {id: 'r1'}; }) };
   const notifications = { create: vi.fn(async () => ({})), createForCampusPermission: vi.fn(async () => ({})) };
   const api = new PostgresEncuentrosService(store as any, { findOne: async () => campus, findAll: async () => [campus] } as any, notifications as any);
   return { api, store, record, notifications };
 }
 
 describe('revisión y sumas de encuentros', () => {
+  it('valida oradores y calcula 60 presenciales sin mezclar los 362 online', async () => {
+    const {api, record} = fixture();
+    const dto = plainToInstance(CreateEncuentroDto, {tipo: 'encuentro', campus: 'Santiago', fecha: '2026-10-21',
+      encuentro: 'Encuentro Oración Miércoles 06:00 hrs', modalidad: 'Presencial+Online',
+      asistencia: {auditorio: 21}, voluntarios: {oradores: 5, servicio: 7, tecnica: 18, worship: 4, cocina: 1, rrss: 2, seguridad: 2},
+      presencial: {total: 999}, online: {espectadores: 362}, lideres: 'Iván Cifuentes y Nattaly Medina', adm: 'Administradores de Santiago'});
+    expect(await validate(dto, {whitelist: true, forbidNonWhitelisted: true})).toEqual([]);
+    await api.create(dto, author);
+    expect(record).toMatchObject({totalAsistencia: 21, totalVoluntarios: 39, presencial: {total: 60}, online: {espectadores: 362}, voluntarios: {oradores: 5}, lideres: dto.lideres, adm: dto.adm});
+    await api.update('r1', {voluntarios: {...dto.voluntarios, servicio: 8}}, author);
+    expect(record.presencial.total).toBe(61);
+    expect(record.totalAsistencia).toBe(21);
+    expect(record.online.espectadores).toBe(362);
+  });
   it('no suma pendientes: devolver, corregir y subir conserva las cifras y la trazabilidad', async () => {
     const { api, record, notifications } = fixture();
     expect((await api.resumen('Santiago', 2021, 9)).encuentros.count).toBe(0);
