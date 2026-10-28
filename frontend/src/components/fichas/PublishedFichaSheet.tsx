@@ -2,15 +2,14 @@ import React from 'react';
 import type { Ficha, Row, SectionName } from '@/types/ficha';
 import type { Paleta } from '@/hooks/usePaletas';
 import { hasContent, momentTree } from '@/lib/ficha-timing';
+import { parseSetListEntry } from '@/lib/ficha-setlist';
 
 function value(row: Row, id: string) { return (row.shared ? row.values?.shared ?? row.values?.[id] : row.values?.[id])?.trim() ?? ''; }
 function song(row: Row, id: string) {
   const raw = value(row, id);
-  try {
-    const s = JSON.parse(raw);
-    if (!s || typeof s !== 'object') return raw;
-    return <span className="sheet-song"><span>{s.titulo}{s.cantante && <small>{s.cantante}</small>}</span>{s.tonalidad && <b className="sheet-key">{s.tonalidad}</b>}</span>;
-  } catch { return raw; }
+  const s = parseSetListEntry(row, raw);
+  const moment = row.type !== 'song';
+  return <span className={`sheet-song${moment ? ' sheet-moment' : ''}`}><span>{moment && <small className="sheet-moment-label">Momento</small>}{s.titulo}{s.cantante && <small>{s.cantante}</small>}</span>{!moment && s.tonalidad && <b className="sheet-key">{s.tonalidad}</b>}</span>;
 }
 function pairs(rows: Row[]) { const result: Row[][] = []; for (let i = 0; i < rows.length; i += 2) result.push(rows.slice(i, i + 2)); return result; }
 
@@ -38,7 +37,7 @@ export function PublishedFichaSheet({ ficha, colId, hidden, order, paletas }: {
     anuncios: table('Información especial', assigned('anuncios')),
     voluntarios: grid('Voluntarios', assigned('voluntarios')),
     worship: band.length || positions.length || songs.length || outfit.length ? <table className="sheet-worship"><caption>AR Worship / Banda</caption><colgroup>{[20,30,25,25].map((width,i) => <col key={i} style={{width: `${width}%`}} />)}</colgroup><tbody>
-      {positions.length > 0 && <tr><td colSpan={4}><div className="sheet-positions">{positions.map(r => <div key={r.id}><b>{r.label}</b><span>{value(r,colId)}</span></div>)}</div></td></tr>}
+      {positions.length > 0 && <tr><td colSpan={4}><div className="sheet-positions">{positions.map((r,i) => <div key={r.id}><b className="sheet-position-circle" aria-hidden="true">{i + 1}</b><b>{r.label}</b><span>{value(r,colId)}</span></div>)}</div></td></tr>}
       <tr className="sheet-subhead"><th colSpan={2}>Equipo</th><th colSpan={2}>Canciones · Set list</th></tr>
       {Array.from({length: Math.max(band.length,songs.length)}, (_, i) => <tr key={i}><th>{band[i]?.label ?? ''}</th><td>{band[i] ? value(band[i],colId) : ''}</td><td colSpan={2}>{songs[i] && <div className="sheet-song-row"><span className="sheet-song-number">{String(i+1).padStart(2,'0')}</span>{songs[i]}</div>}</td></tr>)}
       {outfit.length > 0 && <tr><th>Outfit</th><td colSpan={3}>{outfit.join(' · ')}</td></tr>}

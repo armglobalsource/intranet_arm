@@ -6,6 +6,15 @@ const next: RowAssignment = { mode: 'people', people: [{ userId: 2, name: 'Juan'
 const row: Row = { id: 'r', label: 'Sonido', type: 'person', order: 0, required: true, shared: true, values: { shared: 'Ana' }, assignments: { shared: old } };
 const encounters = ['09:00', '11:00', '17:00'].map((time, i) => ({ id: `e${i}`, time, label: time, color: '#111', isLive: false }));
 describe('alcance de las asignaciones', () => {
+  it('conserva el título de un momento del set list al asignar y renombrar', () => {
+    const moment: Row = {...row, type: 'text', label: 'Bienvenida', values: {shared: '{"titulo":"Bienvenida","cantante":"Ana"}'}};
+    const r = editAssignmentCell(moment, 'setList', 'shared', moment.values.shared, encounters, {assignment: next, scope: 'all', encounterId: 'e0'});
+    expect(JSON.parse(r.values.shared)).toMatchObject({titulo: 'Bienvenida', cantante: 'Juan / María · Apoyo'});
+    const renamed = editAssignmentCell(r, 'setList', 'shared', JSON.stringify({...JSON.parse(r.values.shared), titulo: 'Bienvenida al campus'}), encounters);
+    expect(renamed.assignments?.shared).toEqual(next);
+    const legacy = editAssignmentCell({...moment, type: 'person', values: {shared: 'Ana'}}, 'setList', 'shared', 'Ana', encounters, {assignment: next, scope: 'all', encounterId: 'e0'});
+    expect(JSON.parse(legacy.values.shared)).toMatchObject({titulo: 'Bienvenida', cantante: 'Juan / María · Apoyo'});
+  });
   it('crea excepción de un encuentro sin modificar el resto', () => {
     const r = editAssignmentCell(row, 'produccion', 'shared', 'Juan / María · Apoyo', encounters, { assignment: next, scope: 'current', encounterId: 'e1' });
     expect(r.shared).toBe(false);

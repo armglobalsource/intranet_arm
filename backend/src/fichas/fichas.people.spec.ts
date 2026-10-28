@@ -14,6 +14,14 @@ const normalize = (rows: any[], old: any[] = [], conn: any = db(), global = fals
 const enc = (id: string) => ({ id, label: id, time: '11:00', isLive: false, color: '#111' });
 
 describe('asignaciones vinculadas', () => {
+  it('conserva el título de un momento del set list en filas de texto y persona antiguas', async () => {
+    const moment = {...row(), label: 'Bienvenida', type: 'text', values: {shared: '{"titulo":"Bienvenida","cantante":"Falso"}'}};
+    await normalize([moment], [], db(), false, 'setList');
+    expect(JSON.parse(moment.values.shared)).toEqual({titulo: 'Bienvenida', cantante: 'Ana Pérez'});
+    const legacy = {...row(), label: 'Bienvenida', values: {shared: 'Nombre antiguo'}};
+    await normalize([legacy], [], db(), false, 'setList');
+    expect(JSON.parse(legacy.values.shared)).toEqual({titulo: 'Bienvenida', cantante: 'Ana Pérez'});
+  });
   it('valida personas manuales por campus y guarda el tratamiento con el nombre confiable', async () => {
     const id = '86ae332e-7b26-41cf-94f0-352284b090d8';
     const conn = { query: vi.fn().mockResolvedValue({ rows: [{ id, name: 'Eve', campus_id: 1 }] }) };

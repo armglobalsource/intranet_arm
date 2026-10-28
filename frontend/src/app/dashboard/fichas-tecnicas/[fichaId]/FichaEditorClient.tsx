@@ -560,7 +560,8 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
           label,
           type,
           shared,
-          values:   {},
+          values: sectionName === 'setList' ? Object.fromEntries((shared ? ['shared'] : (ficha?.encuentros ?? []).map(e => e.id))
+            .map(key => [key, JSON.stringify({titulo: label, tonalidad: '', cantante: ''})])) : {},
           order:    rows.length,
           required: false,
         };
@@ -569,7 +570,7 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         return { ...prev, [sectionName]: updated };
       });
     },
-    [scheduleSave],
+    [scheduleSave, ficha?.encuentros],
   );
 
   // ── Eliminar fila ──────────────────────────────────────────────────────────

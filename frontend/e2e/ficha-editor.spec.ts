@@ -424,6 +424,35 @@ test.describe('operación táctil', () => {
 });
 
 
+test('set list: agregar un momento conserva título, responsable y orden al recargar', async ({page}) => {
+  const {ficha, writes} = await fixture(page);
+  ficha.hiddenSections = ficha.hiddenSections.filter(s => s !== 'setList');
+  ficha.sections.setList.rows = [{...makeRow('lavado', 'Lavado', 0, '{"titulo":"Lavado","tonalidad":"B"}'), type: 'song'}] as any;
+  await page.setViewportSize({width: 393, height: 852});
+  await page.goto(url);
+  const block = page.locator('[data-ficha-slot="worship"]');
+  const setlist = block.locator('.ficha-worship-setlist');
+  await setlist.getByRole('button', {name: 'Agregar fila'}).click();
+  await setlist.getByPlaceholder('Nombre de la canción o momento…').fill('Bienvenida');
+  await setlist.getByLabel('Tipo de fila').selectOption('text');
+  await setlist.getByRole('button', {name: 'Agregar', exact: true}).click();
+  await expect(block.getByLabel('Nombre del momento')).toHaveValue('Bienvenida');
+  await block.getByRole('button', {name: 'Asignar personas: Bienvenida'}).click();
+  await page.getByRole('dialog').getByRole('checkbox').first().check();
+  await page.getByRole('button', {name: 'Aplicar asignación'}).click();
+  await expect.poll(() => {
+    const rows = writes.filter(w => w.path.endsWith('/sections/setList')).at(-1)?.body.rows;
+    return rows && JSON.parse(rows.at(-1).values.unico);
+  }).toMatchObject({titulo: 'Bienvenida', cantante: 'Ana Pérez'});
+  await page.reload();
+  await expect(block.getByLabel('Nombre del momento')).toHaveValue('Bienvenida');
+  await expect(block.getByRole('button', {name: 'Asignar personas: Bienvenida'})).toContainText('Ana Pérez');
+  await page.goto('/ficha/ui-fixture');
+  await expect(page.locator('.sheet-moment')).toContainText('Bienvenida');
+  await expect(page.locator('.sheet-moment')).toContainText('Ana Pérez');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 for (const width of [320, 393, 834, 1366]) {
   test(`ficha publicada ${width}px: hoja completa, zoom y columnas estables`, async ({ page }) => {
     const { ficha, writes } = await fixture(page);

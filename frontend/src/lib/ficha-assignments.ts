@@ -1,4 +1,5 @@
 import type { AssignmentEdit, Encuentro, Row, RowAssignment, SectionName } from '@/types/ficha';
+import { parseSetListEntry } from './ficha-setlist';
 
 export const ASSIGNMENT_LABELS: Record<RowAssignment['mode'], string> = {
   people: 'Personas del directorio', pending: 'Por confirmar', fixed: 'Fija',
@@ -8,10 +9,12 @@ export function assignmentText(a: RowAssignment) {
   return [a.mode === 'people' ? a.people.map(p => [p.title, p.name].filter(Boolean).join(' ')).join(' / ') : ASSIGNMENT_LABELS[a.mode], a.note].filter(Boolean).join(' · ');
 }
 function personValue(value: string, section: SectionName, row: Row) {
+  if (section === 'setList') return parseSetListEntry(row, value).cantante ?? '';
   if (section !== 'horarios' && row.type !== 'song') return value;
   try { return JSON.parse(value || '{}')[section === 'horarios' ? 'responsable' : 'cantante'] ?? ''; } catch { return ''; }
 }
 function writePerson(value: string, text: string, section: SectionName, row: Row) {
+  if (section === 'setList') return JSON.stringify({...parseSetListEntry(row, value), cantante: text});
   if (section !== 'horarios' && row.type !== 'song') return text;
   let data = {};
   try { data = JSON.parse(value || '{}'); } catch { /* legacy fields are upgraded by the editor */ }

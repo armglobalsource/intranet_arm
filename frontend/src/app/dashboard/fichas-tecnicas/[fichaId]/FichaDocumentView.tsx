@@ -7,6 +7,7 @@ import { SECTION_LABELS } from '@/types/ficha';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { SongLibraryDialog } from '@/components/fichas/SongLibraryDialog';
 import { SongInput } from '@/components/fichas/SongInput';
+import { parseSetListEntry } from '@/lib/ficha-setlist';
 import { FichaPaperViewport } from '@/components/fichas/FichaPaperViewport';
 import { PublishedFichaSheet } from '@/components/fichas/PublishedFichaSheet';
 import { LayoutVisualView } from './LayoutVisualView';
@@ -267,16 +268,17 @@ function AddRowInline({ sectionName, onAdd }: {
           if (e.key === 'Enter') submit();
           if (e.key === 'Escape') { setOpen(false); setLabel(''); }
         }}
-        placeholder="Nombre de la fila…"
+        placeholder={sectionName === 'setList' ? 'Nombre de la canción o momento…' : 'Nombre de la fila…'}
         style={{ ...inputStyle, flex: 1, minWidth: 100 }}
       />
       <select
         value={type}
+        aria-label="Tipo de fila"
         onChange={(e) => setType(e.target.value as Row['type'])}
         style={{ ...inputStyle, padding: '3px 5px' }}
       >
-        <option value="person">Persona</option>
-        <option value="text">Texto</option>
+        {sectionName !== 'setList' && <option value="person">Persona</option>}
+        <option value="text">{sectionName === 'setList' ? 'Momento (bienvenida, oración…)' : 'Texto'}</option>
         <option value="song">Canción</option>
       </select>
       <button onClick={submit} style={{
@@ -735,13 +737,16 @@ function SongRowCell({
   singers?: string[];
 }) {
   const raw    = rawVal(row, colId);
-  const data   = parseSongData(raw);
+  const isMoment = row.type !== 'song';
+  const data: SongData = parseSetListEntry(row, raw);
   const eColId = effectiveColId(row, colId);
 
   const [editingKey, setEditingKey] = useState(false);
   const [showSong, setShowSong] = useState(false);
   const signedIn = useAuthStore(state => state.isAuthenticated);
   const [keyDraft,   setKeyDraft]   = useState(data.tonalidad);
+  const [momentTitle, setMomentTitle] = useState(data.titulo);
+  useEffect(() => { setMomentTitle(data.titulo); }, [data.titulo]);
 
   useEffect(() => { setKeyDraft(data.tonalidad); }, [data.tonalidad]);
 
@@ -780,15 +785,19 @@ function SongRowCell({
 
   return (
     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {isMoment && <span style={{fontSize: 10, color: D.textSecond, fontWeight: 700}}>MOMENTO</span>}
       {/* Fila principal: título + tipo/bpm + tonalidad */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <SongInput
+          {isMoment ? <input aria-label="Nombre del momento" value={momentTitle} placeholder="Ej. Bienvenida"
+            onChange={e => setMomentTitle(e.target.value)} onBlur={() => update({titulo: momentTitle.trim()})}
+            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+            style={{width: '100%', minWidth: 0, fontSize: 13, padding: '4px 2px', border: 'none', borderBottom: `1px dashed ${D.cardBorder}`, background: 'transparent', color: D.textPrimary}} /> : <SongInput
             value={data.titulo}
             onChange={(titulo) => update({ titulo, cancionId: titulo === data.titulo ? data.cancionId : undefined, ...(titulo === data.titulo ? {} : {tonalidad: '', tipo: undefined, bpm: undefined}) })}
             onSongSelect={(c) => { if (c) update({ titulo: c.titulo, cancionId: c.cancionId, tonalidad: c.tonalidad || '', tipo: c.tipo, bpm: c.bpm }); }}
             placeholder="Nombre de la canción…"
-          />
+          />}
         </div>
 
         {/* Tipo + BPM (auto desde catálogo, no editable) */}
@@ -801,7 +810,7 @@ function SongRowCell({
         )}
 
         {/* Tonalidad — badge clickeable para editar */}
-        {editingKey ? (
+        {!isMoment && (editingKey ? (
           <input
             autoFocus
             value={keyDraft}
@@ -831,11 +840,11 @@ function SongRowCell({
             }}>
             {data.tonalidad || 'Key'}
           </button>
-        )}
+        ))}
       </div>
 
       {signedIn && data.cancionId && <div className="ficha-no-print"><button type="button" onClick={() => setShowSong(true)} style={{fontSize: 11, color: '#276b62', textDecoration: 'underline'}}>Letra y catálogo</button>{showSong && <SongLibraryDialog id={data.cancionId} onClose={() => setShowSong(false)} onUseKey={tonalidad => update({tonalidad})} />}</div>}
-      <PersonCellInput row={row} value={data.cantante} placeholder="Seleccionar cantante…"
+      <PersonCellInput row={row} value={data.cantante} placeholder={isMoment ? 'Seleccionar responsable…' : 'Seleccionar cantante…'}
         onChange={(v, assignment) => onCellChange?.(row.id, eColId, encodeSongData({ ...data, cantante: v }), assignment)}
         style={{ fontSize: 11, textAlign: 'left' }} />
 

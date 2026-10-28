@@ -61,9 +61,12 @@ export async function normalizeRowAssignments(rows: any[], oldRows: any[], encou
         return { userId: Number(user.id), name: user.name || `Usuario #${user.id}`, ...suffix };
       }) };
       const text = assignmentText(next[key]);
-      if (section === 'horarios' || row.type === 'song') {
+      if (section === 'horarios' || section === 'setList' || row.type === 'song') {
         let value: any;
-        try { value = JSON.parse(row.values[key] || '{}'); } catch { throw new BadRequestException('El momento o la canción necesita formato estructurado para asignar usuarios'); }
+        try { value = JSON.parse(row.values[key] || '{}'); } catch {
+          if (section === 'setList' && row.type !== 'song') value = { titulo: row.label };
+          else throw new BadRequestException('El momento o la canción necesita formato estructurado para asignar usuarios');
+        }
         if (!value || typeof value !== 'object' || Array.isArray(value)) throw new BadRequestException('Valor estructurado inválido');
         row.values[key] = JSON.stringify({ ...value, [section === 'horarios' ? 'responsable' : 'cantante']: text });
       } else row.values[key] = text;

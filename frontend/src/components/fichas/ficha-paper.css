@@ -43,6 +43,18 @@
 .published-sheet table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .published-sheet caption { text-align: left; background: #edf0f2; color: #303944; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 5px 8px; border-top: 1px solid #cbd1d7; border-bottom: 1px solid #dce0e5; }
 .published-sheet caption::before { content: counter(sheet-section, decimal-leading-zero); display: inline-block; margin-right: 9px; padding-right: 9px; border-right: 1px solid #b9c1ca; font-size: 9px; letter-spacing: .02em; color: #596573; }
+/* Area identity is limited to the title strip; the content stays white. */
+.published-sheet section { --area-bg: #edf0f2; --area-ink: #303944; --area-edge: #cbd1d7; }
+.published-sheet [data-block-id="pastoral"] { --area-bg: #f0ebf7; --area-ink: #594278; --area-edge: #d1c2e3; }
+.published-sheet [data-block-id="responsables"] { --area-bg: #e9eef4; --area-ink: #354d68; --area-edge: #bfccdb; }
+.published-sheet [data-block-id="streaming"] { --area-bg: #e7f0f7; --area-ink: #285779; --area-edge: #b9d2e3; }
+.published-sheet [data-block-id="produccion"] { --area-bg: #fff2df; --area-ink: #79511c; --area-edge: #e8d1ab; }
+.published-sheet [data-block-id="media"] { --area-bg: #e8f3f4; --area-ink: #2b6068; --area-edge: #b7d9dd; }
+.published-sheet [data-block-id="anuncios"] { --area-bg: #f8ece7; --area-ink: #7e4c3a; --area-edge: #e5c6b9; }
+.published-sheet [data-block-id="worship"] { --area-bg: #e6f2e9; --area-ink: #2d6342; --area-edge: #b6d5bf; }
+.published-sheet [data-block-id="voluntarios"] { --area-bg: #f5eee3; --area-ink: #755b31; --area-edge: #dfcfae; }
+.published-sheet caption { background: var(--area-bg); color: var(--area-ink); border-color: var(--area-edge); }
+.published-sheet caption::before { color: var(--area-ink); border-color: var(--area-edge); }
 .published-sheet th, .published-sheet td { border: 0; border-bottom: 1px solid #e8ebee; padding: 4px 8px; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-wrap; }
 .published-sheet th { font-weight: 700; color: #303944; background: #f8f9fa; }
 .published-sheet td { background: #fff; color: #424b57; }
@@ -50,8 +62,10 @@
 .published-sheet .sheet-pairs tr > :nth-child(3), .published-sheet .sheet-worship tr > td:last-child:not(:first-child) { border-left: 1px solid #e0e4e8; }
 .published-sheet .sheet-time { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sheet-positions { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 2px 0; }
-.sheet-positions > div { flex: 1 1 120px; display: grid; gap: 2px; }
+.sheet-positions > div { flex: 1 1 120px; display: grid; justify-items: center; text-align: center; gap: 3px; padding: 4px 0; }
 .sheet-positions b { font-size: 8px; color: #626c78; text-transform: uppercase; letter-spacing: .05em; }
+.sheet-positions .sheet-position-circle { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid #b9c4bd; border-radius: 50%; background: #fff; color: #3e5948; font-size: 11px; }
+.sheet-moment .sheet-moment-label { font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #596573; }
 .sheet-song-row { display: flex; align-items: baseline; gap: 8px; }
 .sheet-song-number { color: #6d7681; font-size: 8px; font-variant-numeric: tabular-nums; }
 .sheet-song { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex: 1; min-width: 0; font-weight: 600; }
