@@ -7,6 +7,7 @@ import { SECTION_LABELS } from '@/types/ficha';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { SongLibraryDialog } from '@/components/fichas/SongLibraryDialog';
 import { SongInput } from '@/components/fichas/SongInput';
+import { FichaPaperViewport } from '@/components/fichas/FichaPaperViewport';
 import { LayoutVisualView } from './LayoutVisualView';
 import { PersonCellInput, FichaPeopleContext } from '@/components/fichas/PersonCellInput';
 import { SortableSection, SortableRow, SortableFichaLayout, SortablePdfSections } from '@/components/fichas/FichaSortable';
@@ -2312,6 +2313,8 @@ function resolveSectionLayout(
 
 export interface FichaDocumentViewProps {
   ficha:  Ficha;
+  /** Fixed-width, scalable sheet for published/read-only views. */
+  documentMode?: boolean;
   onEdit?: () => void;
   onSave?: () => void;
   onArchive?: () => void;
@@ -2354,7 +2357,7 @@ export interface FichaDocumentViewProps {
 }
 
 export function FichaDocumentView({
-  ficha, onEdit, onSave, onArchive, onUnarchive, canArchive,
+  ficha, documentMode = false, onEdit, onSave, onArchive, onUnarchive, canArchive,
   onPublish, onUnpublish, canPublish, isPublishing,
   editable, forceShowAll, localSections, onCellChange, onAddRow, onDeleteRow, onLabelChange, onReorderRow, onRowPatch, onSectionComplete,
   sectionStatus, saveState, hiddenSections, modulesPanelOpen, onToggleModulesPanel, onToggleSection,
@@ -2524,11 +2527,12 @@ export function FichaDocumentView({
   const isSaving = saveState === 'saving';
   const isSaved  = saveState === 'saved';
   const isSaveError = saveState === 'error';
+  const paperMode = documentMode && !editable;
 
   return (
     <FichaPeopleContext.Provider value={{fichaId: ficha.fichaId, encuentros, currentId: colId}}>
     <div
-      className="ficha-doc-root"
+      className={`ficha-doc-root${paperMode ? ' ficha-document-mode' : ''}`}
       style={{ maxWidth: 980, margin: '0 auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
     >
       {/* ── Estilos globales y de impresión ── */}
@@ -2787,6 +2791,10 @@ export function FichaDocumentView({
       )}
 
       {/* Documento */}
+      <FichaPaperViewport enabled={paperMode} actions={<>
+        {onEdit && <button type="button" onClick={onEdit}>Editar ficha</button>}
+        <button type="button" onClick={handleShare}>{copied ? '¡Copiado!' : 'Compartir'}</button>
+      </>}>
       <div
         ref={docRef}
         className="ficha-doc ficha-sheet"
@@ -3389,6 +3397,7 @@ export function FichaDocumentView({
         </div>
 
       </div>
+      </FichaPaperViewport>
     </div>
     </FichaPeopleContext.Provider>
   );

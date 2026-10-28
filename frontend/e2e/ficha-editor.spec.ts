@@ -32,7 +32,7 @@ async function fixture(page: Page, permissions = ['*']) {
       } else Object.assign(ficha, body);
     }
     if (path.endsWith('/people/manual') && route.request().method() === 'POST') manualPeople.push({ manualId: '86ae332e-7b26-41cf-94f0-352284b090d8', name: route.request().postDataJSON().name, campusName: 'Santiago' });
-    const data = path.endsWith('/people/manual') ? manualPeople.at(-1) : path.endsWith('/canciones/song-1') ? song : path.endsWith('/canciones') ? (route.request().method() === 'POST' ? song : [song]) : path.endsWith('/changelog') ? [] : path.endsWith('/people') ? [...[{ userId: 10, name: 'Ana Pérez', campusName: 'Santiago' }, { userId: 11, name: 'Ana Pérez', campusName: 'Puente Alto' }], ...manualPeople].filter(p => p.name.toLowerCase().includes((new URL(route.request().url()).searchParams.get('search') ?? '').toLowerCase())) : path.includes('/fichas/ui-fixture') ? ficha
+    const data = path.endsWith('/people/manual') ? manualPeople.at(-1) : path.endsWith('/canciones/song-1') ? song : path.endsWith('/canciones') ? (route.request().method() === 'POST' ? song : [song]) : path.endsWith('/changelog') ? [] : path.endsWith('/people') ? [...[{ userId: 10, name: 'Ana Pérez', campusName: 'Santiago' }, { userId: 11, name: 'Ana Pérez', campusName: 'Puente Alto' }], ...manualPeople].filter(p => p.name.toLowerCase().includes((new URL(route.request().url()).searchParams.get('search') ?? '').toLowerCase())) : (path.includes('/fichas/ui-fixture') || path.includes('/fichas/public/ui-fixture')) ? ficha
       : path.endsWith('/equipo-roster') ? { worship: [], tecnico: [], ninguno: [] }
       : path.endsWith('/auth/me') ? user : [];
     await route.fulfill({ json: data });
@@ -421,4 +421,80 @@ test.describe('operación táctil', () => {
     await expect(page.getByRole('button', { name: 'Mover fila' })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
+});
+
+
+for (const width of [320, 393, 834, 1366]) {
+  test(`ficha publicada ${width}px: hoja completa, zoom y columnas estables`, async ({ page }) => {
+    const { ficha, writes } = await fixture(page);
+    await page.addInitScript(() => localStorage.removeItem('auth-storage'));
+    Object.assign(ficha, { publicMeta: { paletas: [], visualRefs: [] } });
+    ficha.type = 'multi';
+    ficha.encuentros = ['09:00', '11:00'].map((time, i) => ({ id: `e${i}`, label: `Encuentro ${time}`, time, color: '#315e49' }));
+    ficha.hiddenSections = ['media', 'voluntarios', 'outfit'];
+    ficha.sections.produccion.rows = [makeRow('pr1', 'Productor General', 0), ...['Sonido', 'Stage', 'Iluminación', 'Visuales', 'ProPresenter'].map((label, i) => makeRow(`p${i}`, label, i + 1))] as any;
+    ficha.sections.streaming.rows = [makeRow('tv', 'Director de televisión', 0), makeRow('cam1', 'CAM 1', 1), makeRow('cam2', 'CAM 2', 2)] as any;
+    ficha.sections.anuncios.rows = [{ ...makeRow('news', 'Información del encuentro', 0, 'Reunión de equipos al terminar el encuentro. Ingreso por la puerta principal.'), type: 'text' }] as any;
+    ficha.sections.horarios.rows = [{ ...makeRow('time', 'Inicio encuentro', 0, JSON.stringify({ inicio: '11:00', fin: '11:10', nota: 'Bienvenida al campus', tipo: 'momento' })), type: 'text' }] as any;
+    ficha.sections.setList.rows = [{ ...makeRow('song', 'Canción 1', 0, JSON.stringify({ titulo: 'See the light', tonalidad: 'G' })), type: 'song' }] as any;
+    const calls: string[] = [];
+    page.on('request', request => { if (request.url().includes('/api/v1/')) calls.push(new URL(request.url()).pathname); });
+    await page.setViewportSize({ width, height: 852 });
+    await page.goto('/ficha/ui-fixture');
+    const sheet = page.locator('.ficha-paper-content');
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toHaveCSS('width', '794px');
+    await expect(page.locator('.ficha-matrix-head')).toBeVisible();
+    await expect(page.locator('.ficha-matrix-row').first()).toHaveCSS('display', 'grid');
+    await expect(page.getByRole('button', { name: 'Mover fila', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Editar ficha', exact: true })).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const viewport = page.getByRole('region', { name: 'Documento de la ficha técnica' });
+    await expect.poll(() => viewport.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    const before = (await sheet.boundingBox())!.width;
+    if (width === 393) {
+      await page.setViewportSize({ width: 852, height: 393 });
+      await expect.poll(async () => Math.round((await sheet.boundingBox())!.width)).toBe(794);
+      await page.setViewportSize({ width, height: 852 });
+      await expect.poll(async () => Math.round((await sheet.boundingBox())!.width)).toBe(Math.round(before));
+    }
+    await page.screenshot({ path: `test-results/ficha-publicada-${width}.png`, fullPage: true });
+    await page.getByRole('button', { name: 'Ampliar ficha' }).click();
+    await expect.poll(async () => (await sheet.boundingBox())!.width).toBeGreaterThan(before);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.locator('.ficha-matrix-row').first()).toHaveCSS('display', 'grid');
+    await page.getByRole('button', { name: 'Ajustar al ancho' }).click();
+    await expect.poll(async () => Math.round((await sheet.boundingBox())!.width)).toBe(Math.round(before));
+    await page.getByRole('button', { name: 'Layout Visual', exact: true }).click();
+    await expect(page.locator('.layout-visual-page')).toBeVisible();
+    await expect.poll(() => page.locator('.ficha-paper-canvas').evaluate(el => el.clientHeight > 0)).toBe(true);
+    await page.getByRole('button', { name: /Encuentro 11:00/ }).click();
+    await expect(page.locator('.ficha-view-body')).toBeVisible();
+    await page.emulateMedia({ media: 'print' });
+    await expect(sheet).toHaveCSS('transform', 'none');
+    await expect(page.locator('.ficha-paper-toolbar')).toBeHidden();
+    await expect(page.locator('.ficha-view-body')).toBeVisible();
+    if (width === 393) await page.pdf({ path: 'test-results/ficha-publicada.pdf', format: 'A4', printBackground: true });
+    expect(writes).toEqual([]);
+    expect(calls.filter(path => !path.includes('/fichas/public/'))).toEqual([]);
+  });
+}
+
+test('ficha pública no publicada: muestra aviso sin documento ni controles de edición', async ({ page }) => {
+  await page.route('**/api/v1/**', route => route.fulfill({ status: 403, json: { message: 'not_published' } }));
+  await page.goto('/ficha/ui-fixture');
+  await expect(page.getByRole('alert').filter({ hasText: 'Esta ficha aún no está publicada' })).toBeVisible();
+  await expect(page.locator('.ficha-paper-content')).toHaveCount(0);
+});
+
+test('vista documento interna conserva el orden y permite volver a editar', async ({ page }) => {
+  const { ficha } = await fixture(page);
+  Object.assign(ficha.sectionLayout, { pdfOrder: ['worship', 'pastoral', 'produccion'] });
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto('/dashboard/fichas-tecnicas/ui-fixture/view');
+  await expect(page.locator('.ficha-paper-content')).toBeVisible();
+  await expect(page.locator('.ficha-pdf-order > [data-block-id]').first()).toHaveAttribute('data-block-id', 'worship');
+  await expect(page.getByRole('button', { name: 'Imprimir / PDF', exact: true })).toHaveCount(1);
+  await page.getByRole('button', { name: 'Editar ficha', exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard\/fichas-tecnicas\/ui-fixture$/);
 });

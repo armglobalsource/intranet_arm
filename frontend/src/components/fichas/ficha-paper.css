@@ -1,0 +1,57 @@
+.ficha-paper-viewer { min-width: 0; }
+.ficha-paper-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 8px; border: 1px solid #dbe3df; border-radius: 12px; background: #fff; }
+.ficha-paper-zoom, .ficha-paper-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.ficha-paper-toolbar button { min-width: 44px; min-height: 44px; padding: 8px 10px; border-radius: 8px; border: 1px solid #dbe3df; background: #fff; color: #315b48; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ficha-paper-toolbar button:hover, .ficha-paper-toolbar button[aria-pressed="true"] { background: #edf4ef; }
+.ficha-paper-toolbar button:disabled { opacity: .4; cursor: default; }
+.ficha-paper-toolbar output { min-width: 42px; text-align: center; font-size: 12px; color: #52645c; font-variant-numeric: tabular-nums; }
+.ficha-paper-toolbar button:focus-visible, .ficha-paper-viewport:focus-visible { outline: 2px solid #315b48; outline-offset: 2px; }
+.ficha-paper-hint { color: #627068; font-size: 12px; line-height: 1.5; margin: 8px 0 12px; }
+.ficha-paper-viewport { width: 100%; max-width: 100%; overflow: auto; background: #e8edea; overscroll-behavior-x: contain; }
+.ficha-paper-canvas { position: relative; margin: 0 auto; }
+.ficha-paper-content { transform-origin: top left; }
+.public-ficha-page { min-height: 100dvh; background: #f2f5f3; padding: 24px 16px 48px; color: #243a30; }
+.public-ficha-header { max-width: 980px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.public-ficha-header img { width: 120px; height: auto; filter: brightness(0); }
+.public-ficha-header a { font-size: 13px; color: #315b48; padding: 12px 0; }
+.public-ficha-message { max-width: 420px; margin: 18vh auto 0; text-align: center; }
+.public-ficha-message h1 { font-size: 22px; font-weight: 700; }
+.public-ficha-message p { margin: 12px 0 20px; color: #627068; line-height: 1.6; }
+.public-ficha-message a { display: inline-flex; padding: 12px 18px; border: 1px solid #cbd9d0; border-radius: 8px; background: white; color: #315b48; }
+
+/* The published sheet is a compact table, independent of viewport breakpoints.
+   The editor keeps its own responsive layout and touch targets. */
+.ficha-doc-root.ficha-document-mode .ficha-doc { border-radius: 0 !important; border-color: #aebbb3 !important; color: #24332b; }
+.ficha-document-mode .ficha-hdr-top { padding: 12px 20px 8px !important; }
+.ficha-document-mode .ficha-hdr-top .ficha-logo { height: 28px !important; }
+.ficha-document-mode .ficha-hdr > div:last-child { padding: 8px 20px 12px !important; }
+.ficha-document-mode .ficha-title-text { font-size: 19px !important; }
+.ficha-document-mode .ficha-action-bar { display: none !important; }
+.ficha-document-mode .ficha-body { padding: 12px 20px 20px !important; }
+.ficha-document-mode .ficha-pdf-order { gap: 6px !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-card { border-color: #b6c1ba !important; border-radius: 0 !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-card > div:first-child { padding: 5px 8px !important; font-size: 10px !important; background: #e8edea; color: #273b30 !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-section-wrap .ficha-card > div:first-child { padding-right: 8px !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-role-row { min-height: 23px; }
+.ficha-document-mode .ficha-pdf-order .ficha-role-row > span { padding: 4px 8px !important; font-size: 11px !important; line-height: 1.35; background: #f4f6f4; }
+.ficha-document-mode .ficha-pdf-order .ficha-role-row > div { padding: 4px 8px !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-role-row > div > span { font-size: 11px !important; line-height: 1.35; overflow-wrap: anywhere; }
+.ficha-document-mode .ficha-matrix-head > span { padding: 4px 8px; font-size: 10px; }
+.ficha-document-mode .ficha-matrix-label, .ficha-document-mode .ficha-matrix-value { padding: 4px 8px; font-size: 11px; line-height: 1.35; }
+.ficha-document-mode .ficha-worship-columns { gap: 10px; }
+.ficha-document-mode .ficha-worship-setlist { padding-left: 10px; }
+.ficha-document-mode .ficha-positions { margin-top: 6px; margin-bottom: 6px !important; }
+.ficha-document-mode .ficha-camera-grid { margin-top: 6px !important; }
+
+@media screen and (max-width: 767px) {
+  .public-ficha-page { padding: 16px 8px 32px; }
+  .public-ficha-header { margin-bottom: 14px; padding: 0 4px; }
+  main:not(.public-ficha-page):has(.ficha-document-mode) { padding: 12px 8px 80px; }
+  .ficha-document-mode .ficha-encuentro-tabs { gap: 6px !important; }
+  .ficha-document-mode .ficha-encuentro-tabs button { min-height: 44px; padding: 8px 12px !important; font-size: 12px !important; }
+}
+
+@media print {
+  .ficha-paper-viewer, .ficha-paper-viewport, .ficha-paper-canvas, .ficha-paper-content { width: 100% !important; height: auto !important; max-width: none !important; overflow: visible !important; position: static !important; transform: none !important; background: #fff; }
+  .ficha-paper-toolbar, .ficha-paper-hint { display: none !important; }
+}
