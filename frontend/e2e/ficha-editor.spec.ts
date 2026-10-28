@@ -444,8 +444,8 @@ for (const width of [320, 393, 834, 1366]) {
     const sheet = page.locator('.ficha-paper-content');
     await expect(sheet).toBeVisible();
     await expect(sheet).toHaveCSS('width', '794px');
-    await expect(page.locator('.ficha-matrix-head')).toBeVisible();
-    await expect(page.locator('.ficha-matrix-row').first()).toHaveCSS('display', 'grid');
+    await expect(page.locator('.published-sheet table').first()).toBeVisible();
+    await expect(page.locator('.published-sheet table').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Mover fila', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Editar ficha', exact: true })).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -462,7 +462,7 @@ for (const width of [320, 393, 834, 1366]) {
     await page.getByRole('button', { name: 'Ampliar ficha' }).click();
     await expect.poll(async () => (await sheet.boundingBox())!.width).toBeGreaterThan(before);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await expect(page.locator('.ficha-matrix-row').first()).toHaveCSS('display', 'grid');
+    await expect(page.locator('.published-sheet table').first()).toBeVisible();
     await page.getByRole('button', { name: 'Ajustar al ancho' }).click();
     await expect.poll(async () => Math.round((await sheet.boundingBox())!.width)).toBe(Math.round(before));
     await page.getByRole('button', { name: 'Layout Visual', exact: true }).click();
@@ -493,7 +493,7 @@ test('vista documento interna conserva el orden y permite volver a editar', asyn
   await page.setViewportSize({ width: 393, height: 852 });
   await page.goto('/dashboard/fichas-tecnicas/ui-fixture/view');
   await expect(page.locator('.ficha-paper-content')).toBeVisible();
-  await expect(page.locator('.ficha-pdf-order > [data-block-id]').first()).toHaveAttribute('data-block-id', 'worship');
+  await expect(page.locator('.published-sheet > [data-block-id]').first()).toHaveAttribute('data-block-id', 'worship');
   await expect(page.getByRole('button', { name: 'Imprimir / PDF', exact: true })).toHaveCount(1);
   await page.getByRole('button', { name: 'Editar ficha', exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard\/fichas-tecnicas\/ui-fixture$/);

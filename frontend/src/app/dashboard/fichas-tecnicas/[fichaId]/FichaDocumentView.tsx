@@ -8,6 +8,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { SongLibraryDialog } from '@/components/fichas/SongLibraryDialog';
 import { SongInput } from '@/components/fichas/SongInput';
 import { FichaPaperViewport } from '@/components/fichas/FichaPaperViewport';
+import { PublishedFichaSheet } from '@/components/fichas/PublishedFichaSheet';
 import { LayoutVisualView } from './LayoutVisualView';
 import { PersonCellInput, FichaPeopleContext } from '@/components/fichas/PersonCellInput';
 import { SortableSection, SortableRow, SortableFichaLayout, SortablePdfSections } from '@/components/fichas/FichaSortable';
@@ -3234,7 +3235,7 @@ export function FichaDocumentView({
               <span>Selecciona cada puesto para asignar personas. Arrastra las filas o usa los controles de cada sección para ordenarlas; los cambios se guardan automáticamente.</span>
             </div>
           )}
-          {(() => {
+          {paperMode ? <PublishedFichaSheet ficha={ficha} colId={colId} hidden={hiddenSections ?? []} order={resolvedLayout.pdfOrder} paletas={paletas} /> : (() => {
             // La estructura del PDF separa responsables y equipo técnico.
             const allProduction = sec('produccion');
             const isResponsible = (r: Row) => ['pr1', 'pr2', 'pr3'].includes(r.id) || /productor general|responsable t[eé]cnico|encargado t[eé]cnico|productor (del |de los )?encuentro/i.test(r.label);

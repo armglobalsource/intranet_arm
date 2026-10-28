@@ -43,6 +43,27 @@
 .ficha-document-mode .ficha-positions { margin-top: 6px; margin-bottom: 6px !important; }
 .ficha-document-mode .ficha-camera-grid { margin-top: 6px !important; }
 
+/* Compact reading layout, based on the existing production sheets. */
+.ficha-document-mode .ficha-hdr-top { padding: 7px 12px !important; }
+.ficha-document-mode .ficha-hdr > div:last-child { padding: 5px 12px 7px !important; }
+.ficha-document-mode .ficha-title-text { font-size: 15px !important; }
+.ficha-document-mode .ficha-body { padding: 6px 12px 10px !important; }
+.ficha-document-mode .ficha-pdf-order { gap: 3px !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-card > div:first-child { padding: 3px 6px !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-role-row { min-height: 17px !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-role-row > span,
+.ficha-document-mode .ficha-pdf-order .ficha-role-row > div { padding: 2px 6px !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-role-row > span,
+.ficha-document-mode .ficha-pdf-order .ficha-role-row > div > span { font-size: 10px !important; }
+.ficha-document-mode .ficha-camera-grid { gap: 0 !important; margin-top: 2px !important; }
+.ficha-document-mode .ficha-camera-grid > div { display: flex; align-items: baseline; gap: 6px; padding: 2px 6px !important; border-radius: 0 !important; background: transparent !important; }
+.ficha-document-mode .ficha-camera-grid > div > div:last-child { margin-top: 0 !important; font-size: 10px !important; }
+.ficha-document-mode [data-timing-row] > div:first-child { width: 95px !important; padding: 2px 6px !important; font-size: 10px !important; }
+.ficha-document-mode [data-timing-row] > div:nth-child(2) { margin: 1px 5px 1px 0 !important; }
+.ficha-document-mode [data-timing-row] > div:nth-child(3) { padding: 2px 0 !important; }
+.ficha-document-mode [data-timing-row] > div:nth-child(3) > div:first-child > span { font-size: 10px !important; }
+.ficha-document-mode [data-timing-row] > div:nth-child(3) > div:nth-child(2) { margin-top: 0 !important; font-size: 10px !important; }
+
 @media screen and (max-width: 767px) {
   .public-ficha-page { padding: 16px 8px 32px; }
   .public-ficha-header { margin-bottom: 14px; padding: 0 4px; }
@@ -55,3 +76,13 @@
   .ficha-paper-viewer, .ficha-paper-viewport, .ficha-paper-canvas, .ficha-paper-content { width: 100% !important; height: auto !important; max-width: none !important; overflow: visible !important; position: static !important; transform: none !important; background: #fff; }
   .ficha-paper-toolbar, .ficha-paper-hint { display: none !important; }
 }
+
+.published-sheet { color: #111; font-family: Arial, sans-serif; font-size: 10px; line-height: 1.2; }
+.published-sheet section { margin: 0 0 7px; }
+.published-sheet table { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #222; }
+.published-sheet th, .published-sheet td { border: 1px solid #555; padding: 2px 4px; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-wrap; }
+.published-sheet th { font-weight: 700; }
+.published-sheet .sheet-bar { background: #dedede; text-transform: uppercase; }
+.published-sheet .sheet-center { text-align: center; }
+.published-sheet .sheet-time { width: 9%; text-align: right; font-variant-numeric: tabular-nums; }
+@media print { .published-sheet section { break-inside: auto; } }
