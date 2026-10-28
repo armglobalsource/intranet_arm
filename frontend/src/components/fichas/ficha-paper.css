@@ -77,12 +77,22 @@
   .ficha-paper-toolbar, .ficha-paper-hint { display: none !important; }
 }
 
-.published-sheet { color: #111; font-family: Arial, sans-serif; font-size: 10px; line-height: 1.2; }
+.published-sheet { color: #253b32; font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; }
 .published-sheet section { margin: 0 0 7px; }
-.published-sheet table { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #222; }
-.published-sheet th, .published-sheet td { border: 1px solid #555; padding: 2px 4px; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-wrap; }
-.published-sheet th { font-weight: 700; }
-.published-sheet .sheet-bar { background: #dedede; text-transform: uppercase; }
+.published-sheet table { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #c8d8cf; }
+.published-sheet th, .published-sheet td { border: 1px solid #dbe5df; padding: 3px 5px; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-wrap; }
+.published-sheet th { font-weight: 700; color: #315447; background: #f6f9f7; }
+.published-sheet td { background: #fff; color: #283a33; }
+.published-sheet .sheet-bar { background: #e6f0ea; color: #24533e; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; padding: 4px 6px; border-left: 3px solid #3c8060; }
 .published-sheet .sheet-center { text-align: center; }
 .published-sheet .sheet-time { width: 9%; text-align: right; font-variant-numeric: tabular-nums; }
 @media print { .published-sheet section { break-inside: auto; } }
+
+@media screen {
+  .ficha-document-mode .ficha-doc { box-shadow: 0 12px 32px rgba(27, 51, 39, .10); }
+  .ficha-document-mode .ficha-hdr { background: #f7faf8 !important; }
+  .ficha-document-mode .ficha-title-text { color: #203f30 !important; }
+}
+@media print {
+  .published-sheet th, .published-sheet td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
