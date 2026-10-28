@@ -1,27 +1,27 @@
 .ficha-paper-viewer { min-width: 0; }
-.ficha-paper-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 8px; border: 1px solid #dbe3df; border-radius: 12px; background: #fff; }
+.ficha-paper-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 8px; border: 1px solid #d9dce2; border-radius: 12px; background: #fff; }
 .ficha-paper-zoom, .ficha-paper-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-.ficha-paper-toolbar button { min-width: 44px; min-height: 44px; padding: 8px 10px; border-radius: 8px; border: 1px solid #dbe3df; background: #fff; color: #315b48; font-size: 12px; font-weight: 600; cursor: pointer; }
-.ficha-paper-toolbar button:hover, .ficha-paper-toolbar button[aria-pressed="true"] { background: #edf4ef; }
+.ficha-paper-toolbar button { min-width: 44px; min-height: 44px; padding: 8px 10px; border-radius: 8px; border: 1px solid #d9dce2; background: #fff; color: #353d4a; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ficha-paper-toolbar button:hover, .ficha-paper-toolbar button[aria-pressed="true"] { background: #edf0f4; }
 .ficha-paper-toolbar button:disabled { opacity: .4; cursor: default; }
-.ficha-paper-toolbar output { min-width: 42px; text-align: center; font-size: 12px; color: #52645c; font-variant-numeric: tabular-nums; }
-.ficha-paper-toolbar button:focus-visible, .ficha-paper-viewport:focus-visible { outline: 2px solid #315b48; outline-offset: 2px; }
-.ficha-paper-hint { color: #627068; font-size: 12px; line-height: 1.5; margin: 8px 0 12px; }
-.ficha-paper-viewport { width: 100%; max-width: 100%; overflow: auto; background: #e8edea; overscroll-behavior-x: contain; }
+.ficha-paper-toolbar output { min-width: 42px; text-align: center; font-size: 12px; color: #626a78; font-variant-numeric: tabular-nums; }
+.ficha-paper-toolbar button:focus-visible, .ficha-paper-viewport:focus-visible { outline: 2px solid #353d4a; outline-offset: 2px; }
+.ficha-paper-hint { color: #6a7280; font-size: 12px; line-height: 1.5; margin: 8px 0 12px; }
+.ficha-paper-viewport { width: 100%; max-width: 100%; overflow: auto; background: #e9ebee; overscroll-behavior-x: contain; }
 .ficha-paper-canvas { position: relative; margin: 0 auto; }
 .ficha-paper-content { transform-origin: top left; }
-.public-ficha-page { min-height: 100dvh; background: #f2f5f3; padding: 24px 16px 48px; color: #243a30; }
+.public-ficha-page { min-height: 100dvh; background: #f5f6f8; padding: 24px 16px 48px; color: #29313d; }
 .public-ficha-header { max-width: 980px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .public-ficha-header img { width: 120px; height: auto; filter: brightness(0); }
-.public-ficha-header a { font-size: 13px; color: #315b48; padding: 12px 0; }
+.public-ficha-header a { font-size: 13px; color: #353d4a; padding: 12px 0; }
 .public-ficha-message { max-width: 420px; margin: 18vh auto 0; text-align: center; }
 .public-ficha-message h1 { font-size: 22px; font-weight: 700; }
-.public-ficha-message p { margin: 12px 0 20px; color: #627068; line-height: 1.6; }
-.public-ficha-message a { display: inline-flex; padding: 12px 18px; border: 1px solid #cbd9d0; border-radius: 8px; background: white; color: #315b48; }
+.public-ficha-message p { margin: 12px 0 20px; color: #6a7280; line-height: 1.6; }
+.public-ficha-message a { display: inline-flex; padding: 12px 18px; border: 1px solid #d6dae1; border-radius: 8px; background: white; color: #353d4a; }
 
 /* The published sheet is a compact table, independent of viewport breakpoints.
    The editor keeps its own responsive layout and touch targets. */
-.ficha-doc-root.ficha-document-mode .ficha-doc { border-radius: 0 !important; border-color: #aebbb3 !important; color: #24332b; }
+.ficha-doc-root.ficha-document-mode .ficha-doc { border-radius: 0 !important; border-color: #cbd0d8 !important; color: #252c37; }
 .ficha-document-mode .ficha-hdr-top { padding: 12px 20px 8px !important; }
 .ficha-document-mode .ficha-hdr-top .ficha-logo { height: 28px !important; }
 .ficha-document-mode .ficha-hdr > div:last-child { padding: 8px 20px 12px !important; }
@@ -29,11 +29,11 @@
 .ficha-document-mode .ficha-action-bar { display: none !important; }
 .ficha-document-mode .ficha-body { padding: 12px 20px 20px !important; }
 .ficha-document-mode .ficha-pdf-order { gap: 6px !important; }
-.ficha-document-mode .ficha-pdf-order .ficha-card { border-color: #b6c1ba !important; border-radius: 0 !important; }
-.ficha-document-mode .ficha-pdf-order .ficha-card > div:first-child { padding: 5px 8px !important; font-size: 10px !important; background: #e8edea; color: #273b30 !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-card { border-color: #cfd4dc !important; border-radius: 0 !important; }
+.ficha-document-mode .ficha-pdf-order .ficha-card > div:first-child { padding: 5px 8px !important; font-size: 10px !important; background: #e9ebee; color: #303b49 !important; }
 .ficha-document-mode .ficha-pdf-order .ficha-section-wrap .ficha-card > div:first-child { padding-right: 8px !important; }
 .ficha-document-mode .ficha-pdf-order .ficha-role-row { min-height: 23px; }
-.ficha-document-mode .ficha-pdf-order .ficha-role-row > span { padding: 4px 8px !important; font-size: 11px !important; line-height: 1.35; background: #f4f6f4; }
+.ficha-document-mode .ficha-pdf-order .ficha-role-row > span { padding: 4px 8px !important; font-size: 11px !important; line-height: 1.35; background: #f4f5f7; }
 .ficha-document-mode .ficha-pdf-order .ficha-role-row > div { padding: 4px 8px !important; }
 .ficha-document-mode .ficha-pdf-order .ficha-role-row > div > span { font-size: 11px !important; line-height: 1.35; overflow-wrap: anywhere; }
 .ficha-document-mode .ficha-matrix-head > span { padding: 4px 8px; font-size: 10px; }
@@ -77,22 +77,26 @@
   .ficha-paper-toolbar, .ficha-paper-hint { display: none !important; }
 }
 
-.published-sheet { color: #253b32; font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; }
+.published-sheet { color: #27303d; font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; }
 .published-sheet section { margin: 0 0 7px; }
-.published-sheet table { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #c8d8cf; }
-.published-sheet th, .published-sheet td { border: 1px solid #dbe5df; padding: 3px 5px; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-wrap; }
-.published-sheet th { font-weight: 700; color: #315447; background: #f6f9f7; }
-.published-sheet td { background: #fff; color: #283a33; }
-.published-sheet .sheet-bar { background: #e6f0ea; color: #24533e; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; padding: 4px 6px; border-left: 3px solid #3c8060; }
+.published-sheet table { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #d5d9df; }
+.published-sheet th, .published-sheet td { border: 1px solid #e1e4e9; padding: 3px 5px; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-wrap; }
+.published-sheet th { font-weight: 700; color: #3c4655; background: #f7f8fa; }
+.published-sheet td { background: #fff; color: #27303d; }
+.published-sheet .sheet-bar { background: #e9edf2; color: #303d4e; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; padding: 4px 6px; border-left: 3px solid #64758c; }
 .published-sheet .sheet-center { text-align: center; }
 .published-sheet .sheet-time { width: 9%; text-align: right; font-variant-numeric: tabular-nums; }
 @media print { .published-sheet section { break-inside: auto; } }
 
 @media screen {
-  .ficha-document-mode .ficha-doc { box-shadow: 0 12px 32px rgba(27, 51, 39, .10); }
-  .ficha-document-mode .ficha-hdr { background: #f7faf8 !important; }
-  .ficha-document-mode .ficha-title-text { color: #203f30 !important; }
+  .ficha-document-mode .ficha-doc { box-shadow: 0 12px 32px rgba(31, 41, 55, .10); }
+  .ficha-document-mode .ficha-hdr { background: #f8f9fb !important; }
+  .ficha-document-mode .ficha-title-text { color: #263140 !important; }
 }
 @media print {
   .published-sheet th, .published-sheet td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Pestañas neutras en la lectura de documentos; su estado sigue siendo visible. */
+.ficha-document-mode .ficha-encuentro-tabs button { background: #fff !important; color: #475467 !important; border-color: #d7dce3 !important; }
+.ficha-document-mode .ficha-encuentro-tabs button[aria-pressed="true"] { background: #293443 !important; border-color: #293443 !important; color: #fff !important; }

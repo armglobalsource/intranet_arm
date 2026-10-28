@@ -2204,6 +2204,7 @@ function EncuentroTabs({
       {showEncuentroPills && encuentros.map((e) => (
         <button
           key={e.id}
+          aria-pressed={selected === e.id}
           onClick={() => onChange(e.id)}
           style={{
             padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
@@ -2220,6 +2221,7 @@ function EncuentroTabs({
       {showCompareTab && (
         <button
           onClick={() => onChange('compare')}
+          aria-pressed={selected === 'compare'}
           title="Ver todos los encuentros lado a lado"
           style={{
             padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
@@ -2240,6 +2242,7 @@ function EncuentroTabs({
           )}
           <button
             onClick={() => onChange('layout')}
+            aria-pressed={selected === 'layout'}
             title="Ver / editar layout visual (iluminación + visuales por canción)"
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
