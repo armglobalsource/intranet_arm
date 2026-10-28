@@ -2,6 +2,30 @@
    the sheet. Print retains its own A4 layout in FichaDocumentView. */
 .ficha-time-field > span { display: none; }
 
+/* The interactive sheet uses the same hierarchy and area strips as publication. */
+.ficha-editor-theme .ficha-doc { border-top: 4px solid #303944 !important; background: #fff; }
+.ficha-editor-theme .ficha-hdr { background: #fff !important; }
+.ficha-editor-theme .ficha-encuentro-tabs button { color: #475467 !important; background: #fff !important; border-color: #d7dce3 !important; }
+.ficha-editor-theme .ficha-encuentro-tabs button[aria-pressed="true"] { background: #293443 !important; color: #fff !important; border-color: #293443 !important; }
+.ficha-editor-theme .ficha-pdf-order { counter-reset: editor-section; }
+.ficha-editor-theme .ficha-pdf-order > [data-block-id] { counter-increment: editor-section; }
+.ficha-editor-theme .ficha-doc .ficha-pdf-order .ficha-card { border-color: #dce0e5 !important; border-radius: 3px !important; }
+.ficha-editor-theme .ficha-doc .ficha-pdf-order .ficha-card > div:first-child { background: var(--area-bg) !important; color: var(--area-ink) !important; border-top: 1px solid var(--area-edge); border-bottom: 1px solid var(--area-edge); text-transform: uppercase; }
+.ficha-editor-theme .ficha-pdf-order .ficha-card > div:first-child::before { content: counter(editor-section, decimal-leading-zero); display: inline-block; margin-right: 9px; padding-right: 9px; border-right: 1px solid var(--area-edge); font-size: 10px; }
+.ficha-editor-theme .ficha-pdf-block-tools button { background: #f8f9fa !important; color: #526071 !important; border-color: #dce0e5 !important; }
+.ficha-editor-theme .ficha-position-card { background: #fff !important; border-color: #e1e5e9 !important; }
+.ficha-position-circle { display: grid; place-items: center; width: 28px; height: 28px; margin: 0 auto 6px; border: 1px solid #b9c4bd; border-radius: 50%; background: #fff; color: #3e5948; font-size: 11px; font-weight: 700; }
+.ficha-outfit-edit-preview { flex-wrap: wrap; }
+.ficha-outfit-edit-preview .sheet-outfit { flex: 1 1 100%; min-width: 0; }
+.ficha-editor-theme .sheet-outfit > strong { font-size: 12px; }
+.ficha-editor-theme .sheet-swatches > div { font-size: 10px; }
+.ficha-editor-theme .sheet-swatches .sheet-swatch { height: 30px; }
+.ficha-editor-theme.ficha-doc-root:not(.ficha-document-mode) .ficha-doc .ficha-role-row > .ficha-editable-label,
+.ficha-editor-theme.ficha-doc-root:not(.ficha-document-mode) .ficha-doc .ficha-role-row > span,
+.ficha-editor-theme.ficha-doc-root:not(.ficha-document-mode) .ficha-doc .ficha-role-row > input { color: #303944 !important; background: #f8f9fa !important; border-radius: 0; }
+.ficha-editor-theme.ficha-doc-root:not(.ficha-document-mode) .ficha-doc .ficha-matrix-label { background: #f8f9fa; border-left: 0; }
+.ficha-editor-theme.ficha-doc-root:not(.ficha-document-mode) .ficha-doc .ficha-matrix-label > :is(.ficha-editable-label, span, input) { color: #303944 !important; }
+
 @media screen {
   .ficha-doc-root:not(.ficha-document-mode) { min-width: 0; width: 100%; }
   .ficha-doc-root:not(.ficha-document-mode) .ficha-date-area { min-width: 0; flex-shrink: 1 !important; }

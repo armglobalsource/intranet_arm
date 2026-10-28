@@ -3,6 +3,7 @@ import type { Ficha, Row, SectionName } from '@/types/ficha';
 import type { Paleta } from '@/hooks/usePaletas';
 import { hasContent, momentTree } from '@/lib/ficha-timing';
 import { parseSetListEntry } from '@/lib/ficha-setlist';
+import { OutfitPalettePreview } from './OutfitPalettePreview';
 
 function value(row: Row, id: string) { return (row.shared ? row.values?.shared ?? row.values?.[id] : row.values?.[id])?.trim() ?? ''; }
 function song(row: Row, id: string) {
@@ -41,13 +42,9 @@ export function PublishedFichaSheet({ ficha, colId, hidden, order, paletas }: {
       <tr className="sheet-subhead"><th colSpan={2}>Equipo</th><th colSpan={2}>Canciones · Set list</th></tr>
       {Array.from({length: Math.max(band.length,songs.length)}, (_, i) => <tr key={i}><th>{band[i]?.label ?? ''}</th><td>{band[i] ? value(band[i],colId) : ''}</td><td colSpan={2}>{songs[i] && <div className="sheet-song-row"><span className="sheet-song-number">{String(i+1).padStart(2,'0')}</span>{songs[i]}</div>}</td></tr>)}
       {outfit.length > 0 && <><tr className="sheet-subhead sheet-outfit-title"><th colSpan={4}>Outfit / Paleta de colores</th></tr>
-        <tr><td colSpan={4}><div className="sheet-outfits">{outfit.map(({id, palette}, i) => <div key={`${id}-${i}`} className="sheet-outfit" aria-label={`Paleta de outfit: ${palette?.name ?? id}`}>
-          <strong>{palette?.name ?? id}</strong>
-          {palette && <div className="sheet-swatches">{palette.colors.map((color, index) => <div key={`${color.hex}-${index}`}>
-            <span className="sheet-swatch" role="img" aria-label={`${color.name}: ${color.hex}`} style={{backgroundColor: /^#[0-9a-f]{3,8}$/i.test(color.hex) ? color.hex : '#fff'}} />
-            <span>{color.name}</span>
-          </div>)}</div>}
-        </div>)}</div></td></tr></>}
+        <tr><td colSpan={4}><div className="sheet-outfits">{outfit.map(({id, palette}, i) => palette
+          ? <OutfitPalettePreview key={`${id}-${i}`} palette={palette} />
+          : <div key={`${id}-${i}`} className="sheet-outfit"><strong>{id}</strong></div>)}</div></td></tr></>}
     </tbody></table> : null,
     horarios: moments.length ? <table><caption>Horarios</caption><colgroup><col style={{width:'10%'}} /><col style={{width:'10%'}} /><col style={{width:'30%'}} /><col /></colgroup><thead><tr><th scope="col">Inicio</th><th scope="col">Término</th><th scope="col">Momento</th><th scope="col">Responsable / Indicaciones</th></tr></thead><tbody>
       {moments.map(m => <tr key={m.row.id}><td className="sheet-time">{m.value.inicio || '—'}</td><td className="sheet-time">{m.value.fin || '—'}</td><th scope="row">{m.label}</th><td>{[m.value.responsable, m.value.nota].filter(Boolean).join(' · ')}</td></tr>)}

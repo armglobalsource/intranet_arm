@@ -326,6 +326,8 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   const searchParams = useSearchParams();
   const startInEditMode = searchParams?.get('edit') === '1';
   const [isEditing, setIsEditing]             = useState(startInEditMode);
+  const [publicationPreview, setPublicationPreview] = useState(false);
+  useEffect(() => { if (!isEditing) setPublicationPreview(false); }, [isEditing]);
   const [transitioningToEdit, setTransitioningToEdit] = useState(false);
 
   // Panel de edición de módulos: mientras está abierto, reemplaza la lista
@@ -742,7 +744,11 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
   // ficha (fichas:view ya se validó vía `allowed` arriba) — antes dependía de
   // permisos separados (disponibilidad:view / tecnicos:view) que la mayoría
   // de los roles productores no tenían, dejando el panel siempre oculto.
-  const showSidePanel = editable;
+  const showSidePanel = editable && !publicationPreview;
+  const previewFicha: Ficha = {...ficha, sections: {
+    ...ficha.sections,
+    ...Object.fromEntries(Object.entries(localSections).map(([name, rows]) => [name, {...ficha.sections[name as SectionName], rows}])),
+  }};
   const fichaCampusId = rosterCampusId;
 
   function handleDesignate(key: 'encargadoTecnico' | 'responsableActualizacion', userId: number | null) {
@@ -883,10 +889,15 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         </div>
       )}
 
-      {editable && <button type="button" className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 md:hidden" aria-expanded={teamSettingsOpen} aria-controls="ficha-team-settings" onClick={() => setTeamSettingsOpen(open => !open)}>
+      {editable && <div className="ficha-no-print flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
+        <p className="text-xs text-slate-600">{publicationPreview ? 'Así se verá la ficha publicada, con los cambios actuales.' : 'Edita la ficha y revisa cómo se verá al publicarla.'}</p>
+        <button type="button" aria-pressed={publicationPreview} onClick={() => setPublicationPreview(preview => !preview)} className="min-h-11 rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">{publicationPreview ? 'Volver a editar' : 'Vista previa de publicación'}</button>
+      </div>}
+
+      {editable && !publicationPreview && <button type="button" className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 md:hidden" aria-expanded={teamSettingsOpen} aria-controls="ficha-team-settings" onClick={() => setTeamSettingsOpen(open => !open)}>
         {teamSettingsOpen ? 'Ocultar equipo y responsables' : 'Equipo y responsables de la ficha'}
       </button>}
-      <div id="ficha-team-settings" className={`${teamSettingsOpen ? 'block' : 'hidden'} space-y-4 md:block`}>
+      <div id="ficha-team-settings" className={publicationPreview ? 'hidden' : `${teamSettingsOpen ? 'block' : 'hidden'} space-y-4 md:block`}>
       {editable && <FichaEquipoPanel ficha={ficha} onDesignate={handleDesignate} />}
 
       {editable && (!permisos || permisos.content) && (
@@ -902,11 +913,13 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
       <div className={showSidePanel ? 'flex flex-col gap-5 xl:flex-row xl:items-start' : ''}>
         <div className={showSidePanel ? 'order-2 min-w-0 xl:order-1 xl:flex-1' : ''}>
           <FichaDocumentView
-            ficha={ficha}
-            showHistory
-            editable={editable}
-            forceShowAll={canEdit}
+            ficha={publicationPreview ? previewFicha : ficha}
+            showHistory={!publicationPreview}
+            documentMode={publicationPreview}
+            editable={editable && !publicationPreview}
+            forceShowAll={canEdit && !publicationPreview}
             onEdit={canEdit ? () => {
+                if (publicationPreview) { setPublicationPreview(false); return; }
                 // flushSync pinta el overlay en pantalla antes de que React
                 // empiece el render pesado del modo edición
                 flushSync(() => setTransitioningToEdit(true));

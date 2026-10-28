@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import './ficha-responsive.css';
+import '@/components/fichas/ficha-areas.css';
 import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSlot, FichaPermisos, AssignmentEdit } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -10,6 +11,7 @@ import { SongInput } from '@/components/fichas/SongInput';
 import { parseSetListEntry } from '@/lib/ficha-setlist';
 import { FichaPaperViewport } from '@/components/fichas/FichaPaperViewport';
 import { PublishedFichaSheet } from '@/components/fichas/PublishedFichaSheet';
+import { OutfitPalettePreview } from '@/components/fichas/OutfitPalettePreview';
 import { LayoutVisualView } from './LayoutVisualView';
 import { PersonCellInput, FichaPeopleContext } from '@/components/fichas/PersonCellInput';
 import { SortableSection, SortableRow, SortableFichaLayout, SortablePdfSections } from '@/components/fichas/FichaSortable';
@@ -1076,20 +1078,8 @@ function OutfitPaletteSelector({
   /* ── Modo edición: paleta seleccionada (colapsado) ── */
   if (selectedPaleta && !expanded) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* Swatches de la paleta seleccionada */}
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-          {selectedPaleta.colors.map((c) => (
-            <div key={c.name} title={c.name} style={{
-              width: 22, height: 22, borderRadius: 5, background: c.hex,
-              border: '0.5px solid rgba(255,255,255,0.15)', flexShrink: 0,
-            }} />
-          ))}
-        </div>
-        {/* Nombre */}
-        <span style={{ fontSize: 12, fontWeight: 600, color: D.textPrimary, flex: 1 }}>
-          {selectedPaleta.name}
-        </span>
+      <div className="ficha-outfit-edit-preview" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <OutfitPalettePreview palette={selectedPaleta} />
         {/* Cambiar */}
         <button
           onClick={() => setExpanded(true)}
@@ -1504,12 +1494,13 @@ function WorshipSetListCard({
           {(positions.length > 0 || editable) && (
             <SortableSection items={positions} onReorder={editable ? escena.onReorderRow : undefined}>
             <div className="ficha-positions" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12, alignItems: 'stretch' }}>
-              {positions.map((row) => {
+              {positions.map((row, positionIndex) => {
                 const posLabel = row.label.replace(/posición\s*/i, '');
                 return (
                   <SortableRow key={row.id} id={row.id} editable={editable}>
                     {(handle) => (
-                      <div style={{ flex: '1 1 0', minWidth: 0, textAlign: 'center', background: D.badgeBg, borderRadius: 8, padding: '9px 4px', border: `0.5px solid ${D.cardBorder}` }}>
+                      <div className="ficha-position-card" style={{ flex: '1 1 0', minWidth: 0, textAlign: 'center', background: D.badgeBg, borderRadius: 8, padding: '9px 4px', border: `0.5px solid ${D.cardBorder}` }}>
+                        <span className="ficha-position-circle" aria-hidden="true">{positionIndex + 1}</span>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 2 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, justifyContent: 'center' }}>
                             {handle}
@@ -2545,7 +2536,7 @@ export function FichaDocumentView({
   return (
     <FichaPeopleContext.Provider value={{fichaId: ficha.fichaId, encuentros, currentId: colId}}>
     <div
-      className={`ficha-doc-root${paperMode ? ' ficha-document-mode' : ''}`}
+      className={`ficha-doc-root${paperMode ? ' ficha-document-mode' : ' ficha-editor-theme'}`}
       style={{ maxWidth: 980, margin: '0 auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
     >
       {/* ── Estilos globales y de impresión ── */}

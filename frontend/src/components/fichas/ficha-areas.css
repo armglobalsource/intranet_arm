@@ -1,0 +1,10 @@
+/* The editor and publication share the same area identity. */
+:is(.published-sheet, .ficha-pdf-order) > [data-block-id] { --area-bg: #edf0f2; --area-ink: #303944; --area-edge: #cbd1d7; }
+:is(.published-sheet, .ficha-pdf-order) > [data-block-id="pastoral"] { --area-bg: #f0ebf7; --area-ink: #594278; --area-edge: #d1c2e3; }
+:is(.published-sheet, .ficha-pdf-order) > [data-block-id="responsables"] { --area-bg: #e9eef4; --area-ink: #354d68; --area-edge: #bfccdb; }
+:is(.published-sheet, .ficha-pdf-order) > [data-block-id="streaming"] { --area-bg: #e7f0f7; --area-ink: #285779; --area-edge: #b9d2e3; }
+:is(.published-sheet, .ficha-pdf-order) > [data-block-id="produccion"] { --area-bg: #fff2df; --area-ink: #79511c; --area-edge: #e8d1ab; }
+:is(.published-sheet, .ficha-pdf-order) > [data-block-id="media"] { --area-bg: #e8f3f4; --area-ink: #2b6068; --area-edge: #b7d9dd; }
+:is(.published-sheet, .ficha-pdf-order) > [data-block-id="anuncios"] { --area-bg: #f8ece7; --area-ink: #7e4c3a; --area-edge: #e5c6b9; }
+:is(.published-sheet, .ficha-pdf-order) > [data-block-id="worship"] { --area-bg: #e6f2e9; --area-ink: #2d6342; --area-edge: #b6d5bf; }
+:is(.published-sheet, .ficha-pdf-order) > [data-block-id="voluntarios"] { --area-bg: #f5eee3; --area-ink: #755b31; --area-edge: #dfcfae; }

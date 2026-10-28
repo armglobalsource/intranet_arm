@@ -424,6 +424,38 @@ test.describe('operación táctil', () => {
 });
 
 
+for (const width of [393, 1366]) {
+  test(`editor y publicación ${width}px: misma identidad y vista previa conserva asignaciones`, async ({page}) => {
+    const {ficha, writes} = await fixture(page);
+    ficha.hiddenSections = ficha.hiddenSections.filter(s => s !== 'outfit');
+    ficha.sections.outfit.rows = [{...makeRow('outfit_palette', 'Paleta', 0, 'tierra'), type: 'text'}] as any;
+    await page.route('**/api/v1/paletas', route => route.fulfill({json: [{id: 'tierra', name: 'Tierra / Coral', colors: [{name: 'Coral', hex: '#E85D2A'}]}]}));
+    await page.setViewportSize({width, height: 852});
+    await page.goto(url);
+    const title = page.locator('.ficha-pdf-order > [data-block-id="worship"] .ficha-card > div').first();
+    await expect(title).toHaveCSS('background-color', 'rgb(230, 242, 233)');
+    await expect(page.locator('.ficha-position-circle')).toHaveCount(3);
+    await expect(page.getByLabel('Paleta de outfit: Tierra / Coral')).toBeVisible();
+    await page.getByRole('button', {name: 'Asignar personas: Bienvenida', exact: true}).click();
+    await page.getByRole('dialog').getByRole('checkbox').first().check();
+    await page.getByRole('button', {name: 'Aplicar asignación'}).click();
+    await page.getByRole('button', {name: 'Vista previa de publicación'}).click();
+    await expect(page.locator('.published-sheet')).toContainText('Ana Pérez');
+    await expect(page.locator('.published-sheet [data-block-id="worship"] caption')).toHaveCSS('background-color', 'rgb(230, 242, 233)');
+    await expect(page.getByLabel('Paleta de outfit: Tierra / Coral')).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Mover fila', exact: true})).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({path: `test-results/editor-preview-${width}.png`, fullPage: true});
+    await page.getByRole('button', {name: 'Volver a editar'}).click();
+    await expect(page.getByRole('button', {name: 'Asignar personas: Bienvenida', exact: true})).toContainText('Ana Pérez');
+    await expect(page.locator('.ficha-position-circle')).toHaveCount(3);
+    await page.locator('[data-ficha-slot="worship"]').scrollIntoViewIfNeeded();
+    await page.screenshot({path: `test-results/editor-unificado-${width}.png`});
+    await expect.poll(() => writes.some(w => w.path.endsWith('/sections/pastoral'))).toBe(true);
+    expect(writes.some(w => 'published' in w.body)).toBe(false);
+  });
+}
+
 test('set list: agregar un momento conserva título, responsable y orden al recargar', async ({page}) => {
   const {ficha, writes} = await fixture(page);
   ficha.hiddenSections = ficha.hiddenSections.filter(s => s !== 'setList');
