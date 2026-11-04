@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import './ficha-responsive.css';
 import '@/components/fichas/ficha-areas.css';
-import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSlot, FichaPermisos, AssignmentEdit } from '@/types/ficha';
+import type { Ficha, Row, SectionName, Encuentro, LayoutVisualSlot, LayoutVisualPatch, FichaPermisos, AssignmentEdit } from '@/types/ficha';
 import { SECTION_LABELS } from '@/types/ficha';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { SongLibraryDialog } from '@/components/fichas/SongLibraryDialog';
@@ -13,6 +13,8 @@ import { FichaPaperViewport } from '@/components/fichas/FichaPaperViewport';
 import { PublishedFichaSheet } from '@/components/fichas/PublishedFichaSheet';
 import { OutfitPalettePreview } from '@/components/fichas/OutfitPalettePreview';
 import { LayoutVisualView } from './LayoutVisualView';
+import { PrayerAssemblyView } from '@/components/fichas/PrayerAssemblyView';
+import { FichaVisualReferencesContext } from '@/components/fichas/VisualReferencePicker';
 import { PersonCellInput, FichaPeopleContext } from '@/components/fichas/PersonCellInput';
 import { SortableSection, SortableRow, SortableFichaLayout, SortablePdfSections } from '@/components/fichas/FichaSortable';
 
@@ -2181,8 +2183,8 @@ function VoluntariosCard({
 // ── EncuentroTabs ─────────────────────────────────────────────────────────────
 
 function EncuentroTabs({
-  encuentros, selected, onChange, showLayoutTab, showCompareTab,
-}: { encuentros: Encuentro[]; selected: string; onChange: (id: string) => void; showLayoutTab?: boolean; showCompareTab?: boolean }) {
+  encuentros, selected, onChange, showLayoutTab, showCompareTab, prayer,
+}: { encuentros: Encuentro[]; selected: string; onChange: (id: string) => void; showLayoutTab?: boolean; showCompareTab?: boolean; prayer?: boolean }) {
   const hasMultipleEncuentros = encuentros.length > 1;
   // Cuando showLayoutTab está activo, SIEMPRE mostramos al menos una píldora
   // de encuentro (aunque haya solo uno) para que el usuario pueda volver
@@ -2195,7 +2197,7 @@ function EncuentroTabs({
   // Label para la píldora del único encuentro: si viene con label propio, se
   // usa tal cual; si no, "Ficha" es más natural para el toggle de vuelta.
   function pillLabel(e: Encuentro): string {
-    if (hasMultipleEncuentros) return e.label;
+    if (hasMultipleEncuentros) return e.time && !e.label.includes(e.time) ? `${e.label} · ${e.time}` : e.label;
     return e.label && e.label.trim() ? e.label : 'Ficha';
   }
 
@@ -2243,7 +2245,7 @@ function EncuentroTabs({
           <button
             onClick={() => onChange('layout')}
             aria-pressed={selected === 'layout'}
-            title="Ver / editar layout visual (iluminación + visuales por canción)"
+            title={prayer ? 'Ver referencia del montaje de sala y sillas' : 'Ver / editar layout visual (iluminación + visuales por canción)'}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
@@ -2258,7 +2260,7 @@ function EncuentroTabs({
               <circle cx="8.5" cy="8.5" r="1.5" />
               <polyline points="21 15 16 10 5 21" />
             </svg>
-            Layout Visual
+            {prayer ? 'Montaje de sala' : 'Layout Visual'}
           </button>
         </>
       )}
@@ -2351,7 +2353,7 @@ export interface FichaDocumentViewProps {
   sectionLayout?: { left: string[]; right: string[]; leftRatio?: number; pdfOrder?: string[] };
   onUpdateLayout?: (layout: { left: string[]; right: string[]; leftRatio?: number; pdfOrder?: string[] }) => void;
   /** Persistir el bloque layoutVisual completo (vista alternativa por canción). */
-  onUpdateLayoutVisual?: (patch: { slots: LayoutVisualSlot[] }) => void;
+  onUpdateLayoutVisual?: (patch: LayoutVisualPatch) => void;
   /** Mostrar el historial de cambios en la primera vista (requiere sesión). */
   showHistory?: boolean;
   /** Guardar la lista de encuentros (agregar, quitar, cambiar hora). */
@@ -2535,6 +2537,7 @@ export function FichaDocumentView({
 
   return (
     <FichaPeopleContext.Provider value={{fichaId: ficha.fichaId, encuentros, currentId: colId}}>
+    <FichaVisualReferencesContext.Provider value={ficha.publicMeta?.visualRefs}>
     <div
       className={`ficha-doc-root${paperMode ? ' ficha-document-mode' : ' ficha-editor-theme'}`}
       style={{ maxWidth: 980, margin: '0 auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
@@ -2769,6 +2772,7 @@ export function FichaDocumentView({
       `}</style>
 
       <EncuentroTabs
+        prayer={ficha.type === 'oracion'}
         encuentros={encuentros ?? []}
         selected={selectedId}
         onChange={setSelectedId}
@@ -3298,7 +3302,7 @@ export function FichaDocumentView({
 
             const pdfDefaults = ['pastoral', 'responsables', 'streaming', 'produccion', 'media', 'anuncios', 'worship', 'horarios', 'voluntarios'];
             const pdfSlots: Record<string, React.ReactNode> = {
-              pastoral: !hidden('pastoral') ? (<div className="ficha-section-wrap" data-ficha-slot="pastoral">{remove('pastoral', 'Equipo Pastoral')}{(encuentros?.length ?? 0) > 1 ? <PastoralMatrix rows={sec('pastoral')} encuentros={encuentros} fichaId={ficha.fichaId} {...editProps('pastoral')} /> : <RoleCard title="Encuentro · Plataforma" rows={sec('pastoral')} {...editProps('pastoral')} />}</div>) : null,
+              pastoral: !hidden('pastoral') ? (<div className="ficha-section-wrap" data-ficha-slot="pastoral">{remove('pastoral', 'Equipo Pastoral')}<RoleCard title="Encuentro · Plataforma" rows={sec('pastoral')} {...editProps('pastoral')} /></div>) : null,
               responsables: !hidden('produccion') && responsibilities.length > 0 ? (<div data-ficha-slot="responsables"><RoleCard title="Responsables" rows={responsibilities} {...editProps('produccion')} onAddRow={undefined} onComplete={undefined} /></div>) : null,
               streaming: !hidden('streaming') ? (<div className="ficha-section-wrap" data-ficha-slot="streaming">{remove('streaming', 'Streaming')}{renderSlot('streaming')}</div>) : null,
               produccion: !hidden('produccion') ? (<div className="ficha-section-wrap" data-ficha-slot="produccion">{remove('produccion', 'Producción')}<RoleCard title="Equipo técnico" rows={technical} {...editProps('produccion')} /></div>) : null,
@@ -3357,19 +3361,19 @@ export function FichaDocumentView({
           const hasLegacyContent =
             legacySongs.some(songHasContent)
             || (legacyNotes.trim().length > 0);
-          const hasLayoutContent = hasSlotContent || hasLegacyContent;
+          const hasLayoutContent = ficha.type === 'oracion' ? !!ficha.layoutVisual?.assemblyReferenceIds?.length : hasSlotContent || hasLegacyContent;
           return (
             <div
               ref={layoutRef}
               className={`layout-visual-page ${isLayoutView ? 'ficha-view-active' : 'ficha-view-hidden'} ${hasLayoutContent ? '' : 'layout-visual-empty'}`}
               style={{ display: isLayoutView ? 'block' : 'none' }}
             >
-              <LayoutVisualView
+              {ficha.type === 'oracion' ? <PrayerAssemblyView key={ficha.fichaId} ficha={ficha} editable={!!editable && !!onUpdateLayoutVisual} onSave={onUpdateLayoutVisual} /> : <LayoutVisualView
                 ficha={ficha}
                 editable={!!editable && !!onUpdateLayoutVisual}
                 localSetListRows={editable ? localSections?.setList : undefined}
                 onSave={onUpdateLayoutVisual}
-              />
+              />}
             </div>
           );
         })()}
@@ -3403,6 +3407,7 @@ export function FichaDocumentView({
       </div>
       </FichaPaperViewport>
     </div>
+    </FichaVisualReferencesContext.Provider>
     </FichaPeopleContext.Provider>
   );
 }

@@ -41,6 +41,7 @@ function AssignmentDialog({ row, value, saved, context, onClose, onSave }: {
   const titleId = useId();
   const [draft, setDraft] = useState<RowAssignment>(saved ? structuredClone(saved) : { mode: 'people', people: [], note: '' });
   const [scope, setScope] = useState<AssignmentEdit['scope']>(row.shared ? 'all' : 'current');
+  const [encounterIds, setEncounterIds] = useState<string[]>([context.currentId]);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const userId = useAuthStore(s => s.user?.id);
@@ -91,9 +92,18 @@ function AssignmentDialog({ row, value, saved, context, onClose, onSave }: {
         <option value="current">Solo este encuentro · {context.encuentros.find(e => e.id === context.currentId)?.time}</option>
         <option value="block">Encuentros del mismo bloque (AM / PM)</option>
         <option value="all">Todos los encuentros de esta ficha</option>
+        <option value="selected">Elegir encuentros específicos</option>
       </select></label>}
+      {context.encuentros.length > 1 && scope === 'selected' && <fieldset className="rounded-lg border border-slate-200 p-3">
+        <legend className="px-1 text-sm font-semibold">Encuentros donde participa</legend>
+        <div className="grid gap-2 sm:grid-cols-2">{context.encuentros.map(e => <label key={e.id} className="flex min-h-11 items-center gap-2 rounded-md bg-slate-50 p-2 text-sm">
+          <input type="checkbox" checked={encounterIds.includes(e.id)} onChange={() => setEncounterIds(ids => ids.includes(e.id) ? ids.filter(id => id !== e.id) : [...ids, e.id])} />
+          <span>{e.time} · {e.label}</span>
+        </label>)}</div>
+        {!encounterIds.length && <p role="status" className="mt-2 text-xs text-amber-800">Elige al menos un encuentro.</p>}
+      </fieldset>}
       <p className="text-xs text-slate-500">El tratamiento solo se muestra en esta asignación. Las personas sin cuenta no reciben acceso a la plataforma.</p>
-      <div className="ficha-dialog-actions flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={onClose} disabled={createPerson.isPending} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancelar</button><button type="button" onClick={() => onSave({ assignment: draft, scope, encounterId: context.currentId })} disabled={createPerson.isPending || (draft.mode === 'team' && !draft.note.trim())} className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Aplicar asignación</button></div>
+      <div className="ficha-dialog-actions flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={onClose} disabled={createPerson.isPending} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancelar</button><button type="button" onClick={() => onSave({ assignment: draft, scope, encounterId: context.currentId, ...(scope === 'selected' ? {encounterIds} : {}) })} disabled={createPerson.isPending || (draft.mode === 'team' && !draft.note.trim()) || (scope === 'selected' && !encounterIds.length)} className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Aplicar asignación</button></div>
     </div>
   </dialog>;
 }

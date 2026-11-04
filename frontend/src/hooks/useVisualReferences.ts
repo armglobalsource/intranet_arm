@@ -28,11 +28,12 @@ const keys = {
   detail: (id: number)      => ['visual-references', 'detail', id] as const,
 };
 
-export function useVisualReferences(search?: string) {
+export function useVisualReferences(search?: string, enabled = true) {
   return useQuery<VisualReference[]>({
     queryKey: keys.list(search),
     queryFn:  () => api.get('/visual-references', { params: search ? { search } : undefined }).then((r) => r.data),
     staleTime: 30_000,
+    enabled,
   });
 }
 

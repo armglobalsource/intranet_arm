@@ -1,6 +1,6 @@
 'use client';
 import { editAssignmentCell } from '@/lib/ficha-assignments';
-import type { AssignmentEdit } from '@/types/ficha';
+import type { AssignmentEdit, LayoutVisualPatch } from '@/types/ficha';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
@@ -447,11 +447,15 @@ export function FichaEditorClient({ fichaId }: { fichaId: string }) {
         });
   }, [fichaId, updateFichaAsync]);
 
-  function handleUpdateLayoutVisual(patch: { slots: LayoutVisualSlot[] }) {
+  function handleUpdateLayoutVisual(patch: LayoutVisualPatch) {
     if (!ficha) return;
+    setSaveState('saving');
     updateLayoutVisual({
       fichaId: ficha.fichaId,
-      slots:   patch.slots,
+      ...patch,
+    }, {
+      onSuccess: () => { setSaveState('saved'); setActionError(null); },
+      onError: err => { setSaveState('error'); setActionError(apiErrorMessage(err, 'No se pudo guardar la referencia visual. Vuelve a seleccionarla para reintentar.')); },
     });
   }
 

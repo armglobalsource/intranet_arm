@@ -540,7 +540,7 @@ function LayoutSlotBody({
           {/* Encabezado */}
           <div className="layout-visual-head" style={{
             display: 'grid',
-            gridTemplateColumns: '1.4fr 1fr 1.4fr 2fr',
+            gridTemplateColumns: '1.2fr 1fr 1.8fr',
             background: D.headerBg,
             borderBottom: `0.5px solid ${D.divider}`,
             padding: '10px 14px',
@@ -551,7 +551,6 @@ function LayoutSlotBody({
             <div>Canción</div>
             <div>Iluminación</div>
             <div>Visuales</div>
-            <div>Referencias</div>
           </div>
 
           {/* Filas */}
@@ -564,7 +563,7 @@ function LayoutSlotBody({
                 className="layout-visual-row"
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1.4fr 1fr 1.4fr 2fr',
+                  gridTemplateColumns: '1.2fr 1fr 1.8fr',
                   padding: '12px 14px',
                   gap: 12,
                   alignItems: 'flex-start',
@@ -673,7 +672,7 @@ function LayoutSlotBody({
                 </div>
 
                 {/* Columna Referencias */}
-                <div data-label="Referencias" style={{ minWidth: 0 }}>
+                <div data-label="Referencias" className="layout-visual-references" style={{ minWidth: 0, gridColumn: '1 / -1' }}>
                   <VisualReferencePicker
                     value={song.referenceIds}
                     onChange={(next) => onUpdateSong(song.songRowId, { referenceIds: next })}

@@ -25,6 +25,19 @@ describe('directorio y persistencia desde fichas', () => {
     expect(query.mock.calls.at(-1)?.[1]).toEqual([false, '1', ['%perez%', '%ana%']]);
     expect(query.mock.calls.at(-1)?.[0]).not.toContain('email');
   });
+  it('guarda el montaje sin borrar visuales anteriores y enriquece sus imágenes públicas', async () => {
+    const {service, query, ficha} = fixture();
+    ficha.layoutVisual = {slots: [{id: 'default', encuentroIds: ['unico'], songs: [{songRowId: 's1', referenceIds: [44]}]}]};
+    await service.updateLayoutVisual('f1', {assemblyReferenceIds: [12]}, admin);
+    const write = query.mock.calls.find(([sql]) => sql.startsWith('UPDATE arm_app.fichas'))!;
+    const raw = write[1]?.find((v:any) => typeof v === 'string' && v.includes('"assemblyReferenceIds"'));
+    const layout = JSON.parse(raw);
+    expect(layout).toMatchObject({assemblyReferenceIds: [12], slots: [{songs: [{songRowId: 's1', referenceIds: [44]}]}]});
+    ficha.layoutVisual = layout;
+    await service.findPublic('f1');
+    expect(query.mock.calls.find(([sql]) => sql.includes('FROM arm_app.visual_references'))?.[1]).toEqual([[44,12]]);
+    await expect(service.updateLayoutVisual('f1', {assemblyReferenceIds: []}, reader)).rejects.toThrow();
+  });
   it('bloquea consulta del directorio y escritura a lectores y editores ajenos', async () => {
     const { service, query } = fixture();
     for (const user of [reader, { ...reader, campusId: 2, permissions: ['fichas:edit'] }]) {

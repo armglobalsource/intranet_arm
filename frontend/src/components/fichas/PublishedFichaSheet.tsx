@@ -30,7 +30,7 @@ export function PublishedFichaSheet({ ficha, colId, hidden, order, paletas }: {
   const outfit = rows('outfit').map(r => value(r,colId)).filter(Boolean).map(id => ({id, palette: paletas.find(p => p.id === id)}));
   const moments = momentTree(rows('horarios'), colId, true).flatMap(n => [n, ...n.children]).filter(m => hasContent(m.value));
   const slots: Record<string, React.ReactNode> = {
-    pastoral: (ficha.encuentros?.length ?? 0) > 1 && rows('pastoral').some(r => ficha.encuentros.some(e => value(r,e.id))) ? <table><caption>Encuentro · Plataforma</caption><colgroup><col style={{width: '27%'}} />{ficha.encuentros.map(e => <col key={e.id} />)}</colgroup><thead><tr><th scope="col">Asignación</th>{ficha.encuentros.map(e => <th scope="col" key={e.id}>{e.time || e.label}</th>)}</tr></thead><tbody>{rows('pastoral').filter(r => ficha.encuentros.some(e => value(r,e.id))).map(r => <tr key={r.id}><th scope="row">{r.label}</th>{ficha.encuentros.map(e => <td key={e.id}>{value(r,e.id)}</td>)}</tr>)}</tbody></table> : table('Encuentro · Plataforma', assigned('pastoral')),
+    pastoral: table('Encuentro · Plataforma', assigned('pastoral')),
     responsables: table('Responsables', production.filter(responsibilities)),
     streaming: grid('Equipo streaming', assigned('streaming')),
     produccion: grid('Equipo técnico', production.filter(r => !responsibilities(r))),

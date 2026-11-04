@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient, useIsMutating } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '@/lib/api';
-import type { Ficha, FichaListItem, CreateFichaPayload, SectionName, LayoutVisualSlot } from '@/types/ficha';
+import type { Ficha, FichaListItem, CreateFichaPayload, SectionName, LayoutVisualSlot, LayoutVisualPatch } from '@/types/ficha';
 
 const KEYS = {
   all:    ['fichas'] as const,
@@ -213,8 +213,8 @@ export function useUpdateLayoutVisual() {
   const qc = useQueryClient();
   return useMutation({
     mutationKey: WRITE_KEY,
-    mutationFn: ({ fichaId, slots }: { fichaId: string; slots: LayoutVisualSlot[] }) =>
-      api.patch(`/fichas/${fichaId}/layout-visual`, { slots }).then(r => r.data),
+    mutationFn: ({ fichaId, ...patch }: { fichaId: string } & LayoutVisualPatch) =>
+      api.patch(`/fichas/${fichaId}/layout-visual`, patch).then(r => r.data),
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(variables.fichaId) });
       qc.invalidateQueries({ queryKey: KEYS.all });

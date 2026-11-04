@@ -1,211 +1,65 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  useVisualReferences,
-  useUploadVisualReference,
-  type VisualReference,
-} from '@/hooks/useVisualReferences';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useVisualReferences, useUploadVisualReference, type VisualReference } from '@/hooks/useVisualReferences';
 import { CanDo } from '@/components/shared/CanDo';
+import './visual-reference-gallery.css';
 
-const ACCENT = '#0D9488';
-
+const ACCENT = '#3f536b';
+export const FichaVisualReferencesContext = createContext<VisualReference[] | undefined>(undefined);
 interface VisualReferencePickerProps {
-  value:    number[];
-  onChange: (next: number[]) => void;
-  editable?: boolean;
-  /** Máximo de referencias por canción (defensa contra clicks accidentales). */
-  max?: number;
+  value: number[]; onChange: (next: number[]) => void; editable?: boolean; max?: number;
+  variant?: 'gallery' | 'assembly';
 }
 
-/**
- * Muestra las referencias visuales seleccionadas como chips inline con
- * thumbnails, y un botón "+" que abre el modal para elegir más del catálogo
- * global. En modo NO editable solo muestra los thumbnails.
- */
-export function VisualReferencePicker({
-  value, onChange, editable = true, max = 30,
-}: VisualReferencePickerProps) {
+export function VisualReferencePicker({value, onChange, editable = true, max = 30, variant = 'gallery'}: VisualReferencePickerProps) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const publicRefs = useContext(FichaVisualReferencesContext);
+  const {data: catalog = [], isError, isPending} = useVisualReferences(undefined, publicRefs === undefined);
+  const allRefs = publicRefs ?? catalog;
+  const byId = useMemo(() => new Map(allRefs.map(r => [r.id, r])), [allRefs]);
+  const selected = value.map(id => byId.get(id)).filter((r): r is VisualReference => !!r);
+  const activeIndex = selected.findIndex(r => r.id === activeId);
+  return <div className={'visual-reference-gallery ' + (variant === 'assembly' ? 'visual-reference-assembly' : '')}>
+    {!!selected.length && <p className="reference-gallery-count">{variant === 'assembly' ? 'Referencia de montaje' : selected.length + ' referencia' + (selected.length === 1 ? '' : 's') + ' · Selecciona una imagen para ampliarla'}</p>}
+    <div className="reference-gallery-grid">{selected.map((r, i) => <figure key={r.id} className="reference-gallery-item">
+      <button type="button" className="reference-gallery-open" aria-label={'Ampliar referencia ' + r.name} onClick={() => setActiveId(r.id)}>
+        <img src={r.imageUrl} alt={r.name} loading="lazy" />
+        <span className="reference-gallery-expand ficha-no-print" aria-hidden="true">↗</span>
+      </button>
+      <figcaption><span>{i + 1}. {r.name}</span>{editable && <button type="button" aria-label={'Quitar referencia ' + r.name} className="ficha-no-print" onClick={() => onChange(value.filter(id => id !== r.id))}>×</button>}</figcaption>
+    </figure>)}</div>
+    {publicRefs === undefined && isError && <p role="alert" className="reference-gallery-missing">No se pudieron cargar las referencias.</p>}
+    {(publicRefs !== undefined || (!isError && !isPending)) && value.length > selected.length && <p className="reference-gallery-missing">Hay referencias que ya no están disponibles en el catálogo.</p>}
+    {editable && <button type="button" className="reference-gallery-add ficha-no-print" onClick={() => setModalOpen(true)}>{variant === 'assembly' && value.length ? 'Cambiar imagen de montaje' : variant === 'assembly' ? '+ Agregar imagen de montaje' : '+ Agregar referencias'}</button>}
+    {modalOpen && createPortal(<PickerModal initialSelected={value} max={max} onDone={ids => {onChange(ids.slice(0,max)); setModalOpen(false);}} onClose={() => setModalOpen(false)} />, document.body)}
+    {activeIndex >= 0 && createPortal(<ReferenceLightbox refs={selected} index={activeIndex} onChange={i => setActiveId(selected[i].id)} onClose={() => setActiveId(null)} />, document.body)}
+  </div>;
+}
 
-  // Traemos TODO el catálogo (no filtrado) para poder resolver los IDs
-  // seleccionados a sus URLs. Con debounce del server el costo es aceptable.
-  const { data: allRefs = [] } = useVisualReferences();
-
-  // Mapa id → ref para lookup rápido
-  const refById = useMemo(() => {
-    const m = new Map<number, VisualReference>();
-    allRefs.forEach((r) => m.set(r.id, r));
-    return m;
-  }, [allRefs]);
-
-  const selected = value.map((id) => refById.get(id)).filter((r): r is VisualReference => !!r);
-
-  function removeOne(id: number) {
-    onChange(value.filter((v) => v !== id));
-  }
-
-  function handleModalDone(nextIds: number[]) {
-    onChange(nextIds.slice(0, max));
-    setModalOpen(false);
-  }
-
-  const STRIP_HEIGHT = 64; // altura fija de la tira (en px)
-
-  // ── Vista NO editable — tira horizontal continua ──────────────────────────
-  if (!editable) {
-    if (selected.length === 0) {
-      return <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>—</span>;
-    }
-    return (
-      <div style={{
-        display: 'flex',
-        gap: 0,
-        borderRadius: 4,
-        overflowX: 'auto',
-        overflowY: 'hidden',
-        border: '0.5px solid rgba(255,255,255,0.12)',
-        maxWidth: '100%',
-        height: STRIP_HEIGHT,
-      }}>
-        {selected.map((r) => (
-          <img
-            key={r.id}
-            src={r.imageUrl}
-            alt={r.name}
-            title={r.name}
-            style={{
-              height: STRIP_HEIGHT, width: 'auto', maxWidth: 'none',
-              objectFit: 'contain',
-              display: 'block', flexShrink: 0,
-            }}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  // ── Modo edición — mismo look de tira + X en hover + botón "+" al lado ────
-  return (
-    <>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'stretch', flexWrap: 'wrap' }}>
-        {selected.length > 0 && (
-          <div
-            className="ficha-no-print"
-            style={{
-              display: 'flex',
-              gap: 0,
-              borderRadius: 4,
-              overflowX: 'auto',
-              overflowY: 'hidden',
-              border: '0.5px solid rgba(127,119,221,0.35)',
-              height: STRIP_HEIGHT,
-              maxWidth: '100%',
-              flexWrap: 'nowrap',
-            }}
-          >
-            {selected.map((r) => (
-              <div
-                key={r.id}
-                className="ref-img-wrap"
-                style={{ position: 'relative', flexShrink: 0, height: '100%' }}
-              >
-                <img
-                  src={r.imageUrl}
-                  alt={r.name}
-                  title={r.name}
-                  style={{
-                    height: STRIP_HEIGHT, width: 'auto', maxWidth: 'none',
-                    objectFit: 'contain',
-                    display: 'block', flexShrink: 0,
-                  }}
-                />
-                <button
-                  onClick={() => removeOne(r.id)}
-                  title="Quitar"
-                  className="ref-img-remove"
-                  style={{
-                    position: 'absolute', top: 4, right: 4,
-                    width: 18, height: 18, borderRadius: '50%',
-                    background: 'rgba(220,38,38,0.95)', color: '#fff',
-                    border: '1px solid rgba(0,0,0,0.4)',
-                    fontSize: 11, lineHeight: 1, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: 0, opacity: 0,
-                    transition: 'opacity 0.15s',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Versión estática visible en print — misma tira sin botones */}
-        {selected.length > 0 && (
-          <div className="ficha-print-only" style={{
-            display: 'none', gap: 0, flexWrap: 'nowrap',
-            borderRadius: 3, overflow: 'hidden',
-            border: '0.5px solid #ccc',
-            height: STRIP_HEIGHT,
-            maxWidth: '100%',
-          }}>
-            {selected.map((r) => (
-              <img key={r.id} src={r.imageUrl} alt={r.name}
-                style={{
-                  height: '100%', width: 'auto',
-                  display: 'block', flexShrink: 0,
-                }} />
-            ))}
-          </div>
-        )}
-
-        {value.length < max && (
-          <button
-            onClick={() => setModalOpen(true)}
-            className="ficha-no-print"
-            title="Agregar referencia visual"
-            style={{
-              height: STRIP_HEIGHT, minWidth: STRIP_HEIGHT, padding: '0 12px',
-              borderRadius: 4,
-              border: `1px dashed ${ACCENT}88`,
-              background: `${ACCENT}12`,
-              color: ACCENT,
-              cursor: 'pointer',
-              fontSize: 20, lineHeight: 1, fontWeight: 600,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            +
-          </button>
-        )}
-      </div>
-
-      {/* Estilo global: muestra la X al hover en cada imagen de la tira. */}
-      <style>{`
-        .ref-img-wrap:hover .ref-img-remove { opacity: 1 !important; }
-      `}</style>
-
-      {modalOpen && (
-        <PickerModal
-          initialSelected={value}
-          onDone={handleModalDone}
-          onClose={() => setModalOpen(false)}
-        />
-      )}
-    </>
-  );
+function ReferenceLightbox({refs, index, onChange, onClose}: {refs: VisualReference[]; index: number; onChange: (i: number) => void; onClose: () => void}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {dialog.current?.showModal(); return () => dialog.current?.close();}, []);
+  const ref = refs[index];
+  return <dialog ref={dialog} className="reference-lightbox" aria-label="Referencia visual ampliada" onCancel={onClose} onKeyDown={e => {
+    if (e.key === 'ArrowRight') {e.preventDefault(); onChange((index + 1) % refs.length);}
+    if (e.key === 'ArrowLeft') {e.preventDefault(); onChange((index - 1 + refs.length) % refs.length);}
+  }}>
+    <header><span>{index + 1} / {refs.length} · {ref.name}</span><button type="button" autoFocus aria-label="Cerrar referencia ampliada" onClick={onClose}>×</button></header>
+    <img src={ref.imageUrl} alt={ref.name} />
+    <footer>{refs.length > 1 && <><button type="button" onClick={() => onChange((index - 1 + refs.length) % refs.length)}>← Anterior</button><button type="button" onClick={() => onChange((index + 1) % refs.length)}>Siguiente →</button></>}<a href={ref.imageUrl} target="_blank" rel="noopener noreferrer">Abrir imagen original ↗</a></footer>
+  </dialog>;
 }
 
 // ── PickerModal ───────────────────────────────────────────────────────────────
 
 function PickerModal({
-  initialSelected, onDone, onClose,
+  initialSelected, onDone, onClose, max = 30,
 }: {
   initialSelected: number[];
+  max?: number;
   onDone: (ids: number[]) => void;
   onClose: () => void;
 }) {
@@ -230,14 +84,14 @@ function PickerModal({
   function toggle(id: number) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id); else if (max === 1) return new Set([id]); else if (next.size < max) next.add(id);
       return next;
     });
   }
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[820px] max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Elegir referencias visuales" className="bg-white rounded-2xl shadow-2xl w-full max-w-[820px] max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50 flex-shrink-0">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{ background: `${ACCENT}18` }}>🖼️</div>
@@ -305,6 +159,9 @@ function PickerModal({
                 return (
                   <button
                     key={r.id}
+                    type="button"
+                    aria-label={'Seleccionar referencia ' + r.name}
+                    aria-pressed={isSel}
                     onClick={() => toggle(r.id)}
                     className={`group relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
                       isSel ? 'border-teal-500 shadow-md' : 'border-slate-200 hover:border-slate-400'
@@ -357,7 +214,7 @@ function PickerModal({
       {showUpload && <InlineUploadModal onClose={(newId?: number) => {
         setShowUpload(false);
         if (newId) {
-          setSelected((prev) => new Set(prev).add(newId));
+          setSelected((prev) => max === 1 ? new Set([newId]) : new Set(prev).add(newId));
         }
       }} />}
     </div>

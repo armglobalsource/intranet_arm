@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { DatabaseService } from '../common/database/database.service';
 import { apiRows, databaseError, SqlConnection } from '../common/database/identity-sql';
 import { hasPermission } from '../common/permissions';
-import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto, UpdateEquipoDto } from './dto/ficha.dto';
+import { CreateFichaDto, UpdateFichaDto, UpdateSectionDto, CloneFichaDto, UpdateLayoutVisualDto, UpdateEquipoDto, LayoutVisualSlotDto } from './dto/ficha.dto';
 import { ALL_FICHA_SECTIONS, activeSectionsForType, deriveFichaStatus, FICHA_SECTION_LABELS, formatFichaDateLabel, missingRequiredRows, parseFichaDate } from './fichas.utils';
 import { defaultRows, defaultRowsOracion, buildDefaultSections, buildDefaultCompletion, migrateMediaData, preservePrayerSections, buildGlobalSectionsFromMixedFicha } from './fichas.defaults';
 import { ChangelogEntry, CHANGELOG_MERGE_WINDOW_MS, capRowChanges, diffRows, mergeRowChanges } from './fichas.changelog';
@@ -170,7 +170,7 @@ export class PostgresFichasService {
     if(f.layoutVisual) delete f.layoutVisual.updatedBy;
     const paletteIds = [...new Set((f.sections?.outfit?.rows ?? []).flatMap((r:any)=>Object.values(r.values ?? {})).filter((v:any)=>typeof v==='string' && v.trim()))];
     const songs=[...(f.layoutVisual?.songs ?? []),...(f.layoutVisual?.slots ?? []).flatMap((s:any)=>s.songs ?? [])];
-    const refIds=[...new Set(songs.flatMap((s:any)=>s.referenceIds ?? []).filter((v:any)=>Number.isSafeInteger(v)))];
+    const refIds=[...new Set([...songs.flatMap((s:any)=>s.referenceIds ?? []),...(f.layoutVisual?.assemblyReferenceIds ?? [])].filter((v:any)=>Number.isSafeInteger(v)))];
     const paletas=apiRows(await this.db.query('SELECT id,name,colors,"order" FROM arm_app.paletas WHERE id=ANY($1::text[])',[paletteIds]));
     const visualRefs=apiRows(await this.db.query('SELECT id,name,tags,"imageUrl" FROM arm_app.visual_references WHERE id=ANY($1::bigint[])',[refIds]));
     f.publicMeta={paletas,visualRefs};return f;
@@ -251,9 +251,11 @@ export class PostgresFichasService {
   updateLayoutVisual(id: string, dto: UpdateLayoutVisualDto, u: FichaUser) {
     return this.change(id,u,(f,_db,log)=>{
       log(null,{kind:'layoutVisual'});
-      const input=dto.slots?.length ? dto.slots : [{id:'default',label:'',encuentroIds:[],songs:dto.songs??[],producerNotes:dto.producerNotes??''}];
+      const previous=f.layoutVisual ?? {};
+      const input: LayoutVisualSlotDto[]=dto.slots ?? (dto.songs !== undefined ? [{id:'default',label:'',encuentroIds:[],songs:dto.songs,producerNotes:dto.producerNotes??''}]
+        : previous.slots ?? [{id:'default',label:'',encuentroIds:[],songs:previous.songs??[],producerNotes:previous.producerNotes??''}]);
       const slots=input.map(s=>({id:s.id,label:s.label??'',encuentroIds:s.encuentroIds??[],producerNotes:s.producerNotes??'',songs:(s.songs??[]).map(song=>({songRowId:song.songRowId,iluminacion:song.iluminacion??'',illuminationColors:song.illuminationColors??[],visualDescription:song.visualDescription??'',referenceIds:song.referenceIds??[]}))}));
-      f.layoutVisual={slots,updatedAt:new Date().toISOString(),updatedBy:u.sub};
+      f.layoutVisual={slots,assemblyReferenceIds:dto.assemblyReferenceIds ?? previous.assemblyReferenceIds ?? [],updatedAt:new Date().toISOString(),updatedBy:u.sub};
     },'layout');
   }
   async updateSection(id: string, name: string, dto: UpdateSectionDto, u: FichaUser) {

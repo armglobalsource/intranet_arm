@@ -171,6 +171,9 @@ export class LayoutVisualSlotDto {
  * normaliza a un solo slot 'default'.
  */
 export class UpdateLayoutVisualDto {
+  @IsOptional() @IsArray() @ArrayMaxSize(1)
+  @IsInt({each: true}) @Min(1, {each: true})
+  assemblyReferenceIds?: number[];
   /** Nueva forma: arreglo de slots. */
   @IsOptional() @IsArray() @ArrayMaxSize(5)
   @ValidateNested({ each: true }) @Type(() => LayoutVisualSlotDto)

@@ -30,6 +30,7 @@ export function editAssignmentCell(row: Row, section: SectionName, key: string, 
     return { ...row, values: { ...values, [key]: value }, assignments };
   }
   let shared = row.shared;
+  if (edit.scope === 'selected' && !encounters.some(e => edit.encounterIds?.includes(e.id))) return row;
   if (shared && edit.scope !== 'all' && encounters.length > 1) {
     for (const e of encounters) {
       values[e.id] = values.shared ?? values[e.id] ?? '';
@@ -39,7 +40,7 @@ export function editAssignmentCell(row: Row, section: SectionName, key: string, 
   }
   const current = encounters.find(e => e.id === edit.encounterId) ?? encounters[0] ?? {id: key, time: '00:00'};
   const targets = shared ? ['shared'] : edit.scope === 'current' ? [current.id] : encounters
-    .filter(e => edit.scope === 'all' || (e.time < '15:00') === (current.time < '15:00')).map(e => e.id);
+    .filter(e => edit.scope === 'selected' ? edit.encounterIds?.includes(e.id) : edit.scope === 'all' || (e.time < '15:00') === (current.time < '15:00')).map(e => e.id);
   for (const target of targets) {
     assignments[target] = structuredClone(edit.assignment);
     const source = target === current?.id || target === 'shared' ? value : values[target] ?? '';

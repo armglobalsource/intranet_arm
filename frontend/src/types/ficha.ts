@@ -64,7 +64,7 @@ export interface RowAssignment {
   people: ({ userId: number; manualId?: never; name: string; title?: string } | { manualId: string; userId?: never; name: string; title?: string })[];
   note: string;
 }
-export type AssignmentEdit = { assignment: RowAssignment; scope: 'current' | 'block' | 'all'; encounterId: string };
+export type AssignmentEdit = { assignment: RowAssignment; scope: 'current' | 'block' | 'all' | 'selected'; encounterId: string; encounterIds?: string[] };
 
 export interface Row {
   assignments?: Record<string, RowAssignment>;
@@ -127,6 +127,8 @@ export interface LayoutVisualSlot {
 }
 
 export interface LayoutVisual {
+  /** Room/chair arrangement reference for prayer gatherings. */
+  assemblyReferenceIds?: number[];
   /** Forma actual: arreglo de slots. Los readers deben usar `slots` cuando
    *  esté disponible. Los writers backend normalizan la forma antigua a
    *  slots automáticamente. */
@@ -138,6 +140,8 @@ export interface LayoutVisual {
   updatedAt?:     any;
   updatedBy?:     number;
 }
+
+export type LayoutVisualPatch = { slots?: LayoutVisualSlot[]; assemblyReferenceIds?: number[] };
 
 export interface Ficha {
   fichaId:          string;

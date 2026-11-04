@@ -6,6 +6,15 @@ const next: RowAssignment = { mode: 'people', people: [{ userId: 2, name: 'Juan'
 const row: Row = { id: 'r', label: 'Sonido', type: 'person', order: 0, required: true, shared: true, values: { shared: 'Ana' }, assignments: { shared: old } };
 const encounters = ['09:00', '11:00', '17:00'].map((time, i) => ({ id: `e${i}`, time, label: time, color: '#111', isLive: false }));
 describe('alcance de las asignaciones', () => {
+  it('aplica solo a las 11 y 13 conservando el encuentro de las 9 y sus vínculos', () => {
+    const am = encounters.map((e,i) => ({...e, time: ['09:00','11:00','13:00'][i]}));
+    const result = editAssignmentCell(row, 'pastoral', 'shared', 'Juan', am, {assignment: next, scope: 'selected', encounterId: 'e0', encounterIds: ['e1','e2']});
+    expect(result.shared).toBe(false);
+    expect(result.values).toEqual({e0: 'Ana', e1: 'Juan / María · Apoyo', e2: 'Juan / María · Apoyo'});
+    expect(result.assignments).toEqual({e0: old, e1: next, e2: next});
+    expect(row.values).toEqual({shared: 'Ana'});
+    expect(editAssignmentCell(row, 'pastoral', 'shared', 'Juan', am, {assignment: next, scope: 'selected', encounterId: 'e0', encounterIds: []})).toBe(row);
+  });
   it('conserva el título de un momento del set list al asignar y renombrar', () => {
     const moment: Row = {...row, type: 'text', label: 'Bienvenida', values: {shared: '{"titulo":"Bienvenida","cantante":"Ana"}'}};
     const r = editAssignmentCell(moment, 'setList', 'shared', moment.values.shared, encounters, {assignment: next, scope: 'all', encounterId: 'e0'});

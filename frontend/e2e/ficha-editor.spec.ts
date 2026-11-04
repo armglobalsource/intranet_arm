@@ -26,6 +26,7 @@ async function fixture(page: Page, permissions = ['*']) {
       const body = route.request().postDataJSON();
       writes.push({ path, body });
       if (path.endsWith('/canciones/song-1')) Object.assign(song, body, { revision: '2026-10-27T09:00:01.123456Z' });
+      else if (path.endsWith('/layout-visual')) Object.assign(ficha, {layoutVisual: {...(ficha as any).layoutVisual, ...body}});
       else if (path.includes('/sections/')) {
         const section = path.split('/').pop()!;
         Object.assign(sections[section], body, { revision: sections[section].revision + 1 });
@@ -295,8 +296,7 @@ test('bloque AM: cambiar la asignación compartida conserva el encuentro PM', as
   await page.getByRole('button', { name: 'Asignar personas: Bienvenida', exact: true }).first().click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('checkbox').nth(0).check();
-  await expect(page.locator('.ficha-matrix-head')).toContainText('09:00');
-  await expect(page.locator('.ficha-matrix-head')).toContainText('17:00');
+  await expect(page.locator('.ficha-matrix-head')).toHaveCount(0);
   await dialog.getByLabel('Aplicar a').selectOption('block');
   await dialog.getByRole('button', { name: 'Aplicar asignación' }).click();
   await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/pastoral')).at(-1)?.body.rows[0].values).toEqual({ e0: 'Ana Pérez', e1: 'Ana Pérez', e2: 'María González' });
@@ -566,4 +566,109 @@ test('vista documento interna conserva el orden y permite volver a editar', asyn
   await expect(page.getByRole('button', { name: 'Imprimir / PDF', exact: true })).toHaveCount(1);
   await page.getByRole('button', { name: 'Editar ficha', exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard\/fichas-tecnicas\/ui-fixture$/);
+});
+
+function referenceFixtures(count: number) {
+  return Array.from({length: count}, (_,i) => ({id: i+1, name: `Gráfica ${i+1}`, tags: [],
+    imageUrl: 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="${i % 2 ? '#405c78' : '#8a6045'}"/><text x="50" y="190" fill="white" font-size="36">Referencia ${i+1}</text></svg>`)}));
+}
+
+test('selección específica: asigna 11 y 13 sin cambiar 9 y conserva al recargar', async ({page}) => {
+  const {ficha, writes} = await fixture(page);
+  ficha.type = 'multi';
+  ficha.encuentros = ['09:00','11:00','13:00'].map((time,i) => ({id: `e${i}`, label: `Encuentro ${i+1}`, time, color: '#334155'}));
+  await page.setViewportSize({width: 393, height: 852});
+  await page.goto(url);
+  await page.getByRole('button', {name: 'Asignar personas: Bienvenida', exact: true}).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('checkbox').first().check();
+  await dialog.getByLabel('Aplicar a').selectOption('selected');
+  await dialog.getByRole('checkbox', {name: /09:00/}).uncheck();
+  await expect(dialog.getByRole('button', {name: 'Aplicar asignación'})).toBeDisabled();
+  await dialog.getByRole('checkbox', {name: /11:00/}).check();
+  await dialog.getByRole('checkbox', {name: /13:00/}).check();
+  await dialog.getByRole('button', {name: 'Aplicar asignación'}).click();
+  await expect.poll(() => writes.filter(w => w.path.endsWith('/sections/pastoral')).at(-1)?.body.rows[0].values).toEqual({e0: 'María González', e1: 'Ana Pérez', e2: 'Ana Pérez'});
+  await page.reload();
+  await expect(page.getByRole('button', {name: 'Asignar personas: Bienvenida', exact: true})).toContainText('María González');
+  await page.getByRole('button', {name: /Encuentro 2 · 11:00/}).click();
+  await expect(page.getByRole('button', {name: 'Asignar personas: Bienvenida', exact: true})).toContainText('Ana Pérez');
+});
+
+for (const width of [393,1366]) {
+  test(`domingo separado ${width}px: cada pestaña muestra su plataforma y Comparar muestra las tres`, async ({page}) => {
+    const {ficha} = await fixture(page);
+    ficha.type = 'multi';
+    ficha.encuentros = ['09:00','11:00','13:00'].map((time,i) => ({id: `e${i}`, label: `Encuentro ${i+1}`, time, color: '#334155'}));
+    ficha.sections.pastoral.rows = [{...makeRow('p1','Predicación',0), shared: false, values: {e0: 'Pastor de las nueve',e1: 'Pastor de las once',e2: 'Pastor de la una'}}] as any;
+    Object.assign(ficha, {publicMeta: {paletas: [], visualRefs: []}});
+    await page.setViewportSize({width, height: 852});
+    await page.goto('/ficha/ui-fixture');
+    const platform = page.locator('.published-sheet [data-block-id="pastoral"]');
+    await expect(platform).toContainText('Pastor de las nueve');
+    await expect(platform).not.toContainText('Pastor de las once');
+    await page.getByRole('button', {name: /Encuentro 2 · 11:00/}).click();
+    await expect(platform).toContainText('Pastor de las once');
+    await expect(platform).not.toContainText('Pastor de las nueve');
+    await page.getByRole('button', {name: 'Comparar', exact: true}).click();
+    await expect(page.getByRole('heading', {name: 'Comparar encuentros'})).toBeVisible();
+    await expect(page.getByRole('cell', {name: 'Pastor de las nueve', exact: true})).toBeVisible();
+    await expect(page.getByRole('cell', {name: 'Pastor de la una', exact: true})).toBeVisible();
+  });
+
+  test(`galería visual ${width}px: ocho referencias visibles y ampliación fuera de la hoja`, async ({page}) => {
+    const {ficha, writes} = await fixture(page);
+    const refs = referenceFixtures(8);
+    ficha.sections.setList.rows = [{...makeRow('song','Canción',0, '{"titulo":"En ti yo confiaré","tonalidad":"C"}'),type:'song'}] as any;
+    Object.assign(ficha, {layoutVisual: {slots:[{id:'default', label:'', encuentroIds:['unico'], songs:[{songRowId:'song',iluminacion:'MAGENTA',visualDescription:'Gráficas del encuentro',referenceIds: refs.map(r => r.id)}]}]}, publicMeta:{paletas:[],visualRefs:refs}});
+    const calls: string[]=[];
+    page.on('request',req=>{if(req.url().includes('/api/v1/'))calls.push(new URL(req.url()).pathname);});
+    await page.setViewportSize({width,height:852});
+    await page.goto('/ficha/ui-fixture');
+    await page.getByRole('button',{name:'Layout Visual',exact:true}).click();
+    await expect(page.locator('.reference-gallery-item')).toHaveCount(8);
+    expect(await page.locator('.reference-gallery-grid').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await page.getByRole('button',{name:'Ampliar referencia Gráfica 8',exact:true}).click();
+    const lightbox=page.getByRole('dialog',{name:'Referencia visual ampliada'});
+    await expect(lightbox.getByRole('img',{name:'Gráfica 8',exact:true})).toBeVisible();
+    expect(await lightbox.evaluate(el => !el.closest('.ficha-paper-content'))).toBe(true);
+    await page.screenshot({path:`test-results/referencias-ampliadas-${width}.png`});
+    await lightbox.getByRole('button',{name:'← Anterior'}).click();
+    await expect(lightbox.getByRole('img',{name:'Gráfica 7',exact:true})).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(lightbox).toHaveCount(0);
+    await page.screenshot({path:`test-results/referencias-galeria-${width}.png`,fullPage:true});
+    await page.emulateMedia({media:'print'});
+    await expect(page.locator('.reference-gallery-item').last()).toBeVisible();
+    expect(writes).toEqual([]);
+    expect(calls.filter(path=>!path.includes('/fichas/public/'))).toEqual([]);
+  });
+}
+
+test('oración: guarda referencia de montaje, conserva el set list y permite verla sin sesión', async ({page})=>{
+  const {ficha,writes}=await fixture(page);
+  ficha.type='oracion';
+  const refs=referenceFixtures(2);
+  Object.assign(ficha,{layoutVisual:{slots:[{id:'default',encuentroIds:['unico'],songs:[{songRowId:'legacy',referenceIds:[2]}]}]}});
+  await page.route('**/api/v1/visual-references**',route=>route.fulfill({json:refs}));
+  await page.setViewportSize({width:393,height:852});
+  await page.goto(url);
+  await page.getByRole('button',{name:'Montaje de sala',exact:true}).click();
+  await expect(page.locator('.layout-visual-table')).toHaveCount(0);
+  await page.getByRole('button',{name:'+ Agregar imagen de montaje'}).click();
+  const picker=page.getByRole('dialog',{name:'Elegir referencias visuales'});
+  await picker.getByRole('button',{name:'Seleccionar referencia Gráfica 1',exact:true}).click();
+  await picker.getByRole('button',{name:'Aplicar',exact:true}).click();
+  await expect.poll(()=>writes.find(w=>w.path.endsWith('/layout-visual'))?.body).toEqual({assemblyReferenceIds:[1]});
+  await page.reload();
+  await page.getByRole('button',{name:'Montaje de sala',exact:true}).click();
+  await expect(page.locator('.prayer-assembly .reference-gallery-item')).toHaveCount(1);
+  Object.assign(ficha,{publicMeta:{paletas:[],visualRefs:refs}});
+  await page.addInitScript(()=>localStorage.removeItem('auth-storage'));
+  await page.goto('/ficha/ui-fixture');
+  await page.getByRole('button',{name:'Montaje de sala',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Ampliar referencia Gráfica 1',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'+ Agregar imagen de montaje'})).toHaveCount(0);
+  await page.emulateMedia({media:'print'});
+  await expect(page.locator('.prayer-assembly')).toBeVisible();
 });
