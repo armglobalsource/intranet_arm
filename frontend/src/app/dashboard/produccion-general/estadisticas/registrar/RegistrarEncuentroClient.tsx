@@ -373,31 +373,29 @@ export function RegistrarEncuentroClient() {
     const key = errors[field] ? field : group && errors[group] ? group : null;
     return key ? { 'aria-invalid': true as const, 'aria-describedby': `err-${key}` } : {};
   };
+  // Cada cifra es una fila: nombre a la izquierda y casilla a la derecha, en una lista compacta.
   const numberInput = (value: string, onChange: (v: string) => void, label: string, field: string, group?: string) => (
-    <label key={field} className={`${labelCls} stats-number-field ${errors[field] || (group && errors[group]) ? 'stats-field-invalid' : ''}`}>
+    <label key={field} className={`stats-row-field ${errors[field] || (group && errors[group]) ? 'stats-field-invalid' : ''}`}>
       <span>{label}</span>
-      <input type="number" inputMode="numeric" min={0} step={1} value={value} placeholder="Sin dato" className={inputCls} {...invalid(field, group)}
+      <input type="number" inputMode="numeric" min={0} step={1} value={value} placeholder="—" className={inputCls} {...invalid(field, group)}
         onChange={(e) => { onChange(e.target.value); clearError(field, ...(group ? [group] : [])); }} />
       {fieldError(field)}
     </label>
   );
+  const figuresTitle = fullReport ? (online ? 'Decisiones y online' : 'Decisiones') : 'Participación online';
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 pb-10">
-      <header className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50 p-5 sm:p-7">
-        <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Estadísticas · {campus?.name ?? 'Tu campus'}</p>
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">{form.id ? 'Editar registro' : 'Registrar encuentro'}</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600">Ingresa la asistencia, los voluntarios y las decisiones. El administrador revisa el reporte y lo sube para incorporarlo a Estadísticas.</p>
-          </div>
-          <Link href="/dashboard/produccion-general/estadisticas" className="rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700">Ver estadísticas</Link>
+    <div className="mx-auto max-w-5xl space-y-4 pb-10">
+      <header className="stats-register-header">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-700">Estadísticas · {campus?.name ?? 'Tu campus'}</p>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">{form.id ? 'Editar registro' : 'Registrar encuentro'}</h1>
         </div>
+        <nav aria-label="Accesos de estadísticas" className="stats-register-links">
+          {!form.id && <Link href="/dashboard/produccion-general/estadisticas/operacion">Control semanal{!pendientesQ.isError && pendientes.length ? ` · ${pendientes.length} faltantes` : ''}</Link>}
+          <Link href="/dashboard/produccion-general/estadisticas">Ver estadísticas</Link>
+        </nav>
       </header>
-
-      {!form.id && <Link href="/dashboard/produccion-general/estadisticas/operacion" className="stats-control-shortcut">
-        <span><strong>Control semanal de reportes</strong><span>{pendientesQ.isError ? 'Consultar estado de los reportes' : pendientes.length + ' faltantes en este campus · Ver semanas y estados'}</span></span><span aria-hidden="true">→</span>
-      </Link>}
 
       {notice && (
         <div ref={noticeRef} tabIndex={-1} role={notice.ok ? 'status' : 'alert'} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${notice.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
@@ -408,21 +406,23 @@ export function RegistrarEncuentroClient() {
       {!canCreate && !form.id ? (
         <p className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Para registrar encuentros necesitas el permiso «Registrar nuevos encuentros». Revisa los reportes del campus en <Link href="/dashboard/produccion-general/estadisticas/revisar" className="font-semibold text-emerald-700 underline">Revisar reportes</Link>.</p>
       ) : (
-      <form onSubmit={enviar} noValidate className="stats-register-form space-y-5">
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-          <h2 className="font-bold text-slate-900">Datos del encuentro</h2>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Tipo de registro">
-            {(['encuentro', 'evento'] as const).map((t) => (
-              <button key={t} type="button" role="radio" aria-checked={form.tipo === t} disabled={!!form.id}
-                onClick={() => set({ tipo: t })}
-                className={`rounded-full px-4 py-2 text-sm font-semibold ${form.tipo === t ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'} disabled:opacity-60`}>
-                {t === 'encuentro' ? 'Encuentro' : 'Evento'}
-              </button>
-            ))}
+      <form onSubmit={enviar} noValidate className="stats-register-form space-y-4">
+        <section className="stats-register-card space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-bold text-slate-900">Datos del encuentro</h2>
+            <div className="flex gap-1.5" role="radiogroup" aria-label="Tipo de registro">
+              {(['encuentro', 'evento'] as const).map((t) => (
+                <button key={t} type="button" role="radio" aria-checked={form.tipo === t} disabled={!!form.id}
+                  onClick={() => set({ tipo: t })}
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${form.tipo === t ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'} disabled:opacity-60`}>
+                  {t === 'encuentro' ? 'Encuentro' : 'Evento'}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             {allCampus && (
-              <label className={labelCls}>Campus
+              <label className={`${labelCls} col-span-2 lg:col-span-1`}>Campus
                 <select className={inputCls} value={campusId ?? ''} disabled={!!form.id} {...invalid('campus')} onChange={(e) => { setCampusId(Number(e.target.value)); set({ encuentroSel: '' }); clearError('campus'); }}>
                   <option value="" disabled>Elige un campus</option>
                   {activeCampuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -435,8 +435,13 @@ export function RegistrarEncuentroClient() {
                 onChange={(e) => { set({ fecha: e.target.value, encuentroSel: '' }); clearError('fecha', 'encuentro'); }} />
               {fieldError('fecha')}
             </label>
+            <label className={`${labelCls} lg:order-1`}>Modalidad
+              <select className={inputCls} value={form.modalidad} onChange={(e) => set({ modalidad: e.target.value })}>
+                {MODALIDADES.map((m) => <option key={m} value={m}>{m === 'Presencial+Online' ? 'Presencial + Online' : m}</option>)}
+              </select>
+            </label>
             {form.tipo === 'encuentro' ? (
-              <label className={labelCls}>Encuentro
+              <label className={`${labelCls} col-span-2 lg:col-span-1`}>Encuentro
                 <select className={inputCls} value={form.encuentroSel} {...invalid('encuentro')} onChange={(e) => { set({ encuentroSel: e.target.value }); clearError('encuentro'); }}>
                   <option value="">{opciones.length ? 'Elige el encuentro' : `Sin horarios el ${weekday(form.fecha).toLowerCase()}`}</option>
                   {opciones.map((o) => <option key={o.label} value={o.label}>{o.label}</option>)}
@@ -446,7 +451,7 @@ export function RegistrarEncuentroClient() {
               </label>
             ) : (
               <>
-                <label className={labelCls}>Nombre del evento
+                <label className={`${labelCls} col-span-2 lg:col-span-1`}>Nombre del evento
                   <input className={inputCls} value={form.eventoNombre} {...invalid('eventoNombre')} onChange={(e) => { set({ eventoNombre: e.target.value }); clearError('eventoNombre'); }} placeholder="Ej: Fiestas Patrias" />
                   {fieldError('eventoNombre')}
                 </label>
@@ -457,26 +462,21 @@ export function RegistrarEncuentroClient() {
               </>
             )}
             {form.tipo === 'encuentro' && form.encuentroSel === OTRO && (
-              <label className={labelCls}>Nombre del encuentro
+              <label className={`${labelCls} col-span-2 lg:col-span-1`}>Nombre del encuentro
                 <input className={inputCls} value={form.encuentroOtro} {...invalid('encuentro')} onChange={(e) => { set({ encuentroOtro: e.target.value }); clearError('encuentro'); }} placeholder={`Ej: Encuentro ${weekday(form.fecha)} 16:30 hrs`} />
                 {fieldError('encuentro')}
               </label>
             )}
-            <label className={labelCls}>Modalidad
-              <select className={inputCls} value={form.modalidad} onChange={(e) => set({ modalidad: e.target.value })}>
-                {MODALIDADES.map((m) => <option key={m} value={m}>{m === 'Presencial+Online' ? 'Presencial + Online' : m}</option>)}
-              </select>
-            </label>
-            {fullReport && <><label className={labelCls}>Predicador
+            {fullReport && <><label className={`${labelCls} lg:order-2`}>Predicador
               <input className={inputCls} value={form.predicador} {...invalid('predicador')} onChange={(e) => { set({ predicador: e.target.value }); clearError('predicador'); }} />
               {fieldError('predicador')}
               {sugerido && <span className="text-[11px] font-normal text-slate-500">Según la ficha «{sugerido.ficha}»</span>}
             </label>
-            <label className={labelCls}>Mensaje
-              <input className={inputCls} value={form.mensaje} onChange={(e) => set({ mensaje: e.target.value })} placeholder="Título del mensaje" />
+            <label className={`${labelCls} lg:order-2`}>Mensaje
+              <input className={inputCls} value={form.mensaje} onChange={(e) => set({ mensaje: e.target.value })} placeholder="Título" />
             </label></>}
             {form.tipo === 'evento' && (
-              <label className={`${labelCls} sm:col-span-2 lg:col-span-3`}>Descripción
+              <label className={`${labelCls} col-span-2 lg:col-span-3 lg:order-3`}>Descripción
                 <input className={inputCls} value={form.eventoDesc} onChange={(e) => set({ eventoDesc: e.target.value })} />
               </label>
             )}
@@ -489,66 +489,55 @@ export function RegistrarEncuentroClient() {
           )}
         </section>
 
-        {prayer && <section aria-label="Formato de oración" className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <h2 className="font-bold text-slate-900">Reporte de oración</h2>
-          <p className="text-xs text-slate-600">Auditorio, voluntarios, participación online y responsables del campus.</p>
+        {prayer && <section aria-label="Formato de oración" className="stats-register-card stats-register-note">
+          <p className="text-sm text-slate-700"><strong>Reporte de oración:</strong> auditorio, voluntarios, participación online y responsables.</p>
           <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={fullReport} disabled={savedExtras} onChange={e => set({extra: e.target.checked})} />Mostrar campos adicionales</label>
           {savedExtras && <p className="text-xs text-slate-500">Hay datos adicionales ingresados; se mantienen visibles para que puedas revisarlos.</p>}
         </section>}
 
-        <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-bold text-slate-900">Asistencia</h2>
-            <span className="text-sm font-semibold text-slate-600">Total: {sum(form.asistencia)}</span>
+        <section aria-label="Cifras del encuentro" className="stats-register-card stats-figures">
+          <div className="stats-figure-group">
+            <div className="stats-figure-head"><h2>Asistencia</h2><span>Total {sum(form.asistencia)}</span></div>
+            <div className="stats-row-list">
+              {displayedAsistencia.map((c) => numberInput(form.asistencia[c.key] ?? '', (v) => set({ asistencia: { ...form.asistencia, [c.key]: v } }), c.label, `asistencia.${c.key}`))}
+            </div>
+            <p className="stats-figure-hint">Solo asistentes: los voluntarios van aparte.</p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {displayedAsistencia.map((c) => numberInput(form.asistencia[c.key] ?? '', (v) => set({ asistencia: { ...form.asistencia, [c.key]: v } }), c.label, `asistencia.${c.key}`))}
+          <div className="stats-figure-group stats-figure-tall">
+            <div className="stats-figure-head"><h2>Voluntarios</h2><span>Total {sum(form.voluntarios)}</span></div>
+            {errors.voluntarios && <p id="err-voluntarios" className="stats-field-error">{errors.voluntarios}</p>}
+            <div className="stats-row-list">
+              {displayedVoluntarios.map((c) => numberInput(form.voluntarios[c.key] ?? '', (v) => set({ voluntarios: { ...form.voluntarios, [c.key]: v } }), c.label, `voluntarios.${c.key}`, 'voluntarios'))}
+            </div>
+            <p className="stats-figure-hint">Cada voluntario una sola vez, en su área principal.</p>
           </div>
-          <p className="text-xs text-slate-500">Cuenta aquí a los asistentes. Los voluntarios se registran por separado para no duplicarlos.</p>
+          {(fullReport || online) && <div className="stats-figure-group">
+            <div className="stats-figure-head"><h2>{figuresTitle}</h2></div>
+            <div className="stats-row-list">
+              {fullReport && numberInput(form.aceptoPresencial, (v) => set({ aceptoPresencial: v }), 'Aceptaron a Jesús (presencial)', 'aceptoPresencial')}
+              {fullReport && online && numberInput(form.aceptoOnline, (v) => set({ aceptoOnline: v }), 'Aceptaron a Jesús (online)', 'aceptoOnline')}
+              {online && numberInput(form.espectadores, v => set({espectadores: v}), prayer ? 'Total online (espectadores)' : 'Espectadores online', 'espectadores')}
+            </div>
+          </div>}
         </section>
 
-        {fullReport && <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-          <h2 className="font-bold text-slate-900">Decisiones</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {numberInput(form.aceptoPresencial, (v) => set({ aceptoPresencial: v }), 'Aceptaron a Jesús (presencial)', 'aceptoPresencial')}
-            {online && numberInput(form.aceptoOnline, (v) => set({ aceptoOnline: v }), 'Aceptaron a Jesús (online)', 'aceptoOnline')}
-          </div>
-        </section>}
-
-        {online && <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-          <h2 className="font-bold text-slate-900">Participación online</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{numberInput(form.espectadores, v => set({espectadores: v}), prayer ? 'Total online (espectadores)' : 'Espectadores online', 'espectadores')}</div>
-        </section>}
-
-        <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-bold text-slate-900">Voluntarios</h2>
-            <span className="text-sm font-semibold text-slate-600">Total: {sum(form.voluntarios)}</span>
-          </div>
-          {errors.voluntarios && <p id="err-voluntarios" className="stats-field-error">{errors.voluntarios}</p>}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-            {displayedVoluntarios.map((c) => numberInput(form.voluntarios[c.key] ?? '', (v) => set({ voluntarios: { ...form.voluntarios, [c.key]: v } }), c.label, `voluntarios.${c.key}`, 'voluntarios'))}
+        <section className="stats-register-card space-y-3">
+          <h2 className="font-bold text-slate-900">Responsables del campus</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={labelCls}>Líderes de voluntarios<input className={inputCls} value={form.lideres} onChange={e => set({lideres: e.target.value})} placeholder="Nombres de los líderes" /></label>
+            <label className={labelCls}>Administradores de campus<input className={inputCls} value={form.adm} onChange={e => set({adm: e.target.value})} placeholder="Nombres de los administradores" /></label>
           </div>
         </section>
 
-        <section aria-label="Resumen del reporte" className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-          <h2 className="font-bold text-slate-900">Resumen del reporte</h2>
-          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <section aria-label="Resumen del reporte" className="stats-summary-strip">
+          <dl>
             {[
               ['Asistentes', sum(form.asistencia)], ['Voluntarios', sum(form.voluntarios)],
               ['Total presencial', sum(form.asistencia) + sum(form.voluntarios)],
               ...(online ? [['Total online', toNum(form.espectadores) ?? 0]] : []),
-            ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white p-3"><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{value}</dd></div>)}
+            ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
           </dl>
-          <p className="text-xs text-slate-600">Total presencial = asistentes + voluntarios. Registra a cada voluntario una sola vez, en su área principal. La participación online se muestra por separado.</p>
-        </section>
-
-        <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-          <h2 className="font-bold text-slate-900">Responsables del campus</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className={labelCls}>Líderes de voluntarios<input className={inputCls} value={form.lideres} onChange={e => set({lideres: e.target.value})} placeholder="Nombres de los líderes" /></label>
-            <label className={labelCls}>Administradores de campus<textarea className={inputCls} value={form.adm} onChange={e => set({adm: e.target.value})} placeholder="Nombres de los administradores" rows={2} /></label>
-          </div>
+          <p>Total presencial = asistentes + voluntarios.</p>
         </section>
 
         <div className="stats-form-actions flex flex-wrap justify-end gap-2">

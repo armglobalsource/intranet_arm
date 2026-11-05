@@ -195,3 +195,45 @@
 .weekly-send p { margin-top:2px; font-size:13px; color:#52665b; max-width:640px; }
 .weekly-send-button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:48px; padding:12px 20px; border-radius:12px; background:#1f6f4f; color:#fff; font-size:14px; font-weight:700; }
 @media screen and (max-width: 767px) { .weekly-send-button { width:100%; } }
+
+/* Registro compacto: encabezado corto, cifras en filas y resumen en una franja. */
+.stats-register-header { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:10px 16px; padding:16px 18px; border:1px solid #d7ebe0; border-radius:18px; background:linear-gradient(135deg,#f0f8f3,#fff); }
+.stats-register-links { display:flex; flex-wrap:wrap; gap:8px; }
+.stats-register-links a { display:inline-flex; align-items:center; min-height:40px; padding:8px 12px; border:1px solid #cfe5d8; border-radius:10px; background:#fff; font-size:13px; font-weight:600; color:#1f6f4f; }
+.stats-register-card { padding:16px; border:1px solid #e2e8f0; border-radius:16px; background:#fff; }
+.stats-register-note { display:grid; gap:6px; background:#f8fafc; }
+.stats-figures { display:grid; gap:18px; }
+@media (min-width:1024px) {
+  .stats-figures { grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:28px; align-items:start; }
+  .stats-figure-tall { grid-row:span 2; }
+}
+.stats-figure-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding-bottom:6px; border-bottom:2px solid #e7efe9; }
+.stats-figure-head h2 { font-size:15px; font-weight:700; color:#172532; }
+.stats-figure-head span { font-size:13px; font-weight:700; color:#1f6f4f; font-variant-numeric:tabular-nums; }
+.stats-figure-hint { margin-top:6px; font-size:11px; color:#64748b; }
+.stats-row-list { display:grid; }
+.stats-row-field { display:grid; grid-template-columns:minmax(0,1fr) 92px; align-items:center; gap:2px 12px; padding:5px 4px; border-bottom:1px solid #eef2ef; font-size:13px; font-weight:600; color:#334155; }
+.stats-row-field:last-child { border-bottom:0; }
+.stats-row-field > span:first-child { line-height:1.3; }
+.stats-module .stats-row-field input { padding:7px 10px; text-align:right; font-variant-numeric:tabular-nums; font-weight:700; }
+.stats-row-field .stats-field-error { grid-column:1 / -1; text-align:right; }
+.stats-row-field.stats-field-invalid { border-radius:8px; background:#fff6f5; }
+.stats-summary-strip { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 16px; padding:10px 16px; border:1px solid #dce8df; border-radius:14px; background:#f8fafc; }
+.stats-summary-strip dl { display:flex; flex-wrap:wrap; gap:6px 20px; }
+.stats-summary-strip dl > div { display:flex; align-items:baseline; gap:6px; }
+.stats-summary-strip dt { font-size:12px; color:#64748b; }
+.stats-summary-strip dd { font-size:18px; font-weight:800; color:#172532; font-variant-numeric:tabular-nums; }
+.stats-summary-strip p { font-size:11px; color:#64748b; }
+@media screen and (max-width: 767px) {
+  .stats-register-header { padding:14px; border-radius:16px; }
+  .stats-register-header h1 { font-size:21px; }
+  .stats-register-links { width:100%; }
+  .stats-register-links a { flex:1 1 0; justify-content:center; min-height:44px; font-size:12px; }
+  .stats-module form > section.stats-register-card { padding:12px; }
+  .stats-row-field { grid-template-columns:minmax(0,1fr) 88px; padding:4px 2px; }
+  .stats-module .stats-row-field input { min-height:42px; padding:6px 10px; }
+  /* En el teléfono la barra fija ya muestra los totales: la franja queda breve. */
+  .stats-summary-strip { padding:8px 12px; }
+  .stats-summary-strip dl { gap:4px 14px; }
+  .stats-summary-strip dd { font-size:15px; }
+}

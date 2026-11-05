@@ -61,10 +61,12 @@ for (const width of [320, 393, 834]) {
     await page.getByLabel('Aceptaron a Jesús (presencial)', { exact: true }).fill('3');
     await page.getByLabel('Aceptaron a Jesús (online)', { exact: true }).fill('2');
     await page.getByLabel('Espectadores online', { exact: true }).fill('80');
-    const inputs = page.locator('.stats-number-field input');
+    const inputs = page.locator('.stats-row-field input');
     expect(await inputs.evaluateAll(nodes => nodes.every(el => el.scrollWidth <= el.clientWidth))).toBe(true);
+    // Las cifras quedan en una columna alineada a la derecha, una fila por categoría.
     const first = await inputs.nth(0).boundingBox(), second = await inputs.nth(1).boundingBox();
-    expect(Math.abs(first!.y - second!.y)).toBeLessThan(2);
+    expect(Math.abs(first!.x - second!.x)).toBeLessThan(2);
+    expect(second!.y).toBeGreaterThan(first!.y);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByLabel('Auditorio', { exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: `test-results/stats-registro-${width}.png` });
