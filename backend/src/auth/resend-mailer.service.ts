@@ -40,4 +40,22 @@ export class ResendMailerService {
     const data = await response.json() as { id?: string };
     if (!data.id) throw new Error('Resend did not acknowledge the email');
   }
+
+  /** Correo con HTML propio (reportes). No registra destinatarios ni contenido en los errores. */
+  async sendHtml(mail: { to: string[]; subject: string; html: string; text: string; idempotencyKey: string }) {
+    const key = this.config.get<string>('RESEND_API_KEY');
+    const from = this.config.get<string>('RESEND_FROM_EMAIL');
+    if (!key || !from || !from.includes('@') || /[\r\n]/.test(from)) {
+      throw new ServiceUnavailableException('El envío de correos no está configurado. Avisa al administrador del sistema.');
+    }
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST', signal: AbortSignal.timeout(15000),
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'Idempotency-Key': mail.idempotencyKey },
+      body: JSON.stringify({ from, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text }),
+    });
+    if (!response.ok) throw new ServiceUnavailableException(`No se pudo enviar el correo (código ${response.status}). Inténtalo de nuevo.`);
+    const data = await response.json() as { id?: string };
+    if (!data.id) throw new ServiceUnavailableException('El proveedor de correo no confirmó el envío.');
+    return { id: data.id };
+  }
 }

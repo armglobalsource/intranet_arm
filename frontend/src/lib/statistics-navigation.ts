@@ -2,6 +2,7 @@ export const STATS_ROOT = '/dashboard/produccion-general/estadisticas';
 export const STATS_VIEWS = [
   { id: 'summary', slug: '', label: 'Resumen', description: 'Indicadores principales y comparación del período.' },
   { id: 'operations', slug: 'operacion', label: 'Control de reportes', description: 'Faltantes, revisión y aprobación por semana y campus.' },
+  { id: 'weekly', slug: 'reporte-semanal', label: 'Reporte semanal', description: 'Informe semanal de todos los campus para descargar o enviar por correo.' },
   { id: 'campuses', slug: 'campus', label: 'Campus', description: 'Resultados por país y campus, con su contexto de registro.' },
   { id: 'trends', slug: 'evolucion', label: 'Evolución', description: 'Tendencias de asistencia y distribución de las participaciones.' },
   { id: 'projections', slug: 'proyecciones', label: 'Proyecciones', description: 'Escenarios de asistencia para las próximas cuatro semanas.' },

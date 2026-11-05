@@ -212,7 +212,7 @@ const NAV: NavGroup[] = [
   { href: '/dashboard/produccion-general/finanzas', label: 'Finanzas', section: 'Producción', icon: SiembraIcon, permission: 'finanzas:view' },
   { href: STATS_ROOT, label: 'Estadísticas', section: 'Análisis y operación', icon: StatsIcon,
     children: [
-      ...STATS_VIEWS.map(view => ({ href: statsHref(view.slug), label: view.label, icon: MinisterioSubIcon, permission: 'estadisticas:view' })),
+      ...STATS_VIEWS.map(view => ({ href: statsHref(view.slug), label: view.label, icon: MinisterioSubIcon, permission: view.id === 'weekly' ? 'estadisticas:viewAll' : 'estadisticas:view' })),
       { href: `${STATS_ROOT}/registrar`, label: 'Registrar encuentro', icon: TecnicosIcon, permission: 'encuentros:create' },
       { href: `${STATS_ROOT}/revisar`, label: 'Revisar reportes', icon: FichaIcon, permission: 'encuentros:review' },
     ],

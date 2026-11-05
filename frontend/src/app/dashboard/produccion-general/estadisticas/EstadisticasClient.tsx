@@ -428,7 +428,7 @@ export function EstadisticasClient() {
     </section>
 
     <nav aria-label="Vistas de estadísticas" className="flex flex-wrap gap-2">
-      {STATS_VIEWS.map(item => <button key={item.id} aria-pressed={tab === item.id} onClick={() => {
+      {STATS_VIEWS.filter(item => item.id !== 'weekly' || canViewAll).map(item => <button key={item.id} aria-pressed={tab === item.id} onClick={() => {
         if (item.id === 'operations') applyPreset('week');
         router.push(statsHref(item.slug));
       }} className={'rounded-xl px-4 py-2.5 text-sm font-semibold ' + (tab === item.id ? 'bg-emerald-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-emerald-50')}>{item.label}</button>)}

@@ -1,6 +1,12 @@
 import {
-  BadRequestException, Controller, Get, Query, UseGuards,
+  BadRequestException, Body, Controller, Get, Post, Query, UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
+import { ResendMailerService } from '../auth/resend-mailer.service';
+import { SendWeeklyReportDto } from './dto/weekly-report.dto';
+import { renderWeeklyReportHtml, renderWeeklyReportText, weekLabel } from './weekly-report.html';
+import { validDay } from './statistics-range';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
@@ -15,7 +21,43 @@ import { statisticsRange } from './statistics-range';
 @RequirePermission('estadisticas:view')
 @Controller('estadisticas')
 export class EstadisticasController {
-  constructor(private readonly estadisticas: PostgresEstadisticasService) {}
+  constructor(
+    private readonly estadisticas: PostgresEstadisticasService,
+    private readonly mailer: ResendMailerService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private reportUrl(semana: string) {
+    const origin = (this.config.get<string>('FRONTEND_URL') ?? '').replace(/\/+$/, '');
+    return /^https:\/\//.test(origin) ? `${origin}/dashboard/produccion-general/estadisticas/reporte-semanal?semana=${semana}` : undefined;
+  }
+
+  /** Reporte semanal de todos los campus (lo que antes se armaba a mano). */
+  @Get('reporte-semanal')
+  @RequirePermission('estadisticas:viewAll')
+  async weeklyReport(@Query('semana') semana: string, @Query('porRevisar') porRevisar?: string) {
+    if (!validDay(semana ?? '')) throw new BadRequestException('Semana inválida');
+    const report = await this.estadisticas.weeklyReport(semana, porRevisar === '1' || porRevisar === 'true');
+    return { ...report, html: renderWeeklyReportHtml(report) };
+  }
+
+  @Post('reporte-semanal/enviar')
+  @RequirePermission('estadisticas:viewAll')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async sendWeeklyReport(@Body() dto: SendWeeklyReportDto, @CurrentUser() user: any) {
+    if (!validDay(dto.semana)) throw new BadRequestException('Semana inválida');
+    const report = await this.estadisticas.weeklyReport(dto.semana, !!dto.porRevisar);
+    const to = [...new Set(dto.destinatarios.map((d) => d.trim().toLowerCase()))];
+    const sent = await this.mailer.sendHtml({
+      to,
+      subject: `Reporte semanal ARM · Sem. ${weekLabel(report.semana)}`,
+      html: renderWeeklyReportHtml(report, { appUrl: this.reportUrl(report.semana.desde) }),
+      text: renderWeeklyReportText(report),
+      // Evita un doble envío por doble clic; un reenvío un minuto después sí sale.
+      idempotencyKey: `weekly-report/${user?.sub ?? 'user'}/${report.semana.desde}/${Math.floor(Date.now() / 60000)}`,
+    });
+    return { enviado: true, id: sent.id, destinatarios: to.length, semana: report.semana };
+  }
 
   @Get()
   async dashboard(

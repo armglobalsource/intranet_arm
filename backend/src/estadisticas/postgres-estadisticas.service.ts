@@ -5,6 +5,8 @@ import { PostgresArmCatalogosService } from '../arm-catalogos/postgres-arm-catal
 import { sumCounts } from '../common/arm-records.util';
 import { isUploaded } from '../encuentros/encuentros.review';
 import { countryName, statisticsRange, validDay } from './statistics-range';
+import { addDays as addDayKeys, buildWeeklyReport, mondayOf } from './weekly-report';
+import { nowInSantiago } from '../encuentros/encuentros.pending';
 
 export type GroupBy = 'week' | 'month' | 'year';
 export type RecordType = 'all' | 'encuentro' | 'evento';
@@ -380,6 +382,16 @@ export class PostgresEstadisticasService {
       emitters: byEmitter,
       criterion: 'Reportes de Santiago y Puente Alto identificados como Online o Virtual en su nombre o modalidad, incluidos Presencial + Online. Solo se atribuyen espectadores a la vez y decisiones online; las cifras presenciales permanecen en el campus emisor.',
     };
+  }
+
+  /** Reporte semanal de todos los campus: la semana pedida (lunes a domingo) y la anterior. */
+  async weeklyReport(semana: string, incluirPorRevisar: boolean) {
+    const desde = mondayOf(semana);
+    const [campuses, rows] = await Promise.all([
+      this.campuses.findAll(),
+      this.store.list('encuentros', { start: addDayKeys(desde, -7), end: `${addDayKeys(desde, 6)}T23:59:59.999Z` }),
+    ]);
+    return buildWeeklyReport(rows, campuses as any, desde, { incluirPorRevisar, now: nowInSantiago() });
   }
 
   private encounterMetrics(row: any): Partial<Metrics> {
