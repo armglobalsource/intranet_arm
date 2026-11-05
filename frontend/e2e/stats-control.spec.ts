@@ -57,6 +57,6 @@ test('un reporte de otra persona bloquea un segundo envío desde el formulario',
   await fixture(page);
   await page.route('**/api/v1/encuentros/existente?**',route=>route.fulfill({json:{existente:{id:'other',estado:'enviado'}}}));
   await page.goto('/dashboard/produccion-general/estadisticas/registrar?campus=1&fecha=2026-10-25&encuentro=Encuentro%20Domingo%2011%3A00%20hrs');
-  await expect(page.getByText('Este encuentro ya tiene un reporte. Consulta el control semanal o pide al administrador que lo revise.')).toBeVisible();
+  await expect(page.getByRole('alertdialog',{name:'Este reporte ya se registró'})).toContainText('Revísalo con tu administrador de campus');
   await expect(page.getByRole('button',{name:'Guardar registro',exact:true})).toBeDisabled();
 });

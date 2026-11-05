@@ -190,6 +190,7 @@ export function FeedbackWidget() {
       <button
         onClick={() => setOpen((o) => !o)}
         title="Reportar problema o sugerencia"
+        data-feedback-widget
         className="fixed bottom-5 right-5 w-12 h-12 rounded-full shadow-lg flex items-center justify-center z-50 transition-all hover:scale-110 active:scale-95"
         style={{ background: open ? '#1f2937' : '#111827' }}
       >

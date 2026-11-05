@@ -54,6 +54,7 @@ for (const width of [320, 393, 834]) {
     await page.getByRole('combobox', { name: 'Encuentro', exact: true }).selectOption('__otro__');
     await page.getByLabel('Nombre del encuentro').fill('Encuentro Martes 19:00 hrs');
     await page.getByRole('combobox', { name: 'Modalidad', exact: true }).selectOption('Presencial+Online');
+    await page.getByLabel('Predicador', { exact: true }).fill('Pastor de prueba');
     await page.getByLabel('Auditorio', { exact: true }).fill('125');
     await page.getByLabel('Niños y niñas de Kids', { exact: true }).fill('15');
     await page.getByLabel('Equipo de servicio', { exact: true }).fill('12');
@@ -129,6 +130,74 @@ test('oración: editar un reporte conserva datos adicionales y responsables ya r
   expect(sent.presencial.acepto).toBe(2);
   expect(sent.lideres).toBe('Líder anterior');
   expect(sent.adm).toBe('Administrador actualizado');
+});
+
+test('validaciones: marca los campos que faltan y no envía el reporte', async ({ page }) => {
+  const calls = await fixture(page, true);
+  await page.clock.setFixedTime(new Date('2026-10-28T15:00:00Z'));
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto('/dashboard/produccion-general/estadisticas/registrar');
+  await page.getByLabel('Fecha', { exact: true }).fill('2026-10-20');
+  await page.getByRole('button', { name: 'Guardar registro', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'campos marcados en rojo' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Encuentro', exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByRole('combobox', { name: 'Encuentro', exact: true })).toBeFocused();
+  await expect(page.getByText('Ingresa al menos un área (si no hubo, escribe 0)')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Encuentro', exact: true }).selectOption('__otro__');
+  await page.getByLabel('Nombre del encuentro').fill('Encuentro Martes 19:00 hrs');
+  // Con el error a la vista se busca por nombre accesible (el texto del error no es parte del nombre).
+  await page.getByRole('textbox', { name: 'Predicador', exact: true }).fill('Pastor de prueba');
+  await page.getByRole('spinbutton', { name: 'Auditorio', exact: true }).fill('20');
+  await page.getByRole('spinbutton', { name: 'Equipo de servicio', exact: true }).fill('3');
+  await page.getByLabel('Aceptaron a Jesús (presencial)', { exact: true }).fill('40');
+  await page.getByRole('button', { name: 'Guardar registro', exact: true }).click();
+  await expect(page.getByText('No puede ser mayor que los asistentes (20)')).toBeVisible();
+  expect(calls.some((c) => c.method === 'POST' && c.path === '/encuentros')).toBe(false);
+});
+
+test('reporte ya registrado: avisa con una ventana y pide revisarlo con el administrador', async ({ page }) => {
+  const calls = await fixture(page, true);
+  await page.clock.setFixedTime(new Date('2026-10-28T15:00:00Z'));
+  await page.route('**/api/v1/campus', (route) => route.fulfill({ json: [{ id: 1, name: 'Santiago', isActive: true, schedules: [{ dia: 'Domingo', hora: '11:00' }] }] }));
+  await page.route('**/api/v1/encuentros/existente**', (route) => route.fulfill({ json: { existente: {
+    id: 'otro-reporte', campusId: 1, campus: 'Santiago', fecha: '2026-10-18', encuentro: 'Encuentro Domingo 11:00 hrs',
+    estado: 'subido', registradoPor: 'lider@example.test', totalAsistencia: 210 } } }));
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto('/dashboard/produccion-general/estadisticas/registrar');
+  await page.getByLabel('Fecha', { exact: true }).fill('2026-10-18');
+  await page.getByRole('combobox', { name: 'Encuentro', exact: true }).selectOption('Encuentro Domingo 11:00 hrs');
+  const dialog = page.getByRole('alertdialog', { name: 'Este reporte ya se registró' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('Revísalo con tu administrador de campus');
+  await expect(dialog).toContainText('lider@example.test');
+  await expect(dialog).toContainText('Subido a Estadísticas');
+  await page.screenshot({ path: 'test-results/stats-duplicado-393.png' });
+  await dialog.getByRole('button', { name: 'Entendido, elegir otro' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Encuentro', exact: true })).toHaveValue('');
+  expect(calls.some((c) => c.method === 'POST' && c.path === '/encuentros')).toBe(false);
+});
+
+test('reporte duplicado al guardar: la API responde 409 y se muestra la misma ventana', async ({ page }) => {
+  await fixture(page, true);
+  await page.clock.setFixedTime(new Date('2026-10-28T15:00:00Z'));
+  await page.route('**/api/v1/encuentros', (route) => route.request().method() === 'POST'
+    ? route.fulfill({ status: 409, json: { message: 'Este reporte ya se registró.', details: { existente: {
+      id: 'otro-reporte', campusId: 1, campus: 'Santiago', fecha: '2026-10-20', encuentro: 'Encuentro Martes 19:00 hrs',
+      estado: 'enviado', registradoPor: 'otra@example.test', totalAsistencia: 90 } } } })
+    : route.fallback());
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto('/dashboard/produccion-general/estadisticas/registrar');
+  await page.getByLabel('Fecha', { exact: true }).fill('2026-10-20');
+  await page.getByRole('combobox', { name: 'Encuentro', exact: true }).selectOption('__otro__');
+  await page.getByLabel('Nombre del encuentro').fill('Encuentro Martes 19:00 hrs');
+  await page.getByLabel('Predicador', { exact: true }).fill('Pastor de prueba');
+  await page.getByLabel('Auditorio', { exact: true }).fill('90');
+  await page.getByLabel('Equipo de servicio', { exact: true }).fill('8');
+  await page.getByRole('button', { name: 'Guardar registro', exact: true }).click();
+  const dialog = page.getByRole('alertdialog', { name: 'Este reporte ya se registró' });
+  await expect(dialog).toContainText('otra@example.test');
+  await expect(dialog).toContainText('Por revisar');
 });
 
 test('editar desde revisión muestra el campus del reporte aunque el revisor pertenezca a otro', async ({ page }) => {

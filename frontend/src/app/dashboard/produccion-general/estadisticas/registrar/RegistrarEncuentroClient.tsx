@@ -14,11 +14,12 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAllCampuses, type Campus } from '@/hooks/useCampus';
 import { useActiveArmCatalogos } from '@/hooks/useArmCatalogos';
-import { isPrayerReport, PRAYER_VOLUNTEERS, mergeReportFields } from '@/lib/encuentro-report';
+import { isPrayerReport, PRAYER_VOLUNTEERS, mergeReportFields, validateReport, atypicalAttendance } from '@/lib/encuentro-report';
 import {
   useEliminarRegistro, useGuardarRegistro, usePendientesReporte, useRegistrosRecientes, useRevision, useReporteExistente,
-  type EncuentroPendiente, type RegistroEncuentro, type RegistroInput,
+  type EncuentroPendiente, type RegistroEncuentro, type RegistroInput, type ReporteExistente,
 } from '@/hooks/useRegistrosEncuentros';
+import { ReporteDialog } from './ReporteDialog';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const MODALIDADES = ['Presencial', 'Presencial+Online', 'Online'] as const;
@@ -30,6 +31,10 @@ const labelCls = 'grid gap-1.5 text-xs font-semibold text-slate-600';
 function todayInSantiago() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
 }
+function nowTimeInSantiago() {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
+}
+const ESTADO_LABEL = { enviado: 'Por revisar', observado: 'Devuelto con observación', subido: 'Subido a Estadísticas' } as const;
 function weekday(fecha: string) {
   const d = new Date(`${fecha}T12:00:00`);
   return Number.isNaN(d.getTime()) ? '' : DAYS[d.getDay()];
@@ -192,6 +197,7 @@ export function RegistrarEncuentroClient() {
     // Si el nombre no está entre los horarios de ese día, queda escrito en «Otro».
     const known = encuentrosDelDia(target, p.fecha).some((o) => o.label === p.encuentro);
     setForm({ ...emptyForm(p.fecha), encuentroSel: known ? p.encuentro : OTRO, encuentroOtro: known ? '' : p.encuentro });
+    setErrors({});
     setNotice(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -228,6 +234,33 @@ export function RegistrarEncuentroClient() {
   const existente = useReporteExistente({campus: campus?.name, fecha: form.fecha, encuentro: form.tipo === 'evento' ? eventoLabel : encuentroLabel, tipo: form.tipo}, canCreate && !form.id);
   const yaRegistrado = !!existente.data?.existente;
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const clearError = (...keys: string[]) => setErrors((e) => {
+    if (!keys.some((k) => k in e)) return e;
+    const next = { ...e };
+    keys.forEach((k) => delete next[k]);
+    return next;
+  });
+  // Ventana «este reporte ya se registró»: aparece al elegir un encuentro que ya
+  // tiene reporte (lo responde la base) o si la API rechaza el envío por duplicado.
+  const [duplicado, setDuplicado] = useState<ReporteExistente | null>(null);
+  const avisado = useRef<string | null>(null);
+  useEffect(() => {
+    const r = existente.data?.existente;
+    if (!r || avisado.current === r.id) return;
+    avisado.current = r.id;
+    setDuplicado(r);
+  }, [existente.data?.existente]);
+  const [atipico, setAtipico] = useState<{ asistentes: number; tipico: number } | null>(null);
+  const registroDuplicado = duplicado ? (registros.data ?? []).find((r) => r.id === duplicado.id) : undefined;
+  function cerrarDuplicado() {
+    setDuplicado(null);
+    if (form.tipo === 'encuentro') {
+      avisado.current = null;
+      set({ encuentroSel: '', encuentroOtro: '' });
+    }
+  }
+
 
   function editar(r: RegistroEncuentro) {
     if (r.fechaPrecision === 'mes') {
@@ -249,6 +282,8 @@ export function RegistrarEncuentroClient() {
       aceptoPresencial: String(r.presencial?.acepto ?? ''), aceptoOnline: String(r.online?.acepto ?? ''), espectadores: String(r.online?.espectadores ?? ''),
       asistencia: asText(r.asistencia), voluntarios: asText(r.voluntarios),
     });
+    setErrors({});
+    setDuplicado(null);
     setNotice(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -264,13 +299,41 @@ export function RegistrarEncuentroClient() {
     }
   }
 
-  async function enviar(e: React.FormEvent) {
+  function enviar(e: React.FormEvent) {
     e.preventDefault();
     setNotice(null);
-    if (yaRegistrado) return setNotice({ ok: false, text: 'Este encuentro ya tiene un reporte. Revisa el control semanal antes de registrar otro.' });
-    if (!campus) return setNotice({ ok: false, text: 'Elige el campus.' });
-    if (form.tipo === 'encuentro' && !encuentroLabel) return setNotice({ ok: false, text: 'Elige el encuentro.' });
-    if (form.tipo === 'evento' && (!form.eventoNombre.trim() || !form.eventoHora)) return setNotice({ ok: false, text: 'Escribe el nombre y la hora del evento.' });
+    if (yaRegistrado && existente.data?.existente) return setDuplicado(existente.data.existente);
+    const found = validateReport({
+      tipo: form.tipo, isNew: !form.id, fecha: form.fecha, today: todayInSantiago(), nowTime: nowTimeInSantiago(),
+      encuentro: encuentroLabel, hora: horaSel, eventoNombre: form.eventoNombre, eventoHora: form.eventoHora,
+      modalidad: form.modalidad, fullReport, prayer, predicador: form.predicador,
+      aceptoPresencial: form.aceptoPresencial, aceptoOnline: form.aceptoOnline, espectadores: form.espectadores,
+      asistencia: form.asistencia, voluntarios: form.voluntarios,
+    });
+    if (!campus) found.campus = 'Elige el campus';
+    setErrors(found);
+    const keys = Object.keys(found);
+    if (keys.length) {
+      setNotice({ ok: false, text: keys.length === 1 ? 'Revisa el campo marcado en rojo.' : `Revisa los ${keys.length} campos marcados en rojo.` });
+      // Lleva al primer campo con error, en el orden del formulario.
+      requestAnimationFrame(() => {
+        const first = document.querySelector<HTMLElement>('[aria-invalid="true"]');
+        first?.scrollIntoView({ block: 'center' });
+        first?.focus({ preventScroll: true });
+      });
+      return;
+    }
+    // Un cero de más o de menos al digitar: se pide confirmar antes de enviar.
+    const asistentes = sum(form.asistencia);
+    const historial = (registros.data ?? []).filter((r) => r.id !== form.id && r.encuentro === encuentroLabel && Number(r.campusId) === campus?.id).map((r) => r.totalAsistencia ?? 0);
+    const raro = form.tipo === 'encuentro' ? atypicalAttendance(asistentes, historial) : null;
+    if (raro) return setAtipico({ asistentes, tipico: raro.tipico });
+    void guardarReporte();
+  }
+
+  async function guardarReporte() {
+    setAtipico(null);
+    if (!campus) return;
     const nums = (r: Record<string, string>) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, toNum(v)]).filter(([, v]) => v !== undefined)) as Record<string, number>;
     const payload: RegistroInput = {
       tipo: form.tipo, campus: campus.name, fecha: form.fecha,
@@ -290,17 +353,32 @@ export function RegistrarEncuentroClient() {
       const nombre = `${form.tipo === 'encuentro' ? encuentroLabel : eventoLabel} · ${shortDate(form.fecha)}`;
       setNotice({ ok: true, text: form.id ? `Cambios guardados: ${nombre}.` : `Reporte enviado: ${nombre}. Queda por revisar hasta que el administrador del campus lo suba.` });
       setForm(emptyForm(form.fecha));
+      setErrors({});
     } catch (err) {
+      const dup = (err as any)?.response?.status === 409 ? (err as any)?.response?.data?.details?.existente as ReporteExistente | undefined : undefined;
+      if (dup) {
+        avisado.current = dup.id;
+        setDuplicado(dup);
+        return;
+      }
       setNotice({ ok: false, text: apiErrorMessage(err, 'No se pudo guardar el registro') });
     }
   }
 
   if (!allowed) return revision.isError ? <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">No se pudieron verificar los permisos. <button onClick={() => void revision.refetch()} className="underline">Reintentar</button></p> : null;
 
-  const numberInput = (value: string, onChange: (v: string) => void, label: string) => (
-    <label key={label} className={`${labelCls} stats-number-field`}>
+  // El error queda fuera del nombre del campo (aria-hidden) y se lee como descripción.
+  const fieldError = (field: string) => errors[field] ? <span id={`err-${field}`} aria-hidden="true" className="stats-field-error">{errors[field]}</span> : null;
+  const invalid = (field: string, group?: string) => {
+    const key = errors[field] ? field : group && errors[group] ? group : null;
+    return key ? { 'aria-invalid': true as const, 'aria-describedby': `err-${key}` } : {};
+  };
+  const numberInput = (value: string, onChange: (v: string) => void, label: string, field: string, group?: string) => (
+    <label key={field} className={`${labelCls} stats-number-field ${errors[field] || (group && errors[group]) ? 'stats-field-invalid' : ''}`}>
       <span>{label}</span>
-      <input type="number" inputMode="numeric" min={0} step={1} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Sin dato" className={inputCls} />
+      <input type="number" inputMode="numeric" min={0} step={1} value={value} placeholder="Sin dato" className={inputCls} {...invalid(field, group)}
+        onChange={(e) => { onChange(e.target.value); clearError(field, ...(group ? [group] : [])); }} />
+      {fieldError(field)}
     </label>
   );
 
@@ -330,7 +408,7 @@ export function RegistrarEncuentroClient() {
       {!canCreate && !form.id ? (
         <p className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Para registrar encuentros necesitas el permiso «Registrar nuevos encuentros». Revisa los reportes del campus en <Link href="/dashboard/produccion-general/estadisticas/revisar" className="font-semibold text-emerald-700 underline">Revisar reportes</Link>.</p>
       ) : (
-      <form onSubmit={enviar} className="space-y-5">
+      <form onSubmit={enviar} noValidate className="stats-register-form space-y-5">
         <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <h2 className="font-bold text-slate-900">Datos del encuentro</h2>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Tipo de registro">
@@ -345,37 +423,43 @@ export function RegistrarEncuentroClient() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {allCampus && (
               <label className={labelCls}>Campus
-                <select className={inputCls} value={campusId ?? ''} disabled={!!form.id} onChange={(e) => { setCampusId(Number(e.target.value)); set({ encuentroSel: '' }); }}>
+                <select className={inputCls} value={campusId ?? ''} disabled={!!form.id} {...invalid('campus')} onChange={(e) => { setCampusId(Number(e.target.value)); set({ encuentroSel: '' }); clearError('campus'); }}>
                   <option value="" disabled>Elige un campus</option>
                   {activeCampuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+                {fieldError('campus')}
               </label>
             )}
             <label className={labelCls}>Fecha
-              <input type="date" required className={inputCls} value={form.fecha} max={todayInSantiago()}
-                onChange={(e) => set({ fecha: e.target.value, encuentroSel: '' })} />
+              <input type="date" required className={inputCls} value={form.fecha} max={todayInSantiago()} {...invalid('fecha')}
+                onChange={(e) => { set({ fecha: e.target.value, encuentroSel: '' }); clearError('fecha', 'encuentro'); }} />
+              {fieldError('fecha')}
             </label>
             {form.tipo === 'encuentro' ? (
               <label className={labelCls}>Encuentro
-                <select className={inputCls} value={form.encuentroSel} onChange={(e) => set({ encuentroSel: e.target.value })}>
+                <select className={inputCls} value={form.encuentroSel} {...invalid('encuentro')} onChange={(e) => { set({ encuentroSel: e.target.value }); clearError('encuentro'); }}>
                   <option value="">{opciones.length ? 'Elige el encuentro' : `Sin horarios el ${weekday(form.fecha).toLowerCase()}`}</option>
                   {opciones.map((o) => <option key={o.label} value={o.label}>{o.label}</option>)}
                   <option value={OTRO}>Otro (escribir)</option>
                 </select>
+                {form.encuentroSel !== OTRO && fieldError('encuentro')}
               </label>
             ) : (
               <>
                 <label className={labelCls}>Nombre del evento
-                  <input className={inputCls} value={form.eventoNombre} onChange={(e) => set({ eventoNombre: e.target.value })} placeholder="Ej: Fiestas Patrias" />
+                  <input className={inputCls} value={form.eventoNombre} {...invalid('eventoNombre')} onChange={(e) => { set({ eventoNombre: e.target.value }); clearError('eventoNombre'); }} placeholder="Ej: Fiestas Patrias" />
+                  {fieldError('eventoNombre')}
                 </label>
                 <label className={labelCls}>Hora
-                  <input type="time" className={inputCls} value={form.eventoHora} onChange={(e) => set({ eventoHora: e.target.value })} />
+                  <input type="time" className={inputCls} value={form.eventoHora} {...invalid('eventoHora')} onChange={(e) => { set({ eventoHora: e.target.value }); clearError('eventoHora'); }} />
+                  {fieldError('eventoHora')}
                 </label>
               </>
             )}
             {form.tipo === 'encuentro' && form.encuentroSel === OTRO && (
               <label className={labelCls}>Nombre del encuentro
-                <input className={inputCls} value={form.encuentroOtro} onChange={(e) => set({ encuentroOtro: e.target.value })} placeholder={`Ej: Encuentro ${weekday(form.fecha)} 16:30 hrs`} />
+                <input className={inputCls} value={form.encuentroOtro} {...invalid('encuentro')} onChange={(e) => { set({ encuentroOtro: e.target.value }); clearError('encuentro'); }} placeholder={`Ej: Encuentro ${weekday(form.fecha)} 16:30 hrs`} />
+                {fieldError('encuentro')}
               </label>
             )}
             <label className={labelCls}>Modalidad
@@ -384,7 +468,8 @@ export function RegistrarEncuentroClient() {
               </select>
             </label>
             {fullReport && <><label className={labelCls}>Predicador
-              <input className={inputCls} value={form.predicador} onChange={(e) => set({ predicador: e.target.value })} />
+              <input className={inputCls} value={form.predicador} {...invalid('predicador')} onChange={(e) => { set({ predicador: e.target.value }); clearError('predicador'); }} />
+              {fieldError('predicador')}
               {sugerido && <span className="text-[11px] font-normal text-slate-500">Según la ficha «{sugerido.ficha}»</span>}
             </label>
             <label className={labelCls}>Mensaje
@@ -400,7 +485,7 @@ export function RegistrarEncuentroClient() {
             <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800"><strong>Observación:</strong> {(registros.data ?? []).find((r) => r.id === form.id)?.observacion}. Al guardar, el reporte vuelve a quedar por revisar.</p>
           )}
           {yaRegistrado && (
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Este encuentro ya tiene un reporte. Consulta el control semanal o pide al administrador que lo revise.</p>
+            <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Este reporte ya se registró. Revísalo con tu administrador de campus. <button type="button" onClick={() => setDuplicado(existente.data?.existente ?? null)} className="underline">Ver detalle</button></p>
           )}
         </section>
 
@@ -417,7 +502,7 @@ export function RegistrarEncuentroClient() {
             <span className="text-sm font-semibold text-slate-600">Total: {sum(form.asistencia)}</span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {displayedAsistencia.map((c) => numberInput(form.asistencia[c.key] ?? '', (v) => set({ asistencia: { ...form.asistencia, [c.key]: v } }), c.label))}
+            {displayedAsistencia.map((c) => numberInput(form.asistencia[c.key] ?? '', (v) => set({ asistencia: { ...form.asistencia, [c.key]: v } }), c.label, `asistencia.${c.key}`))}
           </div>
           <p className="text-xs text-slate-500">Cuenta aquí a los asistentes. Los voluntarios se registran por separado para no duplicarlos.</p>
         </section>
@@ -425,14 +510,14 @@ export function RegistrarEncuentroClient() {
         {fullReport && <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <h2 className="font-bold text-slate-900">Decisiones</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {numberInput(form.aceptoPresencial, (v) => set({ aceptoPresencial: v }), 'Aceptaron a Jesús (presencial)')}
-            {online && numberInput(form.aceptoOnline, (v) => set({ aceptoOnline: v }), 'Aceptaron a Jesús (online)')}
+            {numberInput(form.aceptoPresencial, (v) => set({ aceptoPresencial: v }), 'Aceptaron a Jesús (presencial)', 'aceptoPresencial')}
+            {online && numberInput(form.aceptoOnline, (v) => set({ aceptoOnline: v }), 'Aceptaron a Jesús (online)', 'aceptoOnline')}
           </div>
         </section>}
 
         {online && <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <h2 className="font-bold text-slate-900">Participación online</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{numberInput(form.espectadores, v => set({espectadores: v}), prayer ? 'Total online (espectadores)' : 'Espectadores online')}</div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{numberInput(form.espectadores, v => set({espectadores: v}), prayer ? 'Total online (espectadores)' : 'Espectadores online', 'espectadores')}</div>
         </section>}
 
         <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
@@ -440,8 +525,9 @@ export function RegistrarEncuentroClient() {
             <h2 className="font-bold text-slate-900">Voluntarios</h2>
             <span className="text-sm font-semibold text-slate-600">Total: {sum(form.voluntarios)}</span>
           </div>
+          {errors.voluntarios && <p id="err-voluntarios" className="stats-field-error">{errors.voluntarios}</p>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-            {displayedVoluntarios.map((c) => numberInput(form.voluntarios[c.key] ?? '', (v) => set({ voluntarios: { ...form.voluntarios, [c.key]: v } }), c.label))}
+            {displayedVoluntarios.map((c) => numberInput(form.voluntarios[c.key] ?? '', (v) => set({ voluntarios: { ...form.voluntarios, [c.key]: v } }), c.label, `voluntarios.${c.key}`, 'voluntarios'))}
           </div>
         </section>
 
@@ -466,7 +552,12 @@ export function RegistrarEncuentroClient() {
         </section>
 
         <div className="stats-form-actions flex flex-wrap justify-end gap-2">
-          <p>Revisa las cifras antes de guardar. El administrador del campus revisará el reporte para incorporarlo a Estadísticas.</p>
+          <p className="stats-actions-hint">Revisa las cifras antes de guardar. El administrador del campus revisará el reporte para incorporarlo a Estadísticas.</p>
+          <p className="stats-actions-totals" aria-hidden="true">
+            <span><strong>{sum(form.asistencia)}</strong> asistentes</span>
+            <span><strong>{sum(form.voluntarios)}</strong> voluntarios</span>
+            <span><strong>{sum(form.asistencia) + sum(form.voluntarios)}</strong> presencial</span>
+          </p>
           {form.id && (
             <button type="button" onClick={() => setForm(emptyForm(form.fecha))} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600">Cancelar edición</button>
           )}
@@ -475,6 +566,39 @@ export function RegistrarEncuentroClient() {
           </button>
         </div>
       </form>
+      )}
+
+      {duplicado && (
+        <ReporteDialog title="Este reporte ya se registró" onClose={cerrarDuplicado}
+          actions={<>
+            {registroDuplicado && puedeEditar(registroDuplicado) && (
+              <button type="button" onClick={() => editar(registroDuplicado)} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800">
+                {registroDuplicado.estado === 'observado' ? 'Corregir ese reporte' : 'Abrir ese reporte'}
+              </button>
+            )}
+            <button type="button" data-autofocus onClick={cerrarDuplicado} className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white">Entendido, elegir otro</button>
+          </>}>
+          <p><strong>Revísalo con tu administrador de campus</strong> antes de ingresarlo de nuevo, para no duplicar las cifras.</p>
+          <dl className="stats-dialog-facts">
+            <div><dt>Campus</dt><dd>{duplicado.campus}</dd></div>
+            <div><dt>Fecha</dt><dd className="capitalize">{shortDate(duplicado.fecha)}</dd></div>
+            <div><dt>Encuentro</dt><dd>{duplicado.encuentro}</dd></div>
+            <div><dt>Estado</dt><dd>{ESTADO_LABEL[duplicado.estado] ?? duplicado.estado}</dd></div>
+            <div><dt>Asistentes</dt><dd>{duplicado.totalAsistencia}</dd></div>
+            {duplicado.registradoPor && <div><dt>Registrado por</dt><dd>{duplicado.registradoPor}</dd></div>}
+          </dl>
+        </ReporteDialog>
+      )}
+
+      {atipico && (
+        <ReporteDialog title="¿La asistencia está bien digitada?" onClose={() => setAtipico(null)}
+          actions={<>
+            <button type="button" data-autofocus onClick={() => setAtipico(null)} className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white">Revisar las cifras</button>
+            <button type="button" onClick={() => void guardarReporte()} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">Sí, está correcta. Enviar</button>
+          </>}>
+          <p>Registraste <strong>{atipico.asistentes}</strong> asistentes. En este encuentro lo habitual es cerca de <strong>{atipico.tipico}</strong>.</p>
+          <p className="text-xs text-slate-500">Revisa que no sobre ni falte un cero antes de enviar.</p>
+        </ReporteDialog>
       )}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-label="Registros recientes">
