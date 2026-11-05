@@ -199,6 +199,7 @@ const NAV: NavGroup[] = [
   { href: '/dashboard',                    label: 'Inicio',      section: 'General', icon: HomeIcon },
   { href: '/dashboard/produccion-general/noticias', label: 'Noticias', section: 'General', icon: NoticiasIcon, permission: 'content:view' },
   { href: '/dashboard/orgchart',           label: 'Organigrama', section: 'General', icon: OrgIcon, permission: 'orgchart:view' },
+  { href: '/dashboard/correos', label: 'Correos y accesos', section: 'Servicios internos', icon: SoporteIcon },
   {
     href:    '/dashboard/produccion-general',
     label:   'Producción General',

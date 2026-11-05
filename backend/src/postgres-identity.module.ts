@@ -23,6 +23,8 @@ import { PendingAccountGuard } from './common/guards/pending-account.guard';
 import { PostgresUsersPermissionsGuard } from './auth/guards/postgres-users-permissions.guard';
 import { postgresDomainControllers,postgresDomainProviders } from './postgres-domain.providers';
 import { UploadsController } from './common/storage/uploads.controller';
+import { InstitutionalMailController } from './institutional-mail/mail.controller';
+import { InstitutionalMailService } from './institutional-mail/mail.service';
 
 // Application root: identity, permissions and every domain on PostgreSQL (Supabase).
 @Module({
@@ -37,8 +39,9 @@ import { UploadsController } from './common/storage/uploads.controller';
     ThrottlerModule.forRoot([{ttl:60000,limit:100}]),
     JwtModule.registerAsync({inject:[ConfigService],useFactory:(config:ConfigService)=>({secret:config.get<string>('JWT_SECRET')})}),
   ],
-  controllers:[AuthController,UsersController,RolesController,NotificationsController,UploadsController,...postgresDomainControllers],
+  controllers:[InstitutionalMailController,AuthController,UsersController,RolesController,NotificationsController,UploadsController,...postgresDomainControllers],
   providers:[
+    InstitutionalMailService,
     ...postgresDomainProviders,
     PostgresAuthService,PasswordRecoveryService,ResendMailerService,PostgresUsersService,PostgresRolesService,PostgresNotificationsService,
     PostgresJwtStrategy,

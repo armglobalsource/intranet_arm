@@ -1,4 +1,8 @@
 export const PERMISSION_CATALOG = {
+  'institutional-mail': {
+    label: 'Correos y accesos', description: 'Solicitudes institucionales y control de cuentas',
+    actions: { approve: 'Aprobar como jefatura asignada', manage: 'Gestionar solicitudes e inventario como TI' },
+  },
   orgchart: {
     label: 'Organigrama',
     description: 'Estructura de áreas y equipos de la empresa',
@@ -238,10 +242,12 @@ export interface PermissionUiSection {
   breadcrumb:  string[];
   viewActions: string[];
   editActions: string[];
+  editLabel?: string;
   extra?: { key: string; label: string; actions: string[] }[];
 }
 
 export const PERMISSION_UI_CONFIG: Record<string, PermissionUiSection> = {
+  'institutional-mail': { breadcrumb: ['Correos y accesos'], viewActions: [], editActions: ['manage'], editLabel: 'Gestionar solicitudes e inventario (TI)', extra: [{key:'approval',label:'Aprobar solicitudes de su equipo',actions:['approve']}] },
   orgchart:  { breadcrumb: ['Organigrama'],                          viewActions: ['view'], editActions: ['edit', 'delete'] },
   users:     { breadcrumb: ['Configuración', 'Personas'],            viewActions: ['view'], editActions: ['create', 'edit', 'delete'] },
   roles:     { breadcrumb: ['Configuración', 'Roles del Sistema'],   viewActions: ['view'], editActions: ['manage'] },

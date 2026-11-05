@@ -28,7 +28,7 @@ function buildRows(): MatrixRow[] {
       actions: uiCfg.viewActions,
     });
     if (uiCfg.editActions.length > 0) {
-      rows.push({ resource, kind: 'edit', label: 'Editar', sub: null, actions: uiCfg.editActions });
+      rows.push({ resource, kind: 'edit', label: uiCfg.editLabel ?? 'Editar', sub: null, actions: uiCfg.editActions });
     }
     uiCfg.extra?.forEach((ex: { key: string; label: string; actions: string[] }) => {
       rows.push({ resource, kind: 'extra', label: ex.label, sub: null, actions: ex.actions });
@@ -168,7 +168,7 @@ export function PermissionsMatrix({ roles }: PermissionsMatrixProps) {
                   {localRoles.map((role) => (
                     <td key={role.id} className="px-3 py-2 text-center">
                       <div className="flex justify-center">
-                        <Cell on={isRowOn(role, row)} locked={isWildcard(role)} onClick={() => toggleCell(role, row)} />
+                        {row.actions.length ? <Cell on={isRowOn(role, row)} locked={isWildcard(role)} onClick={() => toggleCell(role, row)} /> : <span className="text-xs text-slate-400">Todos</span>}
                       </div>
                     </td>
                   ))}

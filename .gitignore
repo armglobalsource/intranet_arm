@@ -60,6 +60,7 @@ prod_data.sql
 # ── Playwright MCP / build cache ──────────────────────────────
 .playwright-mcp/
 frontend/tsconfig.tsbuildinfo
+supabase/.temp/
 
 # Vínculo Vercel de la raíz (despliegue frontend + API)
 .vercel/
