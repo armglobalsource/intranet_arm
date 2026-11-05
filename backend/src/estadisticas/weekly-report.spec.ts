@@ -47,10 +47,25 @@ describe('reporte semanal', () => {
     expect(jueves.paises[0]).toMatchObject({ pais: 'Uruguay', filas: [{ campus: 'Montevideo', hora: '20:00', estado: 'sin_reporte', totales: null }] });
     const domingo = r.dias.find((d) => d.fecha === '2026-11-01')!;
     expect(domingo.paises[0].filas[0]).toMatchObject({ estado: 'enviado', totales: null });
-    expect(r.resumen).toEqual({ incluidos: 3, sinReporte: 1, porRevisar: 1, observados: 0 });
+    expect(r.resumen).toEqual({ incluidos: 2, sinReporte: 1, porRevisar: 1, observados: 0, programados: 0 });
+    expect(r.enCurso).toBe(false);
     // Con la opción, el reporte por revisar suma.
     const conRevision = buildWeeklyReport(records, campuses, '2026-10-28', { incluirPorRevisar: true, now });
     expect(conRevision.dias.find((d) => d.fecha === '2026-11-01')!.total).toEqual({ totalGral: 365, totalAudit: 265, paj: 24 });
+  });
+
+  it('en la semana en curso separa lo que falta reportar de lo que aún no ocurre', () => {
+    const jueves = { date: '2026-10-29', time: '21:00' };
+    const r = buildWeeklyReport(records.filter((x) => x.id !== 'd'), campuses, '2026-10-29', { incluirPorRevisar: false, now: jueves });
+    expect(r.enCurso).toBe(true);
+    const filas = r.dias.flatMap((d) => d.paises.flatMap((p) => p.filas));
+    // Montevideo jueves 20:00 empezó hace 1 hora: todavía no se pide el reporte.
+    expect(filas.find((f) => f.campus === 'Montevideo')).toMatchObject({ estado: 'programado', encuentro: 'Encuentro Jueves 20:00 hrs' });
+    expect(filas.find((f) => f.campus === 'Stgo Centro' && f.dia === 'Domingo')).toMatchObject({ estado: 'programado', hora: '11:00' });
+    expect(r.resumen).toMatchObject({ sinReporte: 0, programados: 2 });
+    expect(r.campus.find((c) => c.campus === 'Stgo Centro')!.actual.porDia['Domingo']).toBe('Prog.');
+    const tarde = buildWeeklyReport(records.filter((x) => x.id !== 'd'), campuses, '2026-10-29', { incluirPorRevisar: false, now: { date: '2026-10-29', time: '22:30' } });
+    expect(tarde.resumen).toMatchObject({ sinReporte: 1, programados: 1 });
   });
 
   it('compara cada campus con la semana anterior y suma los eventos en el total semanal', () => {
@@ -76,6 +91,7 @@ describe('reporte semanal', () => {
     expect(html).toContain('RESUMEN SEMANA ANTERIOR VS LA ACTUAL');
     expect(html).toContain('Comparación semanal de todos los campus');
     expect(html).toContain('Sem. 26 Oct al 01 Nov');
+    expect(html).toContain('Sem. 19 al 25 Oct');
     expect(html).toContain('&lt;b&gt;Evento&lt;/b&gt;');
     expect(html).not.toContain('<b>Evento</b>');
     expect(html).toContain('Datos incompletos');

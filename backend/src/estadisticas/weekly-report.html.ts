@@ -14,7 +14,9 @@ export function esc(value: unknown) {
 export const fmt = (n: number) => `${n < 0 ? '-' : ''}${String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
 const day = (fecha: string) => `${fecha.slice(8, 10)} ${MONTHS[Number(fecha.slice(5, 7)) - 1]}`;
 const shortDay = (fecha: string) => `${fecha.slice(8, 10)} ${SHORT[Number(fecha.slice(5, 7)) - 1]}`;
-export const weekLabel = (r: { desde: string; hasta: string }) => `${Number(r.desde.slice(8, 10))} ${SHORT[Number(r.desde.slice(5, 7)) - 1]} al ${shortDay(r.hasta)}`;
+/** «19 al 25 Oct» o «26 Oct al 01 Nov», como en el reporte manual. */
+export const weekLabel = (r: { desde: string; hasta: string }) =>
+  r.desde.slice(5, 7) === r.hasta.slice(5, 7) ? `${r.desde.slice(8, 10)} al ${shortDay(r.hasta)}` : `${shortDay(r.desde)} al ${shortDay(r.hasta)}`;
 
 const C = { ink: '#172532', muted: '#5c6b79', line: '#c9d1d9', head: '#d9dee3', dark: '#3f4a54', soft: '#f4f6f8', warn: '#93370d', warnBg: '#fef6e7', red: '#b42318' };
 const td = (extra = '') => `style="border:1px solid ${C.line};padding:4px 8px;font-size:13px;color:${C.ink};${extra}"`;
@@ -22,13 +24,14 @@ const th = (extra = '') => `style="border:1px solid ${C.line};padding:5px 8px;fo
 const dark = (extra = '') => `style="border:1px solid ${C.dark};padding:5px 8px;font-size:13px;font-weight:700;background:${C.dark};color:#fff;${extra}"`;
 const table = (inner: string) => `<table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif">${inner}</table>`;
 
-const ESTADO: Record<string, string> = { sin_reporte: 'S/R', enviado: 'P/R', observado: 'Obs.' };
+const ESTADO: Record<string, string> = { sin_reporte: 'S/R', enviado: 'P/R', observado: 'Obs.', programado: 'Prog.' };
 
 function rowCells(r: WeeklyRow) {
   const center = 'text-align:center;';
   const online = r.modalidad === 'On Line' ? `background:${C.head};font-weight:700;` : '';
   const status = r.totales ? null : ESTADO[r.estado] ?? 'S/R';
-  const numCell = (v: number | null | undefined) => `<td ${td(`${center}${status ? `color:${C.warn};background:${C.warnBg};` : ''}`)}>${status ?? (v == null ? 'n/a' : fmt(v))}</td>`;
+  const tone = r.estado === 'programado' ? `color:${C.muted};background:${C.soft};` : `color:${C.warn};background:${C.warnBg};`;
+  const numCell = (v: number | null | undefined) => `<td ${td(`${center}${status ? tone : ''}`)}>${status ?? (v == null ? 'n/a' : fmt(v))}</td>`;
   return `<td ${td(center)}>${esc(r.hora || '—')}</td><td ${td(center + online)}>${r.modalidad}</td><td ${td(center)}>${esc(r.tipo)}</td>`
     + numCell(r.totales?.totalGral) + numCell(r.totales ? r.totales.totalAudit : 0) + numCell(r.totales?.paj);
 }
@@ -89,12 +92,15 @@ export function renderWeeklyReportHtml(report: WeeklyReport, opts: { appUrl?: st
   const aviso = avisos.length
     ? `<div style="margin:0 0 18px;padding:10px 14px;border:1px solid #f6d48b;border-radius:10px;background:${C.warnBg};color:${C.warn};font-size:13px;line-height:1.5"><strong>Datos incompletos:</strong> ${avisos.map(esc).join(' · ')}. Estas filas no suman en los totales.</div>`
     : '';
+  const enCurso = report.enCurso
+    ? `<div style="margin:0 0 18px;padding:10px 14px;border:1px solid ${C.line};border-radius:10px;background:${C.soft};color:${C.ink};font-size:13px;line-height:1.5"><strong>Semana en curso:</strong> ${r.programados ? `${r.programados} encuentro${r.programados === 1 ? '' : 's'} aún no se realiza${r.programados === 1 ? '' : 'n'} (Prog.). ` : ''}Las cifras pueden cambiar hasta el cierre de la semana.</div>`
+    : '';
   const cmp = report.comparacion;
   const comparacion = table(`<tr>${['Comparativa Semanal', 'Total General', 'Total auditorio', 'P.A.J.'].map((h) => `<th ${th('text-align:center')}>${h}</th>`).join('')}</tr>`
     + `<tr><td ${td()}>Sem. ${weekLabel(report.anterior)}</td><td ${td('text-align:center')}>${fmt(cmp.anterior.totalGral)}</td><td ${td('text-align:center')}>${fmt(cmp.anterior.totalAudit)}</td><td ${td('text-align:center')}>${fmt(cmp.anterior.paj)}</td></tr>`
     + `<tr><td ${td()}>Sem. ${weekLabel(report.semana)}</td><td ${td('text-align:center')}>${fmt(cmp.actual.totalGral)}</td><td ${td('text-align:center')}>${fmt(cmp.actual.totalAudit)}</td><td ${td('text-align:center')}>${fmt(cmp.actual.paj)}</td></tr>`
     + `<tr><td ${dark()}>Diferencia</td><td ${dark('text-align:center')}>${fmt(cmp.diferencia.totalGral)}</td><td ${dark('text-align:center')}>${fmt(cmp.diferencia.totalAudit)}</td><td ${dark('text-align:center')}>${fmt(cmp.diferencia.paj)}</td></tr>`);
-  const legend = table(['n/a|No aplica', 'S/R|Sin reporte', 'P/R|Por revisar', 'Obs.|Devuelto con observación']
+  const legend = table(['n/a|No aplica', 'S/R|Sin reporte', 'P/R|Por revisar (aún no aprobado)', 'Obs.|Devuelto con observación', 'Prog.|Programado: aún no se realiza']
     .map((x) => x.split('|')).map(([k, v]) => `<tr><td ${td('width:60px')}>${k}</td><td ${td()}>${v}</td></tr>`).join(''));
   const h2 = (text: string) => `<h2 style="margin:26px 0 10px;font-size:17px;text-align:center;color:${C.ink};border-bottom:1px solid ${C.ink};padding-bottom:4px">${text}</h2>`;
   const link = opts.appUrl ? `<p style="font-size:12px;color:${C.muted}">Ver en Ecosistema ARM: <a href="${esc(opts.appUrl)}" style="color:#173e32">${esc(opts.appUrl)}</a></p>` : '';
@@ -102,7 +108,7 @@ export function renderWeeklyReportHtml(report: WeeklyReport, opts: { appUrl?: st
     + `<p style="margin:0;font-size:12px;letter-spacing:2px;color:${C.muted}">ESTADÍSTICAS ARM GLOBAL</p>`
     + `<h1 style="margin:4px 0 4px;font-size:22px">Reporte semanal · Sem. ${weekLabel(report.semana)}</h1>`
     + `<p style="margin:0 0 16px;font-size:13px;color:${C.muted}">${report.incluyePorRevisar ? 'Incluye reportes aprobados y por revisar.' : 'Incluye solo reportes aprobados por el administrador de cada campus.'} Total Gral = asistentes + voluntarios (online: espectadores).</p>`
-    + aviso
+    + enCurso + aviso
     + h2('REPORTE SEMANAL') + (report.dias.length ? weeklyTable(report) : `<p style="font-size:13px;color:${C.muted}">No hay encuentros registrados en esta semana.</p>`)
     + legend
     + h2('RESUMEN SEMANA ANTERIOR VS LA ACTUAL') + report.campus.map((c) => campusCard(c, report)).join('')

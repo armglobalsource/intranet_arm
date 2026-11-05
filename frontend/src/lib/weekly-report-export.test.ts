@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRecipients, weeklySheets } from './weekly-report-export';
+import { parseRecipients, pendingItems, weeklySheets } from './weekly-report-export';
 import type { ReporteSemanal } from '@/hooks/useReporteSemanal';
 
 const t = (totalGral: number, totalAudit: number, paj: number) => ({ totalGral, totalAudit, paj });
@@ -8,16 +8,17 @@ const report: ReporteSemanal = {
   anterior: { desde: '2026-10-19', hasta: '2026-10-25' },
   incluyePorRevisar: false,
   dias: [{ fecha: '2026-10-28', dia: 'Miércoles', total: t(673, 213, 12), paises: [{ pais: 'Chile', subtotal: t(673, 213, 12), filas: [
-    { campusId: 1, campus: 'Stgo Centro', pais: 'Chile', fecha: '2026-10-28', dia: 'Miércoles', hora: '20:00', modalidad: 'Presencial', tipo: 'Encuentro', evento: false, estado: 'subido', totales: { totalGral: 319, totalAudit: 213, paj: 9 } },
-    { campusId: 1, campus: 'Stgo Centro', pais: 'Chile', fecha: '2026-10-28', dia: 'Miércoles', hora: '20:00', modalidad: 'On Line', tipo: 'Enc. Global', evento: false, estado: 'subido', totales: { totalGral: 354, totalAudit: null, paj: 3 } },
-    { campusId: 2, campus: 'Puente Alto', pais: 'Chile', fecha: '2026-10-28', dia: 'Miércoles', hora: '20:00', modalidad: 'Presencial', tipo: 'Encuentro', evento: false, estado: 'sin_reporte', totales: null },
+    { campusId: 1, campus: 'Stgo Centro', pais: 'Chile', fecha: '2026-10-28', dia: 'Miércoles', hora: '20:00', modalidad: 'Presencial', tipo: 'Encuentro', evento: false, estado: 'subido', encuentro: 'Encuentro Miércoles 20:00 hrs', totales: { totalGral: 319, totalAudit: 213, paj: 9 } },
+    { campusId: 1, campus: 'Stgo Centro', pais: 'Chile', fecha: '2026-10-28', dia: 'Miércoles', hora: '20:00', modalidad: 'On Line', tipo: 'Enc. Global', evento: false, estado: 'subido', encuentro: 'Encuentro Miércoles 20:00 hrs', totales: { totalGral: 354, totalAudit: null, paj: 3 } },
+    { campusId: 2, campus: 'Puente Alto', pais: 'Chile', fecha: '2026-10-28', dia: 'Miércoles', hora: '20:00', modalidad: 'Presencial', tipo: 'Encuentro', evento: false, estado: 'sin_reporte', encuentro: 'Encuentro Miércoles 20:00 hrs', totales: null },
   ] }] }],
   totalSemana: t(673, 213, 12),
   campus: [{ campusId: 1, campus: 'Stgo Centro', pais: 'Chile', dias: ['Miércoles'], eventos: [],
     anterior: { porDia: { 'Miércoles': t(298, 208, 14) }, semana: t(298, 208, 14) },
     actual: { porDia: { 'Miércoles': 'P/R' }, semana: t(673, 213, 12) }, diferencia: t(375, 5, -2) }],
   comparacion: { anterior: t(298, 208, 14), actual: t(673, 213, 12), diferencia: t(375, 5, -2) },
-  resumen: { incluidos: 1, sinReporte: 1, porRevisar: 0, observados: 0 },
+  resumen: { incluidos: 1, sinReporte: 1, porRevisar: 0, observados: 0, programados: 0 },
+  enCurso: false,
   html: '',
 };
 
@@ -33,5 +34,12 @@ describe('exportación del reporte semanal', () => {
 
   it('separa correos válidos e inválidos y quita repetidos', () => {
     expect(parseRecipients('Cami@ARM.org, cami@arm.org;\nlider@arm.org  malo@')).toEqual({ valid: ['cami@arm.org', 'lider@arm.org'], invalid: ['malo@'] });
+  });
+});
+
+describe('pendientes del reporte semanal', () => {
+  it('lista solo lo que falta completar o revisar, sin repetir presencial y online', () => {
+    const items = pendingItems(report);
+    expect(items.map((i) => [i.campus, i.estado])).toEqual([['Puente Alto', 'sin_reporte']]);
   });
 });

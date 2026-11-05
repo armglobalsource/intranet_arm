@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import report from './fixtures/weekly-report.json';
+import closed from './fixtures/weekly-report.json';
+import current from './fixtures/weekly-report-current.json';
 
 test.use({ baseURL: process.env.FICHA_UI_BASE_URL ?? 'http://localhost:3000', channel: process.env.FICHA_UI_BROWSER });
 
@@ -9,54 +10,71 @@ async function fixture(page: Page, permissions = ['estadisticas:view', 'estadist
   await page.route('**/api/v1/**', async (route) => {
     const req = route.request(), url = new URL(req.url()), path = url.pathname.replace('/api/v1', '');
     calls.push({ method: req.method(), path, query: url.search, body: req.postDataJSON() });
-    if (path === '/estadisticas/reporte-semanal') return route.fulfill({ json: report });
+    if (path === '/estadisticas/reporte-semanal') return route.fulfill({ json: url.searchParams.get('semana') === '2026-11-02' ? current : closed });
     if (path === '/estadisticas/reporte-semanal/enviar') return route.fulfill({ json: { enviado: true, destinatarios: req.postDataJSON().destinatarios.length } });
     return route.fulfill({ json: [] });
   });
+  await page.clock.setFixedTime(new Date('2026-11-06T00:30:00Z')); // jueves 5 de noviembre, 21:30 en Chile
   return calls;
 }
 
 for (const width of [393, 1280]) {
-  test(`reporte semanal ${width}px: totales, avisos, vista previa y envío`, async ({ page }) => {
-    const calls = await fixture(page);
-    await page.clock.setFixedTime(new Date('2026-11-05T15:00:00Z'));
+  test(`reporte semanal ${width}px: abre la semana en curso con sus pendientes`, async ({ page }) => {
+    await fixture(page);
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/dashboard/produccion-general/estadisticas/reporte-semanal');
-    await expect(page.getByRole('heading', { name: 'Reporte semanal', exact: true })).toBeVisible();
-    await expect(page.getByLabel('Semana', { exact: true })).toHaveValue('2026-10-26');
-    expect(calls.some((c) => c.path === '/estadisticas/reporte-semanal' && c.query.includes('semana=2026-10-26'))).toBe(true);
-    const kpis = page.getByLabel('Totales de la semana');
-    await expect(kpis).toContainText('3.596');
-    await expect(page.getByText('Hay datos incompletos en esta semana.')).toBeVisible();
-    const preview = page.getByRole('region', { name: 'Vista previa del reporte' });
-    await expect(preview).toContainText('REPORTE SEMANAL');
-    await expect(preview).toContainText('RESUMEN SEMANA ANTERIOR VS LA ACTUAL');
-    await expect(preview).toContainText('Los datos de JVNS X TEENS se sumaron');
+    await expect(page.getByLabel('Semana', { exact: true })).toHaveValue('2026-11-02');
+    await expect(page.getByText('Semana en curso.')).toBeVisible();
+    const pending = page.getByRole('region', { name: 'Pendientes antes de enviar' });
+    await expect(pending.getByRole('heading')).toHaveText('Pendientes antes de enviar (2)');
+    await expect(pending).toContainText('Sin reporte');
+    await expect(pending).toContainText('Punta Arenas');
+    await expect(pending).toContainText('Por revisar');
+    await expect(pending).toContainText('Montevideo');
+    await expect(page.getByRole('region', { name: 'Vista previa del reporte' })).toContainText('Prog.');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `test-results/reporte-semanal-${width}.png`, fullPage: width > 1000 });
+    await page.screenshot({ path: `test-results/reporte-semanal-en-curso-${width}.png` });
 
+    // Enviar exige reconocer que el reporte está incompleto.
     await page.getByRole('button', { name: 'Enviar por correo' }).click();
     const dialog = page.getByRole('dialog', { name: 'Enviar el reporte por correo' });
-    await dialog.getByRole('textbox').fill('camila@armglobal.org, malo@');
-    await expect(dialog.getByText('Revisa: malo@')).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'Enviar reporte' })).toBeDisabled();
-    await dialog.getByRole('textbox').fill('camila@armglobal.org\npastor@armglobal.org');
+    await dialog.getByRole('textbox').fill('camila@armglobal.org');
+    const send = dialog.getByRole('button', { name: 'Enviar reporte incompleto' });
+    await expect(send).toBeDisabled();
+    await dialog.getByRole('checkbox').check();
+    await expect(send).toBeEnabled();
     await page.screenshot({ path: `test-results/reporte-semanal-envio-${width}.png` });
-    await dialog.getByRole('button', { name: 'Enviar reporte' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Reporte enviado a 2 destinatarios.' })).toBeVisible();
-    const sent = calls.find((c) => c.method === 'POST')!.body;
-    expect(sent).toEqual({ semana: '2026-10-26', porRevisar: false, destinatarios: ['camila@armglobal.org', 'pastor@armglobal.org'] });
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
   });
 }
 
-test('reporte semanal: descarga el Excel y permite incluir los reportes por revisar', async ({ page }) => {
+test('reporte semanal: semana cerrada, envío, Excel y reportes por revisar', async ({ page }) => {
   const calls = await fixture(page);
-  await page.clock.setFixedTime(new Date('2026-11-05T15:00:00Z'));
-  await page.goto('/dashboard/produccion-general/estadisticas/reporte-semanal?semana=2026-10-29');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/dashboard/produccion-general/estadisticas/reporte-semanal');
+  await page.getByRole('button', { name: 'Ver semana cerrada' }).click();
   await expect(page.getByLabel('Semana', { exact: true })).toHaveValue('2026-10-26');
+  await expect(page.getByLabel('Totales de la semana')).toContainText('3.596');
+  const preview = page.getByRole('region', { name: 'Vista previa del reporte' });
+  await expect(preview).toContainText('RESUMEN SEMANA ANTERIOR VS LA ACTUAL');
+  await expect(preview).toContainText('Sem. 19 al 25 Oct');
+  await expect(preview).toContainText('Los datos de JVNS X TEENS se sumaron');
+  await page.screenshot({ path: 'test-results/reporte-semanal-cerrada-1280.png' });
+
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Descargar Excel' }).click();
   expect((await download).suggestedFilename()).toBe('reporte-semanal-2026-10-26.xlsx');
+
+  await page.getByRole('button', { name: 'Enviar por correo' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Enviar el reporte por correo' });
+  await dialog.getByRole('textbox').fill('camila@armglobal.org, malo@');
+  await expect(dialog.getByText('Revisa: malo@')).toBeVisible();
+  await dialog.getByRole('textbox').fill('camila@armglobal.org\npastor@armglobal.org');
+  await dialog.getByRole('checkbox').check();
+  await dialog.getByRole('button', { name: 'Enviar reporte incompleto' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Reporte enviado a 2 destinatarios.' })).toBeVisible();
+  expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ semana: '2026-10-26', porRevisar: false, destinatarios: ['camila@armglobal.org', 'pastor@armglobal.org'] });
+
   await page.getByLabel('Incluir reportes por revisar').check();
   await expect.poll(() => calls.some((c) => c.path === '/estadisticas/reporte-semanal' && c.query.includes('porRevisar=1'))).toBe(true);
 });

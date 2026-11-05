@@ -12,17 +12,21 @@ import { countryName } from './statistics-range';
 
 export interface WeeklyCampus { id: number; name: string; country?: string | null; isActive?: boolean; schedules?: { dia: string; hora: string; fichaType?: string }[] }
 export interface Totals { totalGral: number; totalAudit: number; paj: number }
-export type RowEstado = EstadoReporte | 'sin_reporte';
+/** programado: está en la agenda y todavía no ocurre (o no han pasado 2 horas desde su inicio). */
+export type RowEstado = EstadoReporte | 'sin_reporte' | 'programado';
 export interface WeeklyRow {
   campusId: number; campus: string; pais: string; fecha: string; dia: string; hora: string;
   modalidad: 'Presencial' | 'On Line'; tipo: string; evento: boolean;
   estado: RowEstado;
-  /** null: el reporte aún no cuenta (sin reporte, por revisar u observado). */
+  /** Nombre del encuentro (como en el historial) y id del reporte, para enlazar al pendiente. */
+  encuentro: string;
+  id?: string;
+  /** null: el reporte aún no cuenta (sin reporte, por revisar, observado o programado). */
   totales: { totalGral: number; totalAudit: number | null; paj: number } | null;
 }
 export interface DayBlock { fecha: string; dia: string; paises: { pais: string; filas: WeeklyRow[]; subtotal: Totals }[]; total: Totals }
-/** n/a: el campus no tiene encuentro ese día · S/R: sin reporte · P/R: por revisar · Obs.: devuelto con observación. */
-export type Cell = Totals | 'n/a' | 'S/R' | 'P/R' | 'Obs.';
+/** n/a: el campus no tiene encuentro ese día · S/R: sin reporte · P/R: por revisar · Obs.: devuelto con observación · Prog.: aún no ocurre. */
+export type Cell = Totals | 'n/a' | 'S/R' | 'P/R' | 'Obs.' | 'Prog.';
 export interface CampusComparison {
   campusId: number; campus: string; pais: string; dias: string[];
   anterior: { porDia: Record<string, Cell>; semana: Totals };
@@ -39,7 +43,9 @@ export interface WeeklyReport {
   totalSemana: Totals;
   campus: CampusComparison[];
   comparacion: { anterior: Totals; actual: Totals; diferencia: Totals };
-  resumen: { incluidos: number; sinReporte: number; porRevisar: number; observados: number };
+  resumen: { incluidos: number; sinReporte: number; porRevisar: number; observados: number; programados: number };
+  /** La semana todavía no termina (hora de Chile). */
+  enCurso: boolean;
 }
 
 const zero = (): Totals => ({ totalGral: 0, totalAudit: 0, paj: 0 });
@@ -101,7 +107,8 @@ export function weeklyRows(
     const evento = r.tipo === 'evento';
     const nombreEvento = String(r.eventoNombre || r.encuentro || 'Evento').replace(/\s*\d{1,2}:\d{2}\s*hrs?\.?$/i, '').trim();
     const hora = hhmm(r.encuentro ?? '') ?? hhmm(r.eventoHorario ?? '') ?? hhmm(r.eventoNombre ?? '') ?? '';
-    const base = { campusId: Number(campus.id), campus: campus.name, pais: countryName(campus.country), fecha, dia: weekdayOf(fecha), hora, evento, estado };
+    const base = { campusId: Number(campus.id), campus: campus.name, pais: countryName(campus.country), fecha, dia: weekdayOf(fecha), hora, evento, estado,
+      encuentro: String(r.encuentro ?? nombreEvento), id: r.id ? String(r.id) : undefined };
     if (hasPresencial(r.modalidad)) {
       const asistentes = typeof r.totalAsistencia === 'number' ? r.totalAsistencia : sumCounts(r.asistencia);
       const voluntarios = typeof r.totalVoluntarios === 'number' ? r.totalVoluntarios : sumCounts(r.voluntarios);
@@ -113,12 +120,16 @@ export function weeklyRows(
         totales: cuenta ? { totalGral: num(r.online?.espectadores), totalAudit: null, paj: num(r.online?.acepto) } : null });
     }
   }
-  // Encuentros de la agenda del campus que no tienen ningún reporte (en cualquier estado).
+  // Encuentros de la agenda sin ningún reporte (en cualquier estado). Los que ya debían reportarse
+  // (2 horas después de su inicio) quedan sin reporte; los demás, programados.
   const agenda = campuses.map((c) => ({ ...c, schedules: regularSchedules(c) }));
-  for (const p of pendingEncuentros(agenda as any, inWeek as any, desde, hasta, opts.now)) {
+  const endOfWeek = { date: addDays(hasta, 1), time: '23:59' };
+  const nowAt = Date.parse(`${opts.now.date}T${opts.now.time}:00Z`);
+  for (const p of pendingEncuentros(agenda as any, inWeek as any, desde, hasta, endOfWeek)) {
     const campus = campuses.find((c) => Number(c.id) === p.campusId)!;
+    const due = Date.parse(`${p.fecha}T${p.hora}:00Z`) + 2 * 60 * 60 * 1000 <= nowAt;
     rows.push({ campusId: p.campusId, campus: p.campus, pais: countryName(campus.country), fecha: p.fecha, dia: weekdayOf(p.fecha), hora: p.hora,
-      modalidad: 'Presencial', tipo: 'Encuentro', evento: false, estado: 'sin_reporte', totales: null });
+      modalidad: 'Presencial', tipo: 'Encuentro', evento: false, estado: due ? 'sin_reporte' : 'programado', encuentro: p.encuentro, totales: null });
   }
   return rows;
 }
@@ -148,15 +159,15 @@ function campusWeek(rows: WeeklyRow[], campus: WeeklyCampus, dias: string[]) {
   const mine = rows.filter((r) => r.campusId === Number(campus.id));
   const semana = zero();
   mine.forEach((r) => r.totales && add(semana, r.totales));
-  const scheduled = new Set(regularSchedules(campus).map((s) => s.dia));
   const porDia: Record<string, Cell> = {};
   for (const dia of dias) {
     const delDia = mine.filter((r) => r.dia === dia && !r.evento);
-    if (!delDia.length) { porDia[dia] = scheduled.has(dia) ? 'S/R' : 'n/a'; continue; }
+    if (!delDia.length) { porDia[dia] = 'n/a'; continue; }
     const t = zero();
     delDia.forEach((r) => r.totales && add(t, r.totales));
     porDia[dia] = delDia.some((r) => r.totales) ? t
-      : delDia.some((r) => r.estado === 'enviado') ? 'P/R' : delDia.some((r) => r.estado === 'observado') ? 'Obs.' : 'S/R';
+      : delDia.some((r) => r.estado === 'enviado') ? 'P/R' : delDia.some((r) => r.estado === 'observado') ? 'Obs.'
+      : delDia.some((r) => r.estado === 'sin_reporte') ? 'S/R' : 'Prog.';
   }
   return { porDia, semana };
 }
@@ -186,7 +197,7 @@ export function buildWeeklyReport(
     })
     .sort((a, b) => countryRank(a.pais).localeCompare(countryRank(b.pais)) || a.campus.localeCompare(b.campus, 'es'));
 
-  const count = (estado: RowEstado) => new Set(actuales.filter((r) => r.estado === estado).map((r) => `${r.campusId}|${r.fecha}|${r.hora}|${r.tipo}`)).size;
+  const count = (estado: RowEstado) => new Set(actuales.filter((r) => r.estado === estado).map((r) => `${r.campusId}|${r.fecha}|${r.hora}|${r.encuentro}`)).size;
   return {
     semana: { desde, hasta },
     anterior: { desde: prevDesde, hasta: prevHasta },
@@ -196,10 +207,12 @@ export function buildWeeklyReport(
     campus: comparacion,
     comparacion: { anterior, actual, diferencia: diff(actual, anterior) },
     resumen: {
-      incluidos: new Set(actuales.filter((r) => r.totales).map((r) => `${r.campusId}|${r.fecha}|${r.hora}|${r.tipo}`)).size,
+      incluidos: new Set(actuales.filter((r) => r.totales).map((r) => `${r.campusId}|${r.fecha}|${r.hora}|${r.encuentro}`)).size,
       sinReporte: count('sin_reporte'),
       porRevisar: opts.incluirPorRevisar ? 0 : count('enviado'),
       observados: count('observado'),
+      programados: count('programado'),
     },
+    enCurso: opts.now.date <= hasta,
   };
 }

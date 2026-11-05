@@ -1,0 +1,759 @@
+{
+ "semana": {
+  "desde": "2026-11-02",
+  "hasta": "2026-11-08"
+ },
+ "anterior": {
+  "desde": "2026-10-26",
+  "hasta": "2026-11-01"
+ },
+ "incluyePorRevisar": false,
+ "dias": [
+  {
+   "fecha": "2026-11-04",
+   "dia": "Miércoles",
+   "paises": [
+    {
+     "pais": "Chile",
+     "filas": [
+      {
+       "campusId": 1,
+       "campus": "Stgo Centro",
+       "pais": "Chile",
+       "fecha": "2026-11-04",
+       "dia": "Miércoles",
+       "hora": "20:00",
+       "evento": false,
+       "estado": "subido",
+       "encuentro": "Encuentro 20:00 hrs",
+       "id": "r31",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "totales": {
+        "totalGral": 305,
+        "totalAudit": 201,
+        "paj": 6
+       }
+      },
+      {
+       "campusId": 1,
+       "campus": "Stgo Centro",
+       "pais": "Chile",
+       "fecha": "2026-11-04",
+       "dia": "Miércoles",
+       "hora": "20:00",
+       "evento": false,
+       "estado": "subido",
+       "encuentro": "Encuentro 20:00 hrs",
+       "id": "r31",
+       "modalidad": "On Line",
+       "tipo": "Enc. Global",
+       "totales": {
+        "totalGral": 341,
+        "totalAudit": null,
+        "paj": 2
+       }
+      }
+     ],
+     "subtotal": {
+      "totalGral": 646,
+      "totalAudit": 201,
+      "paj": 8
+     }
+    }
+   ],
+   "total": {
+    "totalGral": 646,
+    "totalAudit": 201,
+    "paj": 8
+   }
+  },
+  {
+   "fecha": "2026-11-05",
+   "dia": "Jueves",
+   "paises": [
+    {
+     "pais": "Chile",
+     "filas": [
+      {
+       "campusId": 2,
+       "campus": "Puente Alto",
+       "pais": "Chile",
+       "fecha": "2026-11-05",
+       "dia": "Jueves",
+       "hora": "20:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Jueves 20:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 3,
+       "campus": "Punta Arenas",
+       "pais": "Chile",
+       "fecha": "2026-11-05",
+       "dia": "Jueves",
+       "hora": "19:30",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "sin_reporte",
+       "encuentro": "Encuentro Jueves 19:30 hrs",
+       "totales": null
+      }
+     ],
+     "subtotal": {
+      "totalGral": 0,
+      "totalAudit": 0,
+      "paj": 0
+     }
+    },
+    {
+     "pais": "Uruguay",
+     "filas": [
+      {
+       "campusId": 5,
+       "campus": "Montevideo",
+       "pais": "Uruguay",
+       "fecha": "2026-11-05",
+       "dia": "Jueves",
+       "hora": "20:00",
+       "evento": false,
+       "estado": "enviado",
+       "encuentro": "Encuentro 20:00 hrs",
+       "id": "r32",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "totales": null
+      }
+     ],
+     "subtotal": {
+      "totalGral": 0,
+      "totalAudit": 0,
+      "paj": 0
+     }
+    }
+   ],
+   "total": {
+    "totalGral": 0,
+    "totalAudit": 0,
+    "paj": 0
+   }
+  },
+  {
+   "fecha": "2026-11-07",
+   "dia": "Sábado",
+   "paises": [
+    {
+     "pais": "Chile",
+     "filas": [
+      {
+       "campusId": 4,
+       "campus": "Concepción",
+       "pais": "Chile",
+       "fecha": "2026-11-07",
+       "dia": "Sábado",
+       "hora": "17:30",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Sábado 17:30 hrs",
+       "totales": null
+      }
+     ],
+     "subtotal": {
+      "totalGral": 0,
+      "totalAudit": 0,
+      "paj": 0
+     }
+    }
+   ],
+   "total": {
+    "totalGral": 0,
+    "totalAudit": 0,
+    "paj": 0
+   }
+  },
+  {
+   "fecha": "2026-11-08",
+   "dia": "Domingo",
+   "paises": [
+    {
+     "pais": "Chile",
+     "filas": [
+      {
+       "campusId": 2,
+       "campus": "Puente Alto",
+       "pais": "Chile",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "11:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 11:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 2,
+       "campus": "Puente Alto",
+       "pais": "Chile",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "18:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 18:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 3,
+       "campus": "Punta Arenas",
+       "pais": "Chile",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "11:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 11:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 3,
+       "campus": "Punta Arenas",
+       "pais": "Chile",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "18:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 18:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 1,
+       "campus": "Stgo Centro",
+       "pais": "Chile",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "09:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 09:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 1,
+       "campus": "Stgo Centro",
+       "pais": "Chile",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "11:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 11:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 1,
+       "campus": "Stgo Centro",
+       "pais": "Chile",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "13:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 13:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 1,
+       "campus": "Stgo Centro",
+       "pais": "Chile",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "17:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 17:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 1,
+       "campus": "Stgo Centro",
+       "pais": "Chile",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "19:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 19:00 hrs",
+       "totales": null
+      }
+     ],
+     "subtotal": {
+      "totalGral": 0,
+      "totalAudit": 0,
+      "paj": 0
+     }
+    },
+    {
+     "pais": "Estados Unidos",
+     "filas": [
+      {
+       "campusId": 6,
+       "campus": "Katy",
+       "pais": "Estados Unidos",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "11:30",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 11:30 hrs",
+       "totales": null
+      }
+     ],
+     "subtotal": {
+      "totalGral": 0,
+      "totalAudit": 0,
+      "paj": 0
+     }
+    },
+    {
+     "pais": "Uruguay",
+     "filas": [
+      {
+       "campusId": 5,
+       "campus": "Montevideo",
+       "pais": "Uruguay",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "11:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 11:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 5,
+       "campus": "Montevideo",
+       "pais": "Uruguay",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "18:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 18:00 hrs",
+       "totales": null
+      }
+     ],
+     "subtotal": {
+      "totalGral": 0,
+      "totalAudit": 0,
+      "paj": 0
+     }
+    },
+    {
+     "pais": "Venezuela",
+     "filas": [
+      {
+       "campusId": 7,
+       "campus": "Maracaibo",
+       "pais": "Venezuela",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "11:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 11:00 hrs",
+       "totales": null
+      },
+      {
+       "campusId": 7,
+       "campus": "Maracaibo",
+       "pais": "Venezuela",
+       "fecha": "2026-11-08",
+       "dia": "Domingo",
+       "hora": "18:00",
+       "modalidad": "Presencial",
+       "tipo": "Encuentro",
+       "evento": false,
+       "estado": "programado",
+       "encuentro": "Encuentro Domingo 18:00 hrs",
+       "totales": null
+      }
+     ],
+     "subtotal": {
+      "totalGral": 0,
+      "totalAudit": 0,
+      "paj": 0
+     }
+    }
+   ],
+   "total": {
+    "totalGral": 0,
+    "totalAudit": 0,
+    "paj": 0
+   }
+  }
+ ],
+ "totalSemana": {
+  "totalGral": 646,
+  "totalAudit": 201,
+  "paj": 8
+ },
+ "campus": [
+  {
+   "campusId": 4,
+   "campus": "Concepción",
+   "pais": "Chile",
+   "dias": [
+    "Sábado"
+   ],
+   "anterior": {
+    "porDia": {
+     "Sábado": {
+      "totalGral": 34,
+      "totalAudit": 13,
+      "paj": 0
+     }
+    },
+    "semana": {
+     "totalGral": 34,
+     "totalAudit": 13,
+     "paj": 0
+    }
+   },
+   "actual": {
+    "porDia": {
+     "Sábado": "Prog."
+    },
+    "semana": {
+     "totalGral": 0,
+     "totalAudit": 0,
+     "paj": 0
+    }
+   },
+   "diferencia": {
+    "totalGral": -34,
+    "totalAudit": -13,
+    "paj": 0
+   },
+   "eventos": []
+  },
+  {
+   "campusId": 2,
+   "campus": "Puente Alto",
+   "pais": "Chile",
+   "dias": [
+    "Jueves",
+    "Domingo"
+   ],
+   "anterior": {
+    "porDia": {
+     "Jueves": {
+      "totalGral": 180,
+      "totalAudit": 92,
+      "paj": 1
+     },
+     "Domingo": {
+      "totalGral": 451,
+      "totalAudit": 237,
+      "paj": 7
+     }
+    },
+    "semana": {
+     "totalGral": 631,
+     "totalAudit": 329,
+     "paj": 8
+    }
+   },
+   "actual": {
+    "porDia": {
+     "Jueves": "Prog.",
+     "Domingo": "Prog."
+    },
+    "semana": {
+     "totalGral": 0,
+     "totalAudit": 0,
+     "paj": 0
+    }
+   },
+   "diferencia": {
+    "totalGral": -631,
+    "totalAudit": -329,
+    "paj": -8
+   },
+   "eventos": []
+  },
+  {
+   "campusId": 3,
+   "campus": "Punta Arenas",
+   "pais": "Chile",
+   "dias": [
+    "Jueves",
+    "Domingo"
+   ],
+   "anterior": {
+    "porDia": {
+     "Jueves": {
+      "totalGral": 110,
+      "totalAudit": 54,
+      "paj": 1
+     },
+     "Domingo": {
+      "totalGral": 221,
+      "totalAudit": 109,
+      "paj": 4
+     }
+    },
+    "semana": {
+     "totalGral": 331,
+     "totalAudit": 163,
+     "paj": 5
+    }
+   },
+   "actual": {
+    "porDia": {
+     "Jueves": "S/R",
+     "Domingo": "Prog."
+    },
+    "semana": {
+     "totalGral": 0,
+     "totalAudit": 0,
+     "paj": 0
+    }
+   },
+   "diferencia": {
+    "totalGral": -331,
+    "totalAudit": -163,
+    "paj": -5
+   },
+   "eventos": []
+  },
+  {
+   "campusId": 1,
+   "campus": "Stgo Centro",
+   "pais": "Chile",
+   "dias": [
+    "Miércoles",
+    "Domingo"
+   ],
+   "anterior": {
+    "porDia": {
+     "Miércoles": {
+      "totalGral": 673,
+      "totalAudit": 213,
+      "paj": 12
+     },
+     "Domingo": {
+      "totalGral": 1357,
+      "totalAudit": 588,
+      "paj": 44
+     }
+    },
+    "semana": {
+     "totalGral": 2121,
+     "totalAudit": 868,
+     "paj": 56
+    }
+   },
+   "actual": {
+    "porDia": {
+     "Miércoles": {
+      "totalGral": 646,
+      "totalAudit": 201,
+      "paj": 8
+     },
+     "Domingo": "Prog."
+    },
+    "semana": {
+     "totalGral": 646,
+     "totalAudit": 201,
+     "paj": 8
+    }
+   },
+   "diferencia": {
+    "totalGral": -1475,
+    "totalAudit": -667,
+    "paj": -48
+   },
+   "eventos": []
+  },
+  {
+   "campusId": 6,
+   "campus": "Katy",
+   "pais": "Estados Unidos",
+   "dias": [
+    "Domingo"
+   ],
+   "anterior": {
+    "porDia": {
+     "Domingo": {
+      "totalGral": 86,
+      "totalAudit": 47,
+      "paj": 2
+     }
+    },
+    "semana": {
+     "totalGral": 86,
+     "totalAudit": 47,
+     "paj": 2
+    }
+   },
+   "actual": {
+    "porDia": {
+     "Domingo": "Prog."
+    },
+    "semana": {
+     "totalGral": 0,
+     "totalAudit": 0,
+     "paj": 0
+    }
+   },
+   "diferencia": {
+    "totalGral": -86,
+    "totalAudit": -47,
+    "paj": -2
+   },
+   "eventos": []
+  },
+  {
+   "campusId": 5,
+   "campus": "Montevideo",
+   "pais": "Uruguay",
+   "dias": [
+    "Jueves",
+    "Domingo"
+   ],
+   "anterior": {
+    "porDia": {
+     "Jueves": {
+      "totalGral": 77,
+      "totalAudit": 39,
+      "paj": 0
+     },
+     "Domingo": {
+      "totalGral": 232,
+      "totalAudit": 116,
+      "paj": 7
+     }
+    },
+    "semana": {
+     "totalGral": 309,
+     "totalAudit": 155,
+     "paj": 7
+    }
+   },
+   "actual": {
+    "porDia": {
+     "Jueves": "P/R",
+     "Domingo": "Prog."
+    },
+    "semana": {
+     "totalGral": 0,
+     "totalAudit": 0,
+     "paj": 0
+    }
+   },
+   "diferencia": {
+    "totalGral": -309,
+    "totalAudit": -155,
+    "paj": -7
+   },
+   "eventos": []
+  },
+  {
+   "campusId": 7,
+   "campus": "Maracaibo",
+   "pais": "Venezuela",
+   "dias": [
+    "Domingo"
+   ],
+   "anterior": {
+    "porDia": {
+     "Domingo": {
+      "totalGral": 84,
+      "totalAudit": 36,
+      "paj": 0
+     }
+    },
+    "semana": {
+     "totalGral": 84,
+     "totalAudit": 36,
+     "paj": 0
+    }
+   },
+   "actual": {
+    "porDia": {
+     "Domingo": "Prog."
+    },
+    "semana": {
+     "totalGral": 0,
+     "totalAudit": 0,
+     "paj": 0
+    }
+   },
+   "diferencia": {
+    "totalGral": -84,
+    "totalAudit": -36,
+    "paj": 0
+   },
+   "eventos": []
+  }
+ ],
+ "comparacion": {
+  "anterior": {
+   "totalGral": 3596,
+   "totalAudit": 1611,
+   "paj": 78
+  },
+  "actual": {
+   "totalGral": 646,
+   "totalAudit": 201,
+   "paj": 8
+  },
+  "diferencia": {
+   "totalGral": -2950,
+   "totalAudit": -1410,
+   "paj": -70
+  }
+ },
+ "resumen": {
+  "incluidos": 1,
+  "sinReporte": 1,
+  "porRevisar": 1,
+  "observados": 0,
+  "programados": 16
+ },
+ "enCurso": true,
+ "html": "<div style=\"font-family:Arial,Helvetica,sans-serif;color:#172532;max-width:960px;margin:0 auto\"><p style=\"margin:0;font-size:12px;letter-spacing:2px;color:#5c6b79\">ESTADÍSTICAS ARM GLOBAL</p><h1 style=\"margin:4px 0 4px;font-size:22px\">Reporte semanal · Sem. 02 al 08 Nov</h1><p style=\"margin:0 0 16px;font-size:13px;color:#5c6b79\">Incluye solo reportes aprobados por el administrador de cada campus. Total Gral = asistentes + voluntarios (online: espectadores).</p><div style=\"margin:0 0 18px;padding:10px 14px;border:1px solid #c9d1d9;border-radius:10px;background:#f4f6f8;color:#172532;font-size:13px;line-height:1.5\"><strong>Semana en curso:</strong> 16 encuentros aún no se realizan (Prog.). Las cifras pueden cambiar hasta el cierre de la semana.</div><div style=\"margin:0 0 18px;padding:10px 14px;border:1px solid #f6d48b;border-radius:10px;background:#fef6e7;color:#93370d;font-size:13px;line-height:1.5\"><strong>Datos incompletos:</strong> 1 encuentro sin reporte (S/R) · 1 reporte por revisar (P/R), aún no aprobado por el administrador de campus. Estas filas no suman en los totales.</div><h2 style=\"margin:26px 0 10px;font-size:17px;text-align:center;color:#172532;border-bottom:1px solid #172532;padding-bottom:4px\">REPORTE SEMANAL</h2><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">País</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Fecha</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Día</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Campus</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Hora</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Modalidad</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Tipo Encuentro</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Total Gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Total Audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">N° P.A.J</th></tr><tr><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">Chile</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">04 noviembre</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Miércoles</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Stgo Centro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">20:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">305</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">201</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">6</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">20:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;background:#d9dee3;font-weight:700;\">On Line</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Enc. Global</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">341</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">n/a</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">2</td></tr><tr><td colspan=\"6\" style=\"border:0\"></td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:right\">Total</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">646</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">201</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">8</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">País</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Fecha</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Día</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Campus</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Hora</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Modalidad</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Tipo Encuentro</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Total Gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Total Audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">N° P.A.J</th></tr><tr><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">Chile</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">05 noviembre</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Jueves</td><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Puente Alto</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">20:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Punta Arenas</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">19:30</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#93370d;background:#fef6e7;\">S/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#93370d;background:#fef6e7;\">S/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#93370d;background:#fef6e7;\">S/R</td></tr><tr><td colspan=\"6\" style=\"border:0\"></td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:right\">Total Chile:</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td></tr><tr><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">Uruguay</td><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">05 noviembre</td><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Jueves</td><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Montevideo</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">20:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#93370d;background:#fef6e7;\">P/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#93370d;background:#fef6e7;\">P/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#93370d;background:#fef6e7;\">P/R</td></tr><tr><td colspan=\"6\" style=\"border:0\"></td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:right\">Total</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">0</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">0</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">0</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">País</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Fecha</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Día</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Campus</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Hora</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Modalidad</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Tipo Encuentro</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Total Gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Total Audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">N° P.A.J</th></tr><tr><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">Chile</td><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">07 noviembre</td><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Sábado</td><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Concepción</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">17:30</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td colspan=\"6\" style=\"border:0\"></td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:right\">Total</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">0</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">0</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">0</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">País</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Fecha</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Día</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Campus</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Hora</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Modalidad</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Tipo Encuentro</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Total Gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Total Audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">N° P.A.J</th></tr><tr><td rowspan=\"9\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">Chile</td><td rowspan=\"9\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">08 noviembre</td><td rowspan=\"9\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Domingo</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Puente Alto</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">11:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">18:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Punta Arenas</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">11:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">18:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td rowspan=\"5\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Stgo Centro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">09:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">11:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">13:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">17:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">19:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td colspan=\"6\" style=\"border:0\"></td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:right\">Total Chile:</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td></tr><tr><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">Estados Unidos</td><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">08 noviembre</td><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Domingo</td><td rowspan=\"1\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Katy</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">11:30</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">Uruguay</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">08 noviembre</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Domingo</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Montevideo</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">11:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">18:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td colspan=\"6\" style=\"border:0\"></td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:right\">Total Uruguay:</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td></tr><tr><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">Venezuela</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">08 noviembre</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Domingo</td><td rowspan=\"2\" style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">Maracaibo</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">11:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">18:00</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Presencial</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;\">Encuentro</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#5c6b79;background:#f4f6f8;\">Prog.</td></tr><tr><td colspan=\"6\" style=\"border:0\"></td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:right\">Total Venezuela:</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td><td style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">0</td></tr><tr><td colspan=\"6\" style=\"border:0\"></td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:right\">Total</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">0</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">0</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">0</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><td style=\"border:0;width:60%\"></td><td style=\"padding:6px 10px;background:#000;color:#fff;font-weight:700;font-size:15px\">TOTAL SEM.</td><td style=\"padding:6px 10px;background:#000;color:#fff;font-weight:700;font-size:15px;text-align:center\">646</td><td style=\"padding:6px 10px;background:#000;color:#fff;font-weight:700;font-size:15px;text-align:center\">201</td><td style=\"padding:6px 10px;background:#000;color:#fff;font-weight:700;font-size:15px;text-align:center\">8</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;width:60px\">n/a</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;\">No aplica</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;width:60px\">S/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;\">Sin reporte</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;width:60px\">P/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;\">Por revisar (aún no aprobado)</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;width:60px\">Obs.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;\">Devuelto con observación</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;width:60px\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;\">Programado: aún no se realiza</td></tr></table><h2 style=\"margin:26px 0 10px;font-size:17px;text-align:center;color:#172532;border-bottom:1px solid #172532;padding-bottom:4px\">RESUMEN SEMANA ANTERIOR VS LA ACTUAL</h2><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><td style=\"border:0\"></td><th colspan=\"6\" style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center;font-size:14px\">Campus Concepción</th></tr><tr><td style=\"border:0\"></td><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Sábado</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Totales Semanales</th></tr><tr><td style=\"border:0\"></td><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 26 Oct al 01 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">34</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">13</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">34</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">13</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 02 al 08 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;font-weight:700\">Diferencia</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-34</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-13</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">0</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><td style=\"border:0\"></td><th colspan=\"9\" style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center;font-size:14px\">Campus Puente Alto</th></tr><tr><td style=\"border:0\"></td><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Jueves</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Domingo</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Totales Semanales</th></tr><tr><td style=\"border:0\"></td><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 26 Oct al 01 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">180</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">92</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">1</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">451</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">237</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">7</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">631</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">329</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">8</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 02 al 08 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;font-weight:700\">Diferencia</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-631</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-329</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-8</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><td style=\"border:0\"></td><th colspan=\"9\" style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center;font-size:14px\">Campus Punta Arenas</th></tr><tr><td style=\"border:0\"></td><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Jueves</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Domingo</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Totales Semanales</th></tr><tr><td style=\"border:0\"></td><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 26 Oct al 01 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">110</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">54</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">1</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">221</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">109</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">4</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">331</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">163</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">5</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 02 al 08 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">S/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">S/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">S/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;font-weight:700\">Diferencia</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-331</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-163</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-5</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><td style=\"border:0\"></td><th colspan=\"9\" style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center;font-size:14px\">Campus Stgo Centro</th></tr><tr><td style=\"border:0\"></td><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Miércoles</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Domingo</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Totales Semanales</th></tr><tr><td style=\"border:0\"></td><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 26 Oct al 01 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">673</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">213</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">12</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">1.357</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">588</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">44</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">2.121</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">868</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">56</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 02 al 08 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">646</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">201</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">8</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">646</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">201</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">8</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;font-weight:700\">Diferencia</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-27</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-12</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-4</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-1.475</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-667</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-48</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><td style=\"border:0\"></td><th colspan=\"6\" style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center;font-size:14px\">Campus Katy</th></tr><tr><td style=\"border:0\"></td><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Domingo</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Totales Semanales</th></tr><tr><td style=\"border:0\"></td><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 26 Oct al 01 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">86</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">47</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">2</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">86</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">47</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">2</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 02 al 08 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;font-weight:700\">Diferencia</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-86</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-47</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-2</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><td style=\"border:0\"></td><th colspan=\"9\" style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center;font-size:14px\">Campus Montevideo</th></tr><tr><td style=\"border:0\"></td><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Jueves</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Domingo</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Totales Semanales</th></tr><tr><td style=\"border:0\"></td><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 26 Oct al 01 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">77</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">39</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">232</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">116</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">7</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">309</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">155</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">7</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 02 al 08 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">P/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">P/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">P/R</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;font-weight:700\">Diferencia</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-309</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-155</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-7</td></tr></table><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><td style=\"border:0\"></td><th colspan=\"6\" style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center;font-size:14px\">Campus Maracaibo</th></tr><tr><td style=\"border:0\"></td><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Domingo</th><th colspan=\"3\" style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Totales Semanales</th></tr><tr><td style=\"border:0\"></td><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total gral</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">Total audit.</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center;font-weight:400;background:#fff\">PAJ</th></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 26 Oct al 01 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">84</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">36</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">84</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">36</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;white-space:nowrap;font-size:12px\">Sem. 02 al 08 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">Prog.</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;color:#172532\">0</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;font-weight:700\">Diferencia</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">—</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-84</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">-36</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center;font-weight:700\">0</td></tr></table><h2 style=\"margin:26px 0 10px;font-size:17px;text-align:center;color:#172532;border-bottom:1px solid #172532;padding-bottom:4px\">Comparación semanal de todos los campus</h2><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%;margin:0 0 18px;font-family:Arial,Helvetica,sans-serif\"><tr><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Comparativa Semanal</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Total General</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">Total auditorio</th><th style=\"border:1px solid #c9d1d9;padding:5px 8px;font-size:13px;font-weight:700;background:#d9dee3;color:#172532;text-align:center\">P.A.J.</th></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;\">Sem. 26 Oct al 01 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">3.596</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">1.611</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">78</td></tr><tr><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;\">Sem. 02 al 08 Nov</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">646</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">201</td><td style=\"border:1px solid #c9d1d9;padding:4px 8px;font-size:13px;color:#172532;text-align:center\">8</td></tr><tr><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;\">Diferencia</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">-2.950</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">-1.410</td><td style=\"border:1px solid #3f4a54;padding:5px 8px;font-size:13px;font-weight:700;background:#3f4a54;color:#fff;text-align:center\">-70</td></tr></table></div>"
+}

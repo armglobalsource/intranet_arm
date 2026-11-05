@@ -1,8 +1,8 @@
 // Hojas del Excel del reporte semanal: mismas tres tablas que el correo.
 
-import type { Celda, ReporteSemanal } from '@/hooks/useReporteSemanal';
+import type { Celda, FilaSemanal, ReporteSemanal } from '@/hooks/useReporteSemanal';
 
-const ESTADO: Record<string, string> = { sin_reporte: 'S/R', enviado: 'P/R', observado: 'Obs.' };
+const ESTADO: Record<string, string> = { sin_reporte: 'S/R', enviado: 'P/R', observado: 'Obs.', programado: 'Prog.' };
 type Cell = string | number;
 
 export function parseRecipients(text: string) {
@@ -10,6 +10,21 @@ export function parseRecipients(text: string) {
   const valid = Array.from(new Set(items.filter((s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s))));
   const invalid = items.filter((s) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s));
   return { valid, invalid };
+}
+
+/** Lo que hay que completar o revisar antes de enviar (sin filas repetidas por presencial/online). */
+export function pendingItems(r: ReporteSemanal) {
+  const seen = new Set<string>();
+  const items: FilaSemanal[] = [];
+  for (const d of r.dias) for (const p of d.paises) for (const f of p.filas) {
+    if (f.totales || f.estado === 'programado' || f.estado === 'subido') continue;
+    const key = `${f.campusId}|${f.fecha}|${f.hora}|${f.encuentro}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(f);
+  }
+  const order: Record<string, number> = { sin_reporte: 0, observado: 1, enviado: 2 };
+  return items.sort((a, b) => (order[a.estado] ?? 3) - (order[b.estado] ?? 3) || a.fecha.localeCompare(b.fecha) || a.campus.localeCompare(b.campus) || a.hora.localeCompare(b.hora));
 }
 
 export function weeklySheets(r: ReporteSemanal): { name: string; rows: Cell[][] }[] {

@@ -10,7 +10,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Download, Mail, Printer, Refre
 import { apiErrorMessage } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEnviarReporteSemanal, useReporteSemanal } from '@/hooks/useReporteSemanal';
-import { parseRecipients, weeklySheets } from '@/lib/weekly-report-export';
+import { parseRecipients, pendingItems, weeklySheets } from '@/lib/weekly-report-export';
 import { STATS_ROOT } from '@/lib/statistics-navigation';
 
 const RECIPIENTS_KEY = 'arm-reporte-semanal-destinatarios';
@@ -18,35 +18,44 @@ function addDays(date: string, days: number) { const d = new Date(`${date}T12:00
 function monday(date: string) { return addDays(date, -((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7)); }
 function label(date: string) { return new Date(`${date}T12:00:00Z`).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }); }
 const fmt = (n: number) => n.toLocaleString('es-CL');
+function shortLabel(date: string) { return new Date(`${date}T12:00:00Z`).toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }); }
+const STATE_LABEL: Record<string, string> = { sin_reporte: 'Sin reporte', enviado: 'Por revisar', observado: 'Observado' };
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
 
 function readRecipients() { try { return localStorage.getItem(RECIPIENTS_KEY) ?? ''; } catch { return ''; } }
 function saveRecipients(value: string) { try { localStorage.setItem(RECIPIENTS_KEY, value); } catch { /* sin almacenamiento */ } }
 
-function Kpi({ title, actual, diferencia }: { title: string; actual: number; diferencia: number }) {
+function Kpi({ title, actual, diferencia, enCurso }: { title: string; actual: number; diferencia: number; enCurso: boolean }) {
+  // Con la semana en curso la diferencia engaña: se muestra la cifra de la semana anterior como referencia.
   return <div className="weekly-kpi"><span>{title}</span><strong>{fmt(actual)}</strong>
-    <em className={diferencia > 0 ? 'up' : diferencia < 0 ? 'down' : ''}>{diferencia > 0 ? '+' : ''}{fmt(diferencia)} vs semana anterior</em></div>;
+    {enCurso ? <em>Semana anterior: {fmt(actual - diferencia)}</em>
+      : <em className={diferencia > 0 ? 'up' : diferencia < 0 ? 'down' : ''}>{diferencia > 0 ? '+' : ''}{fmt(diferencia)} vs semana anterior</em>}</div>;
 }
 
 export function ReporteSemanalClient() {
   const { isAdmin, can } = usePermissions();
   const allowed = isAdmin || can('estadisticas:viewAll');
   const params = useSearchParams();
-  const lastWeek = addDays(monday(today()), -7);
+  const thisWeek = monday(today());
+  const lastWeek = addDays(thisWeek, -7);
   const initial = params?.get('semana');
-  const [semana, setSemana] = useState(initial && /^\d{4}-\d{2}-\d{2}$/.test(initial) ? monday(initial) : lastWeek);
+  // Abre en la semana en curso: así se ve lo que falta mientras todavía se puede completar.
+  const [semana, setSemana] = useState(initial && /^\d{4}-\d{2}-\d{2}$/.test(initial) ? monday(initial) : thisWeek);
   const [porRevisar, setPorRevisar] = useState(false);
   const query = useReporteSemanal(allowed ? semana : '', porRevisar);
   const enviar = useEnviarReporteSemanal();
   const [dialog, setDialog] = useState(false);
   const [recipients, setRecipients] = useState('');
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [aceptaIncompleto, setAceptaIncompleto] = useState(false);
   useEffect(() => { setRecipients(readRecipients()); }, []);
 
   const weeks: string[] = [];
   for (let w = monday(today()), i = 0; i < 26; w = addDays(w, -7), i++) weeks.push(w);
   const r = query.data;
   const parsed = parseRecipients(recipients);
+  const pendientesLista = r ? pendingItems(r) : [];
+  const pendientes = pendientesLista.length;
 
   async function descargar() {
     if (!r) return;
@@ -57,7 +66,7 @@ export function ReporteSemanalClient() {
   }
 
   async function confirmarEnvio() {
-    if (!parsed.valid.length || parsed.invalid.length) return;
+    if (!parsed.valid.length || parsed.invalid.length || (pendientes > 0 && !aceptaIncompleto)) return;
     try {
       const res = await enviar.mutateAsync({ semana, porRevisar, destinatarios: parsed.valid });
       saveRecipients(parsed.valid.join('\n'));
@@ -75,14 +84,13 @@ export function ReporteSemanalClient() {
     </div>;
   }
 
-  const pendientes = r ? r.resumen.sinReporte + r.resumen.porRevisar + r.resumen.observados : 0;
 
   return <div className="stats-control weekly-report mx-auto max-w-6xl space-y-4 pb-8">
     <header className="stats-control-header">
       <div><p className="stats-eyebrow">ESTADÍSTICAS</p><h1>Reporte semanal</h1><p>Las tres tablas del informe de la semana, listas para descargar o enviar por correo.</p></div>
       <div className="stats-control-actions">
         <Link href={`${STATS_ROOT}/operacion`}>Control de reportes</Link>
-        <button type="button" className="stats-primary" disabled={!r} onClick={() => { setNotice(null); setDialog(true); }}><Mail size={16} aria-hidden="true" />Enviar por correo</button>
+        <button type="button" className="stats-primary" disabled={!r} onClick={() => { setNotice(null); setAceptaIncompleto(false); setDialog(true); }}><Mail size={16} aria-hidden="true" />Enviar por correo</button>
       </div>
     </header>
 
@@ -92,7 +100,9 @@ export function ReporteSemanalClient() {
       </select></label>
       <div className="stats-week-actions">
         <button aria-label="Semana anterior" onClick={() => setSemana(addDays(semana, -7))}><ChevronLeft size={18} /></button>
-        <button onClick={() => setSemana(lastWeek)}><CalendarDays size={15} />Última semana cerrada</button>
+        {semana === thisWeek
+          ? <button onClick={() => setSemana(lastWeek)}><CalendarDays size={15} />Ver semana cerrada</button>
+          : <button onClick={() => setSemana(thisWeek)}><CalendarDays size={15} />Ir a esta semana</button>}
         <button aria-label="Semana siguiente" disabled={semana >= monday(today())} onClick={() => setSemana(addDays(semana, 7))}><ChevronRight size={18} /></button>
         <button aria-label="Actualizar reporte" disabled={query.isFetching} onClick={() => void query.refetch()}><RefreshCw size={16} /></button>
       </div>
@@ -105,14 +115,24 @@ export function ReporteSemanalClient() {
       : query.isError || !r ? <div role="alert" className="stats-empty">No pudimos armar el reporte. <button onClick={() => void query.refetch()}>Reintentar</button></div>
       : <>
         <div className="weekly-kpis" aria-label="Totales de la semana">
-          <Kpi title="Total General" actual={r.comparacion.actual.totalGral} diferencia={r.comparacion.diferencia.totalGral} />
-          <Kpi title="Total auditorio" actual={r.comparacion.actual.totalAudit} diferencia={r.comparacion.diferencia.totalAudit} />
-          <Kpi title="P.A.J." actual={r.comparacion.actual.paj} diferencia={r.comparacion.diferencia.paj} />
+          <Kpi title="Total General" actual={r.comparacion.actual.totalGral} diferencia={r.comparacion.diferencia.totalGral} enCurso={r.enCurso} />
+          <Kpi title="Total auditorio" actual={r.comparacion.actual.totalAudit} diferencia={r.comparacion.diferencia.totalAudit} enCurso={r.enCurso} />
+          <Kpi title="P.A.J." actual={r.comparacion.actual.paj} diferencia={r.comparacion.diferencia.paj} enCurso={r.enCurso} />
         </div>
-        {pendientes > 0 && <aside className="stats-control-warning">
-          <strong>Hay datos incompletos en esta semana.</strong>
-          <p>{[r.resumen.sinReporte && `${r.resumen.sinReporte} sin reporte`, r.resumen.porRevisar && `${r.resumen.porRevisar} por revisar`, r.resumen.observados && `${r.resumen.observados} observados`].filter(Boolean).join(' · ')}. Esas filas aparecen marcadas y no suman. <Link className="underline" href={`${STATS_ROOT}/operacion`}>Ver en Control de reportes</Link></p>
-        </aside>}
+        {r.enCurso && <p className="weekly-status"><strong>Semana en curso.</strong> {r.resumen.programados ? `${r.resumen.programados} encuentro${r.resumen.programados === 1 ? '' : 's'} aún no se realiza${r.resumen.programados === 1 ? '' : 'n'}. ` : ''}Las cifras se actualizan a medida que los campus suben y aprueban sus reportes.</p>}
+        <section className="weekly-pending" aria-label="Pendientes antes de enviar">
+          <div className="weekly-pending-head">
+            <h2>{pendientes ? `Pendientes antes de enviar (${pendientes})` : 'Sin pendientes'}</h2>
+            <Link href={`${STATS_ROOT}/operacion`}>Ver en Control de reportes →</Link>
+          </div>
+          {pendientes ? <ul>{pendientesLista.map((p) => (
+            <li key={`${p.campusId}-${p.fecha}-${p.hora}-${p.encuentro}`}>
+              <span className={`weekly-chip weekly-chip-${p.estado}`}>{STATE_LABEL[p.estado]}</span>
+              <span className="weekly-pending-what"><strong>{p.campus}</strong><span>{shortLabel(p.fecha)}{p.hora ? ` · ${p.hora}` : ''} · {p.evento ? p.tipo : 'Encuentro'}</span></span>
+            </li>))}</ul>
+            : <p className="weekly-pending-ok">Todos los encuentros que ya ocurrieron tienen su reporte aprobado.</p>}
+          {pendientes > 0 && <p className="weekly-pending-note">Mientras estén pendientes, estas filas aparecen marcadas en el reporte y no suman en los totales.</p>}
+        </section>
         <div className="weekly-actions">
           <button type="button" onClick={() => void descargar()}><Download size={16} aria-hidden="true" />Descargar Excel</button>
           <button type="button" onClick={() => window.print()}><Printer size={16} aria-hidden="true" />Imprimir o guardar PDF</button>
@@ -126,7 +146,11 @@ export function ReporteSemanalClient() {
       <div role="dialog" aria-modal="true" aria-labelledby="weekly-send-title" className="stats-dialog">
         <h2 id="weekly-send-title" className="text-lg font-bold text-slate-900">Enviar el reporte por correo</h2>
         <p className="mt-1 text-sm text-slate-600">Semana {label(r.semana.desde)} al {label(r.semana.hasta)} · {porRevisar ? 'incluye reportes por revisar' : 'solo reportes aprobados'}.</p>
-        {pendientes > 0 && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Faltan datos: {pendientes} fila{pendientes === 1 ? '' : 's'} no suma{pendientes === 1 ? '' : 'n'}. El correo lo indicará.</p>}
+        {r.enCurso && <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">La semana aún no termina: el reporte puede cambiar.</p>}
+        {pendientes > 0 && <label className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+          <input type="checkbox" className="mt-0.5 h-4 w-4" checked={aceptaIncompleto} onChange={(e) => setAceptaIncompleto(e.target.checked)} />
+          <span>Entiendo que el reporte está incompleto: hay {pendientes} pendiente{pendientes === 1 ? '' : 's'} que no suma{pendientes === 1 ? '' : 'n'}. El correo lo indicará.</span>
+        </label>}
         <label className="mt-4 grid gap-1.5 text-xs font-semibold text-slate-600">Destinatarios (uno por línea o separados por coma)
           <textarea autoFocus rows={5} value={recipients} onChange={(e) => setRecipients(e.target.value)} placeholder="nombre@armglobal.org"
             aria-invalid={parsed.invalid.length > 0} aria-describedby="weekly-recipients-help"
@@ -136,8 +160,8 @@ export function ReporteSemanalClient() {
           {parsed.invalid.length ? `Revisa: ${parsed.invalid.slice(0, 3).join(', ')}` : `${parsed.valid.length} destinatario${parsed.valid.length === 1 ? '' : 's'}. La lista queda guardada en este navegador para el próximo envío.`}
         </p>
         <div className="mt-5 grid gap-2">
-          <button type="button" disabled={!parsed.valid.length || parsed.invalid.length > 0 || enviar.isPending} onClick={() => void confirmarEnvio()}
-            className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{enviar.isPending ? 'Enviando…' : 'Enviar reporte'}</button>
+          <button type="button" disabled={!parsed.valid.length || parsed.invalid.length > 0 || (pendientes > 0 && !aceptaIncompleto) || enviar.isPending} onClick={() => void confirmarEnvio()}
+            className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{enviar.isPending ? 'Enviando…' : pendientes ? 'Enviar reporte incompleto' : 'Enviar reporte'}</button>
           <button type="button" onClick={() => setDialog(false)} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">Cancelar</button>
         </div>
       </div>

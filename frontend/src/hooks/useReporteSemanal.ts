@@ -4,11 +4,13 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export interface Totales { totalGral: number; totalAudit: number; paj: number }
-export type Celda = Totales | 'n/a' | 'S/R' | 'P/R' | 'Obs.';
+export type Celda = Totales | 'n/a' | 'S/R' | 'P/R' | 'Obs.' | 'Prog.';
 export interface FilaSemanal {
   campusId: number; campus: string; pais: string; fecha: string; dia: string; hora: string;
   modalidad: 'Presencial' | 'On Line'; tipo: string; evento: boolean;
-  estado: 'subido' | 'enviado' | 'observado' | 'sin_reporte';
+  estado: 'subido' | 'enviado' | 'observado' | 'sin_reporte' | 'programado';
+  encuentro: string;
+  id?: string;
   totales: { totalGral: number; totalAudit: number | null; paj: number } | null;
 }
 export interface ReporteSemanal {
@@ -24,7 +26,8 @@ export interface ReporteSemanal {
     diferencia: Totales;
   }[];
   comparacion: { anterior: Totales; actual: Totales; diferencia: Totales };
-  resumen: { incluidos: number; sinReporte: number; porRevisar: number; observados: number };
+  resumen: { incluidos: number; sinReporte: number; porRevisar: number; observados: number; programados: number };
+  enCurso: boolean;
   /** El mismo HTML que se envía por correo (los textos ya vienen escapados por la API). */
   html: string;
 }
