@@ -147,9 +147,9 @@ test('agrupa Estadísticas, activa solo el submenú correcto y conserva la ruta 
   await expect(mainNav.getByRole('link', { name: 'Resumen', exact: true })).not.toHaveAttribute('aria-current', 'page');
   await page.reload();
   await expect(page.getByRole('region', { name: 'Cobertura de datos' })).toBeVisible();
-  await mainNav.getByRole('link', { name: 'Operación semanal', exact: true }).click();
-  await expect(page.getByLabel('Período', { exact: true })).toHaveValue('week');
-  await expect(page.getByRole('region', { name: 'Operación de estadísticas' })).toBeVisible();
+  await mainNav.getByRole('link', { name: 'Control de reportes', exact: true }).click();
+  await expect(page.getByLabel('Semana', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('region', { name: 'Detalle de reportes' })).toBeVisible();
 });
 
 test('proyecta con semanas cerradas, escenarios explícitos y filtros de campus', async ({ page }) => {
@@ -180,15 +180,15 @@ test('no inventa proyecciones ni ofrece revisión a quien solo puede ver su camp
   await nav.getByRole('button', { name: 'Proyecciones' }).click();
   await expect(page.getByText('Sin estimación disponible.', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Campus', { exact: true })).toHaveCount(0);
-  await nav.getByRole('button', { name: 'Operación semanal' }).click();
+  await nav.getByRole('button', { name: 'Control de reportes' }).click();
   await expect(page.getByRole('link', { name: 'Abrir revisión de reportes' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Registrar un encuentro' })).toHaveCount(0);
 });
 
-test('el grupo lleva al registro cuando el usuario solo tiene permiso para registrar', async ({ page }) => {
+test('el grupo lleva al control cuando el usuario solo tiene permiso para registrar', async ({ page }) => {
   const requests = await fixture(page, { authorOnly: true });
   await expect(page).toHaveURL(/\/dashboard$/);
   const nav = page.getByRole('navigation', { name: 'Navegación principal' });
-  await expect(nav.getByRole('link', { name: 'Estadísticas', exact: true })).toHaveAttribute('href', '/dashboard/produccion-general/estadisticas/registrar');
+  await expect(nav.getByRole('link', { name: 'Estadísticas', exact: true })).toHaveAttribute('href', '/dashboard/produccion-general/estadisticas/operacion');
   expect(requests.length).toBe(0);
 });

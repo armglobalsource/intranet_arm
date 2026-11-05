@@ -61,16 +61,42 @@ export function useRegistrosRecientes(campusName?: string) {
 }
 
 export interface EncuentroPendiente { campusId: number; campus: string; fecha: string; hora: string; encuentro: string }
+/** Avance de un campus: hasta qué día tiene reportes y cuántos encuentros le faltan. */
+export interface CampusProgreso {
+  campusId: number; campus: string; ultimoReporte: string | null; pendientes: number;
+  pais?: string; desde?: string; corteHistorico?: string | null;
+  seguimiento?: 'horarios' | 'sin_horarios' | 'virtual'; puedeRegistrar?: boolean; puedeRevisar?: boolean;
+}
+export interface ReporteControl { id: string; campusId: number; campus: string; fecha: string; encuentro: string; estado: 'enviado' | 'observado' | 'subido'; tipo: string; puedeEditar?: boolean }
+export interface ControlReportes { pendientes: EncuentroPendiente[]; progreso?: CampusProgreso[]; revisar: RegistroDudoso[]; reportes?: ReporteControl[]; meta?: { desde: string; hasta: string; hora: string; zona: string } }
+/** Reporte que ya existe para ese encuentro; lo responde la base, aunque lo haya subido otra persona. */
+export interface ReporteExistente {
+  id: string; campusId: number; campus: string; fecha: string; encuentro: string;
+  estado: 'enviado' | 'observado' | 'subido'; registradoPor: string | null; totalAsistencia: number;
+}
 export interface RegistroDudoso { id?: string; campusId: number; campus: string; fecha: string; encuentro: string; diaFecha: string; diaNombre: string }
 
-/** Encuentros de los últimos 14 días sin registro, según los horarios del campus, y registros con fecha dudosa. */
+/** Lo que falta subir de cada campus desde su último reporte, su avance y los registros con fecha dudosa. */
 export function usePendientesReporte(enabled = true) {
   const scope = useRecordScope();
-  return useQuery<{ pendientes: EncuentroPendiente[]; revisar: RegistroDudoso[] }>({
+  return useQuery<ControlReportes>({
     queryKey: [...KEY, 'pendientes', scope],
     queryFn: () => api.get('/encuentros/pendientes').then((r) => r.data),
     enabled: enabled && !!scope,
     staleTime: 60_000,
+  });
+}
+
+/** Pregunta a la base si ese encuentro ya se registró. Sin caché: otra persona pudo subirlo recién. */
+export function useReporteExistente(q: { campus?: string; fecha: string; encuentro: string; tipo: 'encuentro' | 'evento' }, enabled: boolean) {
+  const scope = useRecordScope();
+  return useQuery<{ existente: ReporteExistente | null }>({
+    queryKey: [...KEY, 'existente', scope, q.campus, q.fecha, q.encuentro, q.tipo],
+    queryFn: () => api.get('/encuentros/existente', { params: q }).then((r) => r.data),
+    enabled: enabled && !!scope && !!q.campus && !!q.fecha && !!q.encuentro.trim(),
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
   });
 }
 

@@ -5,9 +5,10 @@ import { CreateEncuentroDto, UpdateEncuentroDto } from './dto/encuentro.dto';
 import { PostgresCampusService } from '../campus/postgres-campus.service';
 import { allCampus, assertRecordCampus, RecordUser, sameEncuentroLabel } from './encuentros.scope';
 import { hasPermission } from '../common/permissions';
-import { doubtfulDates, nowInSantiago, pendingEncuentros } from './encuentros.pending';
+import { existingReport, HOLE_DAYS, nowInSantiago } from './encuentros.pending';
 import { canDeleteReport, canEditReport, canReview, estadoDe, isUploaded } from './encuentros.review';
 import { validDay } from '../estadisticas/statistics-range';
+import { controlStart, weekStart, weeklyControl } from './encuentros.control';
 import { PostgresNotificationsService } from '../notifications/postgres-notifications.service';
 
 const COL = 'encuentros';
@@ -90,19 +91,54 @@ export class PostgresEncuentrosService {
   }
 
   /**
-   * Encuentros de los últimos `days` días que según los horarios debieron ocurrir y no tienen
-   * registro, y registros del mismo período cuya fecha no calza con el día que dice su nombre.
+   * Lo que falta subir de cada campus: los encuentros que según sus horarios debieron ocurrir
+   * desde el corte histórico fijo de cada campus, su avance
+   * y los registros del período cuya fecha no calza con el día que dice su nombre.
    */
-  async pendientes(user: RecordUser, days = 14) {
+  async pendientes(user: RecordUser, _legacyDays = HOLE_DAYS) {
     const all = allCampus(user);
-    if (!all && user.campusId == null) return { pendientes: [], revisar: [] };
     const now = nowInSantiago();
-    const start = new Date(`${now.date}T12:00:00Z`);
-    start.setUTCDate(start.getUTCDate() - (days - 1));
-    const from = start.toISOString().slice(0, 10);
-    const campuses = all ? await this.campuses.findAll() : [await this.campuses.findOne(Number(user.campusId))];
-    const records = await this.store.list(COL, { campus: all ? undefined : campuses[0].name, start: from, end: `${now.date}T23:59:59.999Z` });
-    return { pendientes: pendingEncuentros(campuses, records, from, now.date, now), revisar: doubtfulDates(records, campuses) };
+    const allowedOwn = ['encuentros:create','encuentros:view','estadisticas:view'].some(p => hasPermission(user.permissions ?? [],p));
+    const campuses = (await this.campuses.findAll()).filter(c => all || canReview(user,c) || (allowedOwn && String(c.id) === String(user.campusId)));
+    if (!campuses.length) throw new ForbiddenException('No tienes acceso al control de reportes');
+    const anchors = await this.store.encounterControlAnchors(now.date);
+    const fallback = anchors.get('__baseline') ?? now.date;
+    const starts = Object.fromEntries(campuses.map(c => [String(c.id),c.schedules?.length ? controlStart(Number(c.id),anchors,fallback) : weekStart(fallback)]));
+    const from = Object.values(starts).sort()[0] ?? now.date;
+    const records = await this.store.encounterControlRows(campuses.map(c => Number(c.id)),from,now.date,starts);
+    const result = weeklyControl(campuses,records,anchors,fallback,now);
+    return { ...result, progreso: result.progreso.map(c => ({ ...c, puedeRegistrar: hasPermission(user.permissions ?? [],'encuentros:create') && (all || String(c.campusId) === String(user.campusId)), puedeRevisar: canReview(user,campuses.find(x => Number(x.id) === c.campusId)!) })),
+      reportes: result.reportes.map(r => ({...r, puedeEditar: !canEditReport(user,records.find(x => x.id === r.id),canReview(user,campuses.find(c => Number(c.id) === r.campusId)!))})) };
+  }
+
+  /** Datos del reporte existente que se muestran a quien intenta registrarlo de nuevo. */
+  private existingInfo(r: any, campus: any) {
+    return {
+      id: r.id, campusId: Number(campus.id), campus: campus.name, fecha: String(r.fecha ?? '').slice(0, 10),
+      encuentro: r.encuentro ?? '', estado: estadoDe(r), registradoPor: r.registradoPor?.email ?? null,
+      totalAsistencia: r.totalAsistencia ?? 0,
+    };
+  }
+
+  /** Campus sobre el que puede actuar el usuario: el de su cuenta, salvo quien ve todos. */
+  private async scopedCampus(user: RecordUser, name?: string) {
+    if (allCampus(user)) return this.campuses.findByName(String(name ?? ''));
+    if (user.campusId == null) throw new BadRequestException('Tu cuenta no tiene un campus asignado');
+    const campus = await this.campuses.findOne(Number(user.campusId));
+    if (name && name.trim().toLowerCase() !== String(campus.name).trim().toLowerCase()) {
+      throw new ForbiddenException('Solo puedes registrar encuentros de tu campus');
+    }
+    return campus;
+  }
+
+  /** ¿Alguien ya registró este encuentro? La respuesta sale de la base, no de lo que ve cada líder. */
+  async existente(user: RecordUser, q: { campus?: string; fecha?: string; encuentro?: string; tipo?: string }) {
+    if (!q.fecha || !validDay(q.fecha) || !q.encuentro?.trim()) throw new BadRequestException('Indica la fecha y el encuentro');
+    const campus = await this.scopedCampus(user, q.campus);
+    const tipo = q.tipo === 'evento' ? 'evento' : 'encuentro';
+    const rows = await this.store.list(COL, { campus: campus.name, start: q.fecha, end: `${q.fecha}T23:59:59.999Z` });
+    const found = existingReport(campus, rows, q.fecha, q.encuentro, tipo);
+    return { existente: found ? this.existingInfo(found, campus) : null };
   }
 
   // ── Escritura ──────────────────────────────────────────────────────────────
@@ -113,21 +149,23 @@ export class PostgresEncuentrosService {
     const now = new Date();
     const isEvento = dto.tipo === 'evento';
     if (!validDay(dto.fecha)) throw new BadRequestException('Ingresa una fecha válida con formato AAAA-MM-DD');
-    let campus: any;
-    if (allCampus(user)) campus = await this.campuses.findByName(dto.campus);
-    else {
-      // Cada campus reporta lo suyo: el campus sale de la cuenta, no del formulario.
-      if (user.campusId == null) throw new BadRequestException('Tu cuenta no tiene un campus asignado');
-      campus = await this.campuses.findOne(Number(user.campusId));
-      if (dto.campus && dto.campus.trim().toLowerCase() !== String(campus.name).trim().toLowerCase()) {
-        throw new ForbiddenException('Solo puedes registrar encuentros de tu campus');
-      }
-    }
-    if (!isEvento && dto.encuentro?.trim()) {
-      const duplicate = (await this.store.list(COL,{campus:campus.name,start:dto.fecha,end:`${dto.fecha}T23:59:59.999Z`})).find((r) =>
-        r.tipo !== 'evento' && String(r.fecha ?? '').slice(0,10) === dto.fecha && sameEncuentroLabel(r.encuentro, dto.encuentro)
-        && !(dto.idempotencyKey && r.idempotencyKey === dto.idempotencyKey && String(r.registradoPor?.uid) === String(user.sub)));
-      if (duplicate) throw new ConflictException(`Ya existe un registro de «${dto.encuentro}» del ${dto.fecha}. Edítalo en vez de crear otro.`);
+    // Un día de margen: un campus puede ir adelantado respecto de la hora de Chile.
+    const tomorrow = new Date(`${nowInSantiago(now).date}T12:00:00Z`);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    if (dto.fecha > tomorrow.toISOString().slice(0, 10)) throw new BadRequestException('No se puede reportar un encuentro con fecha futura');
+    const label = (isEvento ? (dto.eventoHorario ?? dto.encuentro) : dto.encuentro)?.trim();
+    if (!label) throw new BadRequestException(isEvento ? 'Indica el nombre del evento' : 'Indica el encuentro');
+    // Cada campus reporta lo suyo: el campus sale de la cuenta, no del formulario.
+    const campus: any = await this.scopedCampus(user, dto.campus);
+    const sameDay = (await this.store.list(COL,{campus:campus.name,start:dto.fecha,end:`${dto.fecha}T23:59:59.999Z`}))
+      // Un reintento del mismo envío no es un duplicado: el store devuelve el registro anterior.
+      .filter((r) => !(dto.idempotencyKey && r.idempotencyKey === dto.idempotencyKey && String(r.registradoPor?.uid) === String(user.sub)));
+    const duplicate = existingReport(campus, sameDay, dto.fecha, label, dto.tipo);
+    if (duplicate) {
+      throw new ConflictException({
+        message: `Este reporte ya se registró: ${duplicate.encuentro} del ${dto.fecha}. Revísalo con tu administrador de campus.`,
+        details: { existente: this.existingInfo(duplicate, campus) },
+      });
     }
 
     const doc = {

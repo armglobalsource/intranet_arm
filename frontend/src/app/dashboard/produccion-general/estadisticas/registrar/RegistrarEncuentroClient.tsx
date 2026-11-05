@@ -16,7 +16,7 @@ import { useAllCampuses, type Campus } from '@/hooks/useCampus';
 import { useActiveArmCatalogos } from '@/hooks/useArmCatalogos';
 import { isPrayerReport, PRAYER_VOLUNTEERS, mergeReportFields } from '@/lib/encuentro-report';
 import {
-  useEliminarRegistro, useGuardarRegistro, usePendientesReporte, useRegistrosRecientes, useRevision,
+  useEliminarRegistro, useGuardarRegistro, usePendientesReporte, useRegistrosRecientes, useRevision, useReporteExistente,
   type EncuentroPendiente, type RegistroEncuentro, type RegistroInput,
 } from '@/hooks/useRegistrosEncuentros';
 
@@ -225,8 +225,9 @@ export function RegistrarEncuentroClient() {
 
   const online = /online|virtual/i.test(form.modalidad);
   const eventoLabel = form.eventoNombre.trim() ? `${form.eventoNombre.trim()}${form.eventoHora ? ` ${form.eventoHora} hrs` : ''}` : '';
-  const yaRegistrado = form.tipo === 'encuentro' && !form.id && (registros.data ?? []).some((r) =>
-    r.tipo !== 'evento' && String(r.fecha).slice(0, 10) === form.fecha && r.encuentro.trim().toLowerCase() === encuentroLabel.toLowerCase());
+  const existente = useReporteExistente({campus: campus?.name, fecha: form.fecha, encuentro: form.tipo === 'evento' ? eventoLabel : encuentroLabel, tipo: form.tipo}, canCreate && !form.id);
+  const yaRegistrado = !!existente.data?.existente;
+
 
   function editar(r: RegistroEncuentro) {
     if (r.fechaPrecision === 'mes') {
@@ -266,6 +267,7 @@ export function RegistrarEncuentroClient() {
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setNotice(null);
+    if (yaRegistrado) return setNotice({ ok: false, text: 'Este encuentro ya tiene un reporte. Revisa el control semanal antes de registrar otro.' });
     if (!campus) return setNotice({ ok: false, text: 'Elige el campus.' });
     if (form.tipo === 'encuentro' && !encuentroLabel) return setNotice({ ok: false, text: 'Elige el encuentro.' });
     if (form.tipo === 'evento' && (!form.eventoNombre.trim() || !form.eventoHora)) return setNotice({ ok: false, text: 'Escribe el nombre y la hora del evento.' });
@@ -315,38 +317,9 @@ export function RegistrarEncuentroClient() {
         </div>
       </header>
 
-      {(pendientes.length > 0 || revisar.length > 0) && !form.id && (
-        <section aria-label="Pendientes de reportar" className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 sm:p-5">
-          {pendientes.length > 0 && <>
-            <h2 className="font-bold text-slate-900">Pendientes de reportar</h2>
-            <p className="mb-3 text-xs text-slate-600">Según los horarios del campus, estos encuentros de las últimas dos semanas aún no tienen registro.</p>
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {pendientes.slice(0, 8).map((p) => (
-                <li key={`${p.campusId}-${p.fecha}-${p.hora}`} className="flex items-center justify-between gap-3 rounded-xl border border-amber-100 bg-white px-3 py-2">
-                  <span className="min-w-0 text-sm">
-                    <span className="block font-semibold text-slate-800">{p.encuentro}</span>
-                    <span className="block text-xs capitalize text-slate-500">{shortDate(p.fecha)}{allCampus ? ` · ${p.campus}` : ''}</span>
-                  </span>
-                  <button type="button" onClick={() => reportar(p)} className="shrink-0 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white">Registrar</button>
-                </li>
-              ))}
-            </ul>
-            {pendientes.length > 8 && <p className="mt-2 text-xs text-slate-500">Y {pendientes.length - 8} más.</p>}
-          </>}
-          {revisar.length > 0 && <div className={pendientes.length ? 'mt-4' : ''}>
-            <h2 className="font-bold text-slate-900">Revisar la fecha</h2>
-            <p className="mb-2 text-xs text-slate-600">El nombre de estos registros dice un día distinto al de su fecha.</p>
-            <ul className="space-y-1">
-              {revisar.slice(0, 6).map((r) => (
-                <li key={r.id ?? `${r.campusId}-${r.fecha}-${r.encuentro}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="text-slate-700"><strong>{r.encuentro}</strong> con fecha {shortDate(r.fecha)} ({r.diaFecha.toLowerCase()}){allCampus ? ` · ${r.campus}` : ''}</span>
-                  {canEdit && r.id && <button type="button" onClick={() => void editarPorId(r.id)} className="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">Corregir</button>}
-                </li>
-              ))}
-            </ul>
-          </div>}
-        </section>
-      )}
+      {!form.id && <Link href="/dashboard/produccion-general/estadisticas/operacion" className="stats-control-shortcut">
+        <span><strong>Control semanal de reportes</strong><span>{pendientesQ.isError ? 'Consultar estado de los reportes' : pendientes.length + ' faltantes en este campus · Ver semanas y estados'}</span></span><span aria-hidden="true">→</span>
+      </Link>}
 
       {notice && (
         <div ref={noticeRef} tabIndex={-1} role={notice.ok ? 'status' : 'alert'} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${notice.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
@@ -427,7 +400,7 @@ export function RegistrarEncuentroClient() {
             <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800"><strong>Observación:</strong> {(registros.data ?? []).find((r) => r.id === form.id)?.observacion}. Al guardar, el reporte vuelve a quedar por revisar.</p>
           )}
           {yaRegistrado && (
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Este encuentro ya está registrado. Edítalo en la lista de abajo en vez de crear otro.</p>
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Este encuentro ya tiene un reporte. Consulta el control semanal o pide al administrador que lo revise.</p>
           )}
         </section>
 
@@ -497,7 +470,7 @@ export function RegistrarEncuentroClient() {
           {form.id && (
             <button type="button" onClick={() => setForm(emptyForm(form.fecha))} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600">Cancelar edición</button>
           )}
-          <button type="submit" disabled={guardar.isPending} className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+          <button type="submit" disabled={yaRegistrado || guardar.isPending} className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
             {guardar.isPending ? 'Guardando…' : form.id ? 'Guardar cambios' : 'Guardar registro'}
           </button>
         </div>

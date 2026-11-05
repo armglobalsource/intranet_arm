@@ -141,7 +141,7 @@ export function RevisarReportesClient() {
             <h1 className="text-3xl font-bold text-slate-900">Revisar reportes</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600">Los líderes de voluntarios envían el reporte de cada encuentro. Revísalo y súbelo para que cuente en Estadísticas, o devuélvelo con un comentario.</p>
           </div>
-          <Link href="/dashboard/produccion-general/estadisticas" className="rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700">Ver estadísticas</Link>
+          <Link href="/dashboard/produccion-general/estadisticas/operacion" className="rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700">Control de reportes</Link>
         </div>
       </header>
 
@@ -161,7 +161,7 @@ export function RevisarReportesClient() {
             </div>
             {visibles.length === 0 ? (
               <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-                {filtro === 'enviado' ? 'No hay reportes por revisar. ¡Todo al día!' : 'No hay reportes devueltos esperando corrección.'}
+                {filtro === 'enviado' ? 'No hay reportes enviados por revisar. Consulta los faltantes en Control de reportes.' : 'No hay reportes devueltos esperando corrección.'}
               </p>
             ) : (
               <div className="space-y-3">

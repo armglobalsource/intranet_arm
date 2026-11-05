@@ -17,8 +17,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
     let message: unknown;
+    let details: unknown;
     if (exception instanceof HttpException) {
       const body = exception.getResponse();
+      // Datos adicionales que la excepción declara explícitamente para el frontend.
+      if (typeof body === 'object' && body !== null && 'details' in body) details = (body as { details: unknown }).details;
       // Nest anida { statusCode, message, error } dentro de getResponse() cuando la
       // excepción se construye con un string o un array (ValidationPipe) — se
       // desenvuelve aquí para que el frontend reciba directamente el string/array.
@@ -40,6 +43,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: req.url,
       message,
+      ...(details === undefined ? {} : { details }),
     });
   }
 }

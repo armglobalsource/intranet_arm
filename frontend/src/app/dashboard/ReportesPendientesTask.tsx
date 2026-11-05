@@ -19,10 +19,10 @@ export function ReportesPendientesTask() {
   return (
     <article className="rounded-2xl border border-[#dce5df] bg-white p-5">
       <h3 className="text-base font-semibold text-[#182d25]">Encuentros por reportar</h3>
-      <p className="mt-1 text-sm text-[#607068]">Encuentros de las últimas dos semanas que todavía no tienen estadísticas.</p>
+      <p className="mt-1 text-sm text-[#607068]">Encuentros que faltan por subir desde el último reporte.</p>
       {isLoading ? <p role="status" className="my-4 text-sm text-[#607068]">Revisando los reportes…</p>
         : isError ? <div className="my-4"><p className="mb-3 text-sm text-amber-800">No pudimos revisar los reportes.</p><button className="dashboard-action" onClick={() => void refetch()}>Reintentar</button></div>
-        : pendientes.length === 0 ? <p className="my-4 text-sm text-emerald-800">Todos los encuentros recientes están reportados.</p>
+        : pendientes.length === 0 ? <p className="my-4 text-sm text-emerald-800">No hay faltantes calculados. Revisa también los campus sin horarios en el control semanal.</p>
         : <ul className="my-3 divide-y divide-white/10">
           {pendientes.slice(0, 4).map((p) => (
             <li key={`${p.campusId}-${p.fecha}-${p.hora}`}>
@@ -39,8 +39,8 @@ export function ReportesPendientesTask() {
       {revisar.length > 0 && (
         <p className="mb-3 text-sm text-amber-800">{revisar.length === 1 ? 'Hay 1 registro' : `Hay ${revisar.length} registros`} con una fecha que no calza con el día del encuentro.</p>
       )}
-      <Link href="/dashboard/produccion-general/estadisticas/registrar" className="dashboard-action">
-        Registrar encuentro{pendientes.length > 4 ? ` (${pendientes.length} pendientes)` : ''} →
+      <Link href="/dashboard/produccion-general/estadisticas/operacion" className="dashboard-action">
+        Ver control semanal{pendientes.length > 4 ? ` (${pendientes.length} pendientes)` : ''} →
       </Link>
     </article>
   );

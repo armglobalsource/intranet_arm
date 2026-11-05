@@ -12,6 +12,21 @@ export class ArmRecordStore {
   // Listados sin 'source' (metadatos de la importación histórica): pesa casi la mitad y nadie lo usa.
   const result=await this.db.query(`SELECT document_id,data - 'source' AS data FROM ${this.table(table)} WHERE ($1::text IS NULL OR campus=$1) AND ($2::text IS NULL OR record_user=$2) AND ($3::text IS NULL OR record_date >= $3) AND ($4::text IS NULL OR record_date <= $4) AND ($5::boolean IS NULL OR (data->>'activo')::boolean=$5) ORDER BY record_date DESC NULLS LAST,document_id`,[filter.campus??null,filter.userId==null?null:String(filter.userId),filter.start??null,filter.end??null,filter.active??null]);return result.rows.map(r=>this.row(r));
  }
+ /** Fecha del último encuentro reportado por campus (sin eventos ni históricos de solo mes). */
+ async lastEncounterDates(table:Table,upTo:string){
+  const result=await this.db.query(`SELECT campus_id,max(left(record_date,10)) AS last FROM ${this.table(table)} WHERE campus_id IS NOT NULL AND data->>'tipo' IS DISTINCT FROM 'evento' AND data->>'fechaPrecision' IS DISTINCT FROM 'mes' AND left(record_date,10)<=$1 GROUP BY campus_id`,[upTo]);
+  return new Map<string,string>(result.rows.map((r:any)=>[String(r.campus_id),r.last]));
+ }
+ /** Corte histórico fijo; si no hubo importación, conserva el primer registro diario. */
+ async encounterControlAnchors(upTo:string){
+  const result=await this.db.query(`WITH daily AS (SELECT campus_id,document_id,left(record_date,10) AS day FROM arm_app.encuentros WHERE campus_id IS NOT NULL AND data->>'tipo' IS DISTINCT FROM 'evento' AND data->>'fechaPrecision' IS DISTINCT FROM 'mes' AND left(record_date,10)<=$1), baseline AS (SELECT coalesce(max(day) FILTER (WHERE document_id LIKE 'asana:%'),min(day),$1) AS day FROM daily) SELECT campus_id::text AS key,coalesce(max(day) FILTER (WHERE document_id LIKE 'asana:%'),least(min(day),(SELECT day FROM baseline))) AS anchor FROM daily GROUP BY campus_id UNION ALL SELECT '__baseline',day FROM baseline`,[upTo]);
+  return new Map<string,string>(result.rows.map((r:any)=>[String(r.key),r.anchor]));
+ }
+ /** Solo datos operativos y campus autorizados; evita cargar cifras, contactos e histórico completo. */
+ async encounterControlRows(campusIds:number[],from:string,to:string,starts:Record<string,string>={}){
+  const result=await this.db.query(`SELECT document_id,jsonb_build_object('campusId',campus_id,'campus',campus,'fecha',left(record_date,10),'encuentro',data->>'encuentro','fechaPrecision',data->>'fechaPrecision','tipo',data->>'tipo','estado',data->>'estado','registradoPor',jsonb_build_object('uid',data#>>'{registradoPor,uid}')) AS data FROM arm_app.encuentros WHERE campus_id=ANY($1::bigint[]) AND record_date>=$2 AND record_date>=coalesce($4::jsonb->>campus_id::text,$2) AND record_date<=$3 ORDER BY record_date,document_id`,[campusIds,from,`${to}T23:59:59.999Z`,JSON.stringify(starts)]);
+  return result.rows.map(r=>this.row(r));
+ }
  async find(table:Table,id:string){const row=(await this.db.query(`SELECT document_id,data FROM ${this.table(table)} WHERE document_id=$1`,[id])).rows[0];if(!row)throw new NotFoundException('Registro no encontrado');return this.row(row);}
  async create(table:Table,data:any){
   const id=randomUUID(),name=this.table(table),key=data.idempotencyKey??null,user=data.registradoPor?.uid;

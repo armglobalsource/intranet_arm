@@ -14,7 +14,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { STATS_VIEWS, statsHref, statsView } from '@/lib/statistics-navigation';
 import { planningRange } from '@/lib/statistics-planning';
-import { OperationsPanel, ProjectionsPanel, CoveragePanel } from './PlanningPanels';
+import { ProjectionsPanel, CoveragePanel } from './PlanningPanels';
 
 type GroupBy = 'month' | 'week' | 'year';
 type RecordType = 'all' | 'encuentro' | 'evento';
@@ -389,6 +389,7 @@ export function EstadisticasClient() {
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div><h1 className="text-3xl font-bold text-slate-900">Estadísticas</h1><h2 className="mt-2 text-lg font-semibold text-emerald-800">{view.label}</h2><p className="mt-2 max-w-2xl text-sm text-slate-600">{view.description}</p></div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/dashboard/produccion-general/estadisticas/operacion" className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white">Control de reportes</Link>
           {(isAdmin || can('encuentros:create')) && <Link href="/dashboard/produccion-general/estadisticas/registrar" className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white">Registrar encuentro</Link>}
           <button onClick={() => void refetch()} disabled={isFetching} className="rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 disabled:opacity-50">{isFetching ? 'Actualizando…' : 'Actualizar datos'}</button>
         </div>
@@ -429,7 +430,7 @@ export function EstadisticasClient() {
     <nav aria-label="Vistas de estadísticas" className="flex flex-wrap gap-2">
       {STATS_VIEWS.map(item => <button key={item.id} aria-pressed={tab === item.id} onClick={() => {
         if (item.id === 'operations') applyPreset('week');
-        window.history.pushState(null, '', statsHref(item.slug));
+        router.push(statsHref(item.slug));
       }} className={'rounded-xl px-4 py-2.5 text-sm font-semibold ' + (tab === item.id ? 'bg-emerald-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-emerald-50')}>{item.label}</button>)}
     </nav>
     {isError ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">No fue posible cargar las estadísticas. <button onClick={() => void refetch()} className="ml-2 min-h-[44px] font-semibold underline">Reintentar</button></div>
@@ -447,8 +448,8 @@ export function EstadisticasClient() {
         {data.meta.history && <p className="text-sm text-slate-600">Histórico desde 2020: incluye los reportes disponibles y aprobados hasta hoy. Los datos históricos pendientes de revisión todavía no forman parte de estos totales.</p>}
         {tab === 'summary' && <section aria-label="Resumen de estadísticas" className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label="Asistencias" value={totals.asistencia} detail="Participaciones acumuladas, no personas únicas" icon={Users} accent="#7c3aed" />
-            <MetricCard label="Auditorio" value={totals.auditorio} detail="Asistencias registradas en auditorio" icon={Activity} accent="#2563eb" />
+            <MetricCard label="Asistencias" value={totals.asistencia} detail={number(totals.auditorio) + " de auditorio · participaciones, no personas únicas"} icon={Users} accent="#34495e" />
+            <MetricCard label="Espectadores online" value={totals.espectadoresOnline} detail="Espectadores a la vez por transmisión, acumulados" icon={Wifi} accent="#45718c" />
             <MetricCard label="Decisiones de fe" value={totals.manitosTotal} detail={number(totals.manitosPresencial) + ' presenciales · ' + number(totals.manitosOnline) + ' online'} icon={Hand} accent="#059669" />
             <MetricCard label="Voluntarios" value={totals.voluntarios} detail="Participaciones de servicio acumuladas" icon={HeartHandshake} accent="#d97706" />
           </div>
@@ -463,12 +464,7 @@ export function EstadisticasClient() {
             </div>
             <p className="mt-3 text-xs text-slate-600">Una variación también puede reflejar reportes faltantes. Revisa la calidad de los datos antes de interpretarla.</p>
           </section>}
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label="Servicios registrados" value={totalMeetings} detail={number(totals.encuentros) + ' encuentros · ' + number(totals.eventos) + ' eventos'} icon={CalendarDays} />
-            <MetricCard label="Espectadores online" value={totals.espectadoresOnline} detail="Suma de espectadores a la vez por transmisión; no personas únicas" icon={Wifi} accent="#0891b2" />
-            <MetricCard label="Kilo de Amor" value={totals.kiloAmorCajas} detail={number(totals.kiloAmorRegistros) + ' registros · independiente del tipo de encuentro'} icon={Globe2} accent="#e11d48" />
-            <MetricCard label="Reportes completos" value={data.quality.complete} detail={data.quality.completeness + '% con todos los campos clave'} icon={ClipboardCheck} accent="#16a34a" />
-          </div>
+          <details className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"><summary className="cursor-pointer font-semibold">Información complementaria</summary><p className="mt-3">Kilo de Amor: {number(totals.kiloAmorCajas)} cajas en {number(totals.kiloAmorRegistros)} registros.</p><p className="mt-2">La cobertura y los campos pendientes se consultan en Calidad de datos; los reportes faltantes, en Control de reportes.</p></details>
         </section>}
         {tab === 'trends' && <section aria-label="Evolución de estadísticas" className="space-y-5">
           <div className="flex flex-wrap items-center gap-2"><span className="mr-2 text-sm text-slate-600">Agrupar por</span>{([['year', 'Año'], ['month', 'Mes'], ['week', 'Semana']] as const).map(([value, label]) => <button key={value} aria-pressed={groupBy === value} onClick={() => setGroupBy(value)} className={'rounded-xl px-4 py-2 text-sm font-semibold ' + (groupBy === value ? 'bg-emerald-700 text-white' : 'bg-white text-slate-600 border border-slate-200')}>{label}</button>)}</div>
@@ -495,7 +491,6 @@ export function EstadisticasClient() {
           </section>)}
           {data.byCampus.length === 0 && <p className="text-sm text-slate-500">No hay campus para esta selección.</p>}
         </section>}
-        {tab === 'operations' && <OperationsPanel data={data} canRegister={isAdmin || can('encuentros:create')} canReview={isAdmin || can('encuentros:review')} />}
         {tab === 'projections' && <ProjectionsPanel data={data} />}
         {tab === 'quality' && <div className="space-y-5"><QualityCard quality={data.quality} /><CoveragePanel data={data} /></div>}
         {tab === 'records' && (

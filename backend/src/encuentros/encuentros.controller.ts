@@ -53,10 +53,22 @@ export class EncuentrosController {
     return applyLimit(await this.encuentros.findAll(campus, periodo), limit);
   }
 
-  /** Encuentros que según los horarios del campus aún no se reportan (últimos 14 días por defecto, máximo 60). */
-  @Get('pendientes')
+  /** ¿Ya se registró este encuentro? Responde la base, también para reportes de otras personas. */
+  @Get('existente')
   @UseGuards(PermissionsGuard)
   @RequirePermission('encuentros:create')
+  existente(
+    @CurrentUser() user: any,
+    @Query('campus') campus?: string,
+    @Query('fecha') fecha?: string,
+    @Query('encuentro') encuentro?: string,
+    @Query('tipo') tipo?: string,
+  ) {
+    return this.encuentros.existente(user, { campus, fecha, encuentro, tipo });
+  }
+
+  /** Control desde el corte histórico. `dias` se acepta por compatibilidad y ya no recorta los pendientes. */
+  @Get('pendientes')
   pendientes(@CurrentUser() user: any, @Query('dias') diasText?: string) {
     const dias = diasText === undefined ? 14 : Number(diasText);
     if (!Number.isInteger(dias) || dias < 1 || dias > 60) throw new BadRequestException('dias debe ser un número entre 1 y 60');

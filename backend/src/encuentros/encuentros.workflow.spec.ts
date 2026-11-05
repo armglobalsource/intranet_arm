@@ -33,6 +33,28 @@ describe('revisión y sumas de encuentros', () => {
     expect(record.totalAsistencia).toBe(21);
     expect(record.online.espectadores).toBe(362);
   });
+  it('rechaza el reporte que ya subió otra persona e informa cuál es', async () => {
+    const { api, store, record } = fixture({ fecha: '2026-10-18', encuentro: 'Encuentro Domingo 11:00 hrs', registradoPor: { uid: 99, email: 'otra@example.test' } });
+    const dto: any = { tipo: 'encuentro', campus: 'Santiago', fecha: '2026-10-18', encuentro: 'Encuentro Domingo 11:00 hrs', idempotencyKey: 'k1' };
+    const error: any = await api.create(dto, author).catch((e) => e);
+    expect(error.getStatus()).toBe(409);
+    expect(error.getResponse()).toMatchObject({
+      message: expect.stringContaining('Revísalo con tu administrador de campus'),
+      details: { existente: { id: 'r1', campus: 'Santiago', fecha: '2026-10-18', estado: 'enviado', registradoPor: 'otra@example.test', totalAsistencia: 30 } },
+    });
+    expect(store.create).not.toHaveBeenCalled();
+    expect((await api.existente(author, { fecha: '2026-10-18', encuentro: dto.encuentro })).existente?.id).toBe(record.id);
+    expect((await api.existente(author, { fecha: '2026-10-19', encuentro: dto.encuentro })).existente).toBeNull();
+  });
+  it('valida fecha futura, encuentro vacío y campus ajeno antes de guardar', async () => {
+    const { api, store } = fixture();
+    const base: any = { tipo: 'encuentro', campus: 'Santiago', encuentro: 'Encuentro Domingo 11:00 hrs' };
+    await expect(api.create({ ...base, fecha: '2099-01-01' }, author)).rejects.toMatchObject({ status: 400 });
+    await expect(api.create({ ...base, fecha: '2026-10-18', encuentro: '  ' }, author)).rejects.toMatchObject({ status: 400 });
+    await expect(api.create({ ...base, fecha: '2026-10-18', campus: 'Otro' }, author)).rejects.toMatchObject({ status: 403 });
+    await expect(api.existente(author, { encuentro: 'x' })).rejects.toMatchObject({ status: 400 });
+    expect(store.create).not.toHaveBeenCalled();
+  });
   it('no suma pendientes: devolver, corregir y subir conserva las cifras y la trazabilidad', async () => {
     const { api, record, notifications } = fixture();
     expect((await api.resumen('Santiago', 2021, 9)).encuentros.count).toBe(0);

@@ -249,7 +249,7 @@ export function Sidebar() {
   const visibleNav = NAV
     .map((item) => {
       if (item.children) {
-        const visibleChildren = item.children.filter((c) => !c.permission || isAdmin || can(c.permission));
+        const visibleChildren = item.children.filter((c) => !c.permission || isAdmin || can(c.permission) || (c.href === `${STATS_ROOT}/operacion` && (can('encuentros:create') || can('encuentros:review'))));
         if (visibleChildren.length === 0) return null;
         return { ...item, children: visibleChildren };
       }

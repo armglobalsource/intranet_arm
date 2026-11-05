@@ -13,40 +13,6 @@ function recordDate(row: StatsResponse['records'][number]) {
   return row.fechaPrecision === 'mes' ? `${(row.periodo ?? row.fecha).slice(0, 7)} (solo mes)` : prettyDate(row.fecha);
 }
 
-export function OperationsPanel({ data, canRegister, canReview }: { data: StatsResponse; canRegister: boolean; canReview: boolean }) {
-  const active = data.byCampus.filter(c => c.isActive);
-  const withoutReports = active.filter(c => !data.records.some(r => r.campusId === c.campusId));
-  return <section aria-label="Operación de estadísticas" className="space-y-5">
-    <div className={panel}>
-      <h2 className="text-lg font-bold text-slate-900">Qué revisar en este período</h2>
-      <p className="mt-2 text-sm text-slate-600">Registrar el encuentro → revisar sus cifras → subir el reporte → consultar los indicadores. Solo los reportes aprobados alimentan estos resultados.</p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        {[
-          ['Por subir', data.meta.excludedReports, 'Reportes excluidos de los indicadores dentro del filtro actual.'],
-          ['Campos por completar', data.quality.incomplete, 'Reportes incluidos que no tienen todos los campos clave.'],
-          ['Campus sin reportes', withoutReports.length, 'Campus activos sin registros incluidos en el período.'],
-        ].map(([label, value, help]) => <article key={label} className="rounded-xl bg-slate-50 p-4"><h3 className="text-sm font-semibold text-slate-700">{label}</h3><p className="my-2 text-3xl font-bold text-slate-900">{value}</p><p className="text-xs text-slate-600">{help}</p></article>)}
-      </div>
-      <div className="mt-4 flex flex-wrap gap-3">
-        {canRegister && <Link href={`${STATS_ROOT}/registrar`} className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white">Registrar un encuentro</Link>}
-        {canReview && <Link href={`${STATS_ROOT}/revisar`} className="rounded-xl border border-violet-200 px-4 py-2.5 text-sm font-semibold text-violet-800">Abrir revisión de reportes</Link>}
-      </div>
-      <p className="mt-3 text-xs text-slate-500">La revisión abre su propia bandeja de pendientes. No tener reportes aquí no demuestra que un campus haya faltado: todavía no comparamos con un calendario de encuentros esperados.</p>
-    </div>
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{active.map(c => {
-      const rows = data.records.filter(r => r.campusId === c.campusId).sort((a, b) => b.fecha.localeCompare(a.fecha));
-      return <article key={c.campusId} className={panel}>
-        <p className="text-xs text-slate-500">{c.country}</p><h3 className="mt-1 font-bold text-slate-900">{c.campusName}</h3>
-        <p className={'mt-3 text-sm font-semibold ' + (rows.length ? 'text-emerald-700' : 'text-amber-800')}>{rows.length ? `${rows.length} reportes incluidos` : 'Sin reportes en el período'}</p>
-        <p className="mt-2 text-xs text-slate-600">Último encuentro registrado en este rango: {rows[0] ? recordDate(rows[0]) : 'Sin dato'}</p>
-        <dl className="mt-4 grid grid-cols-2 gap-3"><div><dt className="text-xs text-slate-500">Asistencias</dt><dd className="font-semibold">{number(c.metrics.asistencia)}</dd></div><div><dt className="text-xs text-slate-500">Participaciones de servicio</dt><dd className="font-semibold">{number(c.metrics.voluntarios)}</dd></div></dl>
-        <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-600">{!rows.length ? 'Próximo paso: confirmar si hubo encuentros y registrar sus cifras.' : c.quality.incomplete ? `Próximo paso: revisar ${c.quality.incomplete} reportes con campos sin completar.` : 'Campos clave completos en los reportes incluidos. Revisar las cifras con el responsable del campus.'}</p>
-      </article>;
-    })}</div>
-    {!active.length && <p className={panel}>No hay campus activos en esta selección.</p>}
-  </section>;
-}
-
 export function ProjectionsPanel({ data }: { data: StatsResponse }) {
   const [variation, setVariation] = useState(10);
   const start = new Date(`${data.meta.to}T12:00:00Z`);
