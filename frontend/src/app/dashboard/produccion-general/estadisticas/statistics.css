@@ -186,3 +186,12 @@
 .weekly-pending-ok { font-size:13px; color:#1f6f4f; font-weight:600; }
 .weekly-pending-note { margin-top:10px; font-size:12px; color:#7a5a1c; }
 .weekly-pending:has(.weekly-pending-ok) { border-color:#cfe5d8; background:#f3faf6; }
+
+.weekly-toggle-wrap { display:grid; gap:4px; grid-column:1 / -1; }
+.weekly-toggle-wrap p { font-size:12px; line-height:1.5; color:#5c6b79; }
+.weekly-preview-label { margin:0 0 12px; font-size:12px; font-weight:600; color:#5c6b79; }
+.weekly-send { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:18px; border:1px solid #cfe5d8; border-radius:16px; background:#f3faf6; }
+.weekly-send h2 { font-size:16px; font-weight:700; color:#172532; }
+.weekly-send p { margin-top:2px; font-size:13px; color:#52665b; max-width:640px; }
+.weekly-send-button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:48px; padding:12px 20px; border-radius:12px; background:#1f6f4f; color:#fff; font-size:14px; font-weight:700; }
+@media screen and (max-width: 767px) { .weekly-send-button { width:100%; } }

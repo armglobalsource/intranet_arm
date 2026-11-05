@@ -9,7 +9,7 @@ import { useSearchParams } from 'next/navigation';
 import { CalendarDays, ChevronLeft, ChevronRight, Download, Mail, Printer, RefreshCw } from 'lucide-react';
 import { apiErrorMessage } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useEnviarReporteSemanal, useReporteSemanal } from '@/hooks/useReporteSemanal';
+import { useDestinatariosReporte, useEnviarReporteSemanal, useReporteSemanal } from '@/hooks/useReporteSemanal';
 import { parseRecipients, pendingItems, weeklySheets } from '@/lib/weekly-report-export';
 import { STATS_ROOT } from '@/lib/statistics-navigation';
 
@@ -48,7 +48,14 @@ export function ReporteSemanalClient() {
   const [recipients, setRecipients] = useState('');
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [aceptaIncompleto, setAceptaIncompleto] = useState(false);
-  useEffect(() => { setRecipients(readRecipients()); }, []);
+  // Lista compartida del servidor; si aún no se puede guardar ahí, la de este navegador.
+  const guardados = useDestinatariosReporte(allowed);
+  useEffect(() => {
+    if (!guardados.isFetched) return;
+    const server = guardados.data?.destinatarios ?? [];
+    setRecipients(server.length ? server.join('\n') : readRecipients());
+  }, [guardados.isFetched, guardados.data]);
+  const listaCompartida = guardados.data?.disponible === true;
 
   const weeks: string[] = [];
   for (let w = monday(today()), i = 0; i < 26; w = addDays(w, -7), i++) weeks.push(w);
@@ -87,10 +94,9 @@ export function ReporteSemanalClient() {
 
   return <div className="stats-control weekly-report mx-auto max-w-6xl space-y-4 pb-8">
     <header className="stats-control-header">
-      <div><p className="stats-eyebrow">ESTADÍSTICAS</p><h1>Reporte semanal</h1><p>Las tres tablas del informe de la semana, listas para descargar o enviar por correo.</p></div>
+      <div><p className="stats-eyebrow">ESTADÍSTICAS</p><h1>Reporte semanal</h1><p>Se arma solo con los reportes de los campus. Revisa los pendientes y la vista previa; al final puedes enviarlo por correo.</p></div>
       <div className="stats-control-actions">
         <Link href={`${STATS_ROOT}/operacion`}>Control de reportes</Link>
-        <button type="button" className="stats-primary" disabled={!r} onClick={() => { setNotice(null); setAceptaIncompleto(false); setDialog(true); }}><Mail size={16} aria-hidden="true" />Enviar por correo</button>
       </div>
     </header>
 
@@ -106,7 +112,10 @@ export function ReporteSemanalClient() {
         <button aria-label="Semana siguiente" disabled={semana >= monday(today())} onClick={() => setSemana(addDays(semana, 7))}><ChevronRight size={18} /></button>
         <button aria-label="Actualizar reporte" disabled={query.isFetching} onClick={() => void query.refetch()}><RefreshCw size={16} /></button>
       </div>
-      <label className="weekly-toggle"><input type="checkbox" checked={porRevisar} onChange={(e) => setPorRevisar(e.target.checked)} />Incluir reportes por revisar</label>
+      <div className="weekly-toggle-wrap">
+        <label className="weekly-toggle"><input type="checkbox" aria-describedby="weekly-toggle-help" checked={porRevisar} onChange={(e) => setPorRevisar(e.target.checked)} />Sumar también los reportes por revisar</label>
+        <p id="weekly-toggle-help">Por defecto solo suman los reportes aprobados por el administrador de cada campus. Márcalo para ver un adelanto con los que aún esperan aprobación.</p>
+      </div>
     </section>
 
     {notice && <div role={notice.ok ? 'status' : 'alert'} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${notice.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>{notice.text}</div>}
@@ -138,7 +147,15 @@ export function ReporteSemanalClient() {
           <button type="button" onClick={() => window.print()}><Printer size={16} aria-hidden="true" />Imprimir o guardar PDF</button>
         </div>
         <section aria-label="Vista previa del reporte" className="weekly-preview">
+          <p className="weekly-preview-label">Vista previa del correo{pendientes || r.enCurso ? ' · el correo incluye además el aviso de pendientes' : ''}</p>
           <div className="weekly-print" dangerouslySetInnerHTML={{ __html: r.html }} />
+        </section>
+        <section className="weekly-send" aria-label="Enviar el reporte">
+          <div>
+            <h2>¿Revisaste el reporte?</h2>
+            <p>{pendientes ? `Quedan ${pendientes} pendiente${pendientes === 1 ? '' : 's'}: puedes esperar a que se completen o enviarlo indicando que está incompleto.` : 'Todo lo que ya ocurrió tiene su reporte aprobado.'}</p>
+          </div>
+          <button type="button" className="weekly-send-button" onClick={() => { setNotice(null); setAceptaIncompleto(false); setDialog(true); }}><Mail size={16} aria-hidden="true" />Enviar por correo</button>
         </section>
       </>}
 
@@ -157,7 +174,7 @@ export function ReporteSemanalClient() {
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800" />
         </label>
         <p id="weekly-recipients-help" className={`mt-1 text-xs ${parsed.invalid.length ? 'font-semibold text-red-700' : 'text-slate-500'}`}>
-          {parsed.invalid.length ? `Revisa: ${parsed.invalid.slice(0, 3).join(', ')}` : `${parsed.valid.length} destinatario${parsed.valid.length === 1 ? '' : 's'}. La lista queda guardada en este navegador para el próximo envío.`}
+          {parsed.invalid.length ? `Revisa: ${parsed.invalid.slice(0, 3).join(', ')}` : `${parsed.valid.length} destinatario${parsed.valid.length === 1 ? '' : 's'}. ${listaCompartida ? 'La lista queda guardada para el próximo envío, desde cualquier equipo.' : 'La lista queda guardada en este navegador para el próximo envío.'}`}
         </p>
         <div className="mt-5 grid gap-2">
           <button type="button" disabled={!parsed.valid.length || parsed.invalid.length > 0 || (pendientes > 0 && !aceptaIncompleto) || enviar.isPending} onClick={() => void confirmarEnvio()}

@@ -95,6 +95,7 @@ describe('reporte semanal', () => {
     expect(html).toContain('&lt;b&gt;Evento&lt;/b&gt;');
     expect(html).not.toContain('<b>Evento</b>');
     expect(html).toContain('Datos incompletos');
+    expect(renderWeeklyReportHtml(r, { avisos: false })).not.toContain('Datos incompletos');
     expect(fmt(2706)).toBe('2.706');
     expect(fmt(-1234567)).toBe('-1.234.567');
   });

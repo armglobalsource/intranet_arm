@@ -3,6 +3,7 @@ import { PostgresEventsService } from './events/postgres-events.service';
 import { PostgresJobsService } from './jobs/postgres-jobs.service';
 import { EstadisticasController } from './estadisticas/estadisticas.controller';
 import { PostgresEstadisticasService } from './estadisticas/postgres-estadisticas.service';
+import { WeeklyReportSettings } from './estadisticas/weekly-report.settings';
 import { AnunciosController } from './anuncios/anuncios.controller';
 import { PostgresAnunciosService } from './anuncios/postgres-anuncios.service';
 import { KiloamorController } from './kiloamor/kiloamor.controller';
@@ -55,7 +56,7 @@ import { PostgresOrgChartService } from './orgchart/postgres-orgchart.service';
 export const postgresDomainControllers=[EventsController,EstadisticasController,AnunciosController,KiloamorController,SiembraController,EncuentrosController,ReconciliationController,EquipoRosterController,TipoCambioController,VisualReferencesController,SearchController,FeedbackController,PostgresHealthController,ContentsController,DocumentsController,FichasController,CampusController,ArmCatalogosController,JobTitlesController,OnboardingController,CancionesController,PaletasController,DisponibilidadController,TecnicosController,CampusTurnosController,OrgChartController];
 export const postgresDomainProviders=[
   ArmRecordStore,
-  PostgresEventsService,PostgresJobsService,PostgresEstadisticasService,PostgresAnunciosService,PostgresKiloamorService,
+  PostgresEventsService,PostgresJobsService,PostgresEstadisticasService,WeeklyReportSettings,PostgresAnunciosService,PostgresKiloamorService,
   PostgresSiembraService,PostgresEncuentrosService,PostgresReconciliationService,PostgresEquipoRosterService,
   PostgresTipoCambioService,PostgresVisualReferencesService,PostgresSearchService,PostgresFeedbackService,
   PostgresContentsService,PostgresDocumentsService,PostgresFichasService,PostgresCampusService,PostgresArmCatalogosService,

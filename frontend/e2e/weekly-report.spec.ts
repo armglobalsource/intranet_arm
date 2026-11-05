@@ -11,6 +11,7 @@ async function fixture(page: Page, permissions = ['estadisticas:view', 'estadist
     const req = route.request(), url = new URL(req.url()), path = url.pathname.replace('/api/v1', '');
     calls.push({ method: req.method(), path, query: url.search, body: req.postDataJSON() });
     if (path === '/estadisticas/reporte-semanal') return route.fulfill({ json: url.searchParams.get('semana') === '2026-11-02' ? current : closed });
+    if (path === '/estadisticas/reporte-semanal/destinatarios') return route.fulfill({ json: { destinatarios: ['equipo@armglobal.org'], disponible: true } });
     if (path === '/estadisticas/reporte-semanal/enviar') return route.fulfill({ json: { enviado: true, destinatarios: req.postDataJSON().destinatarios.length } });
     return route.fulfill({ json: [] });
   });
@@ -31,18 +32,27 @@ for (const width of [393, 1280]) {
     await expect(pending).toContainText('Punta Arenas');
     await expect(pending).toContainText('Por revisar');
     await expect(pending).toContainText('Montevideo');
-    await expect(page.getByRole('region', { name: 'Vista previa del reporte' })).toContainText('Prog.');
+    const preview = page.getByRole('region', { name: 'Vista previa del reporte' });
+    await expect(preview).toContainText('Prog.');
+    // Los avisos se muestran una vez en la página, no repetidos en la vista previa.
+    await expect(preview).not.toContainText('Datos incompletos:');
+    await expect(page.getByText('Sumar también los reportes por revisar')).toBeVisible();
+    // Enviar queda al final, después de la vista previa.
+    const send = page.getByRole('region', { name: 'Enviar el reporte' });
+    expect((await send.boundingBox())!.y).toBeGreaterThan((await preview.boundingBox())!.y);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `test-results/reporte-semanal-en-curso-${width}.png` });
 
     // Enviar exige reconocer que el reporte está incompleto.
     await page.getByRole('button', { name: 'Enviar por correo' }).click();
     const dialog = page.getByRole('dialog', { name: 'Enviar el reporte por correo' });
+    await expect(dialog.getByRole('textbox')).toHaveValue('equipo@armglobal.org');
+    await expect(dialog).toContainText('desde cualquier equipo');
     await dialog.getByRole('textbox').fill('camila@armglobal.org');
-    const send = dialog.getByRole('button', { name: 'Enviar reporte incompleto' });
-    await expect(send).toBeDisabled();
+    const sendButton = dialog.getByRole('button', { name: 'Enviar reporte incompleto' });
+    await expect(sendButton).toBeDisabled();
     await dialog.getByRole('checkbox').check();
-    await expect(send).toBeEnabled();
+    await expect(sendButton).toBeEnabled();
     await page.screenshot({ path: `test-results/reporte-semanal-envio-${width}.png` });
     await dialog.getByRole('button', { name: 'Cancelar' }).click();
   });
@@ -75,7 +85,7 @@ test('reporte semanal: semana cerrada, envío, Excel y reportes por revisar', as
   await expect(page.getByRole('status').filter({ hasText: 'Reporte enviado a 2 destinatarios.' })).toBeVisible();
   expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ semana: '2026-10-26', porRevisar: false, destinatarios: ['camila@armglobal.org', 'pastor@armglobal.org'] });
 
-  await page.getByLabel('Incluir reportes por revisar').check();
+  await page.getByLabel('Sumar también los reportes por revisar').check();
   await expect.poll(() => calls.some((c) => c.path === '/estadisticas/reporte-semanal' && c.query.includes('porRevisar=1'))).toBe(true);
 });
 

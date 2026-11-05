@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export interface Totales { totalGral: number; totalAudit: number; paj: number }
@@ -41,9 +41,21 @@ export function useReporteSemanal(semana: string, porRevisar: boolean) {
   });
 }
 
+/** Destinatarios guardados en el servidor; `disponible: false` si aún no se puede guardar ahí. */
+export function useDestinatariosReporte(enabled: boolean) {
+  return useQuery<{ destinatarios: string[]; disponible: boolean }>({
+    queryKey: ['estadisticas', 'reporte-semanal', 'destinatarios'],
+    queryFn: () => api.get('/estadisticas/reporte-semanal/destinatarios').then((r) => r.data),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useEnviarReporteSemanal() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { semana: string; porRevisar: boolean; destinatarios: string[] }) =>
-      api.post('/estadisticas/reporte-semanal/enviar', body).then((r) => r.data as { enviado: boolean; destinatarios: number }),
+      api.post('/estadisticas/reporte-semanal/enviar', body).then((r) => r.data as { enviado: boolean; destinatarios: number; listaGuardada?: boolean }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['estadisticas', 'reporte-semanal', 'destinatarios'] }),
   });
 }

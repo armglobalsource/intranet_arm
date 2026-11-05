@@ -1,10 +1,11 @@
 import {
-  BadRequestException, Body, Controller, Get, Post, Query, UseGuards,
+  BadRequestException, Body, Controller, Get, Post, Put, Query, UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { ResendMailerService } from '../auth/resend-mailer.service';
-import { SendWeeklyReportDto } from './dto/weekly-report.dto';
+import { SendWeeklyReportDto, WeeklyReportRecipientsDto } from './dto/weekly-report.dto';
+import { WeeklyReportSettings } from './weekly-report.settings';
 import { renderWeeklyReportHtml, renderWeeklyReportText, weekLabel } from './weekly-report.html';
 import { validDay } from './statistics-range';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -25,6 +26,7 @@ export class EstadisticasController {
     private readonly estadisticas: PostgresEstadisticasService,
     private readonly mailer: ResendMailerService,
     private readonly config: ConfigService,
+    private readonly settings: WeeklyReportSettings,
   ) {}
 
   private reportUrl(semana: string) {
@@ -38,7 +40,20 @@ export class EstadisticasController {
   async weeklyReport(@Query('semana') semana: string, @Query('porRevisar') porRevisar?: string) {
     if (!validDay(semana ?? '')) throw new BadRequestException('Semana inválida');
     const report = await this.estadisticas.weeklyReport(semana, porRevisar === '1' || porRevisar === 'true');
-    return { ...report, html: renderWeeklyReportHtml(report) };
+    return { ...report, html: renderWeeklyReportHtml(report, { avisos: false }) };
+  }
+
+  /** Lista de destinatarios compartida (la usa quien envíe el reporte, desde cualquier equipo). */
+  @Get('reporte-semanal/destinatarios')
+  @RequirePermission('estadisticas:viewAll')
+  recipients() {
+    return this.settings.recipients();
+  }
+
+  @Put('reporte-semanal/destinatarios')
+  @RequirePermission('estadisticas:viewAll')
+  saveRecipients(@Body() dto: WeeklyReportRecipientsDto, @CurrentUser() user: any) {
+    return this.settings.saveRecipients(dto.destinatarios, String(user?.email ?? user?.sub ?? ''));
   }
 
   @Post('reporte-semanal/enviar')
@@ -56,7 +71,9 @@ export class EstadisticasController {
       // Evita un doble envío por doble clic; un reenvío un minuto después sí sale.
       idempotencyKey: `weekly-report/${user?.sub ?? 'user'}/${report.semana.desde}/${Math.floor(Date.now() / 60000)}`,
     });
-    return { enviado: true, id: sent.id, destinatarios: to.length, semana: report.semana };
+    // La lista usada queda guardada para el próximo envío (si la tabla de configuración ya existe).
+    const guardada = await this.settings.saveRecipients(to, String(user?.email ?? user?.sub ?? '')).then(() => true, () => false);
+    return { enviado: true, id: sent.id, destinatarios: to.length, semana: report.semana, listaGuardada: guardada };
   }
 
   @Get()

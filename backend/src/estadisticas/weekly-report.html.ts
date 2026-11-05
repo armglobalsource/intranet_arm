@@ -82,7 +82,8 @@ function campusCard(c: CampusComparison, report: WeeklyReport) {
     + `<tr><td ${td('font-weight:700')}>Diferencia</td>${diffCells}</tr>` + note);
 }
 
-export function renderWeeklyReportHtml(report: WeeklyReport, opts: { appUrl?: string } = {}) {
+/** `avisos: false` para la vista previa de la intranet, que ya muestra los avisos en la página. */
+export function renderWeeklyReportHtml(report: WeeklyReport, opts: { appUrl?: string; avisos?: boolean } = {}) {
   const r = report.resumen;
   const avisos = [
     r.sinReporte ? `${r.sinReporte} encuentro${r.sinReporte === 1 ? '' : 's'} sin reporte (S/R)` : '',
@@ -108,7 +109,7 @@ export function renderWeeklyReportHtml(report: WeeklyReport, opts: { appUrl?: st
     + `<p style="margin:0;font-size:12px;letter-spacing:2px;color:${C.muted}">ESTADÍSTICAS ARM GLOBAL</p>`
     + `<h1 style="margin:4px 0 4px;font-size:22px">Reporte semanal · Sem. ${weekLabel(report.semana)}</h1>`
     + `<p style="margin:0 0 16px;font-size:13px;color:${C.muted}">${report.incluyePorRevisar ? 'Incluye reportes aprobados y por revisar.' : 'Incluye solo reportes aprobados por el administrador de cada campus.'} Total Gral = asistentes + voluntarios (online: espectadores).</p>`
-    + enCurso + aviso
+    + (opts.avisos === false ? '' : enCurso + aviso)
     + h2('REPORTE SEMANAL') + (report.dias.length ? weeklyTable(report) : `<p style="font-size:13px;color:${C.muted}">No hay encuentros registrados en esta semana.</p>`)
     + legend
     + h2('RESUMEN SEMANA ANTERIOR VS LA ACTUAL') + report.campus.map((c) => campusCard(c, report)).join('')
