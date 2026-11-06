@@ -251,9 +251,10 @@ function FilterSelect({ value, onChange, placeholder, children }: {
   return (
     <div className="relative">
       <select
+        aria-label={`Filtrar por ${placeholder.toLowerCase()}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`pl-3 pr-8 py-2 rounded-xl border text-[12.5px] font-medium appearance-none transition focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white ${
+        className={`min-h-[44px] pl-3 pr-8 py-2 rounded-xl border text-[13px] font-medium appearance-none transition focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white ${
           active
             ? 'border-blue-400 text-blue-700 bg-blue-50'
             : 'border-slate-200 text-slate-600 hover:border-slate-300'
@@ -788,7 +789,7 @@ function PersonasPageInner() {
   if (!allowed) return null;
 
   return (
-    <div className="space-y-5">
+    <div className="personas-page mx-auto max-w-7xl space-y-5">
 
       {/* Back button */}
       <Link
@@ -805,6 +806,7 @@ function PersonasPageInner() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Personas</h1>
+          <p className="mt-1 text-sm text-slate-600">Busca y administra las personas del ecosistema.</p>
           <p className="text-sm text-slate-400 mt-0.5">
             {filtered.length !== users.length
               ? `${filtered.length} de ${users.length} persona${users.length !== 1 ? 's' : ''}`
@@ -812,7 +814,7 @@ function PersonasPageInner() {
             }
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <button
             onClick={() => setImporting(true)}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12.5px] font-semibold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-all"
@@ -824,7 +826,7 @@ function PersonasPageInner() {
           </button>
           <CanDo permission="users:create">
             <Link href="/dashboard/directorio/personas/nueva"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12.5px] font-semibold text-white transition-all bg-violet-600 hover:bg-violet-700">
+              className="flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-white transition-all bg-slate-800 hover:bg-slate-700">
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
@@ -842,10 +844,11 @@ function PersonasPageInner() {
             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            aria-label="Buscar personas por nombre, correo o cargo"
             placeholder="Buscar por nombre, email o cargo..."
-            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-[12.5px] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white" />
+            className="w-full min-h-[44px] pl-9 pr-10 py-2 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white" />
           {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm">✕</button>
+            <button aria-label="Limpiar búsqueda" onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm">✕</button>
           )}
         </div>
 
@@ -891,7 +894,7 @@ function PersonasPageInner() {
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="personas-table w-full">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   {['Persona', 'Cargos', 'Campus', 'Estado', 'Acciones'].map((h) => (
@@ -1014,7 +1017,7 @@ function PersonasPageInner() {
                       <p className="text-slate-400 text-sm">
                         {search || hasFilters ? 'Sin resultados para los filtros aplicados.' : 'No hay personas registradas'}
                       </p>
-                      {hasFilters && (
+                      {(hasFilters || search) && (
                         <button
                           onClick={() => { setCargoFilter(''); setCampusFilter(''); setStatusFilter(''); setSearch(''); }}
                           className="mt-2 text-[12px] text-blue-500 hover:text-blue-700 underline underline-offset-2"

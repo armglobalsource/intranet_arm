@@ -23,6 +23,21 @@
   }
 }
 
+@media (max-width: 640px) {
+  .personas-table, .personas-table tbody, .personas-table tr, .personas-table td { display: block; width: 100%; }
+  .personas-table thead { display: none; }
+  .personas-table tbody tr { padding: 12px 0; }
+  .personas-table td:not([colspan]) { padding: 6px 16px; }
+  .personas-table td:nth-child(2)::before, .personas-table td:nth-child(3)::before, .personas-table td:nth-child(4)::before, .personas-table td:nth-child(5)::before {
+    display: block; margin-bottom: 4px; color: #64748b; font-size: 11px; font-weight: 600;
+  }
+  .personas-table td:nth-child(2)::before { content: 'Cargo'; }
+  .personas-table td:nth-child(3)::before { content: 'Campus'; }
+  .personas-table td:nth-child(4)::before { content: 'Estado'; }
+  .personas-table td:nth-child(5)::before { content: 'Acciones'; }
+  .personas-table td:nth-child(5) a, .personas-table td:nth-child(5) button { min-width: 44px; min-height: 44px; }
+}
+
 @layer components {
   .dashboard-action {
     @apply inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#cddbd1] bg-[#f4f8f5] px-4 py-2 text-sm font-semibold text-[#204b39] transition-colors hover:bg-[#e5f0e8];
@@ -48,7 +63,7 @@
   /* Ítem: al pasar el mouse se desliza un poco y el ícono crece; el activo
      lleva una barra verde a la izquierda. */
   .nav-item {
-    @apply relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#52675a];
+    @apply relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-[#344c3d];
     transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   }
   .nav-item:hover { @apply bg-[#eef4ef] text-[#204b39]; transform: translateX(3px); }
@@ -62,16 +77,17 @@
     @apply absolute -left-3 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#315e49];
   }
   .nav-subitem {
-    @apply relative flex items-center gap-2.5 rounded-lg py-2 pl-9 pr-3 text-[13px] font-medium text-[#65796d];
+    @apply relative flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium leading-5 text-[#526b5b];
     transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   }
   .nav-subitem:hover { @apply bg-[#eef4ef] text-[#204b39]; transform: translateX(3px); }
   .nav-subitem[data-active='true'] { @apply bg-[#e5f0e8] text-[#204b39]; }
   .nav-subitem[data-active='true']::before {
     content: '';
-    @apply absolute left-5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-[#315e49];
+    @apply absolute -left-[9px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#315e49];
   }
-  .nav-submenu { animation: nav-submenu-in 0.2s ease-out; }
+  .nav-submenu { @apply ml-5 border-l border-[#cbd8ce] pl-2; animation: nav-submenu-in 0.2s ease-out; }
+  .nav-item:focus-visible, .nav-subitem:focus-visible { @apply outline outline-2 outline-offset-2 outline-[#315e49]; }
   @keyframes nav-submenu-in {
     from { opacity: 0; transform: translateY(-4px); }
     to   { opacity: 1; transform: translateY(0); }
