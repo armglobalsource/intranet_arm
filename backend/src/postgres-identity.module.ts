@@ -25,6 +25,7 @@ import { postgresDomainControllers,postgresDomainProviders } from './postgres-do
 import { UploadsController } from './common/storage/uploads.controller';
 import { InstitutionalMailController } from './institutional-mail/mail.controller';
 import { InstitutionalMailService } from './institutional-mail/mail.service';
+import { WorkspaceService } from './institutional-mail/workspace.service';
 
 // Application root: identity, permissions and every domain on PostgreSQL (Supabase).
 @Module({
@@ -41,7 +42,7 @@ import { InstitutionalMailService } from './institutional-mail/mail.service';
   ],
   controllers:[InstitutionalMailController,AuthController,UsersController,RolesController,NotificationsController,UploadsController,...postgresDomainControllers],
   providers:[
-    InstitutionalMailService,
+    InstitutionalMailService,WorkspaceService,
     ...postgresDomainProviders,
     PostgresAuthService,PasswordRecoveryService,ResendMailerService,PostgresUsersService,PostgresRolesService,PostgresNotificationsService,
     PostgresJwtStrategy,

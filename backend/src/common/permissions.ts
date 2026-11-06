@@ -1,7 +1,7 @@
 export const PERMISSION_CATALOG = {
   'institutional-mail': {
     label: 'Correos y accesos', description: 'Solicitudes institucionales y control de cuentas',
-    actions: { approve: 'Aprobar como jefatura asignada', manage: 'Gestionar solicitudes e inventario como TI' },
+    actions: { approve: 'Habilitar al aprobador designado', manage: 'Gestionar solicitudes e inventario como TI' },
   },
   orgchart: {
     label: 'Organigrama',

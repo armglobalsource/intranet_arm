@@ -25,7 +25,6 @@ for(const width of [320,393,834,1440]) test(`solicitud responsive ${width}px`,as
   await expect(page.getByRole('button',{name:'Gestión TI',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'+ Nueva solicitud',exact:true}).click();
   await page.getByLabel('Empresa / unidad').selectOption('school');
-  await page.getByLabel('Jefatura directa').selectOption('2');
   await page.getByLabel('RUT o ID de colaborador').fill('DEMO-123');
   await page.getByLabel('Área',{exact:true}).fill('Comunicaciones');
   await page.getByLabel('Cargo',{exact:true}).fill('Coordinador');

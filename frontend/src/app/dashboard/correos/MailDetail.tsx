@@ -5,7 +5,7 @@ import { api, apiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { dateLabel, domains, kindNames, MailRequest, operationNames, statusNames } from './mail.types';
 import s from './mail.module.css';
-const actions:Record<string,string>={submitted:'Solicitud enviada',resubmitted:'Corrección enviada',approve:'Jefatura aprobó',observe:'Observaciones',reject:'Solicitud rechazada',start:'TI inició la gestión',complete:'Gestión completada'};
+const actions:Record<string,string>={submitted:'Solicitud enviada',resubmitted:'Corrección enviada',approve:'Aprobador aprobó',observe:'Observaciones',reject:'Solicitud rechazada',start:'TI inició la gestión',complete:'Gestión completada'};
 
 export function MailDetail({r,onChanged,onEdit,onBack}:{r:MailRequest;onChanged:()=>void;onEdit:()=>void;onBack:()=>void}) {
   const userId=useAuthStore(x=>x.user?.id);
@@ -25,14 +25,14 @@ export function MailDetail({r,onChanged,onEdit,onBack}:{r:MailRequest;onChanged:
   const approver=r.status==='approval'&&r.canApprove;
   const it=r.canManage&&['validation','creating'].includes(r.status);
   const deliver=it&&r.status==='creating'&&Number(r.assigned_to)===userId;
-  const fields=[['Solicitante',r.requester_name],['Jefatura',r.manager_name],['Colaborador',d.name],['RUT / ID',d.employeeId],['Empresa',d.company==='arm'?'ARMGLOBAL':'AR School Global'],['Dominio asignado',domains[d.company]],['Tipo de cuenta',kindNames[d.kind]],['Área y cargo',`${d.area} · ${d.jobTitle}`],['Fecha solicitada',d.startsOn],['Vencimiento',d.expiresOn],['Correo sugerido',d.operation==='create'?`${d.suggestedName}@${domains[d.company]}`:undefined],['Correo existente',d.existingEmail],['Responsable titular',d.responsible],['Grupos y accesos',d.groups],['Motivo / observaciones',d.reason],['Responsable TI',r.assignee_name]];
+  const fields=[['Solicitante',r.requester_name],['Aprobador',r.manager_name],['Colaborador',d.name],['RUT / ID',d.employeeId],['Empresa',d.company==='arm'?'ARMGLOBAL':'AR School Global'],['Dominio asignado',domains[d.company]],['Tipo de cuenta',kindNames[d.kind]],['Área y cargo',`${d.area} · ${d.jobTitle}`],['Fecha solicitada',d.startsOn],['Vencimiento',d.expiresOn],['Correo sugerido',d.operation==='create'?`${d.suggestedName}@${domains[d.company]}`:undefined],['Correo existente',d.existingEmail],['Responsable titular',d.responsible],['Grupos y accesos',d.groups],['Motivo / observaciones',d.reason],['Responsable TI',r.assignee_name]];
   return <>
     <div className={s.toolbar}><button onClick={onBack}>← Volver a solicitudes</button><span className={s.badge} data-status={r.status}>{statusNames[r.status]}</span></div>
     <section className={s.card}><div className={s.eyebrow}>{operationNames[d.operation]}</div><h2 style={{marginTop:7}}>{d.name}</h2><p className={s.muted}>Solicitud {r.id.slice(0,8).toUpperCase()}</p>
       <dl className={s.details}>{fields.filter(([,value])=>value).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       {r.canRevise&&<div className={s.actions}><button className={s.primary} onClick={onEdit}>Corregir y reenviar</button></div>}
     </section>
-    {(approver||it)&&<section className={s.card} aria-labelledby="action-title"><h2 id="action-title">{approver?'Revisión de jefatura':deliver?'Registrar resultado de TI':'Validación TI'}</h2>
+    {(approver||it)&&<section className={s.card} aria-labelledby="action-title"><h2 id="action-title">{approver?'Revisión del aprobador':deliver?'Registrar resultado de TI':'Validación TI'}</h2>
       <p className={s.muted}>{approver?'Revisa identidad, cargo, empresa y accesos antes de aprobar.':'La operación se realiza manualmente en Google Workspace. Aquí queda su resultado y trazabilidad.'}</p>
       <fieldset disabled={mutation.isPending}>
         {it&&<label className={s.check}><input type="checkbox" checked={checked.workspaceChecked} onChange={e=>setChecked({...checked,workspaceChecked:e.target.checked})}/><span>Verifiqué identidad, dominio, duplicados, licencia y accesos en Google Workspace.{d.kind==='alias'?' Confirmé que el alias pertenece a la misma persona y que ambos dominios permiten asociarlo a una sola cuenta principal.':''}</span></label>}

@@ -4,16 +4,14 @@ import { DatabaseService } from '../common/database/database.service';
 import { insertIdentity } from '../common/database/identity-sql';
 import { hasPermission } from '../common/permissions';
 import { CreateMailRequestDto, MailActionDto, ReviseMailRequestDto } from './mail.dto';
-import { approvesMail, canReadRequest, corporateEmail, DOMAINS, identityKey, MailActor, managesMail, nextStatus, validateDetails } from './mail.rules';
+import { APPROVER_EMAIL, approvesMail, canReadRequest, corporateEmail, DOMAINS, identityKey, MailActor, managesMail, nextStatus, validateDetails } from './mail.rules';
 
 @Injectable()
 export class InstitutionalMailService {
   constructor(private readonly db: DatabaseService) {}
 
   async options(user: MailActor) {
-    const rows = (await this.db.query(`SELECT u.id, concat_ws(' ',u."firstName",u."lastName") name, r.permissions
-      FROM arm_app.users u JOIN arm_app.roles r ON r.id=u."roleId"
-      WHERE u.status='active' AND r."isActive" IS DISTINCT FROM false ORDER BY u."firstName"`)).rows;
+    const rows = (await this.db.query(`SELECT u.id, concat_ws(' ',u."firstName",u."lastName") name,r.permissions FROM arm_app.users u JOIN arm_app.roles r ON r.id=u."roleId" WHERE lower(u.email)=$1 AND u.status='active' AND r."isActive" IS DISTINCT FROM false`,[APPROVER_EMAIL])).rows;
     const dueReviews = managesMail(user) ? Number((await this.db.query('SELECT count(*) total FROM arm_app.mail_accounts WHERE active AND review_on<=CURRENT_DATE')).rows[0].total) : 0;
     return { dueReviews, canManage: managesMail(user), canApprove: approvesMail(user), managers: rows
       .filter(r => Number(r.id) !== user.sub && hasPermission(r.permissions ?? [],'institutional-mail:approve'))
@@ -49,10 +47,9 @@ export class InstitutionalMailService {
       canRevise:Number(r.requester_id)===user.sub && r.status==='observed',canManage:managesMail(user)};
   }
   private async manager(client: PoolClient, managerId: number, requesterId: number) {
-    if (managerId === requesterId) throw new BadRequestException('La jefatura debe ser otra persona.');
-    const r = (await client.query(`SELECT r.permissions FROM arm_app.users u JOIN arm_app.roles r ON r.id=u."roleId"
-      WHERE u.id=$1 AND u.status='active' AND r."isActive" IS DISTINCT FROM false`,[managerId])).rows[0];
-    if (!r || !hasPermission(r.permissions ?? [],'institutional-mail:approve')) throw new BadRequestException('Selecciona una jefatura habilitada para aprobar.');
+    if (managerId === requesterId) throw new BadRequestException('El aprobador no puede aprobar su propia solicitud.');
+    const r = (await client.query(`SELECT u.id,r.permissions FROM arm_app.users u JOIN arm_app.roles r ON r.id=u."roleId" WHERE u.id=$1 AND lower(u.email)=$2 AND u.status='active' AND r."isActive" IS DISTINCT FROM false`,[managerId,APPROVER_EMAIL])).rows[0];
+    if (!r || !hasPermission(r.permissions ?? [],'institutional-mail:approve')) throw new BadRequestException('El aprobador designado no está disponible. Contacta al administrador.');
   }
   private async event(client: PoolClient, r: any, user: MailActor, action: string, note: string, snapshot: any = {}) {
     await client.query(`INSERT INTO arm_app.mail_request_events(request_id,actor_id,action,note,snapshot) VALUES($1,$2,$3,$4,$5)`,[r.id,user.sub,action,note,JSON.stringify(snapshot)]);
@@ -73,7 +70,7 @@ export class InstitutionalMailService {
     return this.db.transaction(async client => {
       await this.manager(client,dto.managerId,user.sub);
       const r = (await client.query(`INSERT INTO arm_app.mail_requests(requester_id,manager_id,details) VALUES($1,$2,$3) RETURNING *`,[user.sub,dto.managerId,JSON.stringify(details)])).rows[0];
-      await this.event(client,r,user,'submitted','Solicitud enviada a jefatura.',details);
+      await this.event(client,r,user,'submitted','Solicitud enviada al aprobador.',details);
       return {id:r.id};
     });
   }

@@ -5,9 +5,9 @@ El módulo está en **Servicios internos → Correos y accesos** (`/dashboard/co
 ## Habilitación inicial
 
 1. Desplegar frontend y backend del mismo commit. La migración `20261105205456_institutional_mail_workflow.sql` debe estar aplicada antes del despliegue.
-2. En la configuración de roles, asignar **Aprobar solicitudes de su equipo** (`institutional-mail:approve`) a las jefaturas correspondientes.
-3. Asignar **Gestionar solicitudes e inventario (TI)** (`institutional-mail:manage`) al equipo que administra Google Workspace. Los administradores con `*` ya tienen ambas capacidades.
-4. Cada solicitante debe elegir una jefatura distinta de sí mismo. Ser jefatura no permite consultar solicitudes asignadas a otra persona. TI puede gestionar todas las solicitudes.
+2. En la configuración de roles, asignar `institutional-mail:approve` al rol del aprobador designado, pburgos@armglobal.org.
+3. Asignar **Gestionar solicitudes e inventario (TI)** (`institutional-mail:manage`) al equipo que administra Google Workspace. Los administradores con `*` pueden gestionar TI, pero solo la cuenta activa pburgos@armglobal.org con permiso puede aprobar.
+4. Las solicitudes se asignan automáticamente a pburgos@armglobal.org, quien debe tener una cuenta activa y el permiso de aprobación. No se permite la autoaprobación. TI puede gestionar todas las solicitudes.
 5. Confirmar con TI si `armglobal.org` y `arschoolglobal.com` permiten alias dentro de la misma organización de Google Workspace. Esa comprobación es obligatoria para ejecutar un alias entre dominios.
 
 Todos los usuarios activos pueden presentar solicitudes y consultar las propias. Una cuenta pendiente de aprobación en el ecosistema no puede entrar a este flujo.
@@ -15,7 +15,7 @@ Todos los usuarios activos pueden presentar solicitudes y consultar las propias.
 ## Solicitar un correo
 
 1. Pulsar **Nueva solicitud** y seleccionar **Solicitud de correo**.
-2. Indicar empresa, tipo de cuenta y jefatura. El dominio se asigna automáticamente: ARMGLOBAL → `armglobal.org`; AR School Global → `arschoolglobal.com`.
+2. Indicar empresa, tipo de cuenta y el aprobador asignado. El dominio se asigna automáticamente: ARMGLOBAL → `armglobal.org`; AR School Global → `arschoolglobal.com`.
 3. Completar nombre y apellido, RUT/ID de colaborador, área, cargo y fecha de ingreso. Usar siempre el mismo identificador para una misma persona.
 4. Indicar el nombre sugerido, sin `@dominio`, y los grupos o accesos. Si no requiere grupos, escribir «Ninguno».
 5. Para una cuenta temporal, indicar vencimiento. Para una cuenta funcional, indicar responsable titular y justificación.
@@ -23,7 +23,7 @@ Todos los usuarios activos pueden presentar solicitudes y consultar las propias.
 
 La convención es `nombre.apellido`. TI confirma que esté disponible; ante coincidencias, utiliza `nombre.apellido2`, `nombre.apellido3`, etc. No se reserva una dirección solo por enviar la solicitud.
 
-## Aprobar como jefatura
+## Aprobar como responsable designado
 
 En **Aprobaciones**, abrir la solicitud asignada y comprobar identidad, cargo, empresa y accesos:
 
@@ -31,7 +31,7 @@ En **Aprobaciones**, abrir la solicitud asignada y comprobar identidad, cargo, e
 - **Solicitar corrección** requiere explicar qué debe cambiar. El solicitante puede corregir y reenviar; se requiere una nueva aprobación.
 - **Rechazar solicitud** requiere motivo y cierra el flujo.
 
-No se permite la autoaprobación. No hace falta dar acceso de TI a una jefatura para que apruebe sus solicitudes.
+No se permite la autoaprobación. No hace falta dar acceso de TI al aprobador para que apruebe sus solicitudes.
 
 ## Operar como TI
 
@@ -42,7 +42,7 @@ No se permite la autoaprobación. No hace falta dar acceso de TI a una jefatura 
 5. Configurar/verificar MFA obligatorio y entregar el acceso por un canal seguro. Exigir cambio de contraseña inicial cuando corresponda.
 6. En el ecosistema, registrar correo final, licencia y grupos realmente aplicados. Confirmar las verificaciones y pulsar **Confirmar gestión realizada**.
 
-Solo el operador que tomó la solicitud puede registrar su entrega. Otro operador de TI puede devolverla con observaciones para que se revise y asigne de nuevo si fuera necesario. La aprobación de jefatura no crea automáticamente una cuenta.
+Solo el operador que tomó la solicitud puede registrar su entrega. Otro operador de TI puede devolverla con observaciones para que se revise y asigne de nuevo si fuera necesario. La aprobación del responsable designado no crea automáticamente una cuenta.
 
 Nunca guardar contraseñas, códigos MFA ni enlaces de activación en observaciones, notas o historial. La plataforma registra confirmaciones del operador; no activa MFA ni administra contraseñas en Google.
 
@@ -73,10 +73,10 @@ Esta primera versión presenta la cola y el aviso dentro del módulo; no envía 
 
 Cada envío, corrección, aprobación, observación, rechazo, inicio y entrega conserva actor y fecha. Las correcciones guardan la versión enviada; el backend no puede actualizar ni borrar los eventos del historial. Las transiciones generan notificaciones internas a los participantes correspondientes y a TI cuando toca revisar la cola. Las acciones concurrentes se rechazan si la versión ya cambió.
 
-Las tres tablas viven en el esquema privado `arm_app`, con RLS y sin lectura directa para `anon` o `authenticated`. El backend aplica el acceso por solicitante, jefatura asignada y permiso de TI. No hay rutas públicas ni adjuntos de identificación.
+Las tres tablas viven en el esquema privado `arm_app`, con RLS y sin lectura directa para `anon` o `authenticated`. El backend aplica el acceso por solicitante, aprobador asignado y permiso de TI. No hay rutas públicas ni adjuntos de identificación.
 
 ## Validación técnica
 
 - Backend: `node node_modules/vitest/vitest.mjs run src/institutional-mail/mail.spec.ts` desde `backend`.
 - Interfaz: `node node_modules/@playwright/test/cli.js test e2e/institutional-mail.spec.ts --workers=1` desde `frontend`, con Next local en 3005. Las pruebas simulan la API y no crean cuentas ni envían correos.
-- Las verificaciones de TI son declaraciones registradas por el operador. Una futura integración con Google Admin SDK requerirá alcance, credenciales y permisos propios; no forma parte de esta versión.
+- Las verificaciones de ejecución siguen siendo declaraciones registradas por el operador. La nueva comprobación de conectividad de Google Admin SDK consulta usuarios y grupos, sin ejecutar solicitudes. Ver [configuración y límites de la integración](google-workspace-integracion.md).

@@ -3,9 +3,10 @@ import { hasPermission } from '../common/permissions';
 import { MailDetailsDto } from './mail.dto';
 
 export const DOMAINS = { arm: 'armglobal.org', school: 'arschoolglobal.com' } as const;
-export interface MailActor { sub: number; permissions: string[] }
+export const APPROVER_EMAIL = 'pburgos@armglobal.org';
+export interface MailActor { sub: number; permissions: string[]; email?: string }
 export const managesMail = (u: MailActor) => hasPermission(u.permissions, 'institutional-mail:manage');
-export const approvesMail = (u: MailActor) => hasPermission(u.permissions, 'institutional-mail:approve');
+export const approvesMail = (u: MailActor) => u.email?.trim().toLowerCase() === APPROVER_EMAIL && hasPermission(u.permissions, 'institutional-mail:approve');
 export const identityKey = (s: string) => s.normalize('NFKC').replace(/[.\s-]/g, '').toUpperCase();
 export const corporateEmail = (s: string) => /^[a-z0-9][a-z0-9._-]*@(armglobal\.org|arschoolglobal\.com)$/.test(s);
 function validDate(s: string) { return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0,10) === s; }

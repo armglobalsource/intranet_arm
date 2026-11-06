@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '@/lib/api';
 import { MailForm } from './MailForm';
 import { MailDetail } from './MailDetail';
+import { WorkspaceConnection } from './WorkspaceConnection';
 import { dateLabel, MailDetails, MailRequest, operationNames, Options, RequestSummary, statusNames } from './mail.types';
 import s from './mail.module.css';
 type Account={id:string;email:string;owner_name:string;kind:string;active:boolean;expires_on:string|null;review_on:string|null;primary_email:string|null;license:string;groups_text:string;last_request_id:string;total:string;request_details:MailDetails};
@@ -40,6 +41,7 @@ export function MailWorkspace() {
     <nav className={s.tabs} aria-label="Bandejas de correos">
       {([['mine','Mis solicitudes'],...(options.data?.canApprove?[['approvals','Aprobaciones']]:[]),...(options.data?.canManage?[['it','Gestión TI'],['accounts','Cuentas institucionales']]:[])]).map(([key,label])=><button key={key} aria-pressed={view===key&&!creating&&!id} className={view===key&&!creating&&!id?s.selected:''} onClick={()=>changeView(key)}>{label}</button>)}
     </nav>
+    {options.data?.canManage&&view==='it'&&!id&&!creating&&<WorkspaceConnection/>}
     {!!options.data?.dueReviews&&!id&&!creating&&<div className={s.notice}>{options.data.dueReviews} cuenta(s) con revisión pendiente por vencimiento. <button onClick={()=>{changeView('accounts');setDue(true);}}>Revisar cuentas</button></div>}
     {options.isPending&&<p className={s.empty} role="status">Cargando tu espacio…</p>}
     {options.isError&&<div className={s.error} role="alert">{apiErrorMessage(options.error,'No se pudo cargar el módulo.')} <button onClick={()=>options.refetch()}>Reintentar</button></div>}
@@ -48,7 +50,7 @@ export function MailWorkspace() {
       {detail.isError&&<div className={s.error} role="alert">{apiErrorMessage(detail.error,'No se pudo abrir la solicitud.')} <button onClick={()=>detail.refetch()}>Reintentar</button><button onClick={()=>open(null)}>Volver</button></div>}
       {detail.data&&<MailDetail key={`${id}-${detail.data.version}`} r={detail.data} onChanged={refresh} onEdit={()=>setEditing(true)} onBack={()=>open(null)}/>}
     </>:options.data&&<>
-      <div className={s.toolbar}><div><h2 style={{fontSize:18,fontWeight:700}}>{view==='accounts'?'Inventario de cuentas':view==='approvals'?'Solicitudes asignadas a ti':view==='it'?'Bandeja de TI':'Seguimiento de tus solicitudes'}</h2><p className={s.muted}>{view==='accounts'?'Cuentas registradas al completar gestiones en este módulo.':view==='approvals'?'La aprobación habilita la revisión de TI.':'Jefatura → Validación TI → Ejecución → Entrega'}</p></div>
+      <div className={s.toolbar}><div><h2 style={{fontSize:18,fontWeight:700}}>{view==='accounts'?'Inventario de cuentas':view==='approvals'?'Solicitudes asignadas a ti':view==='it'?'Bandeja de TI':'Seguimiento de tus solicitudes'}</h2><p className={s.muted}>{view==='accounts'?'Cuentas registradas al completar gestiones en este módulo.':view==='approvals'?'La aprobación habilita la revisión de TI.':'Aprobador → Validación TI → Ejecución → Entrega'}</p></div>
         {view==='accounts'?<button className={due?s.selected:''} aria-pressed={due} onClick={()=>{setDue(!due);setPage(1);}}>{due?'Ver todas las cuentas':'Revisiones por vencimiento'}</button>:<label className={s.field}>Estado<select value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}}><option value="">Todos los estados</option>{Object.entries(statusNames).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>}
       </div>
       {view==='accounts'?<>

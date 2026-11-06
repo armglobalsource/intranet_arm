@@ -6,7 +6,7 @@ import { canReadRequest, identityKey, nextStatus, validateDetails } from './mail
 import { InstitutionalMailService } from './mail.service';
 
 const requester={sub:1,permissions:[]};
-const manager={sub:2,permissions:['institutional-mail:approve']};
+const manager={sub:2,email:'pburgos@armglobal.org',permissions:['institutional-mail:approve']};
 const ti={sub:3,permissions:['institutional-mail:manage']};
 const base={id:'00000000-0000-4000-8000-000000000001',requester_id:1,manager_id:2,status:'approval',version:1,assigned_to:3};
 const details:MailDetailsDto={operation:'create',company:'arm',kind:'collaborator',name:'Demo ARM',employeeId:'12.345.678-9',area:'Comunicaciones',jobTitle:'Coordinador',startsOn:'2026-11-05',suggestedName:'demo.arm',groups:'Comunicaciones',reason:''};
@@ -26,6 +26,8 @@ describe('institutional mail rules',()=>{
   });
   it('only the assigned approver can approve; requester and TI cannot bypass approval',()=>{
     expect(nextStatus(base,manager,'approve')).toBe('validation');
+    expect(()=>nextStatus(base,{sub:2,email:'otra@armglobal.org',permissions:['*']},'approve')).toThrow();
+    expect(()=>nextStatus(base,{sub:2,email:'pburgos@armglobal.org',permissions:[]},'approve')).toThrow();
     for(const u of [requester,ti,{sub:5,permissions:['institutional-mail:approve']},{sub:1,permissions:['*']}]) expect(()=>nextStatus(base,u,'approve')).toThrow();
     expect(()=>nextStatus({...base,manager_id:1},{sub:1,permissions:['*']},'approve')).toThrow();
   });

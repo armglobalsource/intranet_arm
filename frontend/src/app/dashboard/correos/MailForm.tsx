@@ -9,7 +9,7 @@ import s from './mail.module.css';
 export function MailForm({options,request,initial,onSaved,onCancel}:{options:Options;request?:MailRequest;initial?:MailDetails;onSaved:(id:string)=>void;onCancel:()=>void}) {
   const user=useAuthStore(x=>x.user);
   const [d,setD]=useState<MailDetails>(request?.details ?? initial ?? {operation:'create',company:'arm',kind:'collaborator',name:`${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim(),employeeId:'',area:'',jobTitle:'',startsOn:new Date().toLocaleDateString('en-CA'),suggestedName:'',groups:'',reason:''});
-  const [managerId,setManagerId]=useState(request?.manager_id ?? '');
+  const managerId=options.managers[0]?.id;
   function field<K extends keyof MailDetails>(key:K,value:MailDetails[K]) { setD(prev=>({...prev,[key]:value})); }
   const save=useMutation({mutationFn:async()=>{
     const {domain,...details}=d;
@@ -20,15 +20,15 @@ export function MailForm({options,request,initial,onSaved,onCancel}:{options:Opt
   const suggested=()=>d.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().split(/\s+/).filter(Boolean).slice(0,2).join('.').replace(/[^a-z0-9.]/g,'');
   return <section className={s.card} aria-labelledby="request-title">
     <h2 id="request-title">{request?'Corregir solicitud':'Nueva solicitud'}</h2>
-    <p className={s.muted}>Completa los datos para revisión de jefatura y TI. Los campos sin «opcional» son obligatorios.</p>
+    <p className={s.muted}>Completa los datos para revisión del aprobador y TI. Los campos sin «opcional» son obligatorios.</p>
     <div className={s.notice} style={{marginTop:16}}>La empresa determina el dominio. Si necesitas ambos dominios, solicita un alias de tu cuenta principal.</div>
-    {!options.managers.length&&<div className={s.error}>No hay otra jefatura habilitada. Un administrador debe asignar el permiso «Aprobar como jefatura asignada» en Configuración → Roles.</div>}
+    {!options.managers.length&&<div className={s.error}>El aprobador designado no está disponible o eres tú mismo. Contacta al administrador.</div>}
     <form onSubmit={submit}>
       <fieldset disabled={save.isPending} className={s.grid}>
         <label className={s.field}>¿Qué necesitas?<select value={d.operation} onChange={e=>field('operation',e.target.value as MailDetails['operation'])}>{Object.entries(operationNames).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
         <label className={s.field}>Empresa / unidad<select value={d.company} onChange={e=>field('company',e.target.value as MailDetails['company'])}><option value="arm">ARMGLOBAL</option><option value="school">AR School Global</option></select></label>
         <label className={s.field}>Tipo de cuenta<select value={d.kind} onChange={e=>field('kind',e.target.value)}>{Object.entries(kindNames).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
-        <label className={s.field}>Jefatura directa<select required value={managerId} onChange={e=>setManagerId(e.target.value)}><option value="">Selecciona tu jefatura</option>{options.managers.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select><small>Solo aparecen personas habilitadas para aprobar.</small></label>
+        <div className={s.field}>Aprobador<span className={s.domain}>Pastor · pburgos@armglobal.org</span><small>Las solicitudes se envían automáticamente al aprobador designado.</small></div>
         <label className={s.field}>Nombre y apellido<input required minLength={2} maxLength={160} autoComplete="name" value={d.name} onChange={e=>field('name',e.target.value)}/></label>
         <label className={s.field}>RUT o ID de colaborador<input required minLength={3} maxLength={60} value={d.employeeId} onChange={e=>field('employeeId',e.target.value)}/><small>Usa siempre el mismo identificador para evitar cuentas duplicadas.</small></label>
         <label className={s.field}>Área<input required minLength={2} maxLength={160} value={d.area} onChange={e=>field('area',e.target.value)}/></label>

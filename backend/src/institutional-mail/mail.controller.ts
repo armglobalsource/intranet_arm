@@ -3,10 +3,13 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CreateMailRequestDto, MailActionDto, ReviseMailRequestDto } from './mail.dto';
 import { MailActor } from './mail.rules';
 import { InstitutionalMailService } from './mail.service';
+import { WorkspaceService } from './workspace.service';
 function pageNumber(value='1') { const n=Number(value); if (!Number.isSafeInteger(n)||n<1||n>100000) throw new BadRequestException('Página inválida.'); return n; }
 @Controller({path:'institutional-mail',version:'1'})
 export class InstitutionalMailController {
-  constructor(private readonly service: InstitutionalMailService) {}
+  constructor(private readonly service: InstitutionalMailService, private readonly workspace: WorkspaceService) {}
+  @Get('workspace') workspaceStatus(@CurrentUser() u: MailActor) { return this.workspace.status(u); }
+  @Post('workspace/check') checkWorkspace(@CurrentUser() u: MailActor) { return this.workspace.check(u); }
   @Get('options') options(@CurrentUser() u: MailActor) { return this.service.options(u); }
   @Get('accounts') accounts(@CurrentUser() u: MailActor,@Query('due') due: string,@Query('page') page: string) { return this.service.accounts(u,due==='true',pageNumber(page)); }
   @Get() list(@CurrentUser() u: MailActor,@Query('view') view='mine',@Query('status') status='',@Query('page') page: string) { return this.service.list(u,view,status,pageNumber(page)); }
