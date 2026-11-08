@@ -50,3 +50,12 @@
 .pagination{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:20px}
 @media(max-width:640px){.workspace{padding:0 0 60px;margin:0 -12px}.heading{align-items:flex-start;flex-direction:column;gap:14px}.heading h1{font-size:25px}.heading>button{width:100%}.tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px}.tabs button{padding:10px 7px;font-size:13px}.card{padding:17px 14px;border-radius:12px}.grid,.details{grid-template-columns:1fr;gap:16px}.actions>button{flex:1 1 140px}.workspace .request{flex-direction:column;gap:10px;padding:15px}.request .badge{order:-1}.toolbar{align-items:stretch}.toolbar>*{max-width:100%}.domain{font-size:13px}.heading p{font-size:13px}.notice,.error{padding:12px;font-size:13px}}
 @media print{.tabs,.actions,.heading>button{display:none}}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:0;margin:20px 0;list-style:none}
+.steps li{border:1px solid #dce3e9;border-radius:12px;padding:14px;background:#f5f7f9;min-width:0}
+.steps strong,.steps span{display:block;font-size:13px;line-height:1.5}
+.steps span{color:#64748b;margin-top:5px}
+.steps li[data-done=true]{border-color:#849baa;background:#edf2f5}
+.groupPicker{margin:18px 0;padding:16px;border:1px solid #dce3e9;border-radius:12px}
+.groupList{max-height:250px;overflow:auto;margin:10px 0}
+.workspace fieldset{min-width:0}.field strong,.check span{overflow-wrap:anywhere;min-width:0}
+@media(max-width:640px){.steps{grid-template-columns:1fr}.steps li{padding:12px}.groupPicker{padding:12px}}

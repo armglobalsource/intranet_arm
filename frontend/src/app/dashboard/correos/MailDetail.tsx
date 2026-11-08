@@ -1,10 +1,11 @@
 'use client';
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { dateLabel, domains, kindNames, MailRequest, operationNames, statusNames } from './mail.types';
 import s from './mail.module.css';
+import { WorkspaceAutomation } from './WorkspaceAutomation';
 const actions:Record<string,string>={submitted:'Solicitud enviada',resubmitted:'Corrección enviada',approve:'Aprobador aprobó',observe:'Observaciones',reject:'Solicitud rechazada',start:'TI inició la gestión',complete:'Gestión completada'};
 
 export function MailDetail({r,onChanged,onEdit,onBack}:{r:MailRequest;onChanged:()=>void;onEdit:()=>void;onBack:()=>void}) {
@@ -25,6 +26,8 @@ export function MailDetail({r,onChanged,onEdit,onBack}:{r:MailRequest;onChanged:
   const approver=r.status==='approval'&&r.canApprove;
   const it=r.canManage&&['validation','creating'].includes(r.status);
   const deliver=it&&r.status==='creating'&&Number(r.assigned_to)===userId;
+  const workspaceStatus=useQuery<{automation:boolean}>({queryKey:['institutional-mail','workspace'],queryFn:async()=>(await api.get('/institutional-mail/workspace')).data,enabled:r.canManage,retry:false});
+  const automatic=deliver&&d.company==='arm'&&d.kind!=='alias'&&['create','offboard'].includes(d.operation)&&(!!r.workspace||workspaceStatus.data?.automation===true);
   const fields=[['Solicitante',r.requester_name],['Aprobador',r.manager_name],['Colaborador',d.name],['RUT / ID',d.employeeId],['Empresa',d.company==='arm'?'ARMGLOBAL':'AR School Global'],['Dominio asignado',domains[d.company]],['Tipo de cuenta',kindNames[d.kind]],['Área y cargo',`${d.area} · ${d.jobTitle}`],['Fecha solicitada',d.startsOn],['Vencimiento',d.expiresOn],['Correo sugerido',d.operation==='create'?`${d.suggestedName}@${domains[d.company]}`:undefined],['Correo existente',d.existingEmail],['Responsable titular',d.responsible],['Grupos y accesos',d.groups],['Motivo / observaciones',d.reason],['Responsable TI',r.assignee_name]];
   return <>
     <div className={s.toolbar}><button onClick={onBack}>← Volver a solicitudes</button><span className={s.badge} data-status={r.status}>{statusNames[r.status]}</span></div>
@@ -32,11 +35,14 @@ export function MailDetail({r,onChanged,onEdit,onBack}:{r:MailRequest;onChanged:
       <dl className={s.details}>{fields.filter(([,value])=>value).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       {r.canRevise&&<div className={s.actions}><button className={s.primary} onClick={onEdit}>Corregir y reenviar</button></div>}
     </section>
-    {(approver||it)&&<section className={s.card} aria-labelledby="action-title"><h2 id="action-title">{approver?'Revisión del aprobador':deliver?'Registrar resultado de TI':'Validación TI'}</h2>
-      <p className={s.muted}>{approver?'Revisa identidad, cargo, empresa y accesos antes de aprobar.':'La operación se realiza manualmente en Google Workspace. Aquí queda su resultado y trazabilidad.'}</p>
+    {d.deliveryEmail&&<p className={s.notice}>Correo de contacto para entregar el acceso: <strong>{d.deliveryEmail}</strong></p>}
+    {automatic&&<WorkspaceAutomation r={r} onChanged={onChanged}/>}
+    {r.workspace&&!automatic&&<section className={s.card}><h2>Estado en Google Workspace</h2><p>{r.workspace.state==='ready'?'Operación confirmada en Google.':'TI está gestionando la ejecución.'}</p>{r.workspace.invitation_sent_at&&<p>Enlace de acceso enviado al correo de contacto.</p>}{r.workspace.activated_at&&<p>El destinatario ya definió su contraseña inicial.</p>}<p className={s.muted}>La solicitud se cierra cuando TI verifica los pasos pendientes.</p></section>}
+    {(approver||it)&&!r.workspace&&<section className={s.card} aria-labelledby="action-title"><h2 id="action-title">{approver?'Revisión del aprobador':automatic?'Corregir antes de ejecutar':deliver?'Registrar resultado de TI':'Validación TI'}</h2>
+      <p className={s.muted}>{approver?'Revisa identidad, cargo, empresa, destinatario de la entrega y accesos antes de aprobar.':automatic?'Puedes devolver o rechazar la solicitud antes de iniciar la operación en Google.':'Revisa identidad, duplicados, licencia y accesos antes de continuar. Las altas y suspensiones de ARM Global se pueden ejecutar desde el módulo; otros cambios se registran tras su gestión en Google.'}</p>
       <fieldset disabled={mutation.isPending}>
         {it&&<label className={s.check}><input type="checkbox" checked={checked.workspaceChecked} onChange={e=>setChecked({...checked,workspaceChecked:e.target.checked})}/><span>Verifiqué identidad, dominio, duplicados, licencia y accesos en Google Workspace.{d.kind==='alias'?' Confirmé que el alias pertenece a la misma persona y que ambos dominios permiten asociarlo a una sola cuenta principal.':''}</span></label>}
-        {deliver&&<>
+        {deliver&&!automatic&&<>
           <div className={s.grid} style={{margin:'12px 0'}}>
             <label className={`${s.field} ${s.wide}`}>Correo final<input type="email" maxLength={254} value={email} onChange={e=>setEmail(e.target.value.toLowerCase())}/></label>
             {d.operation!=='offboard'&&<><label className={s.field}>Licencia aplicada<input value={license} maxLength={160} onChange={e=>setLicense(e.target.value)} readOnly={d.kind==='alias'} placeholder="Ej.: Workspace Business Starter"/></label><label className={s.field}>Grupos / accesos aplicados<textarea value={groups} maxLength={2000} onChange={e=>setGroups(e.target.value)}/></label></>}
@@ -51,7 +57,7 @@ export function MailDetail({r,onChanged,onEdit,onBack}:{r:MailRequest;onChanged:
         <div className={s.actions}>
           {approver&&<button className={s.primary} onClick={()=>act('approve')}>Aprobar y enviar a TI</button>}
           {it&&r.status==='validation'&&<button className={s.primary} disabled={!checked.workspaceChecked} onClick={()=>act('start')}>Tomar solicitud e iniciar</button>}
-          {deliver&&<button className={s.primary} disabled={!checked.workspaceChecked||!email||(d.operation==='offboard'?!checked.accessRevoked:!checked.mfaConfirmed||!checked.secureDelivery||!license.trim())} onClick={()=>act('complete')}>Confirmar gestión realizada</button>}
+          {deliver&&!automatic&&<button className={s.primary} disabled={!checked.workspaceChecked||!email||(d.operation==='offboard'?!checked.accessRevoked:!checked.mfaConfirmed||!checked.secureDelivery||!license.trim())} onClick={()=>act('complete')}>Confirmar gestión realizada</button>}
           <button onClick={()=>act('observe')}>Solicitar corrección</button><button className={s.danger} onClick={()=>act('reject')}>Rechazar solicitud</button>
         </div>
         {it&&r.status==='creating'&&!deliver&&<p className={s.notice} style={{marginTop:14}}>La entrega debe registrarla {r.assignee_name}, quien tomó esta solicitud.</p>}

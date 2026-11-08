@@ -29,7 +29,8 @@ export function validateDetails(d: MailDetailsDto) {
   }
   return {...d, name:d.name.trim(), employeeId:d.employeeId.trim(), area:d.area.trim(), jobTitle:d.jobTitle.trim(),
     groups:d.groups.trim(), reason:d.reason.trim(), responsible:d.kind==='functional'?d.responsible?.trim():undefined,
-    existingEmail:d.operation!=='create'||d.kind==='alias'?d.existingEmail:undefined, domain: DOMAINS[d.company]};
+    existingEmail:d.operation!=='create'||d.kind==='alias'?d.existingEmail:undefined,
+    deliveryEmail:d.operation==='create'&&d.kind!=='alias'?d.deliveryEmail?.trim().toLowerCase():undefined, domain: DOMAINS[d.company]};
 }
 export function canReadRequest(r: any, u: MailActor) {
   return managesMail(u) || Number(r.requester_id) === u.sub || (Number(r.manager_id) === u.sub && approvesMail(u));

@@ -43,7 +43,8 @@ export class InstitutionalMailService {
       concat_ws(' ',u."firstName",u."lastName") actor_name
       FROM arm_app.mail_request_events e JOIN arm_app.users u ON u.id=e.actor_id
       WHERE e.request_id=$1 ORDER BY e.created_at,e.id`,[id])).rows;
-    return {...r,events,canApprove: Number(r.manager_id)===user.sub && approvesMail(user) && Number(r.requester_id)!==user.sub,
+    const workspace=(await this.db.query('SELECT state,plan,invitation_sent_at,activated_at,last_error FROM arm_app.mail_workspace_jobs WHERE request_id=$1',[id])).rows[0]??null;
+    return {...r,events,workspace,canApprove: Number(r.manager_id)===user.sub && approvesMail(user) && Number(r.requester_id)!==user.sub,
       canRevise:Number(r.requester_id)===user.sub && r.status==='observed',canManage:managesMail(user)};
   }
   private async manager(client: PoolClient, managerId: number, requesterId: number) {
@@ -91,11 +92,13 @@ export class InstitutionalMailService {
     if (r.version!==version) throw new ConflictException('La solicitud cambió. Actualiza la vista antes de continuar.');
     return r;
   }
-  async action(id: string,dto: MailActionDto,user: MailActor) {
+  async action(id: string,dto: MailActionDto,user: MailActor,verifiedAutomation=false) {
     try {
       return await this.db.transaction(async client => {
         const r = await this.lock(client,id,user,dto.version);
         const status = nextStatus(r,user,dto.action,dto.note);
+        const job=(await client.query('SELECT request_id FROM arm_app.mail_workspace_jobs WHERE request_id=$1',[id])).rows[0];
+        if (job && !(dto.action==='complete' && verifiedAutomation)) throw new ConflictException('Esta solicitud ya tiene una ejecución en Google. Usa las acciones de automatización para reanudarla o verificar su cierre.');
         if (dto.action==='start' && !dto.workspaceChecked) throw new BadRequestException('Confirma la validación de dominio, identidad, licencia y duplicados en Google Workspace.');
         if (dto.action==='complete') {
           if (Number(r.assigned_to)!==user.sub) throw new ForbiddenException('La entrega debe registrarla el responsable de TI que tomó la solicitud.');

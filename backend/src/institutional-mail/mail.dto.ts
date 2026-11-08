@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsDefined, IsIn, IsInt, IsOptional, IsString, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsDefined, IsEmail, IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 
 export class MailDetailsDto {
   @IsIn(['create','change','offboard']) operation!: 'create'|'change'|'offboard';
@@ -16,6 +16,23 @@ export class MailDetailsDto {
   @IsOptional() @IsString() @MaxLength(10) expiresOn?: string;
   @IsOptional() @IsString() @MaxLength(254) existingEmail?: string;
   @IsOptional() @IsString() @MaxLength(160) responsible?: string;
+  @IsOptional() @IsEmail() @MaxLength(254) deliveryEmail?: string;
+}
+
+export class WorkspacePlanDto {
+  @IsInt() @Min(1) version!: number;
+  @IsEmail() @MaxLength(254) email!: string;
+  @IsString() @MinLength(2) @MaxLength(160) license!: string;
+  @IsArray() @ArrayMaxSize(20) @ArrayUnique() @IsEmail({}, {each:true}) groupEmails!: string[];
+  @Transform(({obj,key})=>obj[key]) @IsBoolean() identityConfirmed!: boolean;
+  @Transform(({obj,key})=>obj[key]) @IsBoolean() licenseConfirmed!: boolean;
+}
+export class WorkspaceActivateDto {
+  @IsString() @Matches(/^[a-f0-9]{64}$/) token!: string;
+  @IsString() @MinLength(12) @MaxLength(100) password!: string;
+}
+export class MailVersionDto {
+  @IsInt() @Min(1) version!: number;
 }
 export class CreateMailRequestDto {
   @IsInt() @Min(1) managerId!: number;

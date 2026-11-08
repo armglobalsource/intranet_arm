@@ -59,6 +59,11 @@ describe('institutional mail rules',()=>{
   });
 });
 describe('request API boundary and service',()=>{
+  it('prevents manual completion or rejection from bypassing an existing Workspace execution',async()=>{
+    const x=service({...base,status:'creating',details},sql=>sql.includes('FROM arm_app.mail_workspace_jobs')?{rows:[{request_id:base.id}]}:undefined);
+    for(const action of ['complete','observe','reject'])await expect(x.service.action(base.id,{version:1,action,note:'Cambio'},ti)).rejects.toThrow('ejecución en Google');
+    expect(x.query.mock.calls.some(([sql])=>sql.startsWith('UPDATE arm_app.mail_requests'))).toBe(false);
+  });
   const pipe=new ValidationPipe({whitelist:true,forbidNonWhitelisted:true,transform:true,transformOptions:{enableImplicitConversion:true}});
   it('rejects missing details, secret fields and non-boolean attestations',async()=>{
     await expect(pipe.transform({managerId:2},{type:'body',metatype:CreateMailRequestDto})).rejects.toThrow();

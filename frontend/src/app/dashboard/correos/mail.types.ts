@@ -1,11 +1,12 @@
 export type MailDetails = {
   operation: 'create'|'change'|'offboard'; company:'arm'|'school'; kind:string;
   name:string;employeeId:string;area:string;jobTitle:string;startsOn:string;suggestedName:string;
-  groups:string;reason:string;expiresOn?:string;existingEmail?:string;responsible?:string;domain?:string;
+  groups:string;reason:string;expiresOn?:string;existingEmail?:string;responsible?:string;domain?:string;deliveryEmail?:string;
 };
 export type Options = {canManage:boolean;canApprove:boolean;dueReviews:number;managers:{id:number;name:string}[]};
 export type RequestSummary = {id:string;name:string;company:string;operation:string;kind:string;domain:string;status:string;created_at:string;version:number};
 export type MailRequest = {id:string;version:number;status:string;details:MailDetails;manager_id:string;requester_name:string;manager_name:string;assignee_name:string;assigned_to:string|null;canApprove:boolean;canRevise:boolean;canManage:boolean;
+  workspace?:{state:'prepared'|'failed'|'ready';plan:{email:string;license:string;groupEmails:string[];operation:string;deliveryEmail?:string};invitation_sent_at:string|null;activated_at:string|null;last_error:string|null}|null;
   events:{id:string;action:string;note:string;actor_name:string;created_at:string;snapshot:Record<string,unknown>}[]};
 export const statusNames:Record<string,string>={approval:'Aprobación pendiente',validation:'Validación TI',creating:'En ejecución',observed:'Con observaciones',delivered:'Completada / entregada',rejected:'Rechazada'};
 export const operationNames:Record<string,string>={create:'Solicitud de correo',change:'Cambio de correo / accesos',offboard:'Baja de colaborador'};

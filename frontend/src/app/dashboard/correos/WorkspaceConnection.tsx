@@ -4,7 +4,7 @@ import { api, apiErrorMessage } from '@/lib/api';
 import s from './mail.module.css';
 
 export function WorkspaceConnection() {
-  const status = useQuery<{available:boolean;configured:boolean}>({
+  const status = useQuery<{available:boolean;configured:boolean;automation:boolean}>({
     queryKey:['institutional-mail','workspace'],
     queryFn:async()=>(await api.get('/institutional-mail/workspace')).data,
     retry:false,
@@ -19,7 +19,8 @@ export function WorkspaceConnection() {
         {check.isPending?'Comprobando…':'Comprobar conexión'}
       </button>
     </div>
-    <p className={s.muted}>Esta comprobación consulta usuarios y grupos. La creación y entrega de cuentas siguen a cargo de TI en Google Workspace.</p>
+    <p className={s.muted}>La comprobación consulta usuarios y grupos. En cada solicitud aprobada, TI puede crear cuentas de ARM Global, asignar grupos y enviar el acceso inicial. Las bajas suspenden la cuenta y conservan los datos.</p>
+    {status.data&&<p className={s.notice}>{status.data.automation?'Automatización habilitada · solo Production.':'Ejecución automática pendiente de habilitación. La comprobación de conexión sigue disponible.'} Los cambios y alias entre dominios siguen bajo gestión directa de TI.</p>}
     {status.isPending&&<p role="status">Revisando configuración…</p>}
     {status.data&&!status.data.available&&<p className={s.notice}>Conexión pendiente de habilitación en producción. Puedes continuar gestionando solicitudes.</p>}
     {status.isError&&<div className={s.error} role="alert">{apiErrorMessage(status.error,'No se pudo consultar la conexión.')} <button onClick={()=>status.refetch()}>Reintentar</button></div>}
