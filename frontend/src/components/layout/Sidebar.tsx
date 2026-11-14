@@ -200,6 +200,13 @@ const NAV: NavGroup[] = [
   { href: '/dashboard/produccion-general/noticias', label: 'Noticias', section: 'General', icon: NoticiasIcon, permission: 'content:view' },
   { href: '/dashboard/orgchart',           label: 'Organigrama', section: 'General', icon: OrgIcon, permission: 'orgchart:view' },
   { href: '/dashboard/correos', label: 'Correos y accesos', section: 'Servicios internos', icon: SoporteIcon },
+  { href: '/dashboard/eventos', label: 'Eventos', section: 'Comunidad', icon: TecnicosIcon,
+    children: [
+      { href: '/dashboard/eventos', label: 'Resumen', icon: MinisterioSubIcon, permission: 'eventos:access' },
+      { href: '/dashboard/eventos/gestion', label: 'Gestión de eventos', icon: MinisterioSubIcon, permission: 'eventos:access' },
+      { href: '/dashboard/eventos/configuracion', label: 'Categorías', icon: MinisterioSubIcon, permission: 'eventos:manageAll' },
+    ],
+  },
   {
     href:    '/dashboard/produccion-general',
     label:   'Producción General',
@@ -250,7 +257,7 @@ export function Sidebar() {
   const visibleNav = NAV
     .map((item) => {
       if (item.children) {
-        const visibleChildren = item.children.filter((c) => !c.permission || isAdmin || can(c.permission) || (c.href === `${STATS_ROOT}/operacion` && (can('encuentros:create') || can('encuentros:review'))));
+        const visibleChildren = item.children.filter((c) => !c.permission || isAdmin || can(c.permission) || (c.permission === 'eventos:access' && (can('eventos:manageAll') || can('eventos:manageCampus') || can('eventos:organize'))) || (c.href === `${STATS_ROOT}/operacion` && (can('encuentros:create') || can('encuentros:review'))));
         if (visibleChildren.length === 0) return null;
         return { ...item, children: visibleChildren };
       }

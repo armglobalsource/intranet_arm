@@ -1,0 +1,51 @@
+import {test,expect,Page} from '@playwright/test';
+test.use({baseURL:'http://localhost:3005',channel:'msedge'});
+const id='59b904e0-b55a-4363-b3db-dfe43d08f468';
+const categoryId='5b7e370e-198c-4d68-8cc2-f47304c6aa22';
+const details={summary:'Un tiempo para construir, fortalecer y renovar nuestra vida en Dios.',description:'Nos reunimos para compartir un tiempo de crecimiento, comunidad y propósito.',bannerUrl:'',color:'#102b40',timezone:'America/Santiago',modality:'onsite',location:'Centro de encuentros',address:'Lugar de prueba',registrationOpensAt:null,registrationClosesAt:null,paymentDueAt:null,waitlist:false,minimumAge:18,conditions:'Trae tu identificación.',cancellationPolicy:'Contacta al equipo organizador.',pricing:'free',faqs:[{question:'¿Qué debo llevar?',answer:'Ropa cómoda y tu identificación.'}]};
+async function fixture(page:Page,permissions=['*']){
+ await page.addInitScript(({permissions})=>localStorage.setItem('auth-storage',JSON.stringify({version:0,state:{user:{id:1,campusId:10,firstName:'Prueba',lastName:'ARM',permissions,role:{name:'user'},status:'active'},accessToken:'fixture',isAuthenticated:true}})),{permissions});
+ let event:any={id,version:1,title:'Retiro de Hombres',slug:'retiro-hombres',categoryId,campusId:10,organizerId:1,startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',status:'draft',registrationStatus:'pending',capacity:120,campusIds:[10],details,ticketTypes:[],audit:[]};
+ const calls:any[]=[];
+ await page.route('**/api/v1/**',async route=>{
+  const req=route.request(),path=new URL(req.url()).pathname.replace('/api/v1','');
+  if(path==='/event-management/options')return route.fulfill({json:{categories:[{id:categoryId,name:'Retiros',active:true}],campuses:[{id:10,name:'Santiago',country:'Chile'}],organizers:[{id:1,name:'Prueba ARM'}],access:{global:permissions.includes('*'),campus:permissions.includes('eventos:manageCampus'),assigned:false}}});
+  if(path.startsWith('/public-events/'))return route.fulfill({json:{...event,status:'published',campusName:'Santiago',categoryName:'Retiros',campuses:['Santiago'],registrationEnabled:false}});
+  if(path==='/event-management'&&req.method()==='GET')return route.fulfill({json:[{...event,campusName:'Santiago',country:'Chile',categoryName:'Retiros',bannerUrl:''}]});
+  if((path==='/event-management'||path===`/event-management/${id}`)&&req.method()!=='GET'){const data=req.postDataJSON();calls.push(data);event={...data,id,version:event.version+1};return route.fulfill({json:{id,version:event.version}});}
+  if(path===`/event-management/${id}`)return route.fulfill({json:event});
+  return route.fulfill({json:[]});
+ });
+ return calls;
+}
+for(const width of [320,393,834,1440])test(`portada y editor sin desbordes ${width}`,async({page})=>{
+ await fixture(page);await page.setViewportSize({width,height:852});
+ await page.goto('/eventos/retiro-hombres');await expect(page.getByRole('heading',{name:'Retiro de Hombres',exact:true})).toBeVisible();
+ await expect(page.getByText('Inscripciones próximamente',{exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/event-public-${width}.png`,fullPage:true});
+ await page.goto(`/dashboard/eventos/${id}`);await expect(page.getByLabel('Nombre del evento *',{exact:true})).toHaveValue('Retiro de Hombres');
+ for(const name of ['Información','Identidad visual','Participación','Publicación']){
+  await page.getByRole('tab',{name:new RegExp(name)}).click();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  expect(await page.locator('main').evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);
+ }
+ await page.getByRole('tab',{name:/Información/}).click();await page.locator('main').evaluate(e=>e.scrollTo(0,0));
+ await page.screenshot({path:`test-results/event-editor-${width}.png`,fullPage:true});
+});
+test('edición, publicación y persistencia del payload',async({page})=>{
+ const calls=await fixture(page);await page.goto(`/dashboard/eventos/${id}`);
+ await page.getByLabel('Nombre del evento *',{exact:true}).fill('Retiro actualizado');
+ await page.getByRole('tab',{name:/Publicación/}).click();await page.getByLabel('Estado del evento',{exact:true}).selectOption('published');
+ await page.getByRole('button',{name:'Guardar y publicar',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText('Cambios guardados');
+ expect(calls[0]).toMatchObject({title:'Retiro actualizado',status:'published',version:1});expect(calls[0].audit).toBeUndefined();expect(calls[0].id).toBeUndefined();
+});
+test('gestor de campus ve Eventos y no la configuración global',async({page})=>{
+ await fixture(page,['eventos:manageCampus']);await page.setViewportSize({width:1440,height:900});await page.goto('/dashboard/eventos');
+ await expect(page.getByRole('heading',{name:'Cada encuentro, en un solo lugar'})).toBeVisible();await expect(page.getByRole('link',{name:'Categorías',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('link',{name:'Crear evento',exact:true})).toBeVisible();
+});
+test('cuenta sin permisos no carga administración',async({page})=>{
+ await fixture(page,[]);await page.goto('/dashboard/eventos');await expect(page.getByText(/No tienes permisos para administrar eventos/)).toBeVisible();await expect(page.getByRole('link',{name:'Crear evento',exact:true})).toHaveCount(0);
+});

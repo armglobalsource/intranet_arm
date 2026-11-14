@@ -1,0 +1,33 @@
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { hasPermission } from '../common/permissions';
+import { SaveEventProgramDto } from './event-program.dto';
+export type EventActor = {sub:number;campusId?:number|null;permissions:string[]};
+export function eventAccess(user:EventActor) {
+ const global=hasPermission(user.permissions,'eventos:manageAll');
+ const campus=hasPermission(user.permissions,'eventos:manageCampus');
+ const assigned=hasPermission(user.permissions,'eventos:organize');
+ if(!global&&!campus&&!assigned)throw new ForbiddenException('No tienes acceso a la administración de eventos');
+ return {global,campus,assigned};
+}
+export function assertEventScope(user:EventActor,row:{campus_id:unknown;organizer_id:unknown}) {
+ const a=eventAccess(user);
+ if(!a.global&&!(a.campus&&user.campusId!=null&&Number(row.campus_id)===Number(user.campusId))&&!(a.assigned&&Number(row.organizer_id)===Number(user.sub)))throw new ForbiddenException('Este evento no está asignado a tu ámbito');
+}
+export function validateEventProgram(dto:SaveEventProgramDto) {
+ if(!dto.title.trim())throw new BadRequestException('Escribe el nombre del evento');
+ if(!dto.details)throw new BadRequestException('Falta la configuración del evento');
+ const d=dto.details;
+ const instant=(v:string)=>/T.*(?:Z|[+-]\d\d:\d\d)$/.test(v)&&Number.isFinite(Date.parse(v));
+ if(!instant(dto.startsAt)||!instant(dto.endsAt)||Date.parse(dto.endsAt)<Date.parse(dto.startsAt))throw new BadRequestException('Revisa las fechas de inicio y término, incluida su zona horaria');
+ try{new Intl.DateTimeFormat('es',{timeZone:d.timezone}).format();}catch{throw new BadRequestException('Zona horaria inválida');}
+ if(d.bannerUrl){try{const u=new URL(d.bannerUrl);if(u.protocol!=='https:'||u.username||u.password)throw new Error();}catch{throw new BadRequestException('El banner debe ser una URL HTTPS sin credenciales');}}
+ for(const v of [d.registrationOpensAt,d.registrationClosesAt,d.paymentDueAt])if(v&&!instant(v))throw new BadRequestException('La fecha de inscripción o pago debe incluir zona horaria');
+ if(d.registrationOpensAt&&d.registrationClosesAt&&Date.parse(d.registrationOpensAt)>Date.parse(d.registrationClosesAt))throw new BadRequestException('La apertura debe ser anterior al cierre');
+ for(const v of [d.registrationOpensAt,d.registrationClosesAt,d.paymentDueAt])if(v&&Date.parse(v)>Date.parse(dto.endsAt))throw new BadRequestException('Inscripciones y pagos deben terminar antes del fin del evento');
+ if(d.pricing==='free'&&dto.ticketTypes.some(t=>t.price!==0))throw new BadRequestException('Un evento gratuito no puede tener entradas pagadas');
+ if(d.pricing==='paid'&&!dto.ticketTypes.some(t=>t.price>0))throw new BadRequestException('Define al menos una entrada con precio');
+ if(dto.ticketTypes.some(t=>!t.name.trim()))throw new BadRequestException('Cada entrada necesita un nombre');
+ if(new Set(dto.ticketTypes.map(t=>t.name.trim().toLowerCase())).size!==dto.ticketTypes.length)throw new BadRequestException('Los nombres de entradas deben ser distintos');
+ if(dto.status==='published'&&(!dto.categoryId||!d.summary.trim()||!d.description.trim()||(d.modality!=='online'&&!d.location.trim())))throw new BadRequestException('Para publicar completa categoría, resumen, descripción y lugar');
+ if(['cancelled','finished'].includes(dto.status)&&dto.registrationStatus!=='closed')throw new BadRequestException('Cierra las inscripciones al finalizar o cancelar');
+}

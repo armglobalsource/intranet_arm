@@ -1,3 +1,5 @@
+import { EventProgramController, PublicEventProgramController } from './event-management/event-program.controller';
+import { EventProgramService } from './event-management/event-program.service';
 import { EventsController } from './events/events.controller';
 import { PostgresEventsService } from './events/postgres-events.service';
 import { PostgresJobsService } from './jobs/postgres-jobs.service';
@@ -53,9 +55,9 @@ import { OrgChartController } from './orgchart/orgchart.controller';
 import { PostgresOrgChartService } from './orgchart/postgres-orgchart.service';
 
 // Domain controllers and their PostgreSQL services.
-export const postgresDomainControllers=[EventsController,EstadisticasController,AnunciosController,KiloamorController,SiembraController,EncuentrosController,ReconciliationController,EquipoRosterController,TipoCambioController,VisualReferencesController,SearchController,FeedbackController,PostgresHealthController,ContentsController,DocumentsController,FichasController,CampusController,ArmCatalogosController,JobTitlesController,OnboardingController,CancionesController,PaletasController,DisponibilidadController,TecnicosController,CampusTurnosController,OrgChartController];
+export const postgresDomainControllers=[EventProgramController,PublicEventProgramController,EventsController,EstadisticasController,AnunciosController,KiloamorController,SiembraController,EncuentrosController,ReconciliationController,EquipoRosterController,TipoCambioController,VisualReferencesController,SearchController,FeedbackController,PostgresHealthController,ContentsController,DocumentsController,FichasController,CampusController,ArmCatalogosController,JobTitlesController,OnboardingController,CancionesController,PaletasController,DisponibilidadController,TecnicosController,CampusTurnosController,OrgChartController];
 export const postgresDomainProviders=[
-  ArmRecordStore,
+  ArmRecordStore, EventProgramService,
   PostgresEventsService,PostgresJobsService,PostgresEstadisticasService,WeeklyReportSettings,PostgresAnunciosService,PostgresKiloamorService,
   PostgresSiembraService,PostgresEncuentrosService,PostgresReconciliationService,PostgresEquipoRosterService,
   PostgresTipoCambioService,PostgresVisualReferencesService,PostgresSearchService,PostgresFeedbackService,

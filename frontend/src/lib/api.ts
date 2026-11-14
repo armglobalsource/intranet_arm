@@ -36,7 +36,7 @@ api.interceptors.request.use((config) => {
 // ficha compartida por link. Estos bundles pueden importar transitivamente
 // hooks que usan `api`, y si alguno se dispara sin sesión, no queremos
 // arrastrar a un visitante anónimo al login.
-const PUBLIC_ROUTES = ['/agenda', '/ficha/', '/auth/', '/politicas'];
+const PUBLIC_ROUTES = ['/agenda', '/ficha/', '/auth/', '/politicas', '/eventos/'];
 
 function isOnPublicRoute(): boolean {
   if (typeof window === 'undefined') return false;
