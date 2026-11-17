@@ -66,7 +66,7 @@ Las inscripciones conservan una copia del nombre de entrada, importe, moneda, co
 
 ## Inscripciones y Mercado Pago Chile de prueba (16 noviembre 2026)
 
-Implementación local, todavía sin aplicar la migración `20261116154624_event_registrations.sql` ni desplegar esta etapa.
+La migración `20261116154624_event_registrations.sql` se aplicó el 16 de noviembre de 2026 con autorización expresa del propietario. Se verificó RLS activo, acceso del backend y ausencia de lectura para `anon` y `authenticated`. El asesor no reportó hallazgos en la tabla nueva. El código se entrega mediante push; falta configurar credenciales y verificar el flujo completo de prueba antes de abrir inscripciones.
 
 ### Operación
 
