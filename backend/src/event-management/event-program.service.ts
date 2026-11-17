@@ -1,3 +1,4 @@
+import { EventRegistrationService, registrationsOpen } from './event-registration.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PoolClient } from 'pg';
@@ -7,7 +8,7 @@ import { assertEventScope, EventActor, eventAccess, validateEventProgram } from 
 
 @Injectable()
 export class EventProgramService {
- constructor(private readonly db:DatabaseService) {}
+ constructor(private readonly db:DatabaseService,private readonly registrations?:EventRegistrationService) {}
  private async unique<T>(operation:()=>Promise<T>):Promise<T>{
   try{return await operation();}catch(e){if((e as {code?:string}).code==='23505')throw new ConflictException('Ese enlace o nombre ya existe. Elige otro.');throw e;}
  }
@@ -39,7 +40,7 @@ export class EventProgramService {
  private async expand(row:any){
   const [campuses,tickets,audit]=await Promise.all([
    this.db.query('SELECT campus_id FROM arm_app.event_program_campuses WHERE event_id=$1 ORDER BY campus_id',[row.id]),
-   this.db.query('SELECT name,price,currency FROM arm_app.event_ticket_types WHERE event_id=$1 ORDER BY position',[row.id]),
+   this.db.query('SELECT id,name,price,currency FROM arm_app.event_ticket_types WHERE event_id=$1 ORDER BY position',[row.id]),
    this.db.query(`SELECT a.action,a.version,a.created_at AS "createdAt",concat_ws(' ',u."firstName",u."lastName") AS actor FROM arm_app.event_audit_logs a JOIN arm_app.users u ON u.id=a.actor_id WHERE event_id=$1 ORDER BY a.created_at DESC LIMIT 20`,[row.id]),
   ]);
   return {id:row.id,version:row.version,title:row.title,slug:row.slug,categoryId:row.category_id,campusId:Number(row.campus_id),organizerId:Number(row.organizer_id),startsAt:row.starts_at,endsAt:row.ends_at,status:row.status,registrationStatus:row.registration_status,capacity:row.capacity,details:row.details,campusIds:campuses.rows.map(r=>Number(r.campus_id)),ticketTypes:tickets.rows.map(t=>({name:String(t.name),currency:String(t.currency),price:Number(t.price)})),audit:audit.rows};
@@ -53,6 +54,7 @@ export class EventProgramService {
  }
  async save(user:EventActor,dto:SaveEventProgramDto,id?:string,sourceId?:string){
   const a=eventAccess(user);validateEventProgram(dto);
+  if(dto.registrationStatus==='open')this.registrations?.assertConfigured(dto.details.pricing);
   return this.unique(()=>this.db.transaction(async db=>{
    const old=id?await this.read(db,id,true):undefined;
    if(old){assertEventScope(user,old);if(old.version!==dto.version)throw new ConflictException('Otra persona actualizó el evento. Recarga antes de guardar.');}
@@ -64,6 +66,10 @@ export class EventProgramService {
     if(campusManager&&!(await db.query('SELECT id FROM arm_app.users WHERE id=$1 AND "campusId"=$2',[dto.organizerId,dto.campusId])).rowCount)throw new ForbiddenException('Selecciona un responsable de tu campus');
    }
    await this.references(db,dto,old);
+   if(old&&dto.capacity!=null){
+    const occupied=Number((await db.query("SELECT count(*) FROM arm_app.event_registrations WHERE event_id=$1 AND (status='confirmed' OR (status='pending_payment' AND expires_at>now()))",[id])).rows[0]?.count??0);
+    if(dto.capacity<occupied)throw new BadRequestException('La capacidad no puede ser menor que los cupos ya confirmados o reservados');
+   }
    if(old&&old.published_at&&old.slug!==dto.slug)throw new BadRequestException('El enlace de un evento publicado no puede cambiar');
    const eventId=id??randomUUID();
    const values=[eventId,dto.title.trim(),dto.slug,dto.categoryId??null,dto.campusId,dto.organizerId,dto.startsAt,dto.endsAt,dto.status,dto.registrationStatus,dto.capacity??null,JSON.stringify(dto.details)];
@@ -85,12 +91,12 @@ export class EventProgramService {
   return this.save(user,dto,undefined,id);
  }
  async publicEvent(slug:string){
-  const row=(await this.db.query(`SELECT e.id,e.slug,e.title,e.starts_at,e.ends_at,e.status,e.registration_status,e.capacity,e.details,c.name AS campus_name,k.name AS category_name FROM arm_app.event_programs e JOIN arm_app.campuses c ON c.id=e.campus_id LEFT JOIN arm_app.event_categories k ON k.id=e.category_id WHERE e.slug=$1 AND e.published_at IS NOT NULL AND e.status IN ('published','finished','cancelled')`,[slug])).rows[0];
+  const row=(await this.db.query(`SELECT e.id,e.slug,e.title,e.starts_at,e.ends_at,e.status,e.published_at,e.registration_status,e.capacity,e.details,c.name AS campus_name,k.name AS category_name FROM arm_app.event_programs e JOIN arm_app.campuses c ON c.id=e.campus_id LEFT JOIN arm_app.event_categories k ON k.id=e.category_id WHERE e.slug=$1 AND e.published_at IS NOT NULL AND e.status IN ('published','finished','cancelled')`,[slug])).rows[0];
   if(!row)throw new NotFoundException('Este evento no está publicado');
   const [tickets,campuses]=await Promise.all([
-   this.db.query('SELECT name,price,currency FROM arm_app.event_ticket_types WHERE event_id=$1 ORDER BY position',[row.id]),
-   this.db.query('SELECT c.name FROM arm_app.event_program_campuses ec JOIN arm_app.campuses c ON c.id=ec.campus_id WHERE ec.event_id=$1 ORDER BY c.name',[row.id]),
+   this.db.query('SELECT id,name,price,currency FROM arm_app.event_ticket_types WHERE event_id=$1 ORDER BY position',[row.id]),
+   this.db.query('SELECT c.id,c.name FROM arm_app.event_program_campuses ec JOIN arm_app.campuses c ON c.id=ec.campus_id WHERE ec.event_id=$1 ORDER BY c.name',[row.id]),
   ]);
-  return {title:row.title,slug:row.slug,startsAt:row.starts_at,endsAt:row.ends_at,status:row.status,registrationStatus:row.registration_status,capacity:row.capacity,details:row.details,campusName:row.campus_name,categoryName:row.category_name,campuses:campuses.rows.map(c=>c.name),ticketTypes:tickets.rows.map(t=>({...t,price:Number(t.price)})),registrationEnabled:false};
+  return {title:row.title,slug:row.slug,startsAt:row.starts_at,endsAt:row.ends_at,status:row.status,registrationStatus:row.registration_status,capacity:row.capacity,details:row.details,campusName:row.campus_name,categoryName:row.category_name,campuses:campuses.rows.map(c=>c.name),ticketTypes:tickets.rows.map(t=>({...t,price:Number(t.price)})),registrationEnabled:registrationsOpen(row),campusOptions:campuses.rows.map(c=>({id:Number(c.id),name:c.name}))};
  }
 }

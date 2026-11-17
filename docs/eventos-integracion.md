@@ -62,4 +62,46 @@ La comprobación DML con rollback no llegó a ejecutarse: venció la confirmaci�
 
 ## Continuación de inscripciones
 
-Conservar los identificadores de tipos de entrada al introducir inscripciones/órdenes: la fase 2 reemplaza esas filas en cada guardado porque todavía no tienen referencias. Introducir versionado de formularios, reservas transaccionales y la apertura efectiva de inscripciones de forma conjunta. Agregar personal de acreditación y sus permisos únicamente cuando exista el flujo de tickets.
+Las inscripciones conservan una copia del nombre de entrada, importe, moneda, condiciones y versión del evento. No dependen de las filas reemplazables del catálogo de entradas. Una entrada del catálogo que cambie mientras alguien completa el formulario se rechaza y debe seleccionarse nuevamente. El formulario de esta etapa es fijo; el constructor de campos personalizados y la acreditación QR quedan pendientes.
+
+## Inscripciones y Mercado Pago Chile de prueba (16 noviembre 2026)
+
+Implementación local, todavía sin aplicar la migración `20261116154624_event_registrations.sql` ni desplegar esta etapa.
+
+### Operación
+
+1. Información: fechas y horas propias de cada evento; seleccionar campus participantes.
+2. Participación: acceso gratuito o pagado. Gratuito oculta precios; pagado utiliza entradas CLP enteras y Mercado Pago exclusivamente de prueba. Definir capacidad, edad mínima, apertura/cierre opcionales y lista de espera.
+3. Publicación: Publicado + Abiertas habilita el formulario solo dentro de las fechas configuradas. No se abren eventos sin campus o sin configuración segura del servidor.
+4. Participante: datos personales → contacto/campus/entrada → condiciones y confirmación. En un evento gratuito se confirma inmediatamente si hay cupo; con cupo agotado se rechaza o se registra en espera según configuración.
+5. Pagado: reserva máxima de 24 horas, acotada por el fin del evento y la fecha límite de pago. Solo la notificación firmada y la consulta al proveedor pueden confirmar el pago. Un retorno del navegador no confirma nada. Un pago tardío queda en revisión sin otorgar un cupo adicional. Pagos reembolsados/revertidos retiran la entrada y quedan en revisión.
+6. Comprobante: enlace privado por correo y pantalla imprimible con código de inscripción. El participante puede actualizar estado y reintentar un correo fallido. El código todavía NO es un QR de acreditación; no se implementa check-in en esta etapa.
+7. El editor muestra las últimas 500 inscripciones con nombre, correo, campus y estado, respetando permisos de evento/campus. La promoción desde espera y la resolución de pagos en revisión aún requieren desarrollo; no se promociona ni reembolsa automáticamente.
+
+### Variables exclusivamente del servidor
+
+- `EVENT_REGISTRATION_SECRET`: secreto aleatorio de al menos 32 caracteres. Mantener estable: rotarlo invalida los enlaces existentes.
+- `EVENT_PAYMENTS_MODE=test`.
+- `MERCADOPAGO_TEST_ACCESS_TOKEN`: credencial del **vendedor de prueba de Chile**. Antes de crear checkout se consulta `/users/me`: debe tener `site_id=MLC` y etiqueta `test_user`. Un vendedor real se rechaza.
+- `MERCADOPAGO_WEBHOOK_SECRET`: firma secreta de notificaciones de esa aplicación.
+- `FRONTEND_URL`: origen público HTTPS, sin rutas, por ejemplo `https://ecosistema.armglobal.org`.
+- Reutiliza `RESEND_API_KEY` y `RESEND_FROM_EMAIL` existentes.
+
+Configurar notificaciones `payment` hacia `/api/v1/event-payments/webhook`. La firma utiliza el `data.id` del query y los headers `x-request-id`/`x-signature`; se verifica por HMAC y comparación constante. El servidor consulta el pago y valida vendedor, `live_mode=false`, importe, moneda y referencia interna. El identificador del pago es único y sus repeticiones no vuelven a confirmar la inscripción. El checkout usa `init_point`; las credenciales y la verificación del vendedor determinan el entorno de prueba, no una URL sandbox.
+
+Referencias oficiales: [Preferencias Checkout Pro](https://www.mercadopago.cl/developers/en/reference/online-payments/checkout-pro/preferences/create-preference/post), [firma de notificaciones](https://www.mercadopago.cl/developers/en/docs/checkout-pro-preferences/additional-settings/optional-notifications), [guía técnica oficial de integración](https://github.com/mercadopago/mercadopago-claude-marketplace/blob/main/plugins/mercadopago/skills/mp-integrate/SKILL.md).
+
+### Persistencia y límites
+
+- Nueva tabla privada `arm_app.event_registrations`, RLS y privilegios únicamente para el backend; amplía el estado de inscripción con `open` sin cambiar estados actuales.
+- Reserva serializada por bloqueo del evento. Email único por evento e idempotencia mediante clave aleatoria de 256 bits (solo hash almacenado).
+- El acceso privado usa HMAC por inscripción y se transmite en el fragmento de URL/cuerpo POST, nunca como parámetro de consulta.
+- Los correos se intentan después de confirmar la transacción. El fallo queda visible y permite reintento; todavía no existe una cola automática de reintentos.
+- La capacidad no puede reducirse por debajo de los cupos confirmados/reservados. Las reservas vencidas dejan de ocupar cupo. Para reinscribir un correo cuya reserva venció se requiere implementar la gestión administrativa; no se sobreescribe el historial.
+- Pendiente antes de uso real: aplicar y verificar migración, configurar secretos, prueba completa con vendedor/comprador de prueba y webhook accesible. No se han creado participantes, enviado correos ni efectuado pagos reales durante las pruebas locales.
+
+### Validación local de esta etapa
+
+- 35 pruebas de backend aprobadas: alcance, fechas, DTO, cupos/espera, reintentos, correo fallido, claves privadas, firma, bloqueo de vendedor real/pago live, importe, pago pendiente, confirmación repetida y pago tardío. Base de datos y proveedores simulados: no sustituye la prueba transaccional real después de aplicar la migración.
+- 9 escenarios de navegador aprobados: los 7 existentes de editor/portada/permisos y 2 inscripciones completas a 393 px (gratis y pagada). Se corrigieron etiquetas accesibles de edad/campus/entrada y se revisó la captura móvil.
+- Compilación TypeScript backend correcta. Build Next compila y genera las páginas; persiste el aviso EPERM de Windows al copiar el symlink de backend en standalone, ya presente en la etapa anterior. Comprobar el despliegue Linux de Vercel antes de darlo por operativo.

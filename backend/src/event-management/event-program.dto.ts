@@ -44,7 +44,7 @@ export class SaveEventProgramDto {
  @IsISO8601({strict:true}) startsAt: string;
  @IsISO8601({strict:true}) endsAt: string;
  @IsIn(['draft','published','finished','cancelled']) status: string;
- @IsIn(['pending','closed']) registrationStatus: string;
+ @IsIn(['pending','open','closed']) registrationStatus: string;
  @IsOptional() @IsInt() @Min(1) @Max(1000000) capacity?: number | null;
  @IsArray() @ArrayUnique() @ArrayMaxSize(200) @IsInt({each:true}) @Min(1,{each:true}) campusIds: number[];
  @ValidateNested() @Type(()=>EventDetailsDto) details: EventDetailsDto;

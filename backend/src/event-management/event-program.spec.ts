@@ -27,11 +27,11 @@ describe('Validación y publicación',()=>{
  it('no permite publicar sin contenido',()=>{const d=dto();d.status='published';d.details.summary='';expect(()=>validateEventProgram(d)).toThrow();});
  it('bloquea URLs no HTTPS y con credenciales',()=>{for(const url of ['javascript:alert(1)','http://example.com/x','https://user:pass@example.com/x']){const d=dto();d.details.bannerUrl=url;expect(()=>validateEventProgram(d)).toThrow();}});
  it('comprueba la zona horaria',()=>{const d=dto();d.details.timezone='Fake/City';expect(()=>validateEventProgram(d)).toThrow();});
- it('valida precios y ventanas de inscripción',()=>{const d=dto();d.details.pricing='paid';expect(()=>validateEventProgram(d)).toThrow();d.ticketTypes=[{name:'General',price:20,currency:'USD'}];expect(()=>validateEventProgram(d)).not.toThrow();d.details.registrationOpensAt='2028-01-01T00:00:00Z';expect(()=>validateEventProgram(d)).toThrow();});
+ it('valida precios y ventanas de inscripción',()=>{const d=dto();d.details.pricing='paid';expect(()=>validateEventProgram(d)).toThrow();d.ticketTypes=[{name:'General',price:20,currency:'CLP'}];expect(()=>validateEventProgram(d)).not.toThrow();d.details.registrationOpensAt='2028-01-01T00:00:00Z';expect(()=>validateEventProgram(d)).toThrow();});
  it('no permite dar por finalizado sin cerrar inscripción',()=>expect(()=>validateEventProgram({...dto(),status:'finished'})).toThrow());
- it('rechaza aperturas y datos anidados desconocidos por el pipe real',async()=>{
+ it('rechaza estados inválidos y datos anidados desconocidos por el pipe real',async()=>{
   const pipe=new ValidationPipe({whitelist:true,forbidNonWhitelisted:true,transform:true,transformOptions:{enableImplicitConversion:true}});
-  for(const data of [{...dto(),registrationStatus:'open'},{...dto(),details:{...dto().details,secret:'unsafe'}},{...dto(),ticketTypes:[{name:'X',price:-1,currency:'CLP'}]}])await expect(pipe.transform(data,{type:'body',metatype:SaveEventProgramDto})).rejects.toThrow();
+  for(const data of [{...dto(),registrationStatus:'invalid'},{...dto(),details:{...dto().details,secret:'unsafe'}},{...dto(),ticketTypes:[{name:'X',price:-1,currency:'CLP'}]}])await expect(pipe.transform(data,{type:'body',metatype:SaveEventProgramDto})).rejects.toThrow();
   await expect(pipe.transform(dto(),{type:'body',metatype:SaveEventProgramDto})).resolves.toBeInstanceOf(SaveEventProgramDto);
  });
 });
