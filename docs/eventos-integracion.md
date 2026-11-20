@@ -105,3 +105,32 @@ Referencias oficiales: [Preferencias Checkout Pro](https://www.mercadopago.cl/de
 - 35 pruebas de backend aprobadas: alcance, fechas, DTO, cupos/espera, reintentos, correo fallido, claves privadas, firma, bloqueo de vendedor real/pago live, importe, pago pendiente, confirmación repetida y pago tardío. Base de datos y proveedores simulados: no sustituye la prueba transaccional real después de aplicar la migración.
 - 9 escenarios de navegador aprobados: los 7 existentes de editor/portada/permisos y 2 inscripciones completas a 393 px (gratis y pagada). Se corrigieron etiquetas accesibles de edad/campus/entrada y se revisó la captura móvil.
 - Compilación TypeScript backend correcta. Build Next compila y genera las páginas; persiste el aviso EPERM de Windows al copiar el symlink de backend en standalone, ya presente en la etapa anterior. Comprobar el despliegue Linux de Vercel antes de darlo por operativo.
+
+## Preparación para pagos reales (17 noviembre 2026)
+
+Solicitada por el propietario. Esta sección reemplaza la restricción de «solo pruebas» del diseño anterior; la activación externa sigue pendiente de configurar y verificar la cuenta receptora.
+
+Variables del servidor en **Vercel → intranet_arm → Production**, nunca `NEXT_PUBLIC_`:
+
+| Variable | Valor / procedencia |
+| --- | --- |
+| `EVENT_PAYMENTS_MODE` | `production` |
+| `MERCADOPAGO_ACCESS_TOKEN` | Access Token productivo de la aplicación de la cuenta receptora de ARM |
+| `MERCADOPAGO_COLLECTOR_ID` | ID numérico de esa cuenta, verificado con su administrador |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Firma secreta de los Webhooks productivos de esa aplicación |
+| `EVENT_REGISTRATION_SECRET` | Secreto aleatorio de al menos 32 caracteres, estable para los enlaces privados |
+
+Se reutilizan `FRONTEND_URL`, `RESEND_API_KEY` y `RESEND_FROM_EMAIL`. Vercel debe exponer su variable de sistema `VERCEL_ENV`; producción se bloquea salvo que sea exactamente `production`. Preview conserva credenciales de prueba y `EVENT_PAYMENTS_MODE=test`, o pagos deshabilitados. La clave real nunca se toma de `MERCADOPAGO_TEST_ACCESS_TOKEN` como alternativa.
+
+En Mercado Pago configurar notificaciones **payment / Production** hacia:
+`https://ecosistema.armglobal.org/api/v1/event-payments/webhook`.
+
+Comprobación desde el editor, Participación → Pagado → **Comprobar conexión de pagos**: valida configuración, país Chile, vendedor real y coincidencia exacta del ID receptor. Es una consulta sin cobros. No demuestra por sí sola la entrega del webhook ni de los correos.
+
+Cada inscripción nueva almacena el entorno y receptor en su snapshot. Las inscripciones anteriores sin entorno se consideran de prueba. No se pueden reutilizar al cambiar a producción; tampoco se puede cambiar la cuenta receptora de una reserva pendiente. Crear un evento separado para las pruebas y no reutilizar inscripciones de prueba en el lanzamiento.
+
+El webhook productivo exige firma válida, pago consultado al proveedor con `live_mode=true`, vendedor configurado, referencia e importe coincidentes y una reserva del mismo entorno/receptor. No se confirma por parámetros de retorno del navegador.
+
+Antes de anunciar el lanzamiento: verificar despliegue, cuenta receptora, formulario con cupos, pago completo autorizado por el propietario, notificación firmada, comprobante y correo. No se ha realizado ni se realizará un cobro real sin destinatario/importe de prueba final definido por el usuario. La acreditación QR, promoción automática de espera, gestión de reembolsos y cola automática de correo siguen fuera de esta entrega; los casos en revisión requieren intervención del organizador.
+
+Validación local: 42 pruebas de backend y 10 pruebas de navegador aprobadas, con proveedores simulados. Incluyen separación test/production, vendedor correcto, bloqueo en Preview, pagos live y formulario móvil en ambos entornos. La vista administrativa muestra el importe y el ID del pago para revisar incidencias. Las credenciales productivas todavía no se han configurado ni se ha comprobado un pago real.

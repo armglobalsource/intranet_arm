@@ -50,14 +50,15 @@ test('cuenta sin permisos no carga administración',async({page})=>{
  await fixture(page,[]);await page.goto('/dashboard/eventos');await expect(page.getByText(/No tienes permisos para administrar eventos/)).toBeVisible();await expect(page.getByRole('link',{name:'Crear evento',exact:true})).toHaveCount(0);
 });
 
-for(const paid of [false,true])test(`inscripción móvil ${paid?'pagada de prueba':'gratuita'}`,async({page})=>{
+for(const mode of ['free','test','production'])test(`inscripción móvil ${mode}`,async({page})=>{
+ const paid=mode!=='free';
  await page.setViewportSize({width:393,height:852});
  const captured:any[]=[];
  await page.route('**/api/v1/**',async route=>{
   const path=new URL(route.request().url()).pathname;
   if(path.endsWith('/registrations')){captured.push(route.request().postDataJSON());return route.fulfill({json:{id,token:'b'.repeat(64),status:paid?'pending_payment':'confirmed'}});}
-  if(path.endsWith('/status'))return route.fulfill({json:{id,token:'b'.repeat(64),status:paid?'pending_payment':'confirmed',participantName:'Prueba ARM',title:'Encuentro de prueba',startsAt:'2027-01-10T12:00:00Z',timezone:'America/Santiago',amount:paid?1000:0,currency:'CLP',expiresAt:'2027-01-09T12:00:00Z',emailSent:true,ticketCode:paid?null:id}});
-  return route.fulfill({json:{title:'Encuentro de prueba',slug:'prueba',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',status:'published',registrationStatus:'open',capacity:100,details:{...details,pricing:paid?'paid':'free'},campusName:'Santiago',campuses:['Santiago'],campusOptions:[{id:10,name:'Santiago'}],ticketTypes:paid?[{id:categoryId,name:'General',price:1000,currency:'CLP'}]:[],registrationEnabled:true}});
+  if(path.endsWith('/status'))return route.fulfill({json:{id,token:'b'.repeat(64),status:paid?'pending_payment':'confirmed',participantName:'Prueba ARM',title:'Encuentro de prueba',startsAt:'2027-01-10T12:00:00Z',timezone:'America/Santiago',testPayment:mode==='test',amount:paid?1000:0,currency:'CLP',expiresAt:'2027-01-09T12:00:00Z',emailSent:true,ticketCode:paid?null:id}});
+  return route.fulfill({json:{title:'Encuentro de prueba',slug:'prueba',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',status:'published',registrationStatus:'open',paymentMode:mode,capacity:100,details:{...details,pricing:paid?'paid':'free'},campusName:'Santiago',campuses:['Santiago'],campusOptions:[{id:10,name:'Santiago'}],ticketTypes:paid?[{id:categoryId,name:'General',price:1000,currency:'CLP'}]:[],registrationEnabled:true}});
  });
  await page.goto('/eventos/prueba');await page.getByRole('link',{name:'Inscribirme ahora'}).click();
  await page.getByLabel('Nombre',{exact:true}).fill('Prueba');await page.getByLabel('Apellido',{exact:true}).fill('ARM');await page.getByLabel('Correo electrónico',{exact:true}).fill('prueba@example.com');await page.getByLabel('Edad',{exact:true}).fill('30');
@@ -66,10 +67,10 @@ for(const paid of [false,true])test(`inscripción móvil ${paid?'pagada de prueb
  if(paid)await page.getByLabel('Entrada',{exact:true}).selectOption(categoryId);
  await page.getByRole('button',{name:'Continuar',exact:true}).click();await page.getByRole('checkbox').check();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.screenshot({path:`test-results/event-registration-${paid?'paid':'free'}-393.png`,fullPage:true});
- await page.getByRole('button',{name:paid?'Registrar y continuar al pago de prueba':'Confirmar inscripción gratuita'}).click();
- await expect(page.getByRole('heading',{name:paid?'Pendiente de pago de prueba':'Inscripción confirmada',exact:true})).toBeVisible();
+ await page.screenshot({path:`test-results/event-registration-${mode}-393.png`,fullPage:true});
+ await page.getByRole('button',{name:paid?'Registrar y continuar al pago':'Confirmar inscripción gratuita'}).click();
+ await expect(page.getByRole('heading',{name:paid?'Pendiente de pago':'Inscripción confirmada',exact:true})).toBeVisible();
  expect(captured[0]).toMatchObject({campusId:10,consent:true});expect(captured[0].amount).toBeUndefined();
- if(paid)await expect(page.getByText('Tu entrada',{exact:true})).toHaveCount(0);else await expect(page.getByRole('button',{name:'Imprimir / Guardar PDF'})).toBeVisible();
+ if(paid){await expect(page.getByText('Tu entrada',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:mode==='test'?'Pagar con Mercado Pago · Prueba':'Pagar con Mercado Pago',exact:true})).toBeVisible();if(mode==='production')await expect(page.getByText('Modo de prueba · No utilices tarjetas ni cuentas reales.')).toHaveCount(0);}else await expect(page.getByRole('button',{name:'Imprimir / Guardar PDF'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

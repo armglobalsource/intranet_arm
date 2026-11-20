@@ -11,9 +11,19 @@ export function verifyPaymentSignature(secret:string,id:string,requestId:string,
 @Injectable()
 export class EventPaymentService {
  constructor(private readonly config:ConfigService){}
+ mode(): 'test'|'production'|'disabled' {
+  const mode=this.config.get<string>('EVENT_PAYMENTS_MODE');
+  return mode==='test'||mode==='production'?mode:'disabled';
+ }
+ assertConfigured(){
+  this.token();
+  if(!this.config.get('MERCADOPAGO_WEBHOOK_SECRET'))throw new ServiceUnavailableException('Falta configurar la firma de notificaciones de Mercado Pago.');
+ }
  private token(){
-  const token=this.config.get<string>('MERCADOPAGO_TEST_ACCESS_TOKEN');
-  if(this.config.get('EVENT_PAYMENTS_MODE')!=='test'||!token)throw new ServiceUnavailableException('Los pagos de prueba todavía no están configurados.');
+  const mode=this.mode();
+  const token=this.config.get<string>(mode==='production'?'MERCADOPAGO_ACCESS_TOKEN':'MERCADOPAGO_TEST_ACCESS_TOKEN');
+  if(mode==='disabled'||!token)throw new ServiceUnavailableException('Los pagos todavía no están configurados.');
+  if(mode==='production'&&(!/^\d+$/.test(this.config.get<string>('MERCADOPAGO_COLLECTOR_ID')??'')||this.config.get('VERCEL_ENV')!=='production'))throw new ServiceUnavailableException('Los pagos reales requieren Production y la cuenta receptora configurada.');
   return token;
  }
  async request(path:string,body?:unknown){
@@ -21,14 +31,22 @@ export class EventPaymentService {
   if(!response.ok)throw new ServiceUnavailableException('Mercado Pago no respondió. Puedes volver a intentarlo sin repetir tu inscripción.');
   return response.json();
  }
- /** Check seller identity before ever creating a checkout; a real seller is rejected. */
- async assertTestSeller(){
+ async assertSeller(){
   const seller=await this.request('/users/me');
-  if(seller.site_id!=='MLC'||!Array.isArray(seller.tags)||!seller.tags.includes('test_user'))throw new ServiceUnavailableException('Configura un vendedor de prueba de Mercado Pago Chile.');
+  const test=Array.isArray(seller.tags)&&seller.tags.includes('test_user');
+  if(seller.site_id!=='MLC'||!Array.isArray(seller.tags))throw new ServiceUnavailableException('Configura un vendedor de Mercado Pago Chile.');
+  if(this.mode()==='test'&&!test)throw new ServiceUnavailableException('Configura un vendedor de prueba de Mercado Pago Chile.');
+  if(this.mode()==='production'&&(test||String(seller.id)!==this.config.get<string>('MERCADOPAGO_COLLECTOR_ID')))throw new ServiceUnavailableException('La credencial no corresponde a la cuenta receptora de producción configurada.');
   return String(seller.id);
  }
+ assertRegistrationMode(row:any){
+  if((row.snapshot?.paymentMode??'test')!==this.mode())throw new ServiceUnavailableException('Esta inscripción pertenece a otro entorno de pagos. Contacta al organizador.');
+  if(this.mode()==='production'&&row.snapshot?.collectorId!==this.config.get('MERCADOPAGO_COLLECTOR_ID'))throw new ServiceUnavailableException('La cuenta receptora cambió. Contacta al organizador.');
+ }
  async checkout(row:any,origin:string){
-  await this.assertTestSeller();
+  this.assertConfigured();
+  this.assertRegistrationMode(row);
+  await this.assertSeller();
   const back=`${origin}/eventos/${encodeURIComponent(row.snapshot.slug)}/inscripcion`;
   const preference=await this.request('/checkout/preferences',{
    external_reference:row.id,
@@ -38,14 +56,14 @@ export class EventPaymentService {
    expires:true,expiration_date_to:new Date(row.expires_at).toISOString(),
   });
   const url=new URL(preference.init_point);
-  if(url.protocol!=='https:'||!['www.mercadopago.cl','mercadopago.cl'].includes(url.hostname)||url.username||url.password||!preference.id)throw new ServiceUnavailableException('No se pudo preparar el enlace de pago de prueba.');
+  if(url.protocol!=='https:'||!['www.mercadopago.cl','mercadopago.cl'].includes(url.hostname)||url.username||url.password||!preference.id)throw new ServiceUnavailableException('No se pudo preparar el enlace de pago.');
   return {id:String(preference.id),url:url.href};
  }
  async payment(id:string,requestId:string,signature:string){
   if(!verifyPaymentSignature(this.config.get('MERCADOPAGO_WEBHOOK_SECRET')??'',id,requestId,signature))throw new UnauthorizedException('Firma de notificación inválida');
-  const seller=await this.assertTestSeller();
+  const seller=await this.assertSeller();
   const payment=await this.request(`/v1/payments/${id}`);
-  if(payment.live_mode!==false||String(payment.collector_id)!==seller||String(payment.id)!==id)throw new UnauthorizedException('El pago no pertenece al vendedor de pruebas');
+  if(payment.live_mode!==(this.mode()==='production')||String(payment.collector_id)!==seller||String(payment.id)!==id)throw new UnauthorizedException('El pago no pertenece al vendedor o entorno configurado');
   return payment;
  }
 }

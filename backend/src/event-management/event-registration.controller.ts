@@ -8,6 +8,8 @@ import { EventRegistrationService } from './event-registration.service';
 @Controller()
 export class EventRegistrationController {
  constructor(private readonly service:EventRegistrationService){}
+ @Post('event-management/payments/check') @Throttle({default:{limit:5,ttl:60000}})
+ check(@CurrentUser() u:EventActor){return this.service.checkPayments(u);}
  @Public() @Post('public-events/:slug/registrations') @Throttle({default:{limit:5,ttl:60000}})
  register(@Param('slug') slug:string,@Body() dto:RegistrationDto){return this.service.register(slug,dto);}
  @Public() @Post('event-registrations/:id/status')

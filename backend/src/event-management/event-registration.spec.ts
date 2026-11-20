@@ -22,7 +22,7 @@ function setup(options:{count?:number;waitlist?:boolean;old?:any;paid?:boolean}=
   if(sql.includes('SET email_sent_at')){if(stored)stored.email_sent_at=new Date();}
   return {rows:[]};
  });
- const db={query,transaction:async(fn:any)=>fn({query})};return {service:new EventRegistrationService(db as any,config as any,{} as any,mail as any),query,mail};
+ const db={query,transaction:async(fn:any)=>fn({query})};return {service:new EventRegistrationService(db as any,config as any,new EventPaymentService(config as any),mail as any),query,mail};
 }
 describe('Inscripciones',()=>{
  it('respeta apertura, cierre, publicación y fin de evento',()=>{
@@ -46,7 +46,36 @@ describe('Inscripciones',()=>{
  });
  it('no permite consultar ni pagar con una clave ajena',async()=>{const x=setup();await expect(x.service.get('id','a'.repeat(64))).rejects.toThrow(/no encontrada/);await expect(x.service.checkout('id','a'.repeat(64))).rejects.toThrow();expect(x.query).not.toHaveBeenCalled();});
 });
-describe('Mercado Pago: solo pruebas y confirmación verificada',()=>{
+describe('Mercado Pago: pruebas, producción y confirmación verificada',()=>{
+ const production={get:(key:string)=>({EVENT_PAYMENTS_MODE:'production',MERCADOPAGO_ACCESS_TOKEN:'mock-production',MERCADOPAGO_COLLECTOR_ID:'456',MERCADOPAGO_WEBHOOK_SECRET:'secret',VERCEL_ENV:'production'}[key])};
+ it('producción usa solo la credencial real y verifica el vendedor esperado',async()=>{
+  const fetch=vi.fn().mockResolvedValue({ok:true,json:async()=>({id:456,site_id:'MLC',tags:[]})});vi.stubGlobal('fetch',fetch);
+  expect(await new EventPaymentService(production as any).assertSeller()).toBe('456');
+  expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer mock-production');
+ });
+ it.each([{id:999,site_id:'MLC',tags:[]},{id:456,site_id:'MLC',tags:['test_user']},{id:456,site_id:'MLA',tags:[]}])('rechaza vendedor incorrecto, de prueba o de otro país: %j',async seller=>{
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>seller}));
+  await expect(new EventPaymentService(production as any).assertSeller()).rejects.toThrow();
+ });
+ it('bloquea pagos reales desde Preview incluso si tiene credenciales',async()=>{
+  const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
+  await expect(new EventPaymentService({get:(key:string)=>key==='VERCEL_ENV'?'preview':production.get(key)} as any).assertSeller()).rejects.toThrow(/Production/);
+  expect(fetch).not.toHaveBeenCalled();
+ });
+ it('no convierte una reserva de prueba en un pago real ni cambia el receptor',()=>{
+  const service=new EventPaymentService(production as any);
+  expect(()=>service.assertRegistrationMode({snapshot:{}})).toThrow(/otro entorno/);
+  expect(()=>service.assertRegistrationMode({snapshot:{paymentMode:'production',collectorId:'999'}})).toThrow(/receptora/);
+  expect(()=>service.assertRegistrationMode({snapshot:{paymentMode:'production',collectorId:'456'}})).not.toThrow();
+ });
+ it('solo acepta pagos live del vendedor de producción',async()=>{
+  const signature=createHmac('sha256','secret').update('id:123;request-id:req;ts:100;').digest('hex');
+  for(const live of [false,true]){
+   vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce({ok:true,json:async()=>({id:456,site_id:'MLC',tags:[]})}).mockResolvedValueOnce({ok:true,json:async()=>({id:123,collector_id:456,live_mode:live})}));
+   const result=new EventPaymentService(production as any).payment('123','req',`ts=100,v1=${signature}`);
+   if(live)await expect(result).resolves.toMatchObject({live_mode:true});else await expect(result).rejects.toThrow();
+  }
+ });
  function webhookFixture(overrides:any={},status='approved'){
   const row:any={id:'11111111-1111-4111-8111-111111111111',event_id:'event',amount:1000,currency:'CLP',preference_id:'pref',status:'pending_payment',expires_at:'2030-01-01T00:00:00Z',payment_id:null,confirmation_sent_at:new Date(),...overrides};
   const query=vi.fn(async(sql:string,v:any[]=[])=>{
@@ -57,7 +86,7 @@ describe('Mercado Pago: solo pruebas y confirmación verificada',()=>{
    return {rows:[]};
   });
   const payment={external_reference:row.id,status,transaction_amount:1000,currency_id:'CLP'};
-  const payments={payment:vi.fn().mockResolvedValue(payment)};
+  const payments={payment:vi.fn().mockResolvedValue(payment),assertRegistrationMode:(row:any)=>new EventPaymentService(config as any).assertRegistrationMode(row)};
   const service=new EventRegistrationService({query,transaction:async(fn:any)=>fn({query})} as any,config as any,payments as any,{sendHtml:vi.fn()} as any);
   return {service,row,query,payment};
  }
@@ -82,9 +111,9 @@ describe('Mercado Pago: solo pruebas y confirmación verificada',()=>{
  it('rechaza pagos live aunque tengan firma válida',async()=>{
   vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce({ok:true,json:async()=>({id:1,site_id:'MLC',tags:['test_user']})}).mockResolvedValueOnce({ok:true,json:async()=>({id:123,collector_id:1,live_mode:true})}));
   const signature=createHmac('sha256','secret').update('id:123;request-id:req;ts:100;').digest('hex');
-  await expect(new EventPaymentService(config as any).payment('123','req',`ts=100,v1=${signature}`)).rejects.toThrow(/vendedor de pruebas/);
+  await expect(new EventPaymentService(config as any).payment('123','req',`ts=100,v1=${signature}`)).rejects.toThrow(/vendedor o entorno/);
  });
  it('sin modo test configurado no llama a Mercado Pago',async()=>{
-  const fetch=vi.fn();vi.stubGlobal('fetch',fetch);await expect(new EventPaymentService({get:()=>undefined} as any).assertTestSeller()).rejects.toThrow();expect(fetch).not.toHaveBeenCalled();
+  const fetch=vi.fn();vi.stubGlobal('fetch',fetch);await expect(new EventPaymentService({get:()=>undefined} as any).assertSeller()).rejects.toThrow();expect(fetch).not.toHaveBeenCalled();
  });
 });

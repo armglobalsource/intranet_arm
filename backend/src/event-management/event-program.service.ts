@@ -19,7 +19,7 @@ export class EventProgramService {
    this.db.query('SELECT id,name,country FROM arm_app.campuses WHERE "isActive"=true ORDER BY name'),
    this.db.query(`SELECT id,concat_ws(' ',"firstName","lastName") AS name FROM arm_app.users WHERE status='active' AND ($1::boolean OR "campusId"=$2 OR id=$3) ORDER BY name`,[access.global,user.campusId??null,user.sub]),
   ]);
-  return {categories:categories.rows,campuses:campuses.rows.map(r=>({...r,id:Number(r.id)})),organizers:organizers.rows.map(r=>({...r,id:Number(r.id)})),access};
+  return {paymentMode:this.registrations?.paymentMode()??'disabled',categories:categories.rows,campuses:campuses.rows.map(r=>({...r,id:Number(r.id)})),organizers:organizers.rows.map(r=>({...r,id:Number(r.id)})),access};
  }
  async category(user:EventActor,dto:EventCategoryDto,id?:string){
   if(!eventAccess(user).global)throw new ForbiddenException('Solo administración global puede configurar categorías');
@@ -97,6 +97,6 @@ export class EventProgramService {
    this.db.query('SELECT id,name,price,currency FROM arm_app.event_ticket_types WHERE event_id=$1 ORDER BY position',[row.id]),
    this.db.query('SELECT c.id,c.name FROM arm_app.event_program_campuses ec JOIN arm_app.campuses c ON c.id=ec.campus_id WHERE ec.event_id=$1 ORDER BY c.name',[row.id]),
   ]);
-  return {title:row.title,slug:row.slug,startsAt:row.starts_at,endsAt:row.ends_at,status:row.status,registrationStatus:row.registration_status,capacity:row.capacity,details:row.details,campusName:row.campus_name,categoryName:row.category_name,campuses:campuses.rows.map(c=>c.name),ticketTypes:tickets.rows.map(t=>({...t,price:Number(t.price)})),registrationEnabled:registrationsOpen(row),campusOptions:campuses.rows.map(c=>({id:Number(c.id),name:c.name}))};
+  return {title:row.title,slug:row.slug,startsAt:row.starts_at,endsAt:row.ends_at,status:row.status,registrationStatus:row.registration_status,capacity:row.capacity,details:row.details,campusName:row.campus_name,categoryName:row.category_name,campuses:campuses.rows.map(c=>c.name),ticketTypes:tickets.rows.map(t=>({...t,price:Number(t.price)})),paymentMode:this.registrations?.paymentMode()??'disabled',registrationEnabled:registrationsOpen(row),campusOptions:campuses.rows.map(c=>({id:Number(c.id),name:c.name}))};
  }
 }

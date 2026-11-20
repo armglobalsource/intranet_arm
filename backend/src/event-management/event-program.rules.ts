@@ -26,7 +26,7 @@ export function validateEventProgram(dto:SaveEventProgramDto) {
  for(const v of [d.registrationOpensAt,d.registrationClosesAt,d.paymentDueAt])if(v&&Date.parse(v)>Date.parse(dto.endsAt))throw new BadRequestException('Inscripciones y pagos deben terminar antes del fin del evento');
  if(dto.registrationStatus==='open'&&dto.status!=='published')throw new BadRequestException('Publica el evento antes de abrir inscripciones');
  if(dto.registrationStatus==='open'&&!dto.campusIds.length)throw new BadRequestException('Selecciona al menos un campus participante');
- if(d.pricing==='paid'&&dto.ticketTypes.some(t=>t.currency!=='CLP'||t.price<=0||!Number.isInteger(t.price)))throw new BadRequestException('Mercado Pago Chile de prueba requiere entradas en CLP, con valores enteros mayores que cero');
+ if(d.pricing==='paid'&&dto.ticketTypes.some(t=>t.currency!=='CLP'||t.price<=0||!Number.isInteger(t.price)))throw new BadRequestException('Mercado Pago Chile requiere entradas en CLP, con valores enteros mayores que cero');
  if(d.pricing==='free'&&dto.ticketTypes.some(t=>t.price!==0))throw new BadRequestException('Un evento gratuito no puede tener entradas pagadas');
  if(d.pricing==='paid'&&!dto.ticketTypes.some(t=>t.price>0))throw new BadRequestException('Define al menos una entrada con precio');
  if(dto.ticketTypes.some(t=>!t.name.trim()))throw new BadRequestException('Cada entrada necesita un nombre');

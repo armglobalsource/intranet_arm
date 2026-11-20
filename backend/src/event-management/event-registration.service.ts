@@ -5,7 +5,7 @@ import { DatabaseService } from '../common/database/database.service';
 import { ResendMailerService } from '../auth/resend-mailer.service';
 import { EventPaymentService } from './event-payment.service';
 import { RegistrationDto } from './event-registration.dto';
-import { assertEventScope, EventActor } from './event-program.rules';
+import { assertEventScope, EventActor, eventAccess } from './event-program.rules';
 
 export function registrationsOpen(event:any,now=Date.now()){
  const d=event.details;
@@ -23,14 +23,20 @@ export class EventRegistrationService {
  }
  assertConfigured(pricing:string){
   this.settings();
-  if(pricing==='paid'&&(this.config.get('EVENT_PAYMENTS_MODE')!=='test'||!this.config.get('MERCADOPAGO_TEST_ACCESS_TOKEN')||!this.config.get('MERCADOPAGO_WEBHOOK_SECRET')))throw new BadRequestException('Configura Mercado Pago Chile de prueba antes de abrir inscripciones pagadas');
+  if(pricing==='paid')this.payments.assertConfigured();
+ }
+ paymentMode(){return this.payments.mode();}
+ async checkPayments(user:EventActor){
+  eventAccess(user);this.assertConfigured('paid');
+  const collectorId=await this.payments.assertSeller();
+  return {mode:this.paymentMode(),collectorId,message:'Cuenta receptora y configuración verificadas. Esta comprobación no realiza cobros.'};
  }
  private token(id:string){return createHmac('sha256',this.settings().secret).update(`event-registration:${id}`).digest('hex');}
  private async row(id:string){const r=(await this.db.query('SELECT * FROM arm_app.event_registrations WHERE id=$1',[id])).rows[0];if(!r)throw new NotFoundException('Inscripción no encontrada');return r;}
  private authorize(id:string,token:string){const expected=this.token(id);if(!/^[a-f0-9]{64}$/.test(token)||!timingSafeEqual(Buffer.from(expected,'hex'),Buffer.from(token,'hex')))throw new NotFoundException('Inscripción no encontrada');}
  private view(row:any){
   const expired=row.status==='pending_payment'&&Date.parse(row.expires_at)<=Date.now();
-  return {id:row.id,token:this.token(row.id),status:expired?'expired':row.status,participantName:`${row.participant.firstName} ${row.participant.lastName}`,title:row.snapshot.title,startsAt:row.snapshot.startsAt,timezone:row.snapshot.timezone,amount:Number(row.amount),currency:row.currency,expiresAt:row.expires_at,emailSent:!!(row.status==='confirmed'?row.confirmation_sent_at:row.email_sent_at),testPayment:Number(row.amount)>0,ticketCode:row.status==='confirmed'?row.id:null};
+  return {id:row.id,token:this.token(row.id),status:expired?'expired':row.status,participantName:`${row.participant.firstName} ${row.participant.lastName}`,title:row.snapshot.title,startsAt:row.snapshot.startsAt,timezone:row.snapshot.timezone,amount:Number(row.amount),currency:row.currency,expiresAt:row.expires_at,emailSent:!!(row.status==='confirmed'?row.confirmation_sent_at:row.email_sent_at),testPayment:Number(row.amount)>0&&(row.snapshot.paymentMode??'test')==='test',ticketCode:row.status==='confirmed'?row.id:null};
  }
  async register(slug:string,dto:RegistrationDto){
   this.settings();
@@ -44,6 +50,7 @@ export class EventRegistrationService {
    if(old)return old;
    if(!registrationsOpen(event))throw new BadRequestException('Las inscripciones no están abiertas en este momento');
    const d=event.details;
+   this.assertConfigured(d.pricing);
    if(d.minimumAge!=null&&(dto.age==null||dto.age<d.minimumAge))throw new BadRequestException(`La edad mínima es ${d.minimumAge} años`);
    const campus=(await db.query('SELECT c.id FROM arm_app.event_program_campuses ec JOIN arm_app.campuses c ON c.id=ec.campus_id WHERE ec.event_id=$1 AND c.id=$2 AND c."isActive"=true',[event.id,dto.campusId])).rows[0];
    if(!campus)throw new BadRequestException('Selecciona un campus participante');
@@ -59,7 +66,7 @@ export class EventRegistrationService {
    if(full&&!d.waitlist)throw new ConflictException('Los cupos se agotaron.');
    const status=full?'waitlisted':amount>0?'pending_payment':'confirmed';
    const expires=amount>0?new Date(Math.min(Date.now()+24*60*60*1000,new Date(event.ends_at).getTime(),d.paymentDueAt?Date.parse(d.paymentDueAt):Infinity)).toISOString():null;
-   const snapshot={title:event.title,slug:event.slug,startsAt:event.starts_at,timezone:d.timezone,ticketName,conditions:d.conditions,cancellationPolicy:d.cancellationPolicy,eventVersion:event.version,consentAt:new Date().toISOString()};
+   const snapshot={paymentMode:amount>0?this.paymentMode():'free',collectorId:amount>0&&this.paymentMode()==='production'?this.config.get('MERCADOPAGO_COLLECTOR_ID'):null,title:event.title,slug:event.slug,startsAt:event.starts_at,timezone:d.timezone,ticketName,conditions:d.conditions,cancellationPolicy:d.cancellationPolicy,eventVersion:event.version,consentAt:new Date().toISOString()};
    const participant={firstName:dto.firstName.trim(),lastName:dto.lastName.trim(),phone:dto.phone,age:dto.age??null};
    return (await db.query('INSERT INTO arm_app.event_registrations(id,event_id,campus_id,request_hash,email,participant,snapshot,status,amount,currency,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,\'CLP\',$10) RETURNING *',[randomUUID(),event.id,dto.campusId,requestHash,email,JSON.stringify(participant),JSON.stringify(snapshot),status,amount,expires])).rows[0];
   });}catch(e){if((e as any).code==='23505')throw new ConflictException('Ya existe una inscripción para ese correo. Revisa tu comprobante o contacta al organizador.');throw e;}
@@ -78,6 +85,8 @@ export class EventRegistrationService {
    if(!row||row.status!=='pending_payment'||Date.parse(row.expires_at)<=Date.now())throw new BadRequestException('Esta inscripción no tiene un pago pendiente vigente');
    const event=(await db.query('SELECT status FROM arm_app.event_programs WHERE id=$1',[row.event_id])).rows[0];
    if(event.status!=='published')throw new BadRequestException('El evento no admite pagos');
+   this.payments.assertConfigured();
+   this.payments.assertRegistrationMode(row);
    if(row.checkout_url)return {url:row.checkout_url};
    const checkout=await this.payments.checkout(row,this.settings().origin);
    await db.query('UPDATE arm_app.event_registrations SET preference_id=$2,checkout_url=$3,updated_at=now() WHERE id=$1',[id,checkout.id,checkout.url]);
@@ -88,9 +97,11 @@ export class EventRegistrationService {
   const confirmed=row.status==='confirmed';
   if(confirmed?row.confirmation_sent_at:row.email_sent_at)return;
   const link=`${this.settings().origin}/eventos/${encodeURIComponent(row.snapshot.slug)}/inscripcion#id=${row.id}&token=${this.token(row.id)}`;
-  const text=`Tu inscripción en ARM Global fue registrada. Consulta su estado y, si está confirmada, tu entrada: ${link}\nSi corresponde un pago, este flujo utiliza exclusivamente Mercado Pago de prueba. Una lista de espera no asegura un cupo.`;
+  const testPayment=Number(row.amount)>0&&(row.snapshot.paymentMode??'test')==='test';
+  const paymentNote=Number(row.amount)===0?'':testPayment?'Este pago utiliza Mercado Pago de prueba.':'El estado de un pago se confirma únicamente después de verificarlo con Mercado Pago.';
+  const text=`Tu inscripción en ARM Global fue registrada. Consulta su estado y, si está confirmada, tu entrada: ${link}\n${paymentNote} Una lista de espera no asegura un cupo.`;
   try{
-   await this.mail.sendHtml({to:[row.email],subject:confirmed?'Tu entrada está confirmada · ARM Global':'Tu inscripción · ARM Global',text,html:`<p>${confirmed?'Tu entrada está confirmada.':'Tu inscripción fue registrada.'}</p><p><a href="${link.replace(/&/g,'&amp;')}">Consultar inscripción y entrada</a></p><p>Si corresponde un pago, se realizará únicamente en modo de prueba.</p>`,idempotencyKey:`event-registration/${row.id}/${confirmed?'confirmed':'registered'}`});
+   await this.mail.sendHtml({to:[row.email],subject:confirmed?'Tu entrada está confirmada · ARM Global':'Tu inscripción · ARM Global',text,html:`<p>${confirmed?'Tu entrada está confirmada.':'Tu inscripción fue registrada.'}</p><p><a href="${link.replace(/&/g,'&amp;')}">Consultar inscripción y entrada</a></p><p>${paymentNote}</p>`,idempotencyKey:`event-registration/${row.id}/${confirmed?'confirmed':'registered'}`});
    await this.db.query(`UPDATE arm_app.event_registrations SET ${confirmed?'confirmation_sent_at':'email_sent_at'}=now() WHERE id=$1`,[row.id]);
   }catch{/* A failed email never undoes a committed booking; authenticated retry is available. */}
  }
@@ -103,6 +114,7 @@ export class EventRegistrationService {
   await this.db.transaction(async db=>{
    const event=(await db.query('SELECT * FROM arm_app.event_programs WHERE id=$1 FOR UPDATE',[found.event_id])).rows[0];
    const row=(await db.query('SELECT * FROM arm_app.event_registrations WHERE id=$1 FOR UPDATE',[payment.external_reference])).rows[0];
+   this.payments.assertRegistrationMode(row);
    if(Number(row.amount)!==Number(payment.transaction_amount)||payment.currency_id!==row.currency||!row.preference_id||Number(row.amount)<=0)throw new BadRequestException('El importe no coincide con la inscripción');
    if(row.payment_id&&row.payment_id!==id)throw new ConflictException('La inscripción ya tiene otro pago asociado');
    if(['refunded','charged_back'].includes(payment.status)||Number(payment.transaction_amount_refunded)>0){
@@ -121,6 +133,6 @@ export class EventRegistrationService {
  async list(user:EventActor,eventId:string){
   const event=(await this.db.query('SELECT * FROM arm_app.event_programs WHERE id=$1',[eventId])).rows[0];
   if(!event)throw new NotFoundException('Evento no encontrado');assertEventScope(user,{campus_id:event.campus_id,organizer_id:event.organizer_id});
-  return (await this.db.query(`SELECT r.id,r.participant,r.email,c.name AS "campusName",CASE WHEN r.status='pending_payment' AND r.expires_at<=now() THEN 'expired' ELSE r.status END AS status,r.amount,r.currency,r.created_at AS "createdAt" FROM arm_app.event_registrations r JOIN arm_app.campuses c ON c.id=r.campus_id WHERE r.event_id=$1 ORDER BY r.created_at DESC LIMIT 500`,[eventId])).rows;
+  return (await this.db.query(`SELECT r.id,r.participant,r.email,c.name AS "campusName",CASE WHEN r.status='pending_payment' AND r.expires_at<=now() THEN 'expired' ELSE r.status END AS status,r.amount,r.currency,r.payment_id AS "paymentId",(r.amount>0 AND coalesce(r.snapshot->>'paymentMode','test')='test') AS "testPayment",r.created_at AS "createdAt" FROM arm_app.event_registrations r JOIN arm_app.campuses c ON c.id=r.campus_id WHERE r.event_id=$1 ORDER BY r.created_at DESC LIMIT 500`,[eventId])).rows;
  }
 }
