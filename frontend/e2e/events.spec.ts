@@ -90,3 +90,24 @@ test('crear evento: enlace automático, pasos guiados y vista previa en vivo',as
  await expect(page.getByText(/Faltan \d+ de \d+ puntos/)).toBeVisible();
  await page.screenshot({path:'test-results/event-editor-nuevo-1440.png',fullPage:true});
 });
+
+test('portada: sube la imagen desde el equipo y se ve en la vista previa',async({page})=>{
+ await fixture(page);await page.setViewportSize({width:1440,height:900});
+ // PNG de 1×1 px.
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=','base64');
+ const cover='https://cdn.example.test/event-covers/portada.jpg';
+ const seen:{ticket?:any;put?:boolean;complete?:any}={};
+ await page.route('**/api/v1/uploads/ticket',r=>{seen.ticket=r.request().postDataJSON();return r.fulfill({json:{signedUrl:'https://storage.example.test/upload',ticket:'ticket-1'}});});
+ await page.route('https://storage.example.test/upload',r=>{seen.put=r.request().method()==='PUT';return r.fulfill({status:200,json:{}});});
+ await page.route('**/api/v1/uploads/event-cover/complete',r=>{seen.complete=r.request().postDataJSON();return r.fulfill({json:{url:cover}});});
+ await page.route(cover,r=>r.fulfill({body:png,contentType:'image/png'}));
+ await page.goto(`/dashboard/eventos/${id}`);
+ await page.getByRole('tab',{name:/Portada y contenido/}).click();
+ await page.getByLabel('Subir imagen de portada').setInputFiles({name:'foto.png',mimeType:'image/png',buffer:png});
+ await expect(page.getByAltText('Imagen de portada actual')).toHaveAttribute('src',cover);
+ expect(seen.ticket).toMatchObject({purpose:'event-cover',contentType:'image/jpeg'});
+ expect(seen.put).toBe(true);
+ expect(seen.complete).toEqual({ticket:'ticket-1'});
+ await expect(page.getByRole('complementary',{name:'Vista previa en vivo'}).locator(`img[src="${cover}"]`)).toHaveCount(1);
+ await page.screenshot({path:'test-results/event-cover-upload-1440.png'});
+});

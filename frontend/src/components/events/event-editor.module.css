@@ -102,3 +102,19 @@
   .stepNav > * { width: 100%; }
   .previewOnly .phone { box-shadow: none; border-radius: 0; margin: 0 auto; }
 }
+
+/* Portada: subida de imagen */
+.cover { position: relative; display: grid; gap: 10px; min-width: 0; }
+.fileInput { position: absolute; top: 0; left: 0; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; opacity: 0; }
+.dropzone { display: grid; justify-items: center; gap: 6px; padding: 28px 20px; border: 2px dashed #bfd0c5; border-radius: 16px; background: #f6faf7; text-align: center; color: #173e32; cursor: pointer; transition: background .15s, border-color .15s; }
+.dropzone b { font-size: 15px; }
+.dropzone span { font-size: 13px; color: #5d6f66; max-width: 420px; }
+.dropzone:hover, .dragging { background: #eaf3ed; border-color: #2f7a5b; }
+.cover:focus-within .dropzone, .cover:focus-within .coverActions label { outline: 3px solid #2f7a5b; outline-offset: 2px; }
+.coverCurrent { position: relative; display: grid; gap: 10px; }
+.coverCurrent img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 14px; border: 1px solid #dfe7e1; }
+.coverActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.coverBusy { position: absolute; top: 12px; left: 12px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; background: rgb(255 255 255 / .92); font-size: 13px; font-weight: 600; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.linkButton { justify-self: start; border: 0; background: none; padding: 4px 0; font-size: 13px; font-weight: 600; color: #173e32; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }

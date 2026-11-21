@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, ArrowRight, Eye, Save, Plus, Trash2, Check, CircleDashed, Monitor, Smartphone,
-  CalendarDays, MapPin, Users, Sparkles, Image as ImageIcon, Ticket, Globe2, Building2, Shuffle, X,
+  CalendarDays, MapPin, Users, Sparkles, Image as ImageIcon, Ticket, Globe2, Building2, Shuffle, X, Upload, Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { api, apiErrorMessage } from '@/lib/api';
@@ -16,6 +16,7 @@ import { EventShell, useEventAccess, useEventOptions } from './EventWorkspace';
 import { EventProgram, EventDetails, EventOptions, newEvent, eventStatuses, PublicEvent } from './event-types';
 import { EVENT_COLORS, EVENT_TIMEZONES, eventReadiness, slugify } from './event-helpers';
 import { EventLanding } from './EventLanding';
+import { uploadCover } from './cover-upload';
 import { EventParticipants } from './EventParticipants';
 import s from './events.module.css';
 import x from './event-editor.module.css';
@@ -46,6 +47,46 @@ function Card({ icon, title, text, children }: { icon: ReactNode; title: string;
     </section>
   );
 }
+/** Portada: se sube desde el equipo (o se pega un enlace) y se ve al instante. */
+function CoverPicker({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const inputId = useId();
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [drag, setDrag] = useState(false); const [showUrl, setShowUrl] = useState(false);
+  async function pick(file?: File | null) {
+    if (!file || busy) return;
+    setBusy(true); setError('');
+    try { onChange(await uploadCover(file)); }
+    catch (e) { setError(apiErrorMessage(e, e instanceof Error ? e.message : 'No se pudo subir la imagen. Inténtalo de nuevo.')); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div className={`${s.wide} ${x.cover}`}>
+      <input id={inputId} type="file" accept="image/jpeg,image/png,image/webp" className={x.fileInput} disabled={busy} aria-label="Subir imagen de portada" onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ''; }} />
+      {value ? (
+        <div className={x.coverCurrent}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt="Imagen de portada actual" referrerPolicy="no-referrer" />
+          {busy && <span className={x.coverBusy} role="status"><Loader2 size={18} className={x.spin} />Subiendo imagen…</span>}
+          <div className={x.coverActions}>
+            <label htmlFor={inputId} className={s.button}><Upload size={15} />Cambiar imagen</label>
+            <button type="button" className={s.button} disabled={busy} onClick={() => onChange('')}><X size={15} />Quitar</button>
+          </div>
+        </div>
+      ) : (
+        <label htmlFor={inputId} className={`${x.dropzone} ${drag ? x.dragging : ''}`}
+          onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
+          onDrop={(e) => { e.preventDefault(); setDrag(false); void pick(e.dataTransfer.files?.[0]); }}>
+          {busy ? <Loader2 size={26} className={x.spin} aria-hidden="true" /> : <Upload size={26} aria-hidden="true" />}
+          <b>{busy ? 'Subiendo imagen…' : 'Sube la imagen de portada'}</b>
+          <span>Arrastra una imagen aquí o toca para elegirla · JPG, PNG o WebP · ideal 1600 × 900 px</span>
+        </label>
+      )}
+      {error && <p role="alert" className={s.error}>{error}</p>}
+      <button type="button" className={x.linkButton} onClick={() => setShowUrl(!showUrl)}>{showUrl ? 'Ocultar enlace' : '¿La imagen ya está en internet? Pega su enlace'}</button>
+      {showUrl && <Field title="Enlace de la imagen" hint="Enlace público https."><input type="url" maxLength={2000} placeholder="https://…" value={value} onChange={(e) => onChange(e.target.value)} /></Field>}
+    </div>
+  );
+}
+
 function localDate(value: string | null) { if (!value) return ''; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
 function isoDate(value: string) { return value ? new Date(value).toISOString() : ''; }
 
@@ -195,9 +236,8 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
             </>}
 
             {tab === 1 && <>
-              <Card icon={<ImageIcon size={18} />} title="Imagen y color de portada" text="Una buena imagen hace que el evento se sienta real. Recomendado: 1600 × 900 px.">
-                <Field title="Imagen de portada (URL)" wide hint="Enlace público https. Sin imagen se usa el color elegido."><input type="url" maxLength={2000} placeholder="https://…" value={d.bannerUrl} onChange={(e) => detail('bannerUrl', e.target.value)} /></Field>
-                {d.bannerUrl && <div className={`${s.wide} ${x.bannerPreview}`}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={d.bannerUrl} alt="Vista de la imagen de portada" referrerPolicy="no-referrer" /><button type="button" className={s.button} onClick={() => detail('bannerUrl', '')}><X size={15} />Quitar imagen</button></div>}
+              <Card icon={<ImageIcon size={18} />} title="Imagen y color de portada" text="Una buena imagen hace que el evento se sienta real. Sin imagen, la portada usa el color elegido.">
+                <CoverPicker value={d.bannerUrl} onChange={(url) => detail('bannerUrl', url)} />
                 <div className={s.wide}>
                   <span className={x.miniLabel}>Color del evento</span>
                   <div className={x.swatches} role="radiogroup" aria-label="Color del evento">

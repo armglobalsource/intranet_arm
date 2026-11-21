@@ -12,9 +12,18 @@ import { PostgresFeedbackService } from '../../feedback/postgres-feedback.servic
 import { CreateVisualReferenceDto } from '../../visual-references/dto/visual-reference.dto';
 import { CreateFeedbackDto } from '../../feedback/dto/feedback.dto';
 
-type Purpose = 'avatar' | 'visual-reference' | 'feedback';
+type Purpose = 'avatar' | 'visual-reference' | 'feedback' | 'event-cover';
+const EVENT_COVER_TYPES: Record<string, string> = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+
+/** Revisa la firma del archivo: el tipo declarado no basta. */
+export function looksLikeImage(buffer: Buffer, contentType: string) {
+  if (contentType === 'image/jpeg') return buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  if (contentType === 'image/png') return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (contentType === 'image/webp') return buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+  return false;
+}
 export class UploadTicketDto {
-  @IsIn(['avatar', 'visual-reference', 'feedback']) purpose: Purpose;
+  @IsIn(['avatar', 'visual-reference', 'feedback', 'event-cover']) purpose: Purpose;
   @IsString() @MaxLength(100) contentType: string;
   @IsInt() @Min(1) @Max(10 * 1024 * 1024) size: number;
   @IsOptional() @IsInt() @Min(1) userId?: number;
@@ -39,6 +48,7 @@ export class UploadsController {
   private authorize(purpose: Purpose, user: any, userId?: number) {
     if (purpose === 'avatar' && (!userId || (userId !== Number(user.sub) && !hasPermission(user.permissions ?? [], 'users:edit')))) throw new ForbiddenException();
     if (purpose === 'visual-reference' && !hasPermission(user.permissions ?? [], 'visual-references:manage')) throw new ForbiddenException();
+    if (purpose === 'event-cover' && !['eventos:manageAll', 'eventos:manageCampus', 'eventos:organize'].some((p) => hasPermission(user.permissions ?? [], p))) throw new ForbiddenException();
   }
 
   @Post('ticket')
@@ -47,7 +57,7 @@ export class UploadsController {
     const formats = dto.purpose === 'avatar'
       ? ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif']
       : dto.purpose === 'visual-reference'
-      ? ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] : ['image/jpeg', 'image/png', 'image/webp'];
+      ? ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] : Object.keys(EVENT_COVER_TYPES);
     if (!formats.includes(dto.contentType) || (dto.purpose !== 'avatar' && dto.size > 5 * 1024 * 1024)) throw new BadRequestException('Formato o tamaño de archivo no permitido');
     if (dto.purpose === 'avatar') await this.users.findOne(dto.userId!);
     const key = `${user.sub}/${randomUUID()}`;
@@ -83,6 +93,19 @@ export class UploadsController {
     const result = await this.visuals.create(dto.metadata, file, user.sub, user.name ?? user.email);
     await this.storage.discardUpload(claims.key);
     return result;
+  }
+
+  /** Portada de un evento: queda en el almacenamiento público y se devuelve su URL. */
+  @Post('event-cover/complete')
+  async eventCover(@Body() dto: CompleteUploadDto, @CurrentUser() user: any) {
+    const { claims, file } = await this.read(dto.ticket, 'event-cover', user);
+    try {
+      if (!looksLikeImage(file.buffer, claims.contentType)) throw new BadRequestException('El archivo no es una imagen JPG, PNG o WebP válida');
+      const url = await this.storage.uploadPublic(`event-covers/${user.sub}-${Date.now()}-${randomUUID().slice(0, 8)}${EVENT_COVER_TYPES[claims.contentType]}`, file.buffer, claims.contentType);
+      return { url };
+    } finally {
+      await this.storage.discardUpload(claims.key);
+    }
   }
 
   @Post('feedback/complete')

@@ -2,7 +2,7 @@ import { api } from './api';
 
 // Keep the existing multipart path for small files and local development.
 // Large files go to a private Supabase bucket; only metadata crosses Vercel.
-export async function directUpload(file: File, purpose: 'avatar' | 'visual-reference' | 'feedback', userId?: number): Promise<string> {
+export async function directUpload(file: File, purpose: 'avatar' | 'visual-reference' | 'feedback' | 'event-cover', userId?: number): Promise<string> {
   const { data } = await api.post<{ signedUrl: string; ticket: string }>('/uploads/ticket', {
     purpose, userId, contentType: file.type, size: file.size,
   });

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { JwtService } from '@nestjs/jwt';
-import { UploadsController } from './uploads.controller';
+import { looksLikeImage, UploadsController } from './uploads.controller';
 
 describe('authorized direct uploads', () => {
-  const storage = { createUploadUrl: vi.fn(), readUpload: vi.fn(), discardUpload: vi.fn() };
+  const storage = { createUploadUrl: vi.fn(), readUpload: vi.fn(), discardUpload: vi.fn(), uploadPublic: vi.fn() };
   const users = { findOne: vi.fn(), uploadAvatar: vi.fn() };
   const visuals = { create: vi.fn() };
   const feedback = { create: vi.fn() };
@@ -42,5 +42,29 @@ describe('authorized direct uploads', () => {
     await expect(controller.ticket({ purpose: 'feedback', contentType: 'text/html', size: 3 }, actor)).rejects.toThrow();
     await expect(controller.ticket({ purpose: 'feedback', contentType: 'image/png', size: 6 * 1024 * 1024 }, actor)).rejects.toThrow();
     expect(storage.createUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it('portada de evento: solo quien administra eventos, solo imágenes reales y URL pública', async () => {
+    await expect(controller.ticket({ purpose: 'event-cover', contentType: 'image/png', size: 3 }, actor)).rejects.toThrow();
+    const organizer = { ...actor, permissions: ['eventos:organize'] };
+    await expect(controller.ticket({ purpose: 'event-cover', contentType: 'image/gif', size: 3 }, organizer)).rejects.toThrow();
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]);
+    storage.readUpload.mockResolvedValue(png);
+    storage.uploadPublic.mockResolvedValue('https://example.supabase.co/public/event-covers/x.png');
+    const { ticket } = await controller.ticket({ purpose: 'event-cover', contentType: 'image/png', size: png.length }, organizer);
+    await expect(controller.eventCover({ ticket }, organizer)).resolves.toEqual({ url: 'https://example.supabase.co/public/event-covers/x.png' });
+    expect(storage.uploadPublic).toHaveBeenCalledWith(expect.stringMatching(/^event-covers\/12-\d+-[a-f0-9]{8}\.png$/), png, 'image/png');
+    expect(storage.discardUpload).toHaveBeenCalledTimes(1);
+    // Un HTML disfrazado de PNG se rechaza y el archivo temporal igual se elimina.
+    storage.readUpload.mockResolvedValue(Buffer.from('<html>no</html>'));
+    const fake = await controller.ticket({ purpose: 'event-cover', contentType: 'image/png', size: 15 }, organizer);
+    await expect(controller.eventCover({ ticket: fake.ticket }, organizer)).rejects.toThrow(/no es una imagen/);
+    expect(storage.discardUpload).toHaveBeenCalledTimes(2);
+  });
+
+  it('reconoce las firmas de JPG, PNG y WebP', () => {
+    expect(looksLikeImage(Buffer.from([0xff, 0xd8, 0xff, 0xe0]), 'image/jpeg')).toBe(true);
+    expect(looksLikeImage(Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')]), 'image/webp')).toBe(true);
+    expect(looksLikeImage(Buffer.from('GIF89a'), 'image/png')).toBe(false);
   });
 });
