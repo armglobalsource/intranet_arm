@@ -36,7 +36,9 @@ export class EventPaymentService {
   const test=Array.isArray(seller.tags)&&seller.tags.includes('test_user');
   if(seller.site_id!=='MLC'||!Array.isArray(seller.tags))throw new ServiceUnavailableException('Configura un vendedor de Mercado Pago Chile.');
   if(this.mode()==='test'&&!test)throw new ServiceUnavailableException('Configura un vendedor de prueba de Mercado Pago Chile.');
-  if(this.mode()==='production'&&(test||String(seller.id)!==this.config.get<string>('MERCADOPAGO_COLLECTOR_ID')))throw new ServiceUnavailableException('La credencial no corresponde a la cuenta receptora de producción configurada.');
+  // Mensajes distintos para cada causa: quien configura sabe qué variable corregir (sin exponer IDs ni tokens).
+  if(this.mode()==='production'&&test)throw new ServiceUnavailableException('La credencial de producción pertenece a un usuario de prueba de Mercado Pago. Usa el Access Token productivo de la cuenta real que recibe los pagos.');
+  if(this.mode()==='production'&&String(seller.id)!==this.config.get<string>('MERCADOPAGO_COLLECTOR_ID'))throw new ServiceUnavailableException('El ID receptor configurado no coincide con la cuenta del Access Token. Usa el User ID de esa cuenta (el número al final del token), no el número de la aplicación.');
   return String(seller.id);
  }
  assertRegistrationMode(row:any){

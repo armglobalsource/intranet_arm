@@ -57,6 +57,12 @@ describe('Mercado Pago: pruebas, producción y confirmación verificada',()=>{
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>seller}));
   await expect(new EventPaymentService(production as any).assertSeller()).rejects.toThrow();
  });
+ it('explica si la credencial es de prueba o si el ID receptor no coincide',async()=>{
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({id:456,site_id:'MLC',tags:['test_user']})}));
+  await expect(new EventPaymentService(production as any).assertSeller()).rejects.toThrow(/usuario de prueba/);
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({id:999,site_id:'MLC',tags:[]})}));
+  await expect(new EventPaymentService(production as any).assertSeller()).rejects.toThrow(/ID receptor configurado no coincide/);
+ });
  it('bloquea pagos reales desde Preview incluso si tiene credenciales',async()=>{
   const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
   await expect(new EventPaymentService({get:(key:string)=>key==='VERCEL_ENV'?'preview':production.get(key)} as any).assertSeller()).rejects.toThrow(/Production/);
