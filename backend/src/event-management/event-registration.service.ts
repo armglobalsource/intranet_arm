@@ -28,7 +28,15 @@ export class EventRegistrationService {
  paymentMode(){return this.payments.mode();}
  async checkPayments(user:EventActor){
   eventAccess(user);this.assertConfigured('paid');
-  const collectorId=await this.payments.assertSeller();
+  let collectorId:string;
+  try{collectorId=await this.payments.assertSeller();}
+  catch(err){
+   // Solo para quien administra eventos: últimos 4 dígitos de cada ID, para ver cuál corregir sin exponer el token.
+   if(!(err instanceof ServiceUnavailableException)||!/ID receptor configurado/.test(err.message))throw err;
+   const ids=await this.payments.sellerIds();
+   const tail=(v:string)=>v?`…${v.slice(-4)} (${v.length} dígitos)`:'(vacío)';
+   throw new ServiceUnavailableException(`${err.message} Cuenta del Access Token: ${tail(ids.seller)} · ID configurado: ${tail(ids.configured)}.`);
+  }
   return {mode:this.paymentMode(),collectorId,message:'Cuenta receptora y configuración verificadas. Esta comprobación no realiza cobros.'};
  }
  private token(id:string){return createHmac('sha256',this.settings().secret).update(`event-registration:${id}`).digest('hex');}

@@ -63,6 +63,15 @@ describe('Mercado Pago: pruebas, producción y confirmación verificada',()=>{
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({id:999,site_id:'MLC',tags:[]})}));
   await expect(new EventPaymentService(production as any).assertSeller()).rejects.toThrow(/ID receptor configurado no coincide/);
  });
+ it('la comprobación del editor muestra los últimos dígitos de ambos IDs cuando no coinciden',async()=>{
+  const prodConfig={get:(key:string)=>({...{EVENT_REGISTRATION_SECRET:'x'.repeat(40),FRONTEND_URL:'https://example.com'},EVENT_PAYMENTS_MODE:'production',MERCADOPAGO_ACCESS_TOKEN:'APP_USR-secret-token',MERCADOPAGO_COLLECTOR_ID:'123450917',MERCADOPAGO_WEBHOOK_SECRET:'secret',VERCEL_ENV:'production'} as any)[key]};
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({id:987654821,site_id:'MLC',tags:[]})}));
+  const service=new EventRegistrationService({query:vi.fn()} as any,prodConfig as any,new EventPaymentService(prodConfig as any),{} as any);
+  const error=await service.checkPayments({sub:1,permissions:['eventos:manageAll']}).catch((e:any)=>e);
+  expect(error.message).toContain('Cuenta del Access Token: …4821 (9 dígitos) · ID configurado: …0917 (9 dígitos).');
+  expect(error.message).not.toContain('APP_USR');
+  expect(error.message).not.toContain('987654821');
+ });
  it('bloquea pagos reales desde Preview incluso si tiene credenciales',async()=>{
   const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
   await expect(new EventPaymentService({get:(key:string)=>key==='VERCEL_ENV'?'preview':production.get(key)} as any).assertSeller()).rejects.toThrow(/Production/);

@@ -41,6 +41,11 @@ export class EventPaymentService {
   if(this.mode()==='production'&&String(seller.id)!==this.config.get<string>('MERCADOPAGO_COLLECTOR_ID'))throw new ServiceUnavailableException('El ID receptor configurado no coincide con la cuenta del Access Token. Usa el User ID de esa cuenta (el número al final del token), no el número de la aplicación.');
   return String(seller.id);
  }
+ /** IDs a comparar cuando el receptor no coincide; solo se usan recortados en la comprobación del editor. */
+ async sellerIds(){
+  const seller=await this.request('/users/me');
+  return {seller:String(seller.id??''),configured:String(this.config.get<string>('MERCADOPAGO_COLLECTOR_ID')??'')};
+ }
  assertRegistrationMode(row:any){
   if((row.snapshot?.paymentMode??'test')!==this.mode())throw new ServiceUnavailableException('Esta inscripción pertenece a otro entorno de pagos. Contacta al organizador.');
   if(this.mode()==='production'&&row.snapshot?.collectorId!==this.config.get('MERCADOPAGO_COLLECTOR_ID'))throw new ServiceUnavailableException('La cuenta receptora cambió. Contacta al organizador.');
