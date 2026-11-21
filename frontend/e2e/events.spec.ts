@@ -21,29 +21,29 @@ async function fixture(page:Page,permissions=['*']){
 for(const width of [320,393,834,1440])test(`portada y editor sin desbordes ${width}`,async({page})=>{
  await fixture(page);await page.setViewportSize({width,height:852});
  await page.goto('/eventos/retiro-hombres');await expect(page.getByRole('heading',{name:'Retiro de Hombres',exact:true})).toBeVisible();
- await expect(page.getByText('Inscripciones próximamente',{exact:true})).toBeVisible();
+ await expect(page.getByText('Inscripciones próximamente',{exact:true}).first()).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`test-results/event-public-${width}.png`,fullPage:true});
  await page.goto(`/dashboard/eventos/${id}`);await expect(page.getByLabel('Nombre del evento *',{exact:true})).toHaveValue('Retiro de Hombres');
- for(const name of ['Información','Identidad visual','Participación','Publicación']){
+ for(const name of ['Lo esencial','Portada y contenido','Inscripción y entradas','Revisar y publicar']){
   await page.getByRole('tab',{name:new RegExp(name)}).click();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   expect(await page.locator('main').evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);
  }
- await page.getByRole('tab',{name:/Información/}).click();await page.locator('main').evaluate(e=>e.scrollTo(0,0));
+ await page.getByRole('tab',{name:/Lo esencial/}).click();await page.locator('main').evaluate(e=>e.scrollTo(0,0));
  await page.screenshot({path:`test-results/event-editor-${width}.png`,fullPage:true});
 });
 test('edición, publicación y persistencia del payload',async({page})=>{
  const calls=await fixture(page);await page.goto(`/dashboard/eventos/${id}`);
  await page.getByLabel('Nombre del evento *',{exact:true}).fill('Retiro actualizado');
- await page.getByRole('tab',{name:/Publicación/}).click();await page.getByLabel('Estado del evento',{exact:true}).selectOption('published');
+ await page.getByRole('tab',{name:/Revisar y publicar/}).click();await page.getByLabel('Estado del evento',{exact:true}).selectOption('published');
  await page.getByRole('button',{name:'Guardar y publicar',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('Cambios guardados');
  expect(calls[0]).toMatchObject({title:'Retiro actualizado',status:'published',version:1});expect(calls[0].audit).toBeUndefined();expect(calls[0].id).toBeUndefined();
 });
 test('gestor de campus ve Eventos y no la configuración global',async({page})=>{
  await fixture(page,['eventos:manageCampus']);await page.setViewportSize({width:1440,height:900});await page.goto('/dashboard/eventos');
- await expect(page.getByRole('heading',{name:'Cada encuentro, en un solo lugar'})).toBeVisible();await expect(page.getByRole('link',{name:'Categorías',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'Todos tus eventos, en un solo lugar'})).toBeVisible();await expect(page.getByRole('link',{name:'Categorías',exact:true})).toHaveCount(0);
  await expect(page.getByRole('link',{name:'Crear evento',exact:true})).toBeVisible();
 });
 test('cuenta sin permisos no carga administración',async({page})=>{
@@ -60,7 +60,7 @@ for(const mode of ['free','test','production'])test(`inscripción móvil ${mode}
   if(path.endsWith('/status'))return route.fulfill({json:{id,token:'b'.repeat(64),status:paid?'pending_payment':'confirmed',participantName:'Prueba ARM',title:'Encuentro de prueba',startsAt:'2027-01-10T12:00:00Z',timezone:'America/Santiago',testPayment:mode==='test',amount:paid?1000:0,currency:'CLP',expiresAt:'2027-01-09T12:00:00Z',emailSent:true,ticketCode:paid?null:id}});
   return route.fulfill({json:{title:'Encuentro de prueba',slug:'prueba',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',status:'published',registrationStatus:'open',paymentMode:mode,capacity:100,details:{...details,pricing:paid?'paid':'free'},campusName:'Santiago',campuses:['Santiago'],campusOptions:[{id:10,name:'Santiago'}],ticketTypes:paid?[{id:categoryId,name:'General',price:1000,currency:'CLP'}]:[],registrationEnabled:true}});
  });
- await page.goto('/eventos/prueba');await page.getByRole('link',{name:'Inscribirme ahora'}).click();
+ await page.goto('/eventos/prueba');await page.getByRole('link',{name:'Inscribirme ahora'}).first().click();
  await page.getByLabel('Nombre',{exact:true}).fill('Prueba');await page.getByLabel('Apellido',{exact:true}).fill('ARM');await page.getByLabel('Correo electrónico',{exact:true}).fill('prueba@example.com');await page.getByLabel('Edad',{exact:true}).fill('30');
  await page.getByRole('button',{name:'Continuar',exact:true}).click();
  await page.getByLabel('Teléfono / WhatsApp').fill('+56912345678');await page.getByLabel('Campus',{exact:true}).selectOption('10');
@@ -73,4 +73,20 @@ for(const mode of ['free','test','production'])test(`inscripción móvil ${mode}
  expect(captured[0]).toMatchObject({campusId:10,consent:true});expect(captured[0].amount).toBeUndefined();
  if(paid){await expect(page.getByText('Tu entrada',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:mode==='test'?'Pagar con Mercado Pago · Prueba':'Pagar con Mercado Pago',exact:true})).toBeVisible();if(mode==='production')await expect(page.getByText('Modo de prueba · No utilices tarjetas ni cuentas reales.')).toHaveCount(0);}else await expect(page.getByRole('button',{name:'Imprimir / Guardar PDF'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('crear evento: enlace automático, pasos guiados y vista previa en vivo',async({page})=>{
+ await fixture(page);await page.setViewportSize({width:1440,height:900});await page.goto('/dashboard/eventos/nuevo');
+ await page.getByLabel('Nombre del evento *',{exact:true}).fill('Retiro de Hombres 2027');
+ await expect(page.getByLabel('Enlace público *',{exact:true})).toHaveValue('retiro-de-hombres-2027');
+ const live=page.getByRole('complementary',{name:'Vista previa en vivo'});
+ await expect(live.getByRole('heading',{name:'Retiro de Hombres 2027'})).toBeVisible();
+ await expect(live).toContainText('ecosistema.armglobal.org/eventos/retiro-de-hombres-2027');
+ await page.getByRole('radio',{name:/Online/}).click();
+ await expect(page.getByLabel('Lugar *')).toHaveCount(0);
+ await page.getByRole('button',{name:/Siguiente: Portada y contenido/}).click();
+ await page.getByRole('radio',{name:'Morado profundo'}).click();
+ await page.getByRole('tab',{name:/Revisar y publicar/}).click();
+ await expect(page.getByText(/Faltan \d+ de \d+ puntos/)).toBeVisible();
+ await page.screenshot({path:'test-results/event-editor-nuevo-1440.png',fullPage:true});
 });

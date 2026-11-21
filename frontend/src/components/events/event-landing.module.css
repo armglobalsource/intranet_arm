@@ -1,0 +1,134 @@
+/* Portada del evento. Responde al ancho de su contenedor (container queries),
+   así la vista previa de teléfono dentro del editor se ve igual que en un teléfono real. */
+.page {
+  container-type: inline-size;
+  container-name: event;
+  --ink: #13231d;
+  --muted: #5d6f66;
+  --line: #dfe7e1;
+  --sage: #f3f6f2;
+  --brand: #173e32;
+  background: var(--sage);
+  color: var(--ink);
+  font-family: Inter, system-ui, sans-serif;
+}
+.page h1, .page h2, .bookingPrice { font-family: var(--font-event-display), Georgia, serif; }
+
+/* Portada */
+.hero { position: relative; isolation: isolate; overflow: hidden; background: var(--event-color, #173e32); color: #fff; }
+.heroImage { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
+.heroPattern {
+  position: absolute; inset: 0; z-index: -2;
+  background:
+    radial-gradient(circle at 85% 15%, rgb(255 255 255 / .18), transparent 40%),
+    radial-gradient(circle at 10% 90%, rgb(0 0 0 / .25), transparent 45%),
+    var(--event-color, #173e32);
+}
+.hero::after {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(180deg, rgb(8 18 14 / .35) 0%, rgb(8 18 14 / .55) 45%, color-mix(in srgb, var(--event-color, #173e32) 75%, #000) 100%);
+}
+.topbar { max-width: 1180px; margin: 0 auto; padding: 22px 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.topbar img { width: 140px; height: auto; filter: brightness(0) invert(1); }
+.topbar span { font-size: 11px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; opacity: .85; }
+.heroInner { max-width: 1180px; margin: 0 auto; padding: 64px 32px 72px; display: flex; gap: 32px; align-items: flex-start; }
+.dateBlock {
+  flex: none; width: 92px; padding: 12px 0 14px; border-radius: 18px; text-align: center;
+  background: rgb(255 255 255 / .95); color: var(--event-color, #173e32); box-shadow: 0 18px 40px rgb(0 0 0 / .22);
+}
+.dateBlock span { display: block; font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.dateBlock strong { display: block; font-size: 44px; line-height: 1; font-weight: 800; font-family: var(--font-event-display), Georgia, serif; }
+.heroText { min-width: 0; max-width: 760px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 6px 12px; border: 1px solid rgb(255 255 255 / .35); border-radius: 999px; background: rgb(255 255 255 / .12); backdrop-filter: blur(6px); font-size: 12px; font-weight: 600; }
+.hero h1 { margin: 18px 0 14px; font-size: clamp(36px, 6.4vw, 72px); font-weight: 600; line-height: 1.02; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.hero p { max-width: 620px; font-size: 18px; line-height: 1.65; color: rgb(255 255 255 / .9); }
+.heroActions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; align-items: center; }
+.cta, .ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 12px 22px;
+  border-radius: 999px; font-size: 15px; font-weight: 700; text-decoration: none; cursor: pointer;
+}
+.cta { background: #fff; color: var(--event-color, #173e32); border: 0; box-shadow: 0 10px 26px rgb(0 0 0 / .2); }
+.booking .cta { width: 100%; background: var(--event-color, #173e32); color: #fff; margin: 14px 0 4px; }
+.ghost { background: transparent; color: #fff; border: 1px solid rgb(255 255 255 / .55); }
+.ghost:disabled { opacity: .5; cursor: not-allowed; }
+.statusPill { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 18px; border-radius: 999px; font-size: 14px; font-weight: 700; background: rgb(255 255 255 / .16); border: 1px solid rgb(255 255 255 / .4); }
+
+/* Franja de datos */
+.facts {
+  position: relative; max-width: 1116px; margin: -34px auto 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: #fff; border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 20px 44px rgb(19 35 29 / .08); overflow: hidden;
+}
+.facts > div { display: flex; gap: 12px; padding: 20px 22px; min-width: 0; border-right: 1px solid var(--line); color: var(--event-color, #173e32); }
+.facts > div:last-child { border-right: 0; }
+.facts span { display: grid; gap: 3px; font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.4; overflow-wrap: anywhere; }
+.facts b { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.facts span::first-letter { text-transform: uppercase; }
+
+/* Contenido */
+.main { max-width: 1180px; margin: 0 auto; padding: 48px 32px 64px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 48px; align-items: start; }
+.content { min-width: 0; }
+.section { margin-bottom: 40px; }
+.section h2 { font-size: 28px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 14px; }
+.prose { font-size: 16px; line-height: 1.85; color: #3f5149; white-space: pre-wrap; overflow-wrap: anywhere; }
+.details { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.details li { display: flex; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--line); color: var(--event-color, #173e32); }
+.details li > div { display: grid; gap: 3px; color: var(--ink); font-size: 15px; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
+.details li > div::first-letter { text-transform: uppercase; }
+.details b { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.details small { font-size: 13px; color: var(--muted); }
+.link { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--event-color, #173e32); text-decoration: underline; text-underline-offset: 3px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tags span { padding: 4px 10px; border-radius: 999px; background: var(--sage); border: 1px solid var(--line); font-size: 12px; font-weight: 600; }
+.tickets { display: grid; gap: 10px; }
+.ticket { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 16px; background: #fff; border: 1px solid var(--line); border-left: 5px solid var(--event-color, #173e32); font-weight: 600; }
+.ticket strong { font-size: 18px; white-space: nowrap; }
+.faq { border-top: 1px solid var(--line); padding: 16px 0; }
+.faq:last-child { border-bottom: 1px solid var(--line); }
+.faq summary { cursor: pointer; font-size: 16px; font-weight: 600; }
+.faq p { padding-top: 10px; }
+
+/* Inscripción */
+.booking { position: sticky; top: 20px; background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 26px; box-shadow: 0 16px 40px rgb(19 35 29 / .07); }
+.bookingEyebrow { font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.bookingPrice { display: block; margin: 8px 0 4px; font-size: 32px; font-weight: 600; line-height: 1.15; }
+.bookingStatus { margin: 16px 0 6px; padding: 12px 14px; border-radius: 12px; font-size: 14px; font-weight: 700; text-align: center; }
+.tone_open { background: #e5f4ea; color: #1d6b3f; }
+.tone_soon { background: #f6efdf; color: #7a5513; }
+.tone_closed { background: #f3e4e2; color: #8a2f25; }
+.statusPill.tone_open, .statusPill.tone_soon, .statusPill.tone_closed { color: #fff; background: rgb(255 255 255 / .16); }
+.muted { font-size: 14px; line-height: 1.6; color: var(--muted); }
+.bookingActions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.bookingActions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.bookingActions button:disabled { opacity: .5; cursor: not-allowed; }
+.previewNote { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--sage); font-size: 12px; color: var(--muted); }
+.footer { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 36px 24px 44px; border-top: 1px solid var(--line); background: #fff; font-size: 13px; color: var(--muted); }
+.footer img { width: 120px; height: auto; }
+
+/* Tablet */
+@container event (max-width: 980px) {
+  .main { grid-template-columns: 1fr; gap: 28px; }
+  .booking { position: static; order: -1; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: -28px 24px 0; }
+  .facts > div:nth-child(2) { border-right: 0; }
+  .facts > div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+}
+/* Teléfono */
+@container event (max-width: 600px) {
+  .topbar { padding: 18px 20px; }
+  .topbar img { width: 116px; }
+  .heroInner { padding: 34px 20px 64px; flex-direction: column; gap: 18px; }
+  .dateBlock { width: 74px; padding: 8px 0 10px; border-radius: 14px; }
+  .dateBlock strong { font-size: 34px; }
+  .hero h1 { font-size: 36px; margin-top: 14px; }
+  .hero p { font-size: 15px; }
+  .heroActions { gap: 10px; }
+  .heroActions > * { width: 100%; }
+  .facts { grid-template-columns: 1fr; margin: -32px 16px 0; border-radius: 16px; }
+  .facts > div { border-right: 0; border-bottom: 1px solid var(--line); padding: 14px 16px; }
+  .facts > div:last-child { border-bottom: 0; }
+  .main { padding: 28px 16px 44px; }
+  .section h2 { font-size: 24px; }
+  .prose { font-size: 15px; }
+  .booking { padding: 20px; border-radius: 18px; }
+}

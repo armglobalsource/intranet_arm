@@ -1,0 +1,33 @@
+import { describe, expect, it } from 'vitest';
+import { eventDay, eventIcs, eventReadiness, eventTimeRange, lowestPrice, mapsUrl, slugify } from './event-helpers';
+import { newEvent } from './event-types';
+
+describe('ayudas de eventos', () => {
+  it('arma el enlace a partir del nombre', () => {
+    expect(slugify('Retiro AR Hombres 2027: ¡Renovación!')).toBe('retiro-ar-hombres-2027-renovacion');
+  });
+
+  it('muestra fecha y horario en la zona del evento', () => {
+    expect(eventDay('2027-01-10T12:00:00Z', 'America/Santiago')).toMatchObject({ day: '10', month: 'ene' });
+    expect(eventTimeRange('2027-01-10T12:00:00Z', '2027-01-10T21:00:00Z', 'America/Santiago')).toBe('09:00 – 18:00 hrs');
+    expect(eventTimeRange('2027-01-10T12:00:00Z', '2027-01-12T21:00:00Z', 'America/Santiago')).toContain('hasta el 12 de enero');
+  });
+
+  it('prepara el calendario, el mapa y el valor desde', () => {
+    const ics = eventIcs({ title: 'Retiro, hombres', slug: 'retiro', startsAt: '2027-01-10T12:00:00Z', endsAt: '2027-01-10T21:00:00Z', details: { ...newEvent(1, 1).details, location: 'Casa de retiro', address: 'Camino 1' } }, 'https://x/eventos/retiro');
+    expect(ics).toContain('DTSTART:20270110T120000Z');
+    expect(ics).toContain('SUMMARY:Retiro\\, hombres');
+    expect(ics).toContain('LOCATION:Casa de retiro\\, Camino 1');
+    expect(mapsUrl('Casa de retiro', '')).toBe('https://www.google.com/maps/search/?api=1&query=Casa%20de%20retiro');
+    expect(lowestPrice([{ name: 'A', price: 20000, currency: 'CLP' }, { name: 'B', price: 15000, currency: 'CLP' }])?.name).toBe('B');
+  });
+
+  it('indica qué falta para publicar', () => {
+    const e = newEvent(1, 10);
+    const pending = eventReadiness(e).filter((i) => i.required && !i.done).map((i) => i.key);
+    expect(pending).toEqual(['title', 'dates', 'place', 'category', 'summary', 'description']);
+    const online = eventReadiness({ ...e, details: { ...e.details, modality: 'online', pricing: 'paid' }, ticketTypes: [] });
+    expect(online.find((i) => i.key === 'place')?.done).toBe(true);
+    expect(online.find((i) => i.key === 'tickets')?.done).toBe(false);
+  });
+});
