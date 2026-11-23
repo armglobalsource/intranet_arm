@@ -70,17 +70,36 @@ for(const mode of ['free','test','production'])test(`inscripción móvil ${mode}
  });
  await page.goto('/eventos/prueba');await page.getByRole('link',{name:'Inscribirme ahora'}).first().click();
  await page.getByLabel('Nombre',{exact:true}).fill('Prueba');await page.getByLabel('Apellido',{exact:true}).fill('ARM');await page.getByLabel('Correo electrónico',{exact:true}).fill('prueba@example.com');await page.getByLabel('Edad',{exact:true}).fill('30');
- await page.getByRole('button',{name:'Continuar',exact:true}).click();
  await page.getByLabel('Teléfono / WhatsApp').fill('+56912345678');await page.getByLabel('Campus',{exact:true}).selectOption('10');
- if(paid)await page.getByLabel('Entrada',{exact:true}).selectOption(categoryId);
- await page.getByRole('button',{name:'Continuar',exact:true}).click();await page.getByRole('checkbox').check();
+ if(paid)await expect(page.getByRole('radio',{name:/General/})).toBeChecked();
+ await page.getByRole('checkbox').check();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`test-results/event-registration-${mode}-393.png`,fullPage:true});
- await page.getByRole('button',{name:paid?'Registrar y continuar al pago':'Confirmar inscripción gratuita'}).click();
- await expect(page.getByRole('heading',{name:paid?'Pendiente de pago':'Inscripción confirmada',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:paid?/^Continuar al pago/:'Confirmar mi inscripción'}).click();
+ await expect(page.getByRole('heading',{name:paid?'Último paso: paga tu entrada':'¡Tu entrada está lista!',exact:true})).toBeVisible();
+ await page.screenshot({path:`test-results/event-receipt-${mode}-393.png`,fullPage:true});
  expect(captured[0]).toMatchObject({campusId:10,consent:true});expect(captured[0].amount).toBeUndefined();
- if(paid){await expect(page.getByText('Tu entrada',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:mode==='test'?'Pagar con Mercado Pago · Prueba':'Pagar con Mercado Pago',exact:true})).toBeVisible();if(mode==='production')await expect(page.getByText('Modo de prueba · No utilices tarjetas ni cuentas reales.')).toHaveCount(0);}else await expect(page.getByRole('button',{name:'Imprimir / Guardar PDF'})).toBeVisible();
+ if(paid){await expect(page.getByRole('article',{name:'Tu entrada'})).toHaveCount(0);await expect(page.getByRole('button',{name:mode==='test'?'Pagar con Mercado Pago · Prueba':'Pagar con Mercado Pago',exact:true})).toBeVisible();if(mode==='production')await expect(page.getByText('Modo de prueba · No utilices tarjetas ni cuentas reales.')).toHaveCount(0);}else await expect(page.getByRole('button',{name:'Imprimir / Guardar PDF'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+for(const width of [393,1280])test(`regreso desde Mercado Pago confirma la entrada ${width}`,async({page})=>{
+ await page.setViewportSize({width,height:900});
+ let checks=0;
+ const receipt=(status:string)=>({id,token:'b'.repeat(64),status,participantName:'Prueba ARM',title:'Encuentro de prueba',startsAt:'2027-01-10T12:00:00Z',timezone:'America/Santiago',testPayment:false,amount:1000,currency:'CLP',ticketName:'General',expiresAt:'2027-01-09T12:00:00Z',emailSent:true,ticketCode:status==='confirmed'?id:null});
+ await page.route('**/api/v1/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/status')){checks++;return route.fulfill({json:receipt(checks<3?'pending_payment':'confirmed')});}
+  return route.fulfill({json:{title:'Encuentro de prueba',slug:'prueba',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',status:'published',registrationStatus:'open',paymentMode:'production',capacity:100,details:{...details,pricing:'paid'},campusName:'Santiago',campuses:['Santiago'],ticketTypes:[{id:categoryId,name:'General',price:1000,currency:'CLP'}],registrationEnabled:true}});
+ });
+ await page.goto(`/eventos/prueba/inscripcion?collection_status=approved&payment_id=123#id=${id}&token=${'b'.repeat(64)}`);
+ await expect(page.getByRole('heading',{name:'Estamos confirmando tu pago'})).toBeVisible();
+ await page.screenshot({path:`test-results/event-receipt-checking-${width}.png`,fullPage:true});
+ await expect(page.getByRole('heading',{name:'¡Tu entrada está lista!'})).toBeVisible({timeout:15000});
+ await expect(page.getByRole('article',{name:'Tu entrada'})).toContainText('General');
+ expect(page.url()).not.toContain('collection_status');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/event-receipt-confirmed-${width}.png`,fullPage:true});
 });
 
 test('crear evento: enlace automático, pasos guiados y vista previa en vivo',async({page})=>{

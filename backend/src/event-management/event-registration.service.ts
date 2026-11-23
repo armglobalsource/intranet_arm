@@ -45,7 +45,7 @@ export class EventRegistrationService {
  private authorize(id:string,token:string){const expected=this.token(id);if(!/^[a-f0-9]{64}$/.test(token)||!timingSafeEqual(Buffer.from(expected,'hex'),Buffer.from(token,'hex')))throw new NotFoundException('Inscripción no encontrada');}
  private view(row:any){
   const expired=row.status==='pending_payment'&&Date.parse(row.expires_at)<=Date.now();
-  return {id:row.id,token:this.token(row.id),status:expired?'expired':row.status,participantName:`${row.participant.firstName} ${row.participant.lastName}`,title:row.snapshot.title,startsAt:row.snapshot.startsAt,timezone:row.snapshot.timezone,amount:Number(row.amount),currency:row.currency,expiresAt:row.expires_at,emailSent:!!(row.status==='confirmed'?row.confirmation_sent_at:row.email_sent_at),testPayment:Number(row.amount)>0&&(row.snapshot.paymentMode??'test')==='test',ticketCode:row.status==='confirmed'?row.id:null};
+  return {id:row.id,token:this.token(row.id),status:expired?'expired':row.status,participantName:`${row.participant.firstName} ${row.participant.lastName}`,title:row.snapshot.title,startsAt:row.snapshot.startsAt,timezone:row.snapshot.timezone,amount:Number(row.amount),currency:row.currency,ticketName:row.snapshot.ticketName??null,expiresAt:row.expires_at,emailSent:!!(row.status==='confirmed'?row.confirmation_sent_at:row.email_sent_at),testPayment:Number(row.amount)>0&&(row.snapshot.paymentMode??'test')==='test',ticketCode:row.status==='confirmed'?row.id:null};
  }
  async register(slug:string,dto:RegistrationDto){
   this.settings();

@@ -62,6 +62,12 @@ export function upcomingMoment(value: string | null | undefined, timeZone?: stri
   return `${parts(value!, timeZone, { day: 'numeric', month: 'long' })}, ${time} hrs`;
 }
 
+/** «lunes 24 de noviembre, 11:35 hrs» en la zona indicada. */
+export function momentLabel(value: string | null | undefined, timeZone?: string) {
+  if (!value || !Number.isFinite(Date.parse(value))) return '';
+  return `${parts(value, timeZone, { weekday: 'long', day: 'numeric', month: 'long' })}, ${parts(value, timeZone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })} hrs`;
+}
+
 /** true cuando la fecha ya pasó (sirve para el cierre de inscripciones). */
 export function isPast(value: string | null | undefined, now = Date.now()) {
   const at = value ? Date.parse(value) : NaN;

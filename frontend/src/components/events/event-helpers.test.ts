@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventDay, eventIcs, isPast, upcomingMoment, eventReadiness, eventTimeRange, mapsUrl, slugify, ticketPriceLabel } from './event-helpers';
+import { eventDay, eventIcs, isPast, momentLabel, upcomingMoment, eventReadiness, eventTimeRange, mapsUrl, slugify, ticketPriceLabel } from './event-helpers';
 import { newEvent } from './event-types';
 
 describe('ayudas de eventos', () => {
@@ -21,6 +21,8 @@ describe('ayudas de eventos', () => {
     expect(isPast('2026-11-20T00:00:00Z', now)).toBe(true);
     expect(isPast('2026-12-01T14:28:00Z', now)).toBe(false);
     expect(isPast(null, now)).toBe(false);
+    expect(momentLabel('2026-11-24T14:35:00Z', 'America/Santiago')).toBe('martes, 24 de noviembre, 11:35 hrs');
+    expect(momentLabel(null)).toBe('');
   });
 
   it('prepara el calendario, el mapa y el valor desde', () => {
