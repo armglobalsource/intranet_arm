@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, ArrowRight, Eye, Save, Plus, Trash2, Check, CircleDashed, Monitor, Smartphone,
-  CalendarDays, MapPin, Users, Sparkles, Image as ImageIcon, Ticket, Globe2, Building2, Shuffle, X, Upload, Loader2,
+  CalendarDays, MapPin, Users, Sparkles, Image as ImageIcon, Ticket, Globe2, Building2, Shuffle, X, Upload, Loader2, Mail,
 } from 'lucide-react';
 import Link from 'next/link';
 import { api, apiErrorMessage } from '@/lib/api';
@@ -295,6 +295,11 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
                 <Field title="Edad mínima" hint="Opcional."><input type="number" min={0} max={120} value={d.minimumAge ?? ''} onChange={(e) => detail('minimumAge', e.target.value ? Number(e.target.value) : null)} /></Field>
                 {dateField('Abrir inscripciones desde', 'registrationOpensAt')}{dateField('Cerrar inscripciones el', 'registrationClosesAt')}
                 <label className={`${s.check} ${s.wide}`}><input type="checkbox" checked={d.waitlist} onChange={(e) => detail('waitlist', e.target.checked)} />Abrir lista de espera cuando se agoten los cupos</label>
+              </Card>
+              <Card icon={<Mail size={18} />} title="Correos a los participantes" text="Las confirmaciones y entradas llevan la portada y el color del evento. Elige quién las firma.">
+                <Field title="Nombre del remitente" hint="Ej.: AR Hombres. Vacío: Ecosistema ARM."><input maxLength={80} value={d.senderName ?? ''} onChange={(e) => detail('senderName', e.target.value)} placeholder="AR Hombres" /></Field>
+                <Field title="Correo del remitente" hint="Solo direcciones @armglobal.org. Las respuestas llegan a este buzón."><input type="email" maxLength={254} value={d.senderEmail ?? ''} onChange={(e) => detail('senderEmail', e.target.value.trim())} placeholder="arhombres@armglobal.org" /></Field>
+                {!!d.senderEmail && !/^[A-Za-z0-9._%+-]+@armglobal\.org$/i.test(d.senderEmail) && <p role="alert" className={`${s.error} ${s.wide}`}>Usa un correo que termine en @armglobal.org.</p>}
               </Card>
               <Card icon={<Check size={18} />} title="Condiciones">
                 <Field title="Condiciones y requisitos" wide><textarea maxLength={5000} value={d.conditions} onChange={(e) => detail('conditions', e.target.value)} placeholder="Ej.: Trae tu identificación y ropa cómoda." /></Field>

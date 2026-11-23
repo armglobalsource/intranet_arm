@@ -1,6 +1,20 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+/** Remitente del evento: solo direcciones del mismo dominio que el remitente configurado. */
+export function senderFor(configuredFrom: string, name?: string, email?: string) {
+  const domain = /@([^>\s]+)>?\s*$/.exec(configuredFrom)?.[1]?.toLowerCase();
+  const cleanName = (name ?? '').replace(/[<>"\r\n]/g, '').trim().slice(0, 80);
+  const cleanEmail = (email ?? '').trim().toLowerCase();
+  const validEmail = /^[a-z0-9._%+-]+@[a-z0-9.-]+$/.test(cleanEmail) && !!domain && cleanEmail.endsWith(`@${domain}`);
+  if (validEmail) return { from: cleanName ? `${cleanName} <${cleanEmail}>` : cleanEmail, replyTo: cleanEmail };
+  if (cleanName) {
+    const address = /<([^>]+)>/.exec(configuredFrom)?.[1] ?? configuredFrom.trim();
+    return { from: `${cleanName} <${address}>`, replyTo: undefined };
+  }
+  return { from: undefined, replyTo: undefined };
+}
+
 @Injectable()
 export class ResendMailerService {
   constructor(private config: ConfigService) {}
@@ -42,7 +56,7 @@ export class ResendMailerService {
   }
 
   /** Correo con HTML propio (reportes). No registra destinatarios ni contenido en los errores. */
-  async sendHtml(mail: { to: string[]; subject: string; html: string; text: string; idempotencyKey: string }) {
+  async sendHtml(mail: { to: string[]; subject: string; html: string; text: string; idempotencyKey: string; sender?: { name?: string; email?: string } }) {
     const key = this.config.get<string>('RESEND_API_KEY');
     const from = this.config.get<string>('RESEND_FROM_EMAIL');
     if (!key || !from || !from.includes('@') || /[\r\n]/.test(from)) {
@@ -51,7 +65,8 @@ export class ResendMailerService {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST', signal: AbortSignal.timeout(15000),
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'Idempotency-Key': mail.idempotencyKey },
-      body: JSON.stringify({ from, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text }),
+      // Un evento puede enviar con su propio nombre y buzón (mismo dominio verificado); las respuestas van a ese buzón.
+      body: JSON.stringify((() => { const s = senderFor(from, mail.sender?.name, mail.sender?.email); return { from: s.from ?? from, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text, ...(s.replyTo ? { reply_to: s.replyTo } : {}) }; })()),
     });
     if (!response.ok) throw new ServiceUnavailableException(`No se pudo enviar el correo (código ${response.status}). Inténtalo de nuevo.`);
     const data = await response.json() as { id?: string };

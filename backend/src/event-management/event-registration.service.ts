@@ -4,6 +4,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { DatabaseService } from '../common/database/database.service';
 import { ResendMailerService } from '../auth/resend-mailer.service';
 import { EventPaymentService, InspectedPayment } from './event-payment.service';
+import { renderEventEmail, EmailKind } from './event-email';
 import { RegistrationDto } from './event-registration.dto';
 import { assertEventScope, EventActor, eventAccess } from './event-program.rules';
 
@@ -106,10 +107,19 @@ export class EventRegistrationService {
   if(confirmed?row.confirmation_sent_at:row.email_sent_at)return;
   const link=`${this.settings().origin}/eventos/${encodeURIComponent(row.snapshot.slug)}/inscripcion#id=${row.id}&token=${this.token(row.id)}`;
   const testPayment=Number(row.amount)>0&&(row.snapshot.paymentMode??'test')==='test';
-  const paymentNote=Number(row.amount)===0?'':testPayment?'Este pago utiliza Mercado Pago de prueba.':'El estado de un pago se confirma únicamente después de verificarlo con Mercado Pago.';
-  const text=`Tu inscripción en ARM Global fue registrada. Consulta su estado y, si está confirmada, tu entrada: ${link}\n${paymentNote} Una lista de espera no asegura un cupo.`;
   try{
-   await this.mail.sendHtml({to:[row.email],subject:confirmed?'Tu entrada está confirmada · ARM Global':'Tu inscripción · ARM Global',text,html:`<p>${confirmed?'Tu entrada está confirmada.':'Tu inscripción fue registrada.'}</p><p><a href="${link.replace(/&/g,'&amp;')}">Consultar inscripción y entrada</a></p><p>${paymentNote}</p>`,idempotencyKey:`event-registration/${row.id}/${confirmed?'confirmed':'registered'}`});
+   // Datos vigentes del evento (portada, lugar, color y remitente); si falta algo, se usa la foto de la inscripción.
+   const event=(await this.db.query('SELECT e.title,e.starts_at,e.ends_at,e.details,c.name AS campus_name FROM arm_app.event_programs e LEFT JOIN arm_app.campuses c ON c.id=e.campus_id WHERE e.id=$1',[row.event_id])).rows[0];
+   const d=event?.details??{};
+   const kind:EmailKind=confirmed?'confirmed':row.status==='pending_payment'?'pending_payment':row.status==='waitlisted'?'waitlisted':'registered';
+   const mail=renderEventEmail({
+    kind,firstName:row.participant?.firstName??'',link,origin:this.settings().origin,ticketCode:confirmed?row.id:null,
+    amount:Number(row.amount),currency:row.currency,ticketName:row.snapshot.ticketName,expiresAt:row.expires_at?new Date(row.expires_at).toISOString():null,testPayment,senderName:d.senderName,
+    event:{title:event?.title??row.snapshot.title,summary:d.summary,bannerUrl:d.bannerUrl,color:d.color,
+     startsAt:new Date(event?.starts_at??row.snapshot.startsAt).toISOString(),endsAt:event?.ends_at?new Date(event.ends_at).toISOString():undefined,
+     timezone:d.timezone??row.snapshot.timezone,modality:d.modality,location:d.location,address:d.address,campusName:event?.campus_name},
+   });
+   await this.mail.sendHtml({to:[row.email],subject:mail.subject,text:mail.text,html:mail.html,sender:{name:d.senderName,email:d.senderEmail},idempotencyKey:`event-registration/${row.id}/${confirmed?'confirmed':'registered'}`});
    await this.db.query(`UPDATE arm_app.event_registrations SET ${confirmed?'confirmation_sent_at':'email_sent_at'}=now() WHERE id=$1`,[row.id]);
   }catch{/* A failed email never undoes a committed booking; authenticated retry is available. */}
  }
