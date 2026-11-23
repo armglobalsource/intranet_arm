@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventDay, eventIcs, eventReadiness, eventTimeRange, mapsUrl, slugify, ticketPriceLabel } from './event-helpers';
+import { eventDay, eventIcs, isPast, upcomingMoment, eventReadiness, eventTimeRange, mapsUrl, slugify, ticketPriceLabel } from './event-helpers';
 import { newEvent } from './event-types';
 
 describe('ayudas de eventos', () => {
@@ -11,6 +11,16 @@ describe('ayudas de eventos', () => {
     expect(eventDay('2027-01-10T12:00:00Z', 'America/Santiago')).toMatchObject({ day: '10', month: 'ene' });
     expect(eventTimeRange('2027-01-10T12:00:00Z', '2027-01-10T21:00:00Z', 'America/Santiago')).toBe('09:00 – 18:00 hrs');
     expect(eventTimeRange('2027-01-10T12:00:00Z', '2027-01-12T21:00:00Z', 'America/Santiago')).toContain('hasta el 12 de enero');
+  });
+
+  it('anuncia cuándo abren las inscripciones y detecta el cierre', () => {
+    const now = Date.parse('2026-11-23T14:30:00Z');
+    expect(upcomingMoment('2026-11-25T14:28:00Z', 'America/Santiago', now)).toBe('25 de noviembre, 11:28 hrs');
+    expect(upcomingMoment('2026-11-20T14:28:00Z', 'America/Santiago', now)).toBe('');
+    expect(upcomingMoment(null, 'America/Santiago', now)).toBe('');
+    expect(isPast('2026-11-20T00:00:00Z', now)).toBe(true);
+    expect(isPast('2026-12-01T14:28:00Z', now)).toBe(false);
+    expect(isPast(null, now)).toBe(false);
   });
 
   it('prepara el calendario, el mapa y el valor desde', () => {

@@ -54,6 +54,20 @@ export function eventTimeRange(start: string, end: string, timeZone?: string) {
   return sameDay ? `${time(start)} – ${time(end)} hrs` : `${time(start)} hrs · hasta el ${parts(end, timeZone, { day: 'numeric', month: 'long' })}, ${time(end)} hrs`;
 }
 
+/** «25 de noviembre, 11:28 hrs» en la zona del evento, solo si la fecha aún no llega. */
+export function upcomingMoment(value: string | null | undefined, timeZone?: string, now = Date.now()) {
+  const at = value ? Date.parse(value) : NaN;
+  if (!Number.isFinite(at) || at <= now) return '';
+  const time = parts(value!, timeZone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  return `${parts(value!, timeZone, { day: 'numeric', month: 'long' })}, ${time} hrs`;
+}
+
+/** true cuando la fecha ya pasó (sirve para el cierre de inscripciones). */
+export function isPast(value: string | null | undefined, now = Date.now()) {
+  const at = value ? Date.parse(value) : NaN;
+  return Number.isFinite(at) && at <= now;
+}
+
 export function mapsUrl(location: string, address: string) {
   const query = [location, address].filter((v) => v.trim()).join(', ');
   return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : '';

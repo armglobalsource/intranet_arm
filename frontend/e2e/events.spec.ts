@@ -18,6 +18,14 @@ async function fixture(page:Page,permissions=['*']){
  });
  return calls;
 }
+test('portada anuncia cuándo abren las inscripciones',async({page})=>{
+ await page.route('**/api/v1/public-events/**',route=>route.fulfill({json:{id,version:1,title:'Retiro de Hombres',slug:'retiro-hombres',startsAt:'2027-03-10T12:00:00Z',endsAt:'2027-03-10T21:00:00Z',status:'published',registrationStatus:'open',capacity:120,details:{...details,registrationOpensAt:'2027-02-25T14:28:00Z'},ticketTypes:[],campusName:'Santiago',categoryName:'Retiros',campuses:['Santiago'],registrationEnabled:false}}));
+ await page.setViewportSize({width:320,height:852});
+ await page.goto('/eventos/retiro-hombres');
+ await expect(page.getByText('Inscripciones desde el 25 de febrero, 11:28 hrs',{exact:true}).first()).toBeVisible();
+ await expect(page.getByText('Vuelve el 25 de febrero, 11:28 hrs (hora de Santiago) para reservar tu cupo.')).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
 for(const width of [320,393,834,1440])test(`portada y editor sin desbordes ${width}`,async({page})=>{
  await fixture(page);await page.setViewportSize({width,height:852});
  await page.goto('/eventos/retiro-hombres');await expect(page.getByRole('heading',{name:'Retiro de Hombres',exact:true})).toBeVisible();

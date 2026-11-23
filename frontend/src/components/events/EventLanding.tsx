@@ -6,19 +6,22 @@
 import { CalendarDays, CalendarPlus, Clock, MapPin, Navigation, Share2, Ticket, Users, Globe2, Check } from 'lucide-react';
 import { CSSProperties, useState } from 'react';
 import { PublicEvent, eventPrice } from './event-types';
-import { eventDay, eventIcs, eventTimeRange, mapsUrl, ticketPriceLabel } from './event-helpers';
+import { eventDay, eventIcs, eventTimeRange, isPast, mapsUrl, ticketPriceLabel, upcomingMoment } from './event-helpers';
 import s from './events.module.css';
 import l from './event-landing.module.css';
 import { EventRegistrationForm } from './EventRegistration';
 
 const MODALITY = { onsite: 'Presencial', online: 'Online', hybrid: 'Presencial y online' } as const;
 
-function statusOf(e: PublicEvent) {
-  if (e.registrationEnabled) return { text: 'Inscripciones abiertas', tone: 'open' };
-  if (e.status === 'cancelled') return { text: 'Evento cancelado', tone: 'closed' };
-  if (e.status === 'finished') return { text: 'Evento finalizado', tone: 'closed' };
-  if (e.registrationStatus === 'closed') return { text: 'Inscripciones cerradas', tone: 'closed' };
-  return { text: 'Inscripciones próximamente', tone: 'soon' };
+export function statusOf(e: PublicEvent, now = Date.now()) {
+  const d = e.details;
+  if (e.registrationEnabled) return { text: 'Inscripciones abiertas', tone: 'open', note: 'Completa tus datos para reservar tu cupo.' };
+  if (e.status === 'cancelled') return { text: 'Evento cancelado', tone: 'closed', note: 'Este evento fue cancelado.' };
+  if (e.status === 'finished') return { text: 'Evento finalizado', tone: 'closed', note: 'Gracias por ser parte de este evento.' };
+  if (e.registrationStatus === 'closed' || isPast(d.registrationClosesAt, now)) return { text: 'Inscripciones cerradas', tone: 'closed', note: 'Ya no se reciben inscripciones para este evento.' };
+  const opens = upcomingMoment(d.registrationOpensAt, d.timezone, now);
+  if (opens) return { text: `Inscripciones desde el ${opens}`, tone: 'soon', note: `Vuelve el ${opens} (hora de ${d.timezone.replace(/_/g, ' ').split('/').pop()}) para reservar tu cupo.` };
+  return { text: 'Inscripciones próximamente', tone: 'soon', note: 'Aquí aparecerá la inscripción cuando esté abierta.' };
 }
 
 export function EventLanding({ event: e, preview = false }: { event: PublicEvent; preview?: boolean }) {
@@ -137,12 +140,7 @@ export function EventLanding({ event: e, preview = false }: { event: PublicEvent
           {e.capacity ? <p className={l.muted}>{e.capacity} cupos en total</p> : null}
           <div className={`${l.bookingStatus} ${l[`tone_${status.tone}`]}`}>{status.text}</div>
           {e.registrationEnabled && !preview && <a href="#inscribirme" className={l.cta}><Ticket size={18} aria-hidden="true" />Inscribirme ahora</a>}
-          <p className={l.muted}>
-            {e.registrationEnabled ? 'Completa tus datos para reservar tu cupo.'
-              : e.status === 'cancelled' ? 'Este evento fue cancelado.'
-              : e.status === 'finished' ? 'Gracias por ser parte de este evento.'
-              : 'Aquí aparecerá la inscripción cuando esté abierta.'}
-          </p>
+          <p className={l.muted}>{status.note}</p>
           <div className={l.bookingActions}>
             <button type="button" onClick={addToCalendar} disabled={!e.startsAt}><CalendarPlus size={16} aria-hidden="true" />Calendario</button>
             <button type="button" onClick={share}><Share2 size={16} aria-hidden="true" />{shared ? 'Enlace copiado' : 'Compartir'}</button>
