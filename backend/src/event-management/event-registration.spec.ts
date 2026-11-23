@@ -72,6 +72,21 @@ describe('Mercado Pago: pruebas, producción y confirmación verificada',()=>{
   expect(error.message).not.toContain('APP_USR');
   expect(error.message).not.toContain('987654821');
  });
+ it('al buscar pagos solo acepta pagos de la cuenta y el entorno configurados',async()=>{
+  const ref='11111111-1111-4111-8111-111111111111';
+  const fetch=vi.fn()
+   .mockResolvedValueOnce({ok:true,json:async()=>({id:456,site_id:'MLC',tags:[]})})
+   .mockResolvedValueOnce({ok:true,json:async()=>({results:[
+    {id:1,external_reference:ref,live_mode:true,collector_id:456,status:'approved'},
+    {id:2,external_reference:ref,live_mode:false,collector_id:456,status:'approved'},
+    {id:3,external_reference:ref,live_mode:true,collector_id:999,status:'approved'},
+    {id:4,external_reference:'otra',live_mode:true,collector_id:456,status:'approved'},
+   ]})});
+  vi.stubGlobal('fetch',fetch);
+  const found=await new EventPaymentService(production as any).findPayments(ref);
+  expect(found.map((p:any)=>p.id)).toEqual([1]);
+  expect(fetch.mock.calls[1][0]).toContain(`/v1/payments/search?external_reference=${ref}`);
+ });
  it('bloquea pagos reales desde Preview incluso si tiene credenciales',async()=>{
   const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
   await expect(new EventPaymentService({get:(key:string)=>key==='VERCEL_ENV'?'preview':production.get(key)} as any).assertSeller()).rejects.toThrow(/Production/);
@@ -112,6 +127,21 @@ describe('Mercado Pago: pruebas, producción y confirmación verificada',()=>{
  it('no confirma pagos pendientes y retiene pagos tardíos para revisión',async()=>{
   const pending=webhookFixture({},'pending');await pending.service.webhook('123','req','signature');expect(pending.row.status).toBe('pending_payment');
   const late=webhookFixture({expires_at:'2020-01-01T00:00:00Z'});await late.service.webhook('123','req','signature');expect(late.row.status).toBe('payment_review');
+ });
+ it('si el aviso no llegó, al consultar el estado confirma un pago aprobado según Mercado Pago',async()=>{
+  const x=webhookFixture();
+  const token=createHmac('sha256','x'.repeat(40)).update(`event-registration:${x.row.id}`).digest('hex');
+  const approved={id:987654,external_reference:x.row.id,status:'approved',transaction_amount:1000,currency_id:'CLP'};
+  (x.service as any).payments.findPayments=vi.fn().mockResolvedValue([approved]);
+  x.row.participant={firstName:'Prueba',lastName:'ARM'};x.row.snapshot={title:'Retiro',slug:'retiro'};
+  const view=await x.service.get(x.row.id,token);
+  expect(view.status).toBe('confirmed');
+  expect(x.row.payment_id).toBe('987654');
+  // Sin pago aprobado (o si Mercado Pago no responde) la inscripción queda igual.
+  const y=webhookFixture();y.row.participant={firstName:'Prueba',lastName:'ARM'};y.row.snapshot={title:'Retiro',slug:'retiro'};
+  (y.service as any).payments.findPayments=vi.fn().mockRejectedValue(new Error('timeout'));
+  const tokenY=createHmac('sha256','x'.repeat(40)).update(`event-registration:${y.row.id}`).digest('hex');
+  expect((await y.service.get(y.row.id,tokenY)).status).toBe('pending_payment');
  });
  it('valida la firma y rechaza modificaciones de ID o firma',()=>{
   const signature=createHmac('sha256','secret').update('id:123;request-id:req;ts:100;').digest('hex');

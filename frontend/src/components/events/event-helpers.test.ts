@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventDay, eventIcs, eventReadiness, eventTimeRange, lowestPrice, mapsUrl, slugify } from './event-helpers';
+import { eventDay, eventIcs, eventReadiness, eventTimeRange, mapsUrl, slugify, ticketPriceLabel } from './event-helpers';
 import { newEvent } from './event-types';
 
 describe('ayudas de eventos', () => {
@@ -19,7 +19,12 @@ describe('ayudas de eventos', () => {
     expect(ics).toContain('SUMMARY:Retiro\\, hombres');
     expect(ics).toContain('LOCATION:Casa de retiro\\, Camino 1');
     expect(mapsUrl('Casa de retiro', '')).toBe('https://www.google.com/maps/search/?api=1&query=Casa%20de%20retiro');
-    expect(lowestPrice([{ name: 'A', price: 20000, currency: 'CLP' }, { name: 'B', price: 15000, currency: 'CLP' }])?.name).toBe('B');
+    const clp = (price: number) => ({ name: 'Entrada', price, currency: 'CLP' });
+    // Un solo valor se muestra tal cual, sin «Desde».
+    expect(ticketPriceLabel([clp(100)])).toBe(new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(100));
+    expect(ticketPriceLabel([clp(100), clp(100)])).not.toContain('–');
+    expect(ticketPriceLabel([clp(20000), clp(15000)])).toMatch(/15.000 – .*20.000/);
+    expect(ticketPriceLabel([])).toBe('');
   });
 
   it('indica qué falta para publicar', () => {

@@ -81,7 +81,7 @@ export class EventRegistrationService {
   await this.notify(row);return this.view(await this.row(row.id));
  }
  async get(id:string,token:string){
-  this.authorize(id,token);const row=await this.row(id);
+  this.authorize(id,token);const row=await this.reconcile(await this.row(id));
   const event=(await this.db.query('SELECT status FROM arm_app.event_programs WHERE id=$1',[row.event_id])).rows[0];
   if(event?.status==='cancelled')row.status='cancelled';
   return this.view(row);
@@ -114,8 +114,27 @@ export class EventRegistrationService {
   }catch{/* A failed email never undoes a committed booking; authenticated retry is available. */}
  }
  async resend(id:string,token:string){this.authorize(id,token);await this.notify(await this.row(id));return this.get(id,token);}
+ /**
+  * Si el aviso de Mercado Pago no llegó, se le pregunta directamente por un pago aprobado de esta
+  * inscripción. Pasa por las mismas comprobaciones que el webhook; si Mercado Pago no responde,
+  * la inscripción queda como estaba.
+  */
+ private async reconcile(row:any){
+  if(row.status!=='pending_payment'||!row.preference_id||Number(row.amount)<=0)return row;
+  try{
+   const approved=(await this.payments.findPayments(row.id)).find((p:any)=>p.status==='approved');
+   if(!approved)return row;
+   await this.applyPayment(approved);
+   return await this.row(row.id);
+  }catch{return row;}
+ }
  async webhook(id:string,requestId:string,signature:string){
-  const payment=await this.payments.payment(id,requestId,signature);
+  // payment() ya comprobó que el pago consultado corresponde a este ID.
+  return this.applyPayment({...(await this.payments.payment(id,requestId,signature)),id});
+ }
+ /** Aplica un pago ya verificado con Mercado Pago (llegue por webhook o por consulta directa). */
+ private async applyPayment(payment:any){
+  const id=String(payment.id);
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payment.external_reference??''))return {received:true};
   const found=(await this.db.query('SELECT event_id FROM arm_app.event_registrations WHERE id=$1',[payment.external_reference])).rows[0];
   if(!found)return {received:true};

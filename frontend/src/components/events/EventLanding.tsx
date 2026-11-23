@@ -6,7 +6,7 @@
 import { CalendarDays, CalendarPlus, Clock, MapPin, Navigation, Share2, Ticket, Users, Globe2, Check } from 'lucide-react';
 import { CSSProperties, useState } from 'react';
 import { PublicEvent, eventPrice } from './event-types';
-import { eventDay, eventIcs, eventTimeRange, lowestPrice, mapsUrl } from './event-helpers';
+import { eventDay, eventIcs, eventTimeRange, mapsUrl, ticketPriceLabel } from './event-helpers';
 import { eventDisplay } from './event-fonts';
 import s from './events.module.css';
 import l from './event-landing.module.css';
@@ -30,8 +30,7 @@ export function EventLanding({ event: e, preview = false }: { event: PublicEvent
   const day = eventDay(e.startsAt, d.timezone);
   const time = eventTimeRange(e.startsAt, e.endsAt, d.timezone);
   const map = d.modality !== 'online' ? mapsUrl(d.location, d.address) : '';
-  const from = d.pricing === 'paid' ? lowestPrice(e.ticketTypes) : null;
-  const price = d.pricing === 'free' ? 'Gratis' : from ? `Desde ${eventPrice(from)}` : 'Valor por confirmar';
+  const price = d.pricing === 'free' ? 'Gratis' : ticketPriceLabel(e.ticketTypes) || 'Valor por confirmar';
   const place = d.modality === 'online' ? 'Evento online' : d.location || 'Lugar por confirmar';
   const [shared, setShared] = useState(false);
   const url = typeof window !== 'undefined' ? `${window.location.origin}/eventos/${e.slug}` : `/eventos/${e.slug}`;

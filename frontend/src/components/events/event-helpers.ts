@@ -1,7 +1,7 @@
 // Ayudas del módulo de eventos: enlace automático, fechas de la portada,
 // calendario, mapas y la lista de lo que falta para publicar.
 
-import type { EventProgram, PublicEvent, TicketType } from './event-types';
+import { eventPrice, type EventProgram, type PublicEvent, type TicketType } from './event-types';
 
 /** Colores sugeridos para la portada, dentro de la identidad ARM Global. */
 export const EVENT_COLORS = [
@@ -59,9 +59,14 @@ export function mapsUrl(location: string, address: string) {
   return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : '';
 }
 
-export function lowestPrice(tickets: TicketType[]) {
-  const priced = tickets.filter((t) => Number.isFinite(t.price));
-  return priced.length ? priced.reduce((min, t) => (t.price < min.price ? t : min)) : null;
+/** Valor de la entrada tal cual: un solo valor, o el rango si hay entradas con valores distintos. */
+export function ticketPriceLabel(tickets: TicketType[]) {
+  const valid = tickets.filter((t) => Number.isFinite(t.price));
+  if (!valid.length) return '';
+  const distinct = Array.from(new Map(valid.map((t) => [`${t.currency}:${t.price}`, t])).values()).sort((a, b) => a.price - b.price);
+  if (distinct.length === 1) return eventPrice(distinct[0]);
+  const sameCurrency = distinct.every((t) => t.currency === distinct[0].currency);
+  return sameCurrency ? `${eventPrice(distinct[0])} – ${eventPrice(distinct[distinct.length - 1])}` : distinct.map(eventPrice).join(' / ');
 }
 
 const icsDate = (value: string) => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');

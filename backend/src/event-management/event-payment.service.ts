@@ -41,6 +41,14 @@ export class EventPaymentService {
   if(this.mode()==='production'&&String(seller.id)!==this.config.get<string>('MERCADOPAGO_COLLECTOR_ID'))throw new ServiceUnavailableException('El ID receptor configurado no coincide con la cuenta del Access Token. Usa el User ID de esa cuenta (el número al final del token), no el número de la aplicación.');
   return String(seller.id);
  }
+ /** Pagos de una inscripción según Mercado Pago, solo del vendedor y entorno configurados. */
+ async findPayments(externalReference:string){
+  const seller=await this.assertSeller();
+  const data=await this.request(`/v1/payments/search?external_reference=${encodeURIComponent(externalReference)}&sort=date_created&criteria=desc&limit=10`);
+  const live=this.mode()==='production';
+  return (Array.isArray(data?.results)?data.results:[]).filter((p:any)=>
+   p.external_reference===externalReference&&p.live_mode===live&&String(p.collector_id??p.collector?.id)===seller);
+ }
  /** IDs a comparar cuando el receptor no coincide; solo se usan recortados en la comprobación del editor. */
  async sellerIds(){
   const seller=await this.request('/users/me');
