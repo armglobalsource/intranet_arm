@@ -17,19 +17,19 @@ export function ReportesPendientesTask() {
     `/dashboard/produccion-general/estadisticas/registrar?fecha=${p.fecha}&encuentro=${encodeURIComponent(p.encuentro)}&campus=${p.campusId}`;
 
   return (
-    <article className="rounded-2xl border border-[#dce5df] bg-white p-5">
-      <h3 className="text-base font-semibold text-[#182d25]">Encuentros por reportar</h3>
-      <p className="mt-1 text-sm text-[#607068]">Encuentros que faltan por subir desde el último reporte.</p>
-      {isLoading ? <p role="status" className="my-4 text-sm text-[#607068]">Revisando los reportes…</p>
+    <article className="rounded-2xl border border-[#e3e0de] bg-white p-5">
+      <h3 className="text-base font-semibold text-[#242221]">Encuentros por reportar</h3>
+      <p className="mt-1 text-sm text-[#6c6864]">Encuentros que faltan por subir desde el último reporte.</p>
+      {isLoading ? <p role="status" className="my-4 text-sm text-[#6c6864]">Revisando los reportes…</p>
         : isError ? <div className="my-4"><p className="mb-3 text-sm text-amber-800">No pudimos revisar los reportes.</p><button className="dashboard-action" onClick={() => void refetch()}>Reintentar</button></div>
         : pendientes.length === 0 ? <p className="my-4 text-sm text-emerald-800">No hay faltantes calculados. Revisa también los campus sin horarios en el control semanal.</p>
         : <ul className="my-3 divide-y divide-white/10">
           {pendientes.slice(0, 4).map((p) => (
             <li key={`${p.campusId}-${p.fecha}-${p.hora}`}>
-              <Link href={href(p)} className="flex min-h-[56px] items-center justify-between gap-3 rounded-lg py-2.5 hover:bg-[#f1f5f2]">
+              <Link href={href(p)} className="flex min-h-[56px] items-center justify-between gap-3 rounded-lg py-2.5 hover:bg-[#f7f3ef]">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#182d25]">{p.encuentro}</p>
-                  <p className="mt-0.5 text-sm capitalize text-[#607068]">{shortDate(p.fecha)} · {p.campus}</p>
+                  <p className="text-sm font-semibold text-[#242221]">{p.encuentro}</p>
+                  <p className="mt-0.5 text-sm capitalize text-[#6c6864]">{shortDate(p.fecha)} · {p.campus}</p>
                 </div>
                 <span className="shrink-0 text-sm font-semibold text-emerald-800">Registrar →</span>
               </Link>

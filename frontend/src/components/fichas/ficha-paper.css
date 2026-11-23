@@ -54,7 +54,7 @@
 .sheet-positions { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 2px 0; }
 .sheet-positions > div { flex: 1 1 120px; display: grid; justify-items: center; text-align: center; gap: 3px; padding: 4px 0; }
 .sheet-positions b { font-size: 8px; color: #626c78; text-transform: uppercase; letter-spacing: .05em; }
-.sheet-positions .sheet-position-circle { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid #b9c4bd; border-radius: 50%; background: #fff; color: #3e5948; font-size: 11px; }
+.sheet-positions .sheet-position-circle { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid #c1bebc; border-radius: 50%; background: #fff; color: #4e4b49; font-size: 11px; }
 .sheet-moment .sheet-moment-label { font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #596573; }
 .sheet-song-row { display: flex; align-items: baseline; gap: 8px; }
 .sheet-song-number { color: #6d7681; font-size: 8px; font-variant-numeric: tabular-nums; }
@@ -66,7 +66,7 @@
 .sheet-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .sheet-swatches > div { flex: 1 1 65px; min-width: 0; text-align: center; font-size: 8px; color: #526071; }
 .sheet-swatches .sheet-swatch { display: block; height: 24px; margin-bottom: 4px; border: 1px solid #aeb6c0; border-radius: 3px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-.published-sheet .sheet-outfit-title th { color: #2d6342; border-bottom-color: #b6d5bf; }
+.published-sheet .sheet-outfit-title th { color: #4a4846; border-bottom-color: #ccc5bf; }
 
 @media screen {
   .ficha-document-mode .ficha-doc { box-shadow: 0 6px 24px rgba(31, 41, 55, .08); }

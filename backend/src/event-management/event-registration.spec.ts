@@ -143,6 +143,29 @@ describe('Mercado Pago: pruebas, producción y confirmación verificada',()=>{
   const tokenY=createHmac('sha256','x'.repeat(40)).update(`event-registration:${y.row.id}`).digest('hex');
   expect((await y.service.get(y.row.id,tokenY)).status).toBe('pending_payment');
  });
+ it('verificación del organizador: explica qué informa Mercado Pago y confirma un pago aprobado',async()=>{
+  const admin={sub:1,permissions:['eventos:manageAll']};
+  const ip=(over:any={})=>({id:'987654',status:'approved',statusDetail:'accredited',amount:1000,currency:'CLP',sameReference:true,sameMode:true,sameSeller:true,...over,payment:{id:987654,external_reference:'11111111-1111-4111-8111-111111111111',status:over.status??'approved',transaction_amount:1000,currency_id:'CLP'}});
+  // Sin pagos con esa referencia.
+  const none=webhookFixture();(none.service as any).payments.inspectPayments=vi.fn().mockResolvedValue([]);
+  const r1=await none.service.verifyPayment(admin,'event',none.row.id);
+  expect(r1).toMatchObject({status:'pending_payment',payments:[]});expect(r1.message).toMatch(/no tiene pagos con la referencia/);
+  // Pago aprobado: se confirma y el detalle no incluye el objeto completo de Mercado Pago.
+  const ok=webhookFixture();(ok.service as any).payments.inspectPayments=vi.fn().mockResolvedValue([ip()]);
+  const r2=await ok.service.verifyPayment(admin,'event',ok.row.id);
+  expect(r2.status).toBe('confirmed');expect(r2.message).toMatch(/quedó confirmada/);expect(ok.row.payment_id).toBe('987654');
+  expect(r2.payments[0]).not.toHaveProperty('payment');
+  // Otro estado: se informa tal cual y no cambia nada.
+  const rejected=webhookFixture();(rejected.service as any).payments.inspectPayments=vi.fn().mockResolvedValue([ip({status:'rejected',statusDetail:'cc_rejected_other_reason'})]);
+  const r3=await rejected.service.verifyPayment(admin,'event',rejected.row.id);
+  expect(r3.status).toBe('pending_payment');expect(r3.message).toContain('«rejected · cc_rejected_other_reason»');
+  // Aprobado pero de otra cuenta o entorno: no se aplica.
+  const other=webhookFixture();(other.service as any).payments.inspectPayments=vi.fn().mockResolvedValue([ip({sameSeller:false})]);
+  const r4=await other.service.verifyPayment(admin,'event',other.row.id);
+  expect(r4.status).toBe('pending_payment');expect(r4.message).toMatch(/no corresponde a esta cuenta/);
+  // Sin permisos de eventos no se puede consultar.
+  await expect(none.service.verifyPayment({sub:2,permissions:[]},'event',none.row.id)).rejects.toThrow();
+ });
  it('valida la firma y rechaza modificaciones de ID o firma',()=>{
   const signature=createHmac('sha256','secret').update('id:123;request-id:req;ts:100;').digest('hex');
   expect(verifyPaymentSignature('secret','123','req',`ts=100,v1=${signature}`)).toBe(true);

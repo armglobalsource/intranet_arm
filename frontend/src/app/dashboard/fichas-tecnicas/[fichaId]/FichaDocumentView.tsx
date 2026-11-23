@@ -2618,17 +2618,17 @@ export function FichaDocumentView({
         .ficha-section-remove:hover { color: #a33b3b; border-color: #e8b8b8; }
         .ficha-pdf-order .ficha-section-wrap .ficha-card > div:first-child { padding-right: 110px !important; }
         .ficha-section-manager { position: relative; margin-bottom: 12px; }
-        .ficha-section-manager summary { display: inline-flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; border: 1px solid #b8d8ce; background: #f0faf6; color: #176c54; border-radius: 7px; padding: 8px 12px; font-size: 12px; font-weight: 700; }
+        .ficha-section-manager summary { display: inline-flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; border: 1px solid #cfc8c1; background: #faf5f0; color: #176c54; border-radius: 7px; padding: 8px 12px; font-size: 12px; font-weight: 700; }
         .ficha-section-manager summary::-webkit-details-marker { display: none; }
-        .ficha-section-list { margin-top: 8px; display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 6px; padding: 12px; border: 1px solid #dbe5e4; border-radius: 8px; background: #f8fbfa; }
-        .ficha-section-list button { display: flex; justify-content: space-between; gap: 8px; align-items: center; text-align: left; padding: 9px 10px; border: 1px solid #e0e8e6; background: white; color: #344454; border-radius: 6px; font-size: 12px; }
+        .ficha-section-list { margin-top: 8px; display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 6px; padding: 12px; border: 1px solid #e3e0de; border-radius: 8px; background: #fcf9f7; }
+        .ficha-section-list button { display: flex; justify-content: space-between; gap: 8px; align-items: center; text-align: left; padding: 9px 10px; border: 1px solid #e6e4e2; background: white; color: #344454; border-radius: 6px; font-size: 12px; }
         .ficha-section-list button span:last-child { color: #187b5b; font-weight: 700; }
         .ficha-pdf-order { display: flex; flex-direction: column; gap: 10px; }
         .ficha-pdf-block-tools { display: flex; justify-content: flex-end; gap: 4px; margin-bottom: 4px; }
-        .ficha-pdf-block-tools button { min-height: 32px; min-width: 32px; border: 1px solid #d3e0d7; border-radius: 7px; background: #f5f9f6; color: #315e49; cursor: pointer; font-size: 13px; }
-        .ficha-pdf-block-tools button:hover { background: #e5f0e8; }
+        .ficha-pdf-block-tools button { min-height: 32px; min-width: 32px; border: 1px solid #ddd9d6; border-radius: 7px; background: #fbf7f3; color: #4a4745; cursor: pointer; font-size: 13px; }
+        .ficha-pdf-block-tools button:hover { background: #f4eae1; }
         .ficha-pdf-block-tools button:disabled { opacity: .35; cursor: default; }
-        .ficha-pdf-block-tools button:focus-visible { outline: 2px solid #315e49; outline-offset: 2px; }
+        .ficha-pdf-block-tools button:focus-visible { outline: 2px solid #4a4745; outline-offset: 2px; }
         .ficha-pdf-block-tools .ficha-pdf-move { display: inline-flex; align-items: center; gap: 4px; padding: 0 9px; font-size: 11px; font-weight: 600; cursor: grab; touch-action: none; }
         .ficha-pdf-block-tools .ficha-pdf-move:active { cursor: grabbing; }
         .ficha-body { padding: 20px 24px !important; }
@@ -2648,7 +2648,7 @@ export function FichaDocumentView({
         .ficha-pdf-order [data-ficha-slot="streaming"] .ficha-card, .ficha-pdf-order [data-ficha-slot="anuncios"] .ficha-card, .ficha-pdf-order [data-ficha-slot="horarios"] .ficha-card, .ficha-pdf-order .ficha-worship { padding-bottom: 12px !important; }
         .ficha-pdf-order [data-ficha-slot="streaming"] .ficha-card > :not(:first-child), .ficha-pdf-order [data-ficha-slot="anuncios"] .ficha-card > :not(:first-child), .ficha-pdf-order [data-ficha-slot="horarios"] .ficha-card > :not(:first-child), .ficha-worship > :not(:first-child) { margin-left: 12px; margin-right: 12px; }
         .ficha-matrix-head, .ficha-matrix-row { display: grid; align-items: stretch; }
-        .ficha-matrix-head { background: #f5f7f8; border-bottom: 1px solid #d4dde4; }
+        .ficha-matrix-head { background: #faf6f3; border-bottom: 1px solid #d4dde4; }
         .ficha-matrix-head > span { padding: 8px 10px; font-size: 11px; font-weight: 700; color: #526476; border-right: 1px solid #dfe5e9; }
         .ficha-matrix-head strong { color: #b43838; white-space: nowrap; }
         .ficha-matrix-row { border-bottom: 1px solid #e1e6eb; }
@@ -2659,7 +2659,7 @@ export function FichaDocumentView({
         .ficha-worship-setlist { border-left: 1px solid #e1e6eb; padding-left: 20px; }
         .ficha-layout-option { display: flex; justify-content: flex-end; margin-bottom: 10px; }
         .ficha-layout-option button { color: #52647a; font-size: 12px; padding: 6px 10px; border: 1px solid #d7e0e7; border-radius: 6px; background: #fff; }
-        @container (max-width: 600px) { .ficha-matrix-head { display: none; } .ficha-matrix-row { display: flex !important; flex-direction: column; } .ficha-matrix-label { background: #f5f7f8; } .ficha-matrix-value::before { content: attr(data-time); flex: 0 0 48px; font-weight: 700; color: #64748b; } .ficha-matrix-value { border-right: 0; border-bottom: 1px solid #eff2f4; } .ficha-worship-columns { grid-template-columns: minmax(0,1fr); gap: 8px; } .ficha-worship-setlist { border-left: 0; border-top: 1px solid #e1e6eb; padding: 8px 0 0; } .ficha-pdf-order .ficha-role-row > span, .ficha-pdf-order .ficha-role-row > input { flex-basis: 38%; } }
+        @container (max-width: 600px) { .ficha-matrix-head { display: none; } .ficha-matrix-row { display: flex !important; flex-direction: column; } .ficha-matrix-label { background: #faf6f3; } .ficha-matrix-value::before { content: attr(data-time); flex: 0 0 48px; font-weight: 700; color: #64748b; } .ficha-matrix-value { border-right: 0; border-bottom: 1px solid #eff2f4; } .ficha-worship-columns { grid-template-columns: minmax(0,1fr); gap: 8px; } .ficha-worship-setlist { border-left: 0; border-top: 1px solid #e1e6eb; padding: 8px 0 0; } .ficha-pdf-order .ficha-role-row > span, .ficha-pdf-order .ficha-role-row > input { flex-basis: 38%; } }
         @media print { .ficha-pdf-order { gap: 5px !important; } .ficha-pdf-order .ficha-card { break-inside: auto !important; page-break-inside: auto !important; } .ficha-pdf-order .ficha-card > div:first-child { padding: 4px 6px !important; } .ficha-pdf-order .ficha-role-row { min-height: 21px; } .ficha-pdf-order .ficha-role-row > span, .ficha-pdf-order .ficha-role-row > input { padding: 3px 6px !important; } .ficha-pdf-order .ficha-role-row > div { padding: 2px 6px; } }
         @page {
           size: A4 portrait;

@@ -77,7 +77,7 @@ export function FichaQuickView({
             {block && <span className="rounded-full bg-[#F1F3F8] px-2 py-0.5 text-[#526078]">{block}</span>}
             {encuentro?.label && <span className="rounded-full bg-[#F1F3F8] px-2 py-0.5 text-[#526078]">{encuentro.label}</span>}
             <span className="rounded-full bg-[#EEF2FF] px-2 py-0.5 text-[#4338CA]">{statusLabel(ficha.status)}</span>
-            <span className={`rounded-full px-2 py-0.5 ${ficha.published ? 'bg-[#E6F6EF] text-[#087F5B]' : 'bg-[#FFF4E5] text-[#9A5B00]'}`}>
+            <span className={`rounded-full px-2 py-0.5 ${ficha.published ? 'bg-[#f6ede6] text-[#087F5B]' : 'bg-[#FFF4E5] text-[#9A5B00]'}`}>
               {ficha.published ? 'Publicada' : 'Sin publicar'}
             </span>
           </div>

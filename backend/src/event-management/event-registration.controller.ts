@@ -20,6 +20,8 @@ export class EventRegistrationController {
  email(@Param('id',ParseUUIDPipe) id:string,@Body() d:RegistrationAccessDto){return this.service.resend(id,d.token);}
  @Public() @Post('event-payments/webhook')
  webhook(@Query('data.id') id:string,@Headers('x-request-id') requestId:string,@Headers('x-signature') signature:string){return this.service.webhook(id??'',requestId??'',signature??'');}
+ @Post('event-management/:id/registrations/:registrationId/verify-payment') @Throttle({default:{limit:10,ttl:60000}})
+ verify(@CurrentUser() u:EventActor,@Param('id',ParseUUIDPipe) id:string,@Param('registrationId',ParseUUIDPipe) registrationId:string){return this.service.verifyPayment(u,id,registrationId);}
  @Get('event-management/:id/registrations')
  list(@CurrentUser() u:EventActor,@Param('id',ParseUUIDPipe) id:string){return this.service.list(u,id);}
 }

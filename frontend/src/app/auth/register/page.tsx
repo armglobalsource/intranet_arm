@@ -89,7 +89,7 @@ export default function RegisterPage() {
       {errors.root && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{errors.root.message}</p>}
       <button type="submit" disabled={isSubmitting} className={authButton}>{isSubmitting ? 'Creando cuenta…' : 'Crear cuenta'}</button>
     </form>
-    <p className="mt-7 text-center text-sm text-[#607068]">¿Ya tienes cuenta? <Link href="/auth/login" className={authLink}>Inicia sesión</Link></p>
-    <p className="mt-6 border-t border-[#e1e7dd] pt-6 text-center text-xs leading-5 text-[#607068]">¿Ya estás en ARM? <Link href="/auth/forgot-password" className={authLink}>Recupera tu acceso por correo</Link></p>
+    <p className="mt-7 text-center text-sm text-[#6c6864]">¿Ya tienes cuenta? <Link href="/auth/login" className={authLink}>Inicia sesión</Link></p>
+    <p className="mt-6 border-t border-[#e4e2e0] pt-6 text-center text-xs leading-5 text-[#6c6864]">¿Ya estás en ARM? <Link href="/auth/forgot-password" className={authLink}>Recupera tu acceso por correo</Link></p>
   </AuthShell>;
 }

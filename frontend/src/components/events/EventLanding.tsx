@@ -7,7 +7,6 @@ import { CalendarDays, CalendarPlus, Clock, MapPin, Navigation, Share2, Ticket, 
 import { CSSProperties, useState } from 'react';
 import { PublicEvent, eventPrice } from './event-types';
 import { eventDay, eventIcs, eventTimeRange, mapsUrl, ticketPriceLabel } from './event-helpers';
-import { eventDisplay } from './event-fonts';
 import s from './events.module.css';
 import l from './event-landing.module.css';
 import { EventRegistrationForm } from './EventRegistration';
@@ -54,7 +53,7 @@ export function EventLanding({ event: e, preview = false }: { event: PublicEvent
     : <span className={`${l.statusPill} ${l[`tone_${status.tone}`]}`}>{status.text}</span>;
 
   return (
-    <div className={`${s.public} ${l.page} ${eventDisplay.variable}`} style={{ '--event-color': d.color || '#173e32' } as CSSProperties}>
+    <div className={`${s.public} ${l.page}`} style={{ '--event-color': d.color || '#2c2a29' } as CSSProperties}>
       <header className={l.hero}>
         {d.bannerUrl ? <img className={l.heroImage} src={d.bannerUrl} alt="" referrerPolicy="no-referrer" /> : <div className={l.heroPattern} aria-hidden="true" />}
         <nav className={l.topbar} aria-label="Identidad del evento">

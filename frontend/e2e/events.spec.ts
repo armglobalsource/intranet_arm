@@ -85,7 +85,7 @@ test('crear evento: enlace automático, pasos guiados y vista previa en vivo',as
  await page.getByRole('radio',{name:/Online/}).click();
  await expect(page.getByLabel('Lugar *')).toHaveCount(0);
  await page.getByRole('button',{name:/Siguiente: Portada y contenido/}).click();
- await page.getByRole('radio',{name:'Morado profundo'}).click();
+ await page.getByRole('radio',{name:'Terracota'}).click();
  await page.getByRole('tab',{name:/Revisar y publicar/}).click();
  await expect(page.getByText(/Faltan \d+ de \d+ puntos/)).toBeVisible();
  await page.screenshot({path:'test-results/event-editor-nuevo-1440.png',fullPage:true});
@@ -110,4 +110,17 @@ test('portada: sube la imagen desde el equipo y se ve en la vista previa',async(
  expect(seen.complete).toEqual({ticket:'ticket-1'});
  await expect(page.getByRole('complementary',{name:'Vista previa en vivo'}).locator(`img[src="${cover}"]`)).toHaveCount(1);
  await page.screenshot({path:'test-results/event-cover-upload-1440.png'});
+});
+
+test('organizador verifica con Mercado Pago un pago pendiente',async({page})=>{
+ await fixture(page);await page.setViewportSize({width:1280,height:900});
+ const reg='3520053e-72a6-48c2-b38a-e077bda942bc';let status='pending_payment';const calls:string[]=[];
+ await page.route(`**/api/v1/event-management/${id}/registrations`,r=>r.fulfill({json:[{id:reg,participant:{firstName:'Prueba',lastName:'ARM'},email:'prueba@example.com',campusName:'Santiago',status,createdAt:'2026-11-23T13:20:08Z',amount:100,currency:'CLP',paymentId:status==='confirmed'?'987654':null,testPayment:false}]}));
+ await page.route(`**/api/v1/event-management/${id}/registrations/${reg}/verify-payment`,r=>{calls.push(r.request().method());status='confirmed';return r.fulfill({json:{status:'confirmed',message:'Pago aprobado verificado con Mercado Pago. La inscripción quedó confirmada.',payments:[]}});});
+ await page.goto(`/dashboard/eventos/${id}`);
+ await page.getByRole('button',{name:'Verificar pago con Mercado Pago'}).click();
+ await expect(page.getByRole('status').filter({hasText:'La inscripción quedó confirmada.'})).toBeVisible();
+ await expect(page.getByText('Confirmada',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Verificar pago con Mercado Pago'})).toHaveCount(0);
+ expect(calls).toEqual(['POST']);
 });

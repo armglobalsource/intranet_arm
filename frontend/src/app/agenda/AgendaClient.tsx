@@ -128,8 +128,8 @@ function FichaCard({ ficha }: { ficha: FichaLite }) {
           {ficha.status && (
             <span style={{
               fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', padding: '2px 8px', borderRadius: 999,
-              background: ficha.status === 'complete' ? '#edf4ef' : '#f1f3f6',
-              color: ficha.status === 'complete' ? '#3f6650' : D.textSecond, textTransform: 'uppercase', flexShrink: 0,
+              background: ficha.status === 'complete' ? '#f7f0ea' : '#f1f3f6',
+              color: ficha.status === 'complete' ? '#5c5249' : D.textSecond, textTransform: 'uppercase', flexShrink: 0,
             }}>
               {statusLabel(ficha.status)}
             </span>

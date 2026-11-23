@@ -26,7 +26,7 @@ interface NavItem {
 function HomeIcon({ active }: { active: boolean }) {
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-      stroke={active ? '#204b39' : '#667b6f'}
+      stroke={active ? '#373534' : '#76706b'}
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
       <polyline points="9 21 9 13 15 13 15 21" />
@@ -37,7 +37,7 @@ function HomeIcon({ active }: { active: boolean }) {
 function OrgIcon({ active }: { active: boolean }) {
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-      stroke={active ? '#204b39' : '#667b6f'}
+      stroke={active ? '#373534' : '#76706b'}
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="8" y="2" width="8" height="4" rx="1" />
       <rect x="1" y="16" width="6" height="4" rx="1" />
@@ -49,7 +49,7 @@ function OrgIcon({ active }: { active: boolean }) {
 }
 
 function ConfigIcon({ active }: { active: boolean }) {
-  const c = active ? '#204b39' : '#667b6f';
+  const c = active ? '#373534' : '#76706b';
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -60,7 +60,7 @@ function ConfigIcon({ active }: { active: boolean }) {
 }
 
 function ProduccionIcon({ active }: { active: boolean }) {
-  const c = active ? '#204b39' : '#667b6f';
+  const c = active ? '#373534' : '#76706b';
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -75,7 +75,7 @@ function ProduccionIcon({ active }: { active: boolean }) {
 function FichaIcon({ active }: { active: boolean }) {
   return (
     <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
-      stroke={active ? '#204b39' : '#667b6f'}
+      stroke={active ? '#373534' : '#76706b'}
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <polyline points="14 2 14 8 20 8" />
@@ -86,7 +86,7 @@ function FichaIcon({ active }: { active: boolean }) {
 }
 
 function StatsIcon({ active }: { active: boolean }) {
-  const c = active ? '#204b39' : '#667b6f';
+  const c = active ? '#373534' : '#76706b';
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -98,7 +98,7 @@ function StatsIcon({ active }: { active: boolean }) {
 }
 
 function NoticiasIcon({ active }: { active: boolean }) {
-  const c = active ? '#204b39' : '#667b6f';
+  const c = active ? '#373534' : '#76706b';
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -110,7 +110,7 @@ function NoticiasIcon({ active }: { active: boolean }) {
 }
 
 function SiembraIcon({ active }: { active: boolean }) {
-  const c = active ? '#204b39' : '#667b6f';
+  const c = active ? '#373534' : '#76706b';
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -123,7 +123,7 @@ function SiembraIcon({ active }: { active: boolean }) {
 }
 
 function MinisteriosIcon({ active }: { active: boolean }) {
-  const c = active ? '#204b39' : '#667b6f';
+  const c = active ? '#373534' : '#76706b';
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -140,13 +140,13 @@ function MinisterioSubIcon({ active }: { active: boolean }) {
   return (
     <span
       className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-      style={{ background: active ? '#315e49' : '#91a398' }}
+      style={{ background: active ? '#4a4745' : '#9f9a95' }}
     />
   );
 }
 
 function AdminCampusIcon({ active }: { active: boolean }) {
-  const c = active ? '#204b39' : '#667b6f';
+  const c = active ? '#373534' : '#76706b';
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -157,7 +157,7 @@ function AdminCampusIcon({ active }: { active: boolean }) {
 }
 
 function SoporteIcon({ active }: { active: boolean }) {
-  const c = active ? '#204b39' : '#667b6f';
+  const c = active ? '#373534' : '#76706b';
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -169,7 +169,7 @@ function SoporteIcon({ active }: { active: boolean }) {
 }
 
 function TecnicosIcon({ active }: { active: boolean }) {
-  const c = active ? '#204b39' : '#667b6f';
+  const c = active ? '#373534' : '#76706b';
   return (
     <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -355,10 +355,10 @@ export function Sidebar() {
 
   return (
     <>
-      <div className="fixed inset-x-0 top-0 z-50 flex h-14 items-center gap-3 border-b border-[#e1e7df] bg-white px-3 text-[#182d25] md:hidden">
-        <button onClick={() => setMobileOpen(!mobileOpen)} aria-expanded={mobileOpen} aria-controls="main-navigation" aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'} className="min-h-[44px] min-w-[44px] rounded-lg border border-[#cdd6d0] text-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300">{mobileOpen ? '×' : '☰'}</button>
+      <div className="fixed inset-x-0 top-0 z-50 flex h-14 items-center gap-3 border-b border-[#e5e3e1] bg-white px-3 text-[#242221] md:hidden">
+        <button onClick={() => setMobileOpen(!mobileOpen)} aria-expanded={mobileOpen} aria-controls="main-navigation" aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'} className="min-h-[44px] min-w-[44px] rounded-lg border border-[#d4d1cf] text-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300">{mobileOpen ? '×' : '☰'}</button>
         <span className="text-sm font-semibold">ARM Global</span>
-        <span className="ml-auto truncate text-xs text-[#52675a]">{user?.campus?.name ?? 'Mi espacio'}</span>
+        <span className="ml-auto truncate text-xs text-[#625c57]">{user?.campus?.name ?? 'Mi espacio'}</span>
       </div>
       {mobileOpen && <button aria-label="Cerrar navegación" onClick={() => setMobileOpen(false)} className="fixed inset-0 top-14 z-30 bg-black/60 md:hidden" />}
       {/* Botón flotante para reabrir cuando está colapsado */}
@@ -368,9 +368,9 @@ export function Sidebar() {
           title="Abrir menú"
           aria-label="Abrir menú de navegación"
           className="fixed left-0 top-1/2 -translate-y-1/2 z-50 hidden md:flex items-center justify-center w-11 h-12 rounded-r-md transition-all"
-          style={{ background: '#fff', border: '1px solid #dce5df', borderLeft: 'none' }}
+          style={{ background: '#fff', border: '1px solid #e3e0de', borderLeft: 'none' }}
         >
-          <svg className="w-3 h-3 text-[#52675a] hover:text-[#204b39]" viewBox="0 0 24 24" fill="none"
+          <svg className="w-3 h-3 text-[#625c57] hover:text-[#373534]" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6" />
           </svg>
@@ -380,11 +380,11 @@ export function Sidebar() {
     <aside
       id="main-navigation"
       onClickCapture={(event) => { if ((event.target as HTMLElement).closest('a')) setMobileOpen(false); }}
-      style={{ background: '#fff', borderRight: '1px solid #e1e7df' }}
+      style={{ background: '#fff', borderRight: '1px solid #e5e3e1' }}
       className={`app-sidebar fixed bottom-0 top-14 left-0 z-40 w-64 flex flex-col shrink-0 print:hidden overflow-hidden transition-all duration-300 ease-in-out md:static md:translate-x-0 ${mobileOpen ? 'translate-x-0 visible' : '-translate-x-full invisible'} ${collapsed ? 'md:w-0 md:invisible' : 'md:w-56 md:visible'}`}
     >
       {/* Logo + botón colapsar */}
-      <div style={{ borderBottom: '1px solid #e1e7df' }}
+      <div style={{ borderBottom: '1px solid #e5e3e1' }}
         className="px-4 pt-4 pb-2 flex items-center justify-between gap-2 min-w-[224px]">
         <div className="relative overflow-hidden group" style={{ width: 100, height: 28 }}>
           <Image src="/logo.png" alt="Logo" width={100} height={28}
@@ -397,9 +397,9 @@ export function Sidebar() {
         <button
           onClick={toggleSidebar}
           title="Ocultar menú"
-          className="hidden md:flex items-center justify-center w-8 h-8 rounded-md transition-all hover:bg-[#edf4ef] flex-shrink-0"
+          className="hidden md:flex items-center justify-center w-8 h-8 rounded-md transition-all hover:bg-[#f7f0ea] flex-shrink-0"
         >
-          <svg className="w-3.5 h-3.5 text-[#52675a] hover:text-[#204b39]" viewBox="0 0 24 24" fill="none"
+          <svg className="w-3.5 h-3.5 text-[#625c57] hover:text-[#373534]" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -439,7 +439,7 @@ export function Sidebar() {
                 </Link>
                 {/* Expandir no cambia de página */}
                 {children && (
-                  <button onClick={(e) => toggleGroup(href, e)} aria-expanded={isExpanded} aria-label={`${isExpanded ? 'Contraer' : 'Expandir'} ${label}`} className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#78887d] transition-colors hover:bg-[#edf4ef] hover:text-[#204b39]">
+                  <button onClick={(e) => toggleGroup(href, e)} aria-expanded={isExpanded} aria-label={`${isExpanded ? 'Contraer' : 'Expandir'} ${label}`} className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#84807c] transition-colors hover:bg-[#f7f0ea] hover:text-[#373534]">
                     <svg
                       className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                       viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -497,19 +497,19 @@ export function Sidebar() {
       </nav>
 
       {/* Notificaciones */}
-      <div ref={bellRef} style={{ borderTop: '1px solid #e1e7df' }}
+      <div ref={bellRef} style={{ borderTop: '1px solid #e5e3e1' }}
         className="relative px-3 py-2 min-w-[224px]">
         {bellOpen && (
           <div
             className="absolute bottom-full left-3 right-3 mb-1 rounded-lg overflow-hidden shadow-lg"
-            style={{ background: '#fff', border: '1px solid #dce5df', maxHeight: 320 }}
+            style={{ background: '#fff', border: '1px solid #e3e0de', maxHeight: 320 }}
           >
             <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest"
-              style={{ color: '#73877a' }}>
+              style={{ color: '#827d78' }}>
               Notificaciones
             </p>
             {notifications.length === 0 ? (
-              <p className="px-3 py-3 text-[12px] text-[#607068]">Sin notificaciones</p>
+              <p className="px-3 py-3 text-[12px] text-[#6c6864]">Sin notificaciones</p>
             ) : (
               <div className="overflow-y-auto" style={{ maxHeight: 260 }}>
                 {notifications.slice(0, 10).map((n) => (
@@ -520,19 +520,19 @@ export function Sidebar() {
                       setBellOpen(false);
                       if (n.link) router.push(n.link);
                     }}
-                    className="w-full text-left px-3 py-2.5 flex gap-2.5 items-start transition-all hover:bg-[#f0f5f1]"
-                    style={{ borderTop: '1px solid #edf1ee' }}
+                    className="w-full text-left px-3 py-2.5 flex gap-2.5 items-start transition-all hover:bg-[#f8f2ed]"
+                    style={{ borderTop: '1px solid #f4efea' }}
                   >
                     <span
                       className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full"
                       style={{ background: n.read ? 'transparent' : '#3b82f6' }}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[12px] leading-snug ${n.read ? 'text-[#607068]' : 'text-[#263b30] font-medium'}`}>
+                      <p className={`text-[12px] leading-snug ${n.read ? 'text-[#6c6864]' : 'text-[#32302f] font-medium'}`}>
                         {n.title}
                       </p>
                       {n.body && (
-                        <p className="text-[11px] text-[#78887d] mt-0.5 truncate">{n.body}</p>
+                        <p className="text-[11px] text-[#84807c] mt-0.5 truncate">{n.body}</p>
                       )}
                     </div>
                   </button>
@@ -544,11 +544,11 @@ export function Sidebar() {
 
         <button
           onClick={() => { setBellOpen((o) => !o); setMenuOpen(false); }}
-          className="flex items-center gap-2.5 w-full rounded-lg px-2 py-1.5 hover:bg-[#f0f5f1] transition-all text-left"
+          className="flex items-center gap-2.5 w-full rounded-lg px-2 py-1.5 hover:bg-[#f8f2ed] transition-all text-left"
         >
           <div className="relative flex-shrink-0">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none"
-              stroke="#667b6f" strokeWidth="1.8"
+              stroke="#76706b" strokeWidth="1.8"
               strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -562,24 +562,24 @@ export function Sidebar() {
               </span>
             )}
           </div>
-          <span className="text-[12px] text-[#607068]">
+          <span className="text-[12px] text-[#6c6864]">
             {unreadCount > 0 ? `${unreadCount} nueva${unreadCount > 1 ? 's' : ''}` : 'Notificaciones'}
           </span>
         </button>
       </div>
 
       {/* Usuario con menú */}
-      <div ref={menuRef} style={{ borderTop: '1px solid #e1e7df' }}
+      <div ref={menuRef} style={{ borderTop: '1px solid #e5e3e1' }}
         className="relative px-3 py-3 min-w-[224px]">
         {menuOpen && (
           <div
             className="absolute bottom-full left-3 right-3 mb-1 rounded-lg overflow-hidden shadow-lg"
-            style={{ background: '#fff', border: '1px solid #dce5df' }}
+            style={{ background: '#fff', border: '1px solid #e3e0de' }}
           >
             <Link
               href="/dashboard/perfil"
               onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-2.5 px-3 py-2.5 text-[12px] text-[#52675a] hover:text-[#204b39] hover:bg-[#f0f5f1] transition-all"
+              className="flex items-center gap-2.5 px-3 py-2.5 text-[12px] text-[#625c57] hover:text-[#373534] hover:bg-[#f8f2ed] transition-all"
             >
               <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -590,7 +590,7 @@ export function Sidebar() {
             </Link>
             {/* Simular rol (admin-only, o salir si ya está simulando) */}
             {(isAdmin || impersonation) && (
-              <div style={{ borderTop: '1px solid #dce5df' }}>
+              <div style={{ borderTop: '1px solid #e3e0de' }}>
                 {impersonation ? (
                   <button
                     onClick={() => { setMenuOpen(false); exitImpersonation(); }}
@@ -610,7 +610,7 @@ export function Sidebar() {
                 ) : (
                   <>
                     <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest"
-                      style={{ color: '#73877a' }}>
+                      style={{ color: '#827d78' }}>
                       Simular rol
                     </p>
                     {(allRoles ?? [])
@@ -619,7 +619,7 @@ export function Sidebar() {
                         <button
                           key={role.id}
                           onClick={() => { setMenuOpen(false); startImpersonation(role.id); }}
-                          className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-[#52675a] hover:text-[#204b39] hover:bg-[#f0f5f1] transition-all"
+                          className="flex items-center gap-2.5 w-full px-3 py-2 text-[12px] text-[#625c57] hover:text-[#373534] hover:bg-[#f8f2ed] transition-all"
                         >
                           <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -636,8 +636,8 @@ export function Sidebar() {
 
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[12px] text-[#607068] hover:text-[#204b39] hover:bg-[#f0f5f1] transition-all"
-              style={{ borderTop: '1px solid #dce5df' }}
+              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[12px] text-[#6c6864] hover:text-[#373534] hover:bg-[#f8f2ed] transition-all"
+              style={{ borderTop: '1px solid #e3e0de' }}
             >
               <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -652,7 +652,7 @@ export function Sidebar() {
 
         <button
           onClick={() => setMenuOpen((o) => !o)}
-          className="flex items-center gap-2.5 w-full rounded-lg px-1 py-1 hover:bg-[#f0f5f1] transition-all text-left"
+          className="flex items-center gap-2.5 w-full rounded-lg px-1 py-1 hover:bg-[#f8f2ed] transition-all text-left"
         >
           {user?.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -661,23 +661,23 @@ export function Sidebar() {
           ) : (
             <div
               className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-semibold"
-              style={{ background: '#e5eee8', color: '#315e49' }}
+              style={{ background: '#f2e9e1', color: '#4a4745' }}
             >
               {initials}
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-[#263b30] text-[12px] font-medium truncate leading-none">{fullName}</p>
+            <p className="text-[#32302f] text-[12px] font-medium truncate leading-none">{fullName}</p>
             {impersonation ? (
               <p className="text-[10px] mt-0.5 truncate font-semibold" style={{ color: '#f59e0b' }}>
                 ⟳ {impersonation.roleName}
               </p>
             ) : (
-              role && <p className="text-[#607068] text-[10px] mt-0.5 truncate">{role}</p>
+              role && <p className="text-[#6c6864] text-[10px] mt-0.5 truncate">{role}</p>
             )}
           </div>
           <svg
-            className={`w-3 h-3 flex-shrink-0 text-[#78887d] transition-transform ${menuOpen ? 'rotate-180' : ''}`}
+            className={`w-3 h-3 flex-shrink-0 text-[#84807c] transition-transform ${menuOpen ? 'rotate-180' : ''}`}
             viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round"
           >

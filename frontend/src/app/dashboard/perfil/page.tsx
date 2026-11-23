@@ -494,7 +494,7 @@ export default function PerfilPage() {
       {/* ── Header / Hero ── */}
       <div className="relative">
         {/* Banner con breadcrumb y estado */}
-        <div className="relative h-28 w-full" style={{ background: 'linear-gradient(135deg, #1a1030 0%, #0f1a2e 50%, #0a1a15 100%)' }}>
+        <div className="relative h-28 w-full" style={{ background: 'linear-gradient(135deg, #1a1030 0%, #0f1a2e 50%, #131211 100%)' }}>
           <div className="absolute inset-x-0 top-0 px-8 pt-4 flex items-center justify-between">
             <Link href="/dashboard"
               className="inline-flex items-center gap-1.5 text-[12px] transition-colors"

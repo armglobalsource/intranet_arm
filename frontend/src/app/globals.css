@@ -4,16 +4,18 @@
 
 @layer base {
   :root {
-    --brand: #153b42;
-    --brand-dark: #0d292f;
-    --surface-app: #f4f6f6;
+    /* Identidad armglobal.org: carbón, crema y grises cálidos, acento terracota. */
+    --brand: #31302e;
+    --brand-dark: #1d1d1b;
+    --brand-accent: #e17b5f;
+    --surface-app: #f7f4f0;
     --surface-panel: #ffffff;
-    --surface-subtle: #eef2f1;
-    --border-default: #dce5e3;
-    --text-primary: #172326;
-    --text-secondary: #526367;
-    --text-muted: #738184;
-    --focus-ring: #2b8a78;
+    --surface-subtle: #f6f1ec;
+    --border-default: #e4ddd5;
+    --text-primary: #1d1d1b;
+    --text-secondary: #656260;
+    --text-muted: #8f8f8f;
+    --focus-ring: #e17b5f;
   }
   * { border-color: var(--border-default); }
   body {
@@ -40,7 +42,7 @@
 
 @layer components {
   .dashboard-action {
-    @apply inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#cddbd1] bg-[#f4f8f5] px-4 py-2 text-sm font-semibold text-[#204b39] transition-colors hover:bg-[#e5f0e8];
+    @apply inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#d7d4d1] bg-[#faf6f2] px-4 py-2 text-sm font-semibold text-[#373534] transition-colors hover:bg-[#f4eae1];
   }
   .dashboard-home :is(a, button):focus-visible,
   .app-sidebar :is(a, button):focus-visible {
@@ -50,44 +52,44 @@
   /* Scroll discreto, del color del menú (sin la barra blanca del navegador). */
   .app-sidebar-scroll {
     scrollbar-width: thin;
-    scrollbar-color: #c5d2c8 transparent;
+    scrollbar-color: #cfcbc8 transparent;
   }
   .app-sidebar-scroll::-webkit-scrollbar { width: 6px; }
   .app-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-  .app-sidebar-scroll::-webkit-scrollbar-thumb { background: #c5d2c8; border-radius: 999px; }
-  .app-sidebar-scroll:hover::-webkit-scrollbar-thumb { background: #a5b9aa; }
+  .app-sidebar-scroll::-webkit-scrollbar-thumb { background: #cfcbc8; border-radius: 999px; }
+  .app-sidebar-scroll:hover::-webkit-scrollbar-thumb { background: #b4afaa; }
 
   .nav-section-label {
-    @apply px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#718277];
+    @apply px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7e7975];
   }
   /* Ítem: al pasar el mouse se desliza un poco y el ícono crece; el activo
      lleva una barra verde a la izquierda. */
   .nav-item {
-    @apply relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-[#344c3d];
+    @apply relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-[#42403e];
     transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   }
-  .nav-item:hover { @apply bg-[#eef4ef] text-[#204b39]; transform: translateX(3px); }
+  .nav-item:hover { @apply bg-[#f7f1eb] text-[#373534]; transform: translateX(3px); }
   .nav-icon { @apply flex shrink-0; transition: transform 0.2s ease; }
   .nav-item:hover .nav-icon { transform: scale(1.12); }
   /* El trazo del ícono viene del componente; al pasar el mouse se ilumina. */
-  .nav-item:hover .nav-icon svg, .nav-subitem:hover .nav-icon svg { stroke: #204b39; }
-  .nav-item[data-active='true'] { @apply bg-[#e5f0e8] text-[#204b39]; }
+  .nav-item:hover .nav-icon svg, .nav-subitem:hover .nav-icon svg { stroke: #373534; }
+  .nav-item[data-active='true'] { @apply bg-[#f4eae1] text-[#373534]; }
   .nav-item[data-active='true']::before {
     content: '';
-    @apply absolute -left-3 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#315e49];
+    @apply absolute -left-3 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#4a4745];
   }
   .nav-subitem {
-    @apply relative flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium leading-5 text-[#526b5b];
+    @apply relative flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium leading-5 text-[#655e58];
     transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   }
-  .nav-subitem:hover { @apply bg-[#eef4ef] text-[#204b39]; transform: translateX(3px); }
-  .nav-subitem[data-active='true'] { @apply bg-[#e5f0e8] text-[#204b39]; }
+  .nav-subitem:hover { @apply bg-[#f7f1eb] text-[#373534]; transform: translateX(3px); }
+  .nav-subitem[data-active='true'] { @apply bg-[#f4eae1] text-[#373534]; }
   .nav-subitem[data-active='true']::before {
     content: '';
-    @apply absolute -left-[9px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#315e49];
+    @apply absolute -left-[9px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#4a4745];
   }
-  .nav-submenu { @apply ml-5 border-l border-[#cbd8ce] pl-2; animation: nav-submenu-in 0.2s ease-out; }
-  .nav-item:focus-visible, .nav-subitem:focus-visible { @apply outline outline-2 outline-offset-2 outline-[#315e49]; }
+  .nav-submenu { @apply ml-5 border-l border-[#d5d1ce] pl-2; animation: nav-submenu-in 0.2s ease-out; }
+  .nav-item:focus-visible, .nav-subitem:focus-visible { @apply outline outline-2 outline-offset-2 outline-[#4a4745]; }
   @keyframes nav-submenu-in {
     from { opacity: 0; transform: translateY(-4px); }
     to   { opacity: 1; transform: translateY(0); }

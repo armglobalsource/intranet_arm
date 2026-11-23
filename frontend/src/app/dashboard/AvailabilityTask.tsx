@@ -24,13 +24,13 @@ export function AvailabilityTask({ campusId, channel }: {
   const href = channel === 'worship' ? '/dashboard/worship/disponibilidad'
     : '/dashboard/produccion-general/tecnicos/disponibilidad';
   return (
-    <article className="rounded-2xl border border-[#dce5df] bg-white p-5">
-      <h3 className="text-base font-semibold text-[#182d25]">Disponibilidad {channel === 'worship' ? 'Worship' : 'técnica'}</h3>
-      <p className="mt-1 text-sm text-[#607068]">Esta semana · {formatWeekLabel(week)}</p>
+    <article className="rounded-2xl border border-[#e3e0de] bg-white p-5">
+      <h3 className="text-base font-semibold text-[#242221]">Disponibilidad {channel === 'worship' ? 'Worship' : 'técnica'}</h3>
+      <p className="mt-1 text-sm text-[#6c6864]">Esta semana · {formatWeekLabel(week)}</p>
       {!campusId ? <>
-        <p className="my-4 text-sm text-[#607068]">Necesitas un campus asignado para enviar tu disponibilidad. Revisa tu perfil o contacta a tu responsable.</p>
+        <p className="my-4 text-sm text-[#6c6864]">Necesitas un campus asignado para enviar tu disponibilidad. Revisa tu perfil o contacta a tu responsable.</p>
         <Link href="/dashboard/perfil" className="dashboard-action">Revisar mi perfil →</Link>
-      </> : loading ? <p className="my-4 text-sm text-[#607068]" role="status">Consultando disponibilidad…</p>
+      </> : loading ? <p className="my-4 text-sm text-[#6c6864]" role="status">Consultando disponibilidad…</p>
         : failed ? <>
           <p className="my-4 text-sm text-amber-800" role="status">No pudimos consultar tu disponibilidad.</p>
           <button className="dashboard-action" onClick={() => { void query.refetch(); void slots.refetch(); }}>Reintentar</button>
@@ -41,7 +41,7 @@ export function AvailabilityTask({ campusId, channel }: {
                 : 'Respondiste todos los encuentros de esta semana.'}
           </p>
           <Link href={href} className="dashboard-action">{remaining ? 'Enviar disponibilidad' : 'Ver disponibilidad'} →</Link>
-          <p className="mt-3 text-xs leading-relaxed text-[#607068]">Indicar disponibilidad no confirma una asignación a un turno.</p>
+          <p className="mt-3 text-xs leading-relaxed text-[#6c6864]">Indicar disponibilidad no confirma una asignación a un turno.</p>
         </>}
     </article>
   );

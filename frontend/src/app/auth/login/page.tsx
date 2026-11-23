@@ -44,7 +44,7 @@ export default function LoginPage() {
       {errors.root && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{errors.root.message}</p>}
       <button disabled={isSubmitting} className={authButton}>{isSubmitting ? <><Loader2 size={18} className="animate-spin" aria-hidden="true" />Ingresando…</> : <>Ingresar<ArrowRight size={17} aria-hidden="true" /></>}</button>
     </form>
-    <p className="mt-7 text-center text-sm text-[#607068]">¿Es tu primera vez? <Link href="/auth/register" className={authLink}>Crea tu cuenta</Link></p>
-    <p className="mt-7 border-t border-[#e1e7dd] pt-6 text-center text-xs leading-5 text-[#607068]">Si ya estás en el directorio y aún no tienes contraseña,<br className="hidden sm:block" /> puedes <Link href="/auth/forgot-password" className={authLink}>activar tu acceso por correo</Link>.</p>
+    <p className="mt-7 text-center text-sm text-[#6c6864]">¿Es tu primera vez? <Link href="/auth/register" className={authLink}>Crea tu cuenta</Link></p>
+    <p className="mt-7 border-t border-[#e4e2e0] pt-6 text-center text-xs leading-5 text-[#6c6864]">Si ya estás en el directorio y aún no tienes contraseña,<br className="hidden sm:block" /> puedes <Link href="/auth/forgot-password" className={authLink}>activar tu acceso por correo</Link>.</p>
   </AuthShell>;
 }

@@ -17,10 +17,10 @@ export default function ForgotPasswordPage() {
     catch (err) { setError('root', { message: apiErrorMessage(err, 'No pudimos procesar tu solicitud. Inténtalo nuevamente.') }); }
   };
   return <AuthShell title={sent ? 'Revisa tu correo.' : 'Recupera tu acceso.'} description={sent ? 'Estás a un paso de volver a tu comunidad.' : 'Te ayudamos a crear una nueva contraseña, sin perder tu información.'}>
-    {sent ? <div role="status" className="rounded-2xl border border-[#dbe5d8] bg-[#f0f5ed] p-6">
-      <Mail size={26} className="mb-4 text-[#315e49]" aria-hidden="true" />
+    {sent ? <div role="status" className="rounded-2xl border border-[#e2dedb] bg-[#f7f1eb] p-6">
+      <Mail size={26} className="mb-4 text-[#4a4745]" aria-hidden="true" />
       <p className="text-sm leading-6">Si el correo corresponde a una cuenta disponible, recibirás un enlace para crear tu contraseña.</p>
-      <p className="mt-3 text-sm leading-6 text-[#607068]">Revisa también spam. El enlace dura 15 minutos. Si no llega, espera un minuto antes de intentarlo otra vez.</p>
+      <p className="mt-3 text-sm leading-6 text-[#6c6864]">Revisa también spam. El enlace dura 15 minutos. Si no llega, espera un minuto antes de intentarlo otra vez.</p>
       <button onClick={() => setSent(false)} className={`${authLink} mt-5 min-h-[44px] text-sm`}>Volver a intentarlo o corregir el correo</button>
     </div> : <form onSubmit={handleSubmit(submit)} noValidate className="space-y-5" aria-busy={isSubmitting}>
       <div><label htmlFor="email" className="mb-2 block text-sm font-medium">Correo electrónico</label>

@@ -14,7 +14,7 @@ export const ROLE_LABELS: Record<string, string> = { admin: 'Administrador', use
 export const ORG_ROLE_LABELS: Record<string, string> = { area_leader: 'Líder de área', team_leader: 'Líder de equipo', member: 'Miembro' };
 
 export const AVATAR_COLORS = [
-  { bg: '#E1F5EE', text: '#0F6E56' },
+  { bg: '#f4eae2', text: '#0F6E56' },
   { bg: '#E6F1FB', text: '#185FA5' },
   { bg: '#FAEEDA', text: '#854F0B' },
   { bg: '#EEEDFE', text: '#534AB7' },

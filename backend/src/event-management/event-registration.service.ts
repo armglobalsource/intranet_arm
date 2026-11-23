@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { DatabaseService } from '../common/database/database.service';
 import { ResendMailerService } from '../auth/resend-mailer.service';
-import { EventPaymentService } from './event-payment.service';
+import { EventPaymentService, InspectedPayment } from './event-payment.service';
 import { RegistrationDto } from './event-registration.dto';
 import { assertEventScope, EventActor, eventAccess } from './event-program.rules';
 
@@ -156,6 +156,26 @@ export class EventRegistrationService {
   const row=await this.row(payment.external_reference);
   if(row.status==='confirmed')await this.notify(row);
   return {received:true};
+ }
+ /** Para el organizador: consulta el pago en Mercado Pago, lo aplica si corresponde y explica el resultado. */
+ async verifyPayment(user:EventActor,eventId:string,registrationId:string){
+  const event=(await this.db.query('SELECT * FROM arm_app.event_programs WHERE id=$1',[eventId])).rows[0];
+  if(!event)throw new NotFoundException('Evento no encontrado');assertEventScope(user,{campus_id:event.campus_id,organizer_id:event.organizer_id});
+  const before=await this.row(registrationId);
+  if(before.event_id!==eventId)throw new NotFoundException('Inscripción no encontrada');
+  if(Number(before.amount)<=0)return {status:before.status,message:'Esta inscripción no tiene pago.',payments:[]};
+  const found:InspectedPayment[]=await this.payments.inspectPayments(registrationId);
+  const payments=found.map(({payment:_p,...rest}:InspectedPayment)=>rest);
+  let after=before;
+  const approved=found.find((p:InspectedPayment)=>p.status==='approved'&&p.sameReference&&p.sameMode&&p.sameSeller);
+  if(approved&&before.status==='pending_payment'){await this.applyPayment(approved.payment);after=await this.row(registrationId);}
+  const message=!found.length?'Mercado Pago no tiene pagos con la referencia de esta inscripción. Revisa que el pago se haya hecho desde su botón «Pagar con Mercado Pago».'
+   :after.status==='confirmed'?'Pago aprobado verificado con Mercado Pago. La inscripción quedó confirmada.'
+   :approved&&after.status==='payment_review'?'El pago está aprobado, pero llegó después de vencer la reserva: queda para revisión.'
+   :approved?'El pago aprobado ya estaba aplicado.'
+   :found.some((p:InspectedPayment)=>p.status==='approved')?'Hay un pago aprobado, pero no corresponde a esta cuenta o entorno de pagos.'
+   :`Mercado Pago informa el pago como «${found[0].status}${found[0].statusDetail?` · ${found[0].statusDetail}`:''}».`;
+  return {status:after.status,message,payments};
  }
  async list(user:EventActor,eventId:string){
   const event=(await this.db.query('SELECT * FROM arm_app.event_programs WHERE id=$1',[eventId])).rows[0];

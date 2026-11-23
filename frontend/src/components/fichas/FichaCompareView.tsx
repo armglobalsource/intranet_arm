@@ -92,7 +92,7 @@ export function FichaCompareView({ encuentros, sections, rowsFor, paletteName, o
                         </td>
                         {r.shared ? (
                           <td colSpan={encuentros.length} className="px-3 py-1.5 text-[#243047]">
-                            <span className="mr-1.5 rounded-full bg-[#E0F2F1] px-1.5 text-[9.5px] font-bold uppercase text-[#0B7A75]">Todos</span>
+                            <span className="mr-1.5 rounded-full bg-[#f3e8df] px-1.5 text-[9.5px] font-bold uppercase text-[#0B7A75]">Todos</span>
                             {r.sharedText || <span className="text-[#69768B]">—</span>}
                           </td>
                         ) : r.cells.map((c) => (

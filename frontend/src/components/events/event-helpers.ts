@@ -3,14 +3,14 @@
 
 import { eventPrice, type EventProgram, type PublicEvent, type TicketType } from './event-types';
 
-/** Colores sugeridos para la portada, dentro de la identidad ARM Global. */
+/** Colores sugeridos para la portada, tomados de la paleta de armglobal.org. */
 export const EVENT_COLORS = [
-  { value: '#173e32', name: 'Verde ARM' },
-  { value: '#102b40', name: 'Azul noche' },
-  { value: '#3b2a52', name: 'Morado profundo' },
-  { value: '#7a2e2e', name: 'Vino' },
-  { value: '#8a5a1f', name: 'Ocre' },
-  { value: '#1f1f1f', name: 'Grafito' },
+  { value: '#31302e', name: 'Carbón ARM' },
+  { value: '#283033', name: 'Pizarra' },
+  { value: '#2c5e4d', name: 'Verde bosque' },
+  { value: '#96523f', name: 'Terracota' },
+  { value: '#4b2920', name: 'Café' },
+  { value: '#4f6067', name: 'Azul acero' },
 ] as const;
 
 /** Zonas horarias de los campus ARM (el resto se puede escribir igual). */

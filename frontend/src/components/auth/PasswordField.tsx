@@ -7,7 +7,7 @@ export const PasswordField = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
   const [visible, setVisible] = useState(false);
   return <div className="relative">
     <input {...props} ref={ref} type={visible ? 'text' : 'password'} className={`${authInput} pr-14`} />
-    <button type="button" aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={visible} onClick={() => setVisible(!visible)} className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-xl text-[#627369] hover:text-[#182d25] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#315e49]">
+    <button type="button" aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={visible} onClick={() => setVisible(!visible)} className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-xl text-[#6f6a66] hover:text-[#242221] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4a4745]">
       {visible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
     </button>
   </div>;

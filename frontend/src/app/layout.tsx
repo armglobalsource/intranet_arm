@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Outfit } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 // ecosistema-arm
 
 export const dynamic = 'force-dynamic';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+// Títulos: Outfit, libre y cercana a Objective (la tipografía de armglobal.org).
+// Si ARM entrega los archivos con licencia de Objective, se reemplaza aquí con next/font/local.
+const display = Outfit({ subsets: ['latin'], weight: ['500', '600', '700', '800'], variable: '--font-display' });
 
 export const metadata: Metadata = {
   title: { default: 'Ecosistema ARM', template: '%s | Ecosistema' },
@@ -24,7 +27,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${inter.variable} ${display.variable}`}>
       <head>
         {/* Recarga automática cuando un chunk JS no se encuentra tras un nuevo deploy */}
         <script dangerouslySetInnerHTML={{ __html: `

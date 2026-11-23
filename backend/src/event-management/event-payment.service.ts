@@ -8,6 +8,8 @@ export function verifyPaymentSignature(secret:string,id:string,requestId:string,
  const expected=createHmac('sha256',secret).update(`id:${id};request-id:${requestId};ts:${parts.ts};`).digest();
  return timingSafeEqual(expected,Buffer.from(parts.v1,'hex'));
 }
+/** Un pago de Mercado Pago con cada condición de aceptación ya evaluada. */
+export interface InspectedPayment { payment:any; id:string; status:string; statusDetail:string; amount:number; currency:string; sameReference:boolean; sameMode:boolean; sameSeller:boolean }
 @Injectable()
 export class EventPaymentService {
  constructor(private readonly config:ConfigService){}
@@ -41,13 +43,21 @@ export class EventPaymentService {
   if(this.mode()==='production'&&String(seller.id)!==this.config.get<string>('MERCADOPAGO_COLLECTOR_ID'))throw new ServiceUnavailableException('El ID receptor configurado no coincide con la cuenta del Access Token. Usa el User ID de esa cuenta (el número al final del token), no el número de la aplicación.');
   return String(seller.id);
  }
- /** Pagos de una inscripción según Mercado Pago, solo del vendedor y entorno configurados. */
- async findPayments(externalReference:string){
+ /** Todo lo que Mercado Pago informa para una referencia, con cada condición evaluada (sin datos personales). */
+ async inspectPayments(externalReference:string):Promise<InspectedPayment[]>{
   const seller=await this.assertSeller();
   const data=await this.request(`/v1/payments/search?external_reference=${encodeURIComponent(externalReference)}&sort=date_created&criteria=desc&limit=10`);
   const live=this.mode()==='production';
-  return (Array.isArray(data?.results)?data.results:[]).filter((p:any)=>
-   p.external_reference===externalReference&&p.live_mode===live&&String(p.collector_id??p.collector?.id)===seller);
+  return (Array.isArray(data?.results)?data.results:[]).map((p:any)=>{
+   // La búsqueda se hace con la credencial del vendedor; si el resultado no trae el receptor, se asume el propio.
+   const collector=p.collector_id??p.collector?.id;
+   return {payment:p,id:String(p.id),status:String(p.status??''),statusDetail:String(p.status_detail??''),amount:Number(p.transaction_amount),currency:String(p.currency_id??''),
+    sameReference:p.external_reference===externalReference,sameMode:p.live_mode===live,sameSeller:collector==null||String(collector)===seller};
+  });
+ }
+ /** Pagos de una inscripción según Mercado Pago, solo del vendedor y entorno configurados. */
+ async findPayments(externalReference:string){
+  return (await this.inspectPayments(externalReference)).filter((p:InspectedPayment)=>p.sameReference&&p.sameMode&&p.sameSeller).map((p:InspectedPayment)=>p.payment);
  }
  /** IDs a comparar cuando el receptor no coincide; solo se usan recortados en la comprobación del editor. */
  async sellerIds(){
