@@ -19,6 +19,7 @@ import { EVENT_COLORS, EVENT_TIMEZONES, eventReadiness, slugify } from './event-
 import { EventLanding } from './EventLanding';
 import { uploadCover } from './cover-upload';
 import { QuestionsEditor, TicketsEditor, cleanQuestions } from './EventSalesEditor';
+import { EventSubnav } from './EventSubnav';
 import s from './events.module.css';
 import x from './event-editor.module.css';
 
@@ -96,7 +97,8 @@ export function EventEditor({ id }: { id?: string }) {
   const query = useQuery({ queryKey: ['event-program', id], enabled: !!id && access.allowed, queryFn: () => api.get<EventProgram>(`/event-management/${id}`).then((r) => r.data) });
   useEffect(() => { if (!draft) { if (id && query.data) setDraft(query.data); else if (!id && user) setDraft(newEvent(user.id, user.campusId ?? 0)); } }, [id, query.data, user, draft]);
   return (
-    <EventShell title={id ? 'Edita tu evento' : 'Crea un nuevo evento'} description="Completa los pasos y mira en vivo cómo lo verán los participantes." action={<div className={s.actions} style={{ marginTop: 0 }}><Link className={s.button} href="/dashboard/eventos/gestion"><ArrowLeft size={16} />Volver</Link>{id && <><Link className={s.button} href={`/dashboard/eventos/${id}/inscritos`}><Users size={16} aria-hidden="true" />Inscritos</Link><Link className={s.button} href={`/dashboard/eventos/${id}/acceso`}><ScanLine size={16} aria-hidden="true" />Control de acceso</Link><Link className={s.button} href={`/dashboard/eventos/${id}/codigos`}><Ticket size={16} aria-hidden="true" />Códigos</Link></>}</div>}>
+    <EventShell title={id ? 'Edita tu evento' : 'Crea un nuevo evento'} description="Completa los pasos y mira en vivo cómo lo verán los participantes." action={<Link className={s.button} href="/dashboard/eventos/gestion"><ArrowLeft size={16} />Volver</Link>}>
+      {id && <EventSubnav id={id} />}
       {(options.isError || query.isError) && <div className={s.error} role="alert">{apiErrorMessage(options.error ?? query.error, 'No se pudo cargar el evento o su configuración.')} <button className={s.button} onClick={() => { options.refetch(); if (id) query.refetch(); }}>Reintentar</button></div>}
       {(!draft || !options.data) && !options.isError && !query.isError && <p role="status">Preparando el editor…</p>}
       {draft && options.data && <EditorForm initial={draft} options={options.data} onReload={async () => { if (id) { const r = await query.refetch(); if (r.data) setDraft(r.data); } }} key={`${id ?? 'new'}-${draft.version}`} />}
@@ -292,6 +294,8 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
                 <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.selfCancel ?? d.pricing !== 'paid'} onChange={(e) => detail('selfCancel', e.target.checked)} />Puede cancelar su entrada y liberar el cupo{d.pricing === 'paid' ? ' (la devolución del dinero la gestiona el equipo)' : ''}</label>
                 <Field title="Hasta cuántas horas antes del inicio" hint="Después de ese plazo, los cambios los hace el equipo."><input type="number" min={0} max={720} value={d.selfServiceHours ?? 24} onChange={(e) => detail('selfServiceHours', e.target.value === '' ? 24 : Number(e.target.value))} /></Field>
                 <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.reminders ?? true} onChange={(e) => detail('reminders', e.target.checked)} />Enviar recordatorios automáticos por correo una semana y un día antes, con las entradas</label>
+                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.survey ?? true} onChange={(e) => detail('survey', e.target.checked)} />Enviar una encuesta de satisfacción al día siguiente del evento (anónima)</label>
+                {(d.survey ?? true) && <Field title="Pregunta propia de la encuesta" wide hint="Opcional. Se suma a calificación, recomendación, lo mejor y qué mejorar."><input maxLength={200} value={d.surveyQuestion ?? ''} onChange={(e) => detail('surveyQuestion', e.target.value)} placeholder="Ej.: ¿Qué tema te gustaría para el próximo retiro?" /></Field>}
                 {d.waitlist && <p className={x.help + ' ' + s.wide}>Con lista de espera activa, cuando se libera un cupo pasa automáticamente a la siguiente persona: si el evento es pagado, recibe 24 horas para pagar.</p>}
               </Card>
               <Card icon={<Users size={18} />} title="Cupos y fechas de inscripción" text="Sin fechas, la inscripción queda abierta mientras la publiques.">

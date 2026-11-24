@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Check, Pencil, Plus, Tag } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { EventShell } from './EventWorkspace';
+import { EventSubnav } from './EventSubnav';
 import { DiscountCode, EventProgram, eventPrice } from './event-types';
 import { isoDate, localDate } from './EventSalesEditor';
 import s from './events.module.css';
@@ -55,10 +56,10 @@ export function EventCodes({ id }: { id: string }) {
   const set = (patch: Partial<DiscountCode>) => setEditing((c) => (c ? { ...c, ...patch } : c));
   return (
     <EventShell title={event.data?.title ?? 'Códigos de descuento'} description="Descuentos para familias, becas, preventas o acceso a entradas reservadas.">
+      <EventSubnav id={id} />
       <div className={a.page}>
         <div className={a.top}>
           <div>
-            <Link className={a.back} href={`/dashboard/eventos/${id}`}><ArrowLeft size={15} aria-hidden="true" />Volver al evento</Link>
             <p className={a.eyebrow}>Códigos</p>
             <h2 className={a.title}>Códigos de descuento</h2>
           </div>

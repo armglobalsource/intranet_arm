@@ -73,4 +73,29 @@ export class ResendMailerService {
     if (!data.id) throw new ServiceUnavailableException('El proveedor de correo no confirmó el envío.');
     return { id: data.id };
   }
+
+  /**
+   * Envía hasta 100 correos por llamada (lote de Resend). Devuelve cuántos se aceptaron.
+   * Sin adjuntos; el remitente puede ser el del evento (mismo dominio verificado).
+   */
+  async sendBatch(mails: { to: string; subject: string; html: string; text: string }[], options: { idempotencyKey: string; sender?: { name?: string; email?: string } }) {
+    const key = this.config.get<string>('RESEND_API_KEY');
+    const from = this.config.get<string>('RESEND_FROM_EMAIL');
+    if (!key || !from || !from.includes('@') || /[\r\n]/.test(from)) throw new ServiceUnavailableException('El envío de correos no está configurado. Avisa al administrador del sistema.');
+    const s = senderFor(from, options.sender?.name, options.sender?.email);
+    let sent = 0;
+    for (let i = 0; i < mails.length; i += 100) {
+      const chunk = mails.slice(i, i + 100).map((m) => ({ from: s.from ?? from, to: [m.to], subject: m.subject, html: m.html, text: m.text, ...(s.replyTo ? { reply_to: s.replyTo } : {}) }));
+      const response = await fetch('https://api.resend.com/emails/batch', {
+        method: 'POST', signal: AbortSignal.timeout(20000),
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'Idempotency-Key': `${options.idempotencyKey}/${i / 100}` },
+        body: JSON.stringify(chunk),
+      });
+      if (!response.ok) break;
+      const data = await response.json().catch(() => ({})) as { data?: unknown[] };
+      sent += Array.isArray(data.data) ? data.data.length : chunk.length;
+      if (i + 100 < mails.length) await new Promise((r) => setTimeout(r, 250));
+    }
+    return { sent, failed: mails.length - sent };
+  }
 }

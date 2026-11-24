@@ -60,6 +60,10 @@ export class EventRegistrationService {
   }
   return {mode:this.paymentMode(),collectorId,message:'Cuenta receptora y configuración verificadas. Esta comprobación no realiza cobros.'};
  }
+ /** Dominio público (https) para enlaces en correos. */
+ publicOrigin(){return this.settings().origin;}
+ /** Firma corta (HMAC) para enlaces sin cuenta, como la encuesta. */
+ sign(text:string){return createHmac('sha256',this.settings().secret).update(text).digest('base64url');}
  /** El enlace de seguimiento firma el ID de la compra (antes, de la inscripción: es el mismo ID). */
  token(id:string){return createHmac('sha256',this.settings().secret).update(`event-registration:${id}`).digest('hex');}
  private async order(id:string,db:Db=this.db){const r=(await db.query('SELECT * FROM arm_app.event_orders WHERE id=$1',[id])).rows[0];if(!r)throw new NotFoundException('Inscripción no encontrada');return r;}
@@ -207,7 +211,7 @@ export class EventRegistrationService {
    if(reminder&&!shown.length)return false;
    const key=`event-registration/${order.id}/${options.kind??(confirmed?'confirmed':'registered')}${options.force?`/${Date.now()}`:''}`;
    await this.mail.sendHtml({to:[order.email],subject:mail.subject,text:mail.text,html:mail.html,sender:{name:d.senderName,email:d.senderEmail},idempotencyKey:key,attachments:attachments.length?attachments:undefined});
-   const column=options.kind==='reminder_week'?'reminder_week_sent_at':options.kind==='reminder_day'?'reminder_day_sent_at':options.kind==='cancelled'?null:confirmed?'confirmation_sent_at':'email_sent_at';
+   const column=options.kind==='reminder_week'?'reminder_week_sent_at':options.kind==='reminder_day'?'reminder_day_sent_at':options.kind==='cancelled'||options.kind==='refunded'?null:confirmed?'confirmation_sent_at':'email_sent_at';
    if(column)await this.db.query(`UPDATE arm_app.event_orders SET ${column}=now() WHERE id=$1`,[order.id]);
    return true;
   }catch{/* A failed email never undoes a committed booking; authenticated retry is available. */return false;}
@@ -250,7 +254,10 @@ export class EventRegistrationService {
     await db.query("UPDATE arm_app.event_registrations SET status=$2,updated_at=now() WHERE order_id=$1 AND status<>'cancelled'",[row.id,status]);
    };
    if(['refunded','charged_back'].includes(payment.status)||Number(payment.transaction_amount_refunded)>0){
-    if(row.payment_id===id)await setStatus('payment_review');
+    // Una devolución hecha desde el panel ya quedó registrada: solo un contracargo o una devolución
+    // mayor a la registrada (hecha fuera del panel) deja la compra para revisión.
+    const ours=payment.status!=='charged_back'&&Number(payment.transaction_amount_refunded??row.amount)<=Number(row.refunded_amount??0);
+    if(row.payment_id===id&&!ours)await setStatus('payment_review');
     return;
    }
    if(payment.status!=='approved'||row.payment_id===id)return;

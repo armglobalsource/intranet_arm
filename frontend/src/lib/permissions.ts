@@ -1,5 +1,5 @@
 export const PERMISSION_CATALOG = {
-  eventos: { label: 'Eventos', description: 'Eventos, publicación y configuración', actions: { manageAll: 'Administrar todos los eventos y categorías', manageCampus: 'Administrar eventos del propio campus', organize: 'Editar eventos asignados como organizador', checkin: 'Registrar ingresos en la puerta (eventos de su campus)' } },
+  eventos: { label: 'Eventos', description: 'Eventos, publicación y configuración', actions: { manageAll: 'Administrar todos los eventos y categorías', manageCampus: 'Administrar eventos del propio campus', organize: 'Editar eventos asignados como organizador', checkin: 'Registrar ingresos en la puerta (eventos de su campus)', refund: 'Devolver pagos con Mercado Pago' } },
   'institutional-mail': {
     label: 'Correos y accesos', description: 'Solicitudes institucionales y control de cuentas',
     actions: { approve: 'Habilitar al aprobador designado', manage: 'Gestionar solicitudes e inventario como TI' },
@@ -276,6 +276,7 @@ export const PERMISSION_UI_CONFIG: Record<string, PermissionUiSection> = {
     extra: [
       { key: 'manageAll', label: 'Administrar todos los eventos y categorías', actions: ['manageAll'] },
       { key: 'checkin', label: 'Registrar ingresos en la puerta (eventos de su campus)', actions: ['checkin'] },
+      { key: 'refund', label: 'Devolver pagos con Mercado Pago (en los eventos que administra)', actions: ['refund'] },
     ],
   },
   finanzas:   { breadcrumb: ['Producción General', 'Finanzas'],      viewActions: ['view'], editActions: [] },

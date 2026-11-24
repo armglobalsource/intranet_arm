@@ -5,7 +5,7 @@ export type Attendee = {
   campusId: number; campusName: string; ticketName: string | null; status: string; amount: number; currency: string;
   paymentId?: string | null; testPayment?: boolean; source: 'public' | 'manual'; note?: string | null; createdAt: string;
   checkedInAt: string | null; checkedInBy: string | null; createdBy?: string | null; emailSent?: boolean;
-  orderId?: string; ticketCode?: string; transferredAt?: string | null; buyerName?: string; buyerEmail?: string; discountCode?: string | null; answers?: Record<string, string | boolean>;
+  orderId?: string; orderAmount?: number | string; orderRefunded?: number | string; orderStatus?: string; refundedAt?: string | null; ticketCode?: string; transferredAt?: string | null; buyerName?: string; buyerEmail?: string; discountCode?: string | null; answers?: Record<string, string | boolean>;
 };
 export type AttendanceQuestion = { id: string; label: string; type: string };
 export type AttendanceEvent = {
@@ -13,7 +13,7 @@ export type AttendanceEvent = {
   timezone?: string; pricing?: 'free' | 'paid'; color?: string; bannerUrl?: string;
   tickets: { id: string; name: string; price: number; currency: string }[]; campuses: { id: number; name: string }[]; questions?: AttendanceQuestion[];
 };
-export type AttendanceData = { event: AttendanceEvent; manage: boolean; registrations: Attendee[] };
+export type AttendanceData = { event: AttendanceEvent; manage: boolean; canRefund?: boolean; registrations: Attendee[] };
 export type Counts = { confirmed: number; checkedIn: number };
 export type CheckInReply = { result: 'ok' | 'already' | 'invalid' | 'not_found'; message: string; attendee: Attendee | null; counts: Counts };
 export type DoorEvent = { id: string; slug: string; title: string; startsAt: string; endsAt: string; capacity: number | null; campusName: string; bannerUrl?: string; timezone?: string; confirmed: number; checkedIn: number };

@@ -23,7 +23,7 @@ const NOT_VALID:Record<string,string>={
 const ATTENDEE_SQL=`SELECT r.id,r.participant,r.email,r.campus_id AS "campusId",c.name AS "campusName",r.snapshot->>'ticketName' AS "ticketName",r.ticket_type_id AS "ticketTypeId",
  CASE WHEN r.status='pending_payment' AND r.expires_at<=now() THEN 'expired' ELSE r.status END AS status,r.amount,r.currency,coalesce(o.payment_id,r.payment_id) AS "paymentId",
  (o.amount>0 AND coalesce(o.snapshot->>'paymentMode','test')='test') AS "testPayment",r.source,r.note,r.created_at AS "createdAt",r.answers,
- r.order_id AS "orderId",r.ticket_code AS "ticketCode",r.transferred_at AS "transferredAt",o.email AS "buyerEmail",concat_ws(' ',o.buyer->>'firstName',o.buyer->>'lastName') AS "buyerName",o.snapshot->>'code' AS "discountCode",
+ r.order_id AS "orderId",o.amount AS "orderAmount",o.refunded_amount AS "orderRefunded",o.status AS "orderStatus",r.refunded_at AS "refundedAt",r.ticket_code AS "ticketCode",r.transferred_at AS "transferredAt",o.email AS "buyerEmail",concat_ws(' ',o.buyer->>'firstName',o.buyer->>'lastName') AS "buyerName",o.snapshot->>'code' AS "discountCode",
  r.checked_in_at AS "checkedInAt",nullif(concat_ws(' ',ci."firstName",ci."lastName"),'') AS "checkedInBy",
  nullif(concat_ws(' ',cb."firstName",cb."lastName"),'') AS "createdBy",(CASE WHEN o.status='confirmed' THEN o.confirmation_sent_at ELSE o.email_sent_at END) IS NOT NULL AS "emailSent"
  FROM arm_app.event_registrations r JOIN arm_app.event_orders o ON o.id=r.order_id JOIN arm_app.campuses c ON c.id=r.campus_id
@@ -89,7 +89,7 @@ export class EventAttendanceService {
    event:{id:event.id,slug:event.slug,title:event.title,status:event.status,startsAt:event.starts_at,endsAt:event.ends_at,capacity:event.capacity,timezone:d.timezone,pricing:d.pricing,color:d.color,bannerUrl:d.bannerUrl,
     tickets:tickets.rows.map((t:any)=>({id:t.id,name:t.name,price:Number(t.price),currency:t.currency})),campuses:campuses.rows.map((c:any)=>({id:Number(c.id),name:c.name})),
     questions:(d.questions??[]).map((q:any)=>({id:q.id,label:q.label,type:q.type}))},
-   manage,
+   manage,canRefund:manage&&hasPermission(user.permissions??[],'eventos:refund'),
    registrations:rows.rows.map(attendee),
   };
  }

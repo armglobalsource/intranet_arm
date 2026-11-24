@@ -5,9 +5,10 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { EventActor } from './event-program.rules';
 import { RegistrationAccessDto, RegistrationDto, SelfCancelDto, TicketsLinkDto, TicketsTokenDto, TransferDto } from './event-registration.dto';
 import { EventRegistrationService } from './event-registration.service';
+import { EventInsightsService } from './event-insights.service';
 @Controller()
 export class EventRegistrationController {
- constructor(private readonly service:EventRegistrationService){}
+ constructor(private readonly service:EventRegistrationService,private readonly insights:EventInsightsService){}
  @Post('event-management/payments/check') @Throttle({default:{limit:5,ttl:60000}})
  check(@CurrentUser() u:EventActor){return this.service.checkPayments(u);}
  @Public() @Post('public-events/:slug/registrations') @Throttle({default:{limit:5,ttl:60000}})
@@ -32,5 +33,5 @@ export class EventRegistrationController {
  myTickets(@Body() d:TicketsTokenDto){return this.service.myTickets(d.token);}
  /** Vercel Cron: lista de espera y recordatorios, una vez al día. */
  @Public() @Get('event-reminders/run') @Throttle({default:{limit:5,ttl:60000}})
- daily(@Headers('authorization') auth:string){this.service.assertCron(auth);return this.service.runDaily();}
+ async daily(@Headers('authorization') auth:string){this.service.assertCron(auth);const daily=await this.service.runDaily();const surveys=await this.insights.dailySurveys().catch(()=>({surveys:0,surveyEmails:0}));return {...daily,...surveys};}
 }

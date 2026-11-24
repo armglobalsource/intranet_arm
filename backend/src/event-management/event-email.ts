@@ -3,7 +3,7 @@
 // línea para que se vea igual en Gmail, Outlook y el teléfono.
 
 export type EmailKind = 'confirmed' | 'pending_payment' | 'waitlisted' | 'registered'
-  | 'reminder_week' | 'reminder_day' | 'spot_opened' | 'transferred' | 'cancelled';
+  | 'reminder_week' | 'reminder_day' | 'spot_opened' | 'transferred' | 'cancelled' | 'refunded';
 /** Correos que muestran las entradas con su QR. */
 const WITH_TICKETS: EmailKind[] = ['confirmed', 'reminder_week', 'reminder_day', 'transferred'];
 
@@ -57,6 +57,7 @@ const COPY: Record<EmailKind, { subject: string; heading: string; intro: string;
   spot_opened: { subject: 'Se liberó un cupo para ti', heading: '¡Se liberó un cupo para ti!', intro: 'Estabas en lista de espera y ahora hay lugar. Completa el pago para confirmar tu entrada antes de que venza la reserva.', cta: 'Completar mi pago' },
   transferred: { subject: 'Te transfirieron una entrada', heading: 'Tienes una entrada', intro: 'Te transfirieron una entrada a tu nombre. Muestra este código QR al llegar.', cta: 'Ver el evento' },
   cancelled: { subject: 'Cancelaste tu entrada', heading: 'Tu entrada fue cancelada', intro: 'Registramos la cancelación y el cupo quedó libre para otra persona.', cta: 'Ver mi inscripción' },
+  refunded: { subject: 'Te devolvimos tu pago', heading: 'Hicimos una devolución', intro: 'El equipo organizador devolvió el monto indicado a tu medio de pago con Mercado Pago. Según tu banco, puede tardar algunos días en verse reflejado.', cta: 'Ver mi inscripción' },
 };
 
 export function renderEventEmail(d: EventEmailData) {
@@ -157,6 +158,40 @@ export function renderEventEmail(d: EventEmailData) {
   return { subject: `${copy.subject} · ${e.title}`, html, text };
 }
 
+
+/**
+ * Mensaje libre del equipo organizador a los inscritos, con la identidad del evento.
+ * El texto se escapa y cada línea en blanco separa un párrafo; sin HTML del organizador.
+ */
+export function renderEventMessage(d: {
+  subject: string; body: string; origin: string; senderName?: string; button?: { label: string; link: string };
+  event: { title: string; slug: string; bannerUrl?: string; color?: string; startsAt: string; timezone?: string; location?: string };
+}) {
+  const e = d.event;
+  const color = safeColor(e.color);
+  const banner = safeUrl(e.bannerUrl);
+  const date = cap(fmt(e.startsAt, e.timezone, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }));
+  const sender = d.senderName?.trim() || 'Eventos ARM Global';
+  const paragraphs = d.body.trim().split(/\n\s*\n/).map((p) => `<p style="margin:0 0 14px;font-size:16px;line-height:1.65;color:#31302e">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+  const button = d.button ?? { label: 'Ver el evento', link: `${d.origin}/eventos/${encodeURIComponent(e.slug)}` };
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(d.subject)}</title></head>
+<body style="margin:0;padding:0;background:#f6f1ec">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ec"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;font-family:Outfit,'Segoe UI',Arial,sans-serif;color:#31302e">
+  <tr><td style="background:${color};padding:0">${banner ? `<img src="${esc(banner)}" alt="${esc(e.title)}" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0">`
+    : `<div style="padding:30px 32px;color:#ffffff;font-size:26px;font-weight:800;line-height:1.15">${esc(e.title)}</div>`}</td></tr>
+  <tr><td style="padding:28px 32px 6px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${color}">${esc(e.title)} · ${esc(date)}</div>
+    <h1 style="margin:10px 0 16px;font-size:26px;line-height:1.2;font-weight:800;color:#1d1d1b">${esc(d.subject)}</h1>
+    ${paragraphs}
+  </td></tr>
+  <tr><td align="center" style="padding:8px 32px 10px"><a href="${esc(button.link)}" style="display:inline-block;padding:14px 28px;border-radius:999px;background:${color};color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">${esc(button.label)}</a></td></tr>
+  <tr><td align="center" style="padding:4px 32px 0"><a href="${esc(d.origin)}/mis-entradas" style="font-size:13px;color:#656260">Ver mis entradas</a></td></tr>
+  <tr><td style="padding:24px 32px 28px"><p style="margin:0;padding-top:18px;border-top:1px solid #ece5dd;font-size:12px;line-height:1.6;color:#8f8f8f;text-align:center">Enviado por ${esc(sender)} · ARM Global.<br>Recibes este correo porque te inscribiste en ${esc(e.title)}.</p></td></tr>
+</table></td></tr></table></body></html>`;
+  const text = [`${d.subject} · ${e.title}`, '', d.body.trim(), '', `${button.label}: ${button.link}`, '', `Enviado por ${sender} · ARM Global. Recibes este correo porque te inscribiste en ${e.title}.`].join('\n');
+  return { subject: `${d.subject} · ${e.title}`, html, text };
+}
 
 /** Correo con el enlace a «Mis entradas»: no depende de un evento y no revela qué compras hay. */
 export function renderTicketsLinkEmail(d: { link: string; origin: string }) {

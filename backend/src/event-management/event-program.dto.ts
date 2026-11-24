@@ -66,6 +66,9 @@ export class EventDetailsDto {
  @IsOptional() @IsInt() @Min(0) @Max(720) selfServiceHours?: number;
  /** Recordatorios automáticos una semana y un día antes. */
  @IsOptional() @IsBoolean() reminders?: boolean;
+ /** Encuesta de satisfacción automática al día siguiente del evento, con una pregunta propia opcional. */
+ @IsOptional() @IsBoolean() survey?: boolean;
+ @IsOptional() @IsString() @MaxLength(200) surveyQuestion?: string;
  /** Remitente de los correos del evento, p. ej. «AR Hombres» y arhombres@armglobal.org (mismo dominio verificado). */
  @IsOptional() @IsString() @MaxLength(80) senderName?: string;
  @IsOptional() @IsString() @MaxLength(254) @Matches(/^$|^[A-Za-z0-9._%+-]+@armglobal\.org$/i,{message:'El correo remitente debe ser una dirección @armglobal.org'}) senderEmail?: string;

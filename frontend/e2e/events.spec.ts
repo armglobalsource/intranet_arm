@@ -498,3 +498,121 @@ test('editor: autogestión y recordatorios se guardan con el evento',async({page
  await expect(page.getByRole('status')).toContainText('Cambios guardados');
  expect(calls[0].details).toMatchObject({selfCancel:false,selfServiceHours:48,reminders:false});
 });
+// Fase 4: ventas, devoluciones, mensajes y encuesta.
+const sales={event:{title:'Retiro de Hombres',startsAt:'2027-01-10T12:00:00Z',timezone:'America/Santiago',capacity:120,pricing:'paid'},
+ totals:{collected:450000,testCollected:0,discounts:25000,refunded:10000,pendingAmount:30000,pendingOrders:2,waitlistedOrders:1,reviewOrders:0,orders:30,tickets:45,checkedIn:12,pendingTickets:3,waitlisted:2,cancelled:1,courtesy:4},
+ byDay:[{day:'2026-11-18',tickets:8,amount:80000},{day:'2026-11-19',tickets:3,amount:30000},{day:'2026-11-21',tickets:20,amount:200000},{day:'2026-11-22',tickets:14,amount:140000}],
+ byTicket:[{name:'General',capacity:100,price:10000,sold:41,pending:3,revenue:410000},{name:'Cortesías y otras',capacity:null,price:0,sold:4,pending:0,revenue:0}],
+ byCampus:[{name:'Santiago',tickets:30,revenue:300000},{name:'Viña del Mar',tickets:15,revenue:150000}],
+ codes:[{code:'FAMILIA',kind:'percent',value:25,active:true,uses:5,given:25000}]};
+for(const width of [393,1280])test(`ventas: totales, gráfico por día y desgloses ${width}`,async({page})=>{
+ await fixture(page);await page.setViewportSize({width,height:900});
+ await page.route(`**/api/v1/event-management/${id}/sales`,r=>r.fulfill({json:sales}));
+ await page.goto(`/dashboard/eventos/${id}/ventas`);
+ await expect(page.getByText('$450.000')).toBeVisible();
+ await expect(page.getByText('Después de $10.000 devueltos')).toBeVisible();
+ await expect(page.getByText('40 %')).toBeVisible();
+ await expect(page.getByRole('navigation',{name:'Secciones del evento'}).getByRole('link',{name:'Ventas'})).toHaveAttribute('aria-current','page');
+ await expect(page.getByRole('img',{name:/Entradas por día: 18 nov: 8 entradas/})).toBeVisible();
+ if(width>600){await page.getByRole('img',{name:/Entradas por día/}).hover({position:{x:width>600?560:300,y:120}});}
+ await page.getByRole('button',{name:'Ver como tabla'}).click();
+ await expect(page.getByRole('cell',{name:'21 nov'})).toBeVisible();
+ await page.getByRole('button',{name:'Ver gráfico'}).click();
+ await expect(page.getByRole('cell',{name:'FAMILIA'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/event-sales-${width}.png`,fullPage:true});
+});
+test('inscritos: devolver una entrada con Mercado Pago',async({page})=>{
+ await fixture(page);await page.setViewportSize({width:1280,height:900});
+ const paid={...people[1],amount:15000,orderAmount:20000,orderRefunded:0,paymentId:'987654',buyerName:'José Muñoz',refundedAt:null as string|null};
+ const calls:any[]=[];
+ await page.route(/\/api\/v1\/event-management\/[^/]+\/(attendees|registrations\/[^/]+\/refund)$/,async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/refund')){calls.push(route.request().postDataJSON());paid.refundedAt='2026-11-24T12:00:00Z';(paid as any).status='cancelled';return route.fulfill({json:{message:'Devolvimos $20.000 a José Muñoz con Mercado Pago y anulamos las entradas de la compra.'}});}
+  return route.fulfill({json:{event:{id,slug:'retiro',title:'Retiro de Hombres',status:'published',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',capacity:120,timezone:'America/Santiago',pricing:'paid',tickets:[],campuses:[{id:10,name:'Santiago'}]},manage:true,canRefund:true,registrations:[paid]}});
+ });
+ await page.goto(`/dashboard/eventos/${id}/inscritos`);
+ await page.getByRole('button',{name:'Devolver $15.000'}).click();
+ const box=page.getByRole('group',{name:'Devolver el pago de José Muñoz'});
+ await expect(box).toContainText('¿Devolver $15.000 a José Muñoz con Mercado Pago?');
+ await box.getByRole('checkbox',{name:'Devolver toda la compra ($20.000)'}).check();
+ await expect(box).toContainText('¿Devolver $20.000');
+ await page.screenshot({path:'test-results/event-refund-1280.png'});
+ await box.getByRole('button',{name:'Sí, devolver'}).click();
+ await expect(page.getByText('Devolvimos $20.000 a José Muñoz con Mercado Pago')).toBeVisible();
+ expect(calls).toEqual([{wholeOrder:true}]);
+ await expect(page.getByText('Devuelta')).toBeVisible();
+ await expect(page.getByRole('button',{name:/^Devolver/})).toHaveCount(0);
+});
+test('inscritos: sin permiso de devolución no aparece el botón',async({page})=>{
+ await attendance(page);await page.setViewportSize({width:1280,height:900});
+ await page.goto(`/dashboard/eventos/${id}/inscritos`);
+ await expect(page.getByRole('heading',{name:'3 inscripciones'})).toBeVisible();
+ await expect(page.getByRole('button',{name:/^Devolver/})).toHaveCount(0);
+});
+test('mensajes: cuenta destinatarios, prueba y envío confirmado',async({page})=>{
+ await fixture(page);await page.setViewportSize({width:393,height:852});
+ const posts:any[]=[];const history:any[]=[];
+ await page.route(`**/api/v1/event-management/${id}/messages`,async route=>{
+  if(route.request().method()==='GET')return route.fulfill({json:history});
+  const b=route.request().postDataJSON();posts.push(b);
+  if(b.dryRun)return route.fulfill({json:{recipients:b.audience==='checked_in'?12:45}});
+  if(b.test)return route.fulfill({json:{test:true,to:'equipo@armglobal.org',message:'Te enviamos una prueba a equipo@armglobal.org.'}});
+  history.push({id:'m1',subject:b.subject,body:b.body,audience:{audience:b.audience},recipients:45,sent:45,failed:0,createdAt:'2026-11-24T15:00:00Z',sentBy:'Prueba ARM'});
+  return route.fulfill({json:{recipients:45,sent:45,failed:0,message:'Mensaje enviado a 45 personas.'}});
+ });
+ await page.goto(`/dashboard/eventos/${id}/mensajes`);
+ await expect(page.getByText('Llegará a 45 personas.')).toBeVisible();
+ await page.getByLabel('Para').selectOption('checked_in');
+ await expect(page.getByText('Llegará a 12 personas.')).toBeVisible();
+ await page.getByLabel('Para').selectOption('confirmed');
+ await page.getByLabel('Asunto').fill('Cambio de horario');
+ await page.getByRole('textbox',{name:/^Mensaje/}).fill('Hola:\n\nEmpezamos a las 10:00.');
+ await page.getByRole('button',{name:'Enviarme una prueba'}).click();
+ await expect(page.getByText('Te enviamos una prueba a equipo@armglobal.org.')).toBeVisible();
+ await page.getByRole('button',{name:'Revisar y enviar'}).click();
+ await expect(page.getByRole('group',{name:'Confirmar envío'})).toContainText('a 45 personas');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/event-messages-393.png',fullPage:true});
+ await page.getByRole('button',{name:'Sí, enviar ahora'}).click();
+ await expect(page.getByText('Mensaje enviado a 45 personas.')).toBeVisible();
+ expect(posts.filter(p=>!p.dryRun)).toEqual([{subject:'Cambio de horario',body:'Hola:\n\nEmpezamos a las 10:00.',audience:'confirmed',test:true},{subject:'Cambio de horario',body:'Hola:\n\nEmpezamos a las 10:00.',audience:'confirmed'}]);
+ await expect(page.getByRole('region',{name:'Enviados'})).toContainText('45 de 45 enviados');
+});
+test('encuesta: resultados y envío manual',async({page})=>{
+ await fixture(page);await page.setViewportSize({width:1280,height:900});
+ let sent=false;
+ await page.route(`**/api/v1/event-management/${id}/survey**`,async route=>{
+  if(route.request().method()==='POST'){sent=true;return route.fulfill({json:{message:'Encuesta enviada a 12 personas.'}});}
+  return route.fulfill({json:{enabled:true,question:'¿Qué tema quieres para el próximo?',sentAt:sent?'2026-11-24T15:00:00Z':null,ended:true,recipients:12,onlyCheckedIn:true,responses:4,rating:4,distribution:[0,1,0,1,2],
+   nps:{score:25,promoters:2,passives:1,detractors:1,answered:4},comments:[{rating:5,liked:'La alabanza',improve:null,extra:'Familia',createdAt:'2026-11-24T16:00:00Z'}]}});
+ });
+ await page.goto(`/dashboard/eventos/${id}/encuesta`);
+ await expect(page.getByText('4 / 5')).toBeVisible();
+ await expect(page.getByText('25',{exact:true})).toBeVisible();
+ await expect(page.getByText('La alabanza')).toBeVisible();
+ await page.getByRole('button',{name:'Enviar encuesta ahora'}).click();
+ await expect(page.getByText('Encuesta enviada a 12 personas.')).toBeVisible();
+ await page.screenshot({path:'test-results/event-survey-results-1280.png',fullPage:true});
+});
+test('encuesta pública: responder una vez',async({page})=>{
+ await page.setViewportSize({width:393,height:852});
+ const answers:any[]=[];
+ await page.route('**/api/v1/public-events/retiro/survey**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/check'))return route.fulfill({json:{title:'Retiro de Hombres',startsAt:'2027-01-10T12:00:00Z',color:'#102b40',question:'¿Qué tema quieres para el próximo?',answered:false}});
+  answers.push(route.request().postDataJSON());return route.fulfill({json:{message:'¡Gracias por responder!'}});
+ });
+ await page.goto('/eventos/retiro/encuesta#e=YW5hQGV4YW1wbGUuY29t&t=firma-de-prueba-123456789012');
+ await expect(page.getByRole('heading',{name:'Retiro de Hombres'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Enviar respuestas'})).toBeDisabled();
+ await page.getByRole('radio',{name:'4 de 5'}).click();
+ await page.getByRole('radio',{name:'9',exact:true}).click();
+ await page.getByLabel('¿Qué fue lo que más te gustó?').fill('La alabanza');
+ await page.getByLabel('¿Qué tema quieres para el próximo?').fill('Familia');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/event-survey-form-393.png',fullPage:true});
+ await page.getByRole('button',{name:'Enviar respuestas'}).click();
+ await expect(page.getByRole('heading',{name:'¡Gracias por responder!'})).toBeVisible();
+ expect(answers).toEqual([{e:'YW5hQGV4YW1wbGUuY29t',t:'firma-de-prueba-123456789012',rating:4,nps:9,liked:'La alabanza',extra:'Familia'}]);
+});

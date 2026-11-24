@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { CSSProperties, FormEvent, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, Download, Mail, QrCode, Search, UserPlus, X } from 'lucide-react';
+import { ArrowLeft, Check, Download, Mail, QrCode, Search, Undo2, UserPlus, X } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { EventShell } from './EventWorkspace';
+import { EventSubnav } from './EventSubnav';
 import { eventPrice } from './event-types';
 import {
   AttendanceData, Attendee, AttendeeFilter, CheckInReply, STATUS_LABELS, VERIFIABLE,
@@ -31,6 +32,7 @@ export function EventAttendees({ id }: { id: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, Note>>({});
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [refunding, setRefunding] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [banner, setBanner] = useState<Note | null>(null);
 
@@ -69,6 +71,14 @@ export function EventAttendees({ id }: { id: string }) {
     const { data: reply } = await api.post<{ message: string }>(`/event-management/${id}/registrations/${r.id}/resend`);
     return { tone: 'ok', text: reply.message };
   });
+  /** Solo entradas con pago de Mercado Pago, monto y sin devolver; requiere el permiso de devolución. */
+  const canRefund = (r: Attendee) => !!data?.canRefund && !!r.paymentId && Number(r.amount) > 0 && !r.refundedAt && ['confirmed', 'payment_review', 'cancelled'].includes(r.status);
+  const refund = (r: Attendee, wholeOrder: boolean) => act(r.id, async () => {
+    const { data: reply } = await api.post<{ message: string }>(`/event-management/${id}/registrations/${r.id}/refund`, { wholeOrder });
+    setRefunding(null);
+    await query.refetch();
+    return { tone: 'ok', text: reply.message };
+  });
   const cancel = (r: Attendee) => act(r.id, async () => {
     setConfirming(null);
     const { data: reply } = await api.post<{ attendee: Attendee; message: string }>(`/event-management/${id}/registrations/${r.id}/cancel`);
@@ -94,12 +104,12 @@ export function EventAttendees({ id }: { id: string }) {
   const color = data?.event.color && /^#[0-9a-f]{6}$/i.test(data.event.color) ? data.event.color : '#96523f';
   return (
     <EventShell door title={data?.event.title ?? 'Inscritos'} description="Quién viene, quién ya llegó y qué falta por resolver.">
+      <EventSubnav id={id} manage={data?.manage ?? false} />
       <div className={a.page} style={{ '--event-color': color } as CSSProperties}>
         <div className={a.top}>
           <div>
-            {data?.manage && <Link className={a.back} href={`/dashboard/eventos/${id}`}><ArrowLeft size={15} aria-hidden="true" />Volver al evento</Link>}
             <p className={a.eyebrow}>Inscritos</p>
-            <h2 className={a.title}>{list.length ? `${list.length} inscripciones` : 'Inscripciones'}</h2>
+            <h2 className={a.title}>{list.length ? `${list.length} ${list.length === 1 ? 'inscripción' : 'inscripciones'}` : 'Inscripciones'}</h2>
           </div>
           <div className={a.toolbarActions}>
             <Link className={a.btn} href={`/dashboard/eventos/${id}/acceso`}><QrCode size={16} aria-hidden="true" />Control de acceso</Link>
@@ -144,7 +154,7 @@ export function EventAttendees({ id }: { id: string }) {
                       <tr key={r.id}>
                         <td className={a.person}><strong>{fullName(r)}</strong><span>{r.email}</span>{r.phone && <span>{r.phone}</span>}<span>{r.campusName}</span>{boughtBy(r) && <span>Compra de {boughtBy(r)}</span>}{(data.event.questions ?? []).filter((q) => answerText(r.answers?.[q.id]) !== '').map((q) => <span key={q.id} className={a.answer}>{q.label}: <b>{answerText(r.answers?.[q.id])}</b></span>)}</td>
                         <td data-label="Entrada">{r.ticketName ?? '—'}<br /><span className={a.tagMuted}>{Number(r.amount) > 0 ? money(Number(r.amount)) : r.source === 'manual' ? `Agregada por ${r.createdBy ?? 'el equipo'}` : 'Sin costo'}</span>{r.note && <div className={a.tagMuted}>«{r.note}»</div>}</td>
-                        <td data-label="Estado"><span className={a.tag} data-status={r.status}>{STATUS_LABELS[r.status] ?? r.status}</span>{r.testPayment && <span className={a.tagMuted}>Prueba</span>}{r.transferredAt && <span className={a.tagMuted}>Transferida</span>}{r.paymentId && <div className={a.tagMuted}>Pago N° {r.paymentId}</div>}</td>
+                        <td data-label="Estado"><span className={a.tag} data-status={r.status}>{STATUS_LABELS[r.status] ?? r.status}</span>{r.testPayment && <span className={a.tagMuted}>Prueba</span>}{r.transferredAt && <span className={a.tagMuted}>Transferida</span>}{r.refundedAt && <span className={a.tagMuted}>Devuelta</span>}{r.paymentId && <div className={a.tagMuted}>Pago N° {r.paymentId}</div>}</td>
                         <td data-label="Ingreso">
                           <div className={a.presence}>
                             {r.checkedInAt
@@ -157,13 +167,16 @@ export function EventAttendees({ id }: { id: string }) {
                         </td>
                         {data.manage && (
                           <td>
-                            {confirming === r.id
+                            {refunding === r.id
+                              ? <RefundBox r={r} busy={busy === r.id} onCancel={() => setRefunding(null)} onConfirm={(whole) => void refund(r, whole)} />
+                              : confirming === r.id
                               ? <div className={a.confirmBox}>¿Anular la inscripción de {r.firstName}?
                                 <button type="button" className={`${a.btnDanger} ${a.small}`} disabled={busy === r.id} onClick={() => void cancel(r)}>Sí, anular</button>
                                 <button type="button" className={`${a.btnGhost} ${a.small}`} onClick={() => setConfirming(null)}>No</button></div>
                               : <div className={a.rowActions}>
                                 {Number(r.amount) > 0 && VERIFIABLE.includes(r.status) && <button type="button" className={`${a.btn} ${a.small}`} disabled={busy === r.id} onClick={() => void verify(r)}>{busy === r.id ? 'Consultando…' : 'Verificar pago'}</button>}
                                 {!['cancelled', 'expired'].includes(r.status) && <button type="button" className={`${a.btnGhost} ${a.small}`} disabled={busy === r.id} onClick={() => void resend(r)}><Mail size={14} aria-hidden="true" />{r.status === 'confirmed' ? 'Reenviar entrada' : 'Reenviar correo'}</button>}
+                                {canRefund(r) && <button type="button" className={`${a.btnGhost} ${a.small}`} disabled={busy === r.id} onClick={() => { setConfirming(null); setRefunding(r.id); }}><Undo2 size={14} aria-hidden="true" />Devolver {money(Number(r.amount))}</button>}
                                 {r.status !== 'cancelled' && <button type="button" className={`${a.btnGhost} ${a.small}`} disabled={busy === r.id} onClick={() => setConfirming(r.id)}>Anular</button>}
                               </div>}
                             {note && <p className={a.rowNote} data-tone={note.tone} role={note.tone === 'ok' ? 'status' : 'alert'}>{note.text}</p>}
@@ -185,6 +198,23 @@ export function EventAttendees({ id }: { id: string }) {
         }} />}
       </div>
     </EventShell>
+  );
+}
+
+/** Confirmación de devolución: monto de la entrada o, si la compra tiene más, todo lo que queda por devolver. */
+function RefundBox({ r, busy, onCancel, onConfirm }: { r: Attendee; busy: boolean; onCancel: () => void; onConfirm: (wholeOrder: boolean) => void }) {
+  const remaining = Number(r.orderAmount ?? r.amount) - Number(r.orderRefunded ?? 0);
+  const [whole, setWhole] = useState(false);
+  const amount = whole ? remaining : Math.min(Number(r.amount), remaining);
+  return (
+    <div className={a.refundBox} role="group" aria-label={'Devolver el pago de ' + fullName(r)}>
+      <p>¿Devolver <b>{money(amount)}</b> a {r.buyerName || fullName(r)} con Mercado Pago? {whole ? 'Se anulan todas las entradas de la compra' : 'Se anula esta entrada'} y no se puede deshacer.</p>
+      {remaining > Number(r.amount) && <label className={a.refundWhole}><input type="checkbox" checked={whole} onChange={(e) => setWhole(e.target.checked)} />Devolver toda la compra ({money(remaining)})</label>}
+      <div className={a.confirmBox}>
+        <button type="button" className={a.btnDanger + ' ' + a.small} disabled={busy} onClick={() => onConfirm(whole)}>{busy ? 'Devolviendo…' : 'Sí, devolver'}</button>
+        <button type="button" className={a.btnGhost + ' ' + a.small} onClick={onCancel}>No</button>
+      </div>
+    </div>
   );
 }
 

@@ -84,6 +84,23 @@ export class EventPaymentService {
   if(url.protocol!=='https:'||!['www.mercadopago.cl','mercadopago.cl'].includes(url.hostname)||url.username||url.password||!preference.id)throw new ServiceUnavailableException('No se pudo preparar el enlace de pago.');
   return {id:String(preference.id),url:url.href};
  }
+ /**
+  * Devuelve un pago (total o parcial) con Mercado Pago. La clave de idempotencia evita devolver dos veces
+  * si se reintenta. Solo acepta devoluciones aprobadas o en proceso.
+  */
+ async refund(paymentId:string,amount:number,idempotencyKey:string){
+  if(!/^\d+$/.test(paymentId)||!(amount>0)||!Number.isInteger(amount))throw new ServiceUnavailableException('Datos de devolución inválidos.');
+  await this.assertSeller();
+  const response=await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}/refunds`,{method:'POST',headers:{Authorization:`Bearer ${this.token()}`,'Content-Type':'application/json','X-Idempotency-Key':idempotencyKey},body:JSON.stringify({amount}),signal:AbortSignal.timeout(20000)});
+  const data:any=await response.json().catch(()=>({}));
+  if(!response.ok){
+   const known:Record<string,string>={'4296':'Mercado Pago indica que este pago ya fue devuelto.','4295':'Mercado Pago no permite devoluciones parciales para este pago.','15016':'El pago es demasiado antiguo para devolverlo desde aquí.'};
+   const code=String(data?.cause?.[0]?.code??data?.code??'');
+   throw new ServiceUnavailableException(known[code]??`Mercado Pago no aceptó la devolución (código ${response.status}). No se hizo ningún cambio.`);
+  }
+  if(!['approved','in_process','authorized'].includes(String(data.status)))throw new ServiceUnavailableException(`Mercado Pago dejó la devolución como «${data.status}». Revisa la cuenta antes de reintentar.`);
+  return {id:String(data.id),amount:Number(data.amount),status:String(data.status)};
+ }
  async payment(id:string,requestId:string,signature:string){
   if(!verifyPaymentSignature(this.config.get('MERCADOPAGO_WEBHOOK_SECRET')??'',id,requestId,signature))throw new UnauthorizedException('Firma de notificación inválida');
   const seller=await this.assertSeller();
