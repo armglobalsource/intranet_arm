@@ -267,6 +267,16 @@ export const PERMISSION_UI_CONFIG: Record<string, PermissionUiSection> = {
     ],
   },
   content:   { breadcrumb: ['Noticias'],                             viewActions: ['view'], editActions: ['create', 'publish', 'delete'] },
+  // La fila base da acceso al menú con los eventos donde la persona es organizadora;
+  // las sub-filas amplían el alcance al campus propio o a toda la organización.
+  eventos: {
+    breadcrumb: ['Comunidad', 'Eventos'],
+    viewActions: ['organize'], editActions: ['manageCampus'],
+    editLabel: 'Administrar eventos del propio campus',
+    extra: [
+      { key: 'manageAll', label: 'Administrar todos los eventos y categorías', actions: ['manageAll'] },
+    ],
+  },
   finanzas:   { breadcrumb: ['Producción General', 'Finanzas'],      viewActions: ['view'], editActions: [] },
   encuentros: {
     breadcrumb: ['Producción', 'Estadísticas'],
