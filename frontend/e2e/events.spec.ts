@@ -97,6 +97,7 @@ for(const width of [393,1280])test(`regreso desde Mercado Pago confirma la entra
  await page.screenshot({path:`test-results/event-receipt-checking-${width}.png`,fullPage:true});
  await expect(page.getByRole('heading',{name:'¡Tu entrada está lista!'})).toBeVisible({timeout:15000});
  await expect(page.getByRole('article',{name:'Tu entrada'})).toContainText('General');
+ await expect(page.getByAltText('Código QR de tu entrada')).toBeVisible();
  expect(page.url()).not.toContain('collection_status');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`test-results/event-receipt-confirmed-${width}.png`,fullPage:true});
@@ -139,15 +140,111 @@ test('portada: sube la imagen desde el equipo y se ve en la vista previa',async(
  await page.screenshot({path:'test-results/event-cover-upload-1440.png'});
 });
 
-test('organizador verifica con Mercado Pago un pago pendiente',async({page})=>{
- await fixture(page);await page.setViewportSize({width:1280,height:900});
- const reg='3520053e-72a6-48c2-b38a-e077bda942bc';let status='pending_payment';const calls:string[]=[];
- await page.route(`**/api/v1/event-management/${id}/registrations`,r=>r.fulfill({json:[{id:reg,participant:{firstName:'Prueba',lastName:'ARM'},email:'prueba@example.com',campusName:'Santiago',status,createdAt:'2026-11-23T13:20:08Z',amount:100,currency:'CLP',paymentId:status==='confirmed'?'987654':null,testPayment:false}]}));
- await page.route(`**/api/v1/event-management/${id}/registrations/${reg}/verify-payment`,r=>{calls.push(r.request().method());status='confirmed';return r.fulfill({json:{status:'confirmed',message:'Pago aprobado verificado con Mercado Pago. La inscripción quedó confirmada.',payments:[]}});});
- await page.goto(`/dashboard/eventos/${id}`);
- await page.getByRole('button',{name:'Verificar pago con Mercado Pago'}).click();
+// Día del evento: inscritos y control de acceso con una API simulada que guarda el estado.
+const people=[
+ {id:'3520053e-72a6-48c2-b38a-e077bda942bc',firstName:'Ana',lastName:'Pérez',email:'ana@example.com',phone:'+56911111111',age:30,campusId:10,campusName:'Santiago',ticketName:'General',status:'pending_payment',amount:100,currency:'CLP',paymentId:null,testPayment:false,source:'public',note:null,createdAt:'2026-11-23T13:20:08Z',checkedInAt:null,checkedInBy:null,emailSent:true},
+ {id:'4cf1c2a8-0d5e-4f7e-9a51-6a1b2c3d4e5f',firstName:'José',lastName:'Muñoz',email:'jose@example.com',phone:'+56922222222',age:41,campusId:10,campusName:'Santiago',ticketName:'General',status:'confirmed',amount:100,currency:'CLP',paymentId:'987654',testPayment:false,source:'public',note:null,createdAt:'2026-11-22T10:00:00Z',checkedInAt:null,checkedInBy:null,emailSent:true},
+ {id:'7d9e8f10-1a2b-4c3d-8e4f-5a6b7c8d9e0f',firstName:'Marta',lastName:'Díaz',email:'marta@example.com',phone:'',age:null,campusId:20,campusName:'Viña del Mar',ticketName:'General',status:'waitlisted',amount:100,currency:'CLP',paymentId:null,testPayment:false,source:'public',note:null,createdAt:'2026-11-21T10:00:00Z',checkedInAt:null,checkedInBy:null,emailSent:true},
+];
+async function attendance(page:Page,permissions=['*'],manage=true){
+ await fixture(page,permissions);
+ const regs:any[]=people.map(p=>({...p}));const calls:{path:string;body:any}[]=[];
+ const counts=()=>({confirmed:regs.filter(r=>r.status==='confirmed').length,checkedIn:regs.filter(r=>r.status==='confirmed'&&r.checkedInAt).length});
+ await page.route(/\/api\/v1\/(event-management\/[^/]+\/(attendees|check-in|registrations.*)|event-door\/events)$/,async route=>{
+  const req=route.request(),path=new URL(req.url()).pathname.replace('/api/v1','');const body=req.method()==='POST'?req.postDataJSON():null;calls.push({path,body});
+  if(path==='/event-door/events')return route.fulfill({json:[{id,slug:'retiro-hombres',title:'Retiro de Hombres',startsAt:new Date(Date.now()-3600_000).toISOString(),endsAt:new Date(Date.now()+3600_000).toISOString(),capacity:120,campusName:'Santiago',timezone:'America/Santiago',confirmed:counts().confirmed,checkedIn:counts().checkedIn}]});
+  if(path.endsWith('/attendees'))return route.fulfill({json:{event:{id,slug:'retiro-hombres',title:'Retiro de Hombres',status:'published',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',capacity:120,timezone:'America/Santiago',pricing:'paid',color:'#102b40',tickets:[{id:categoryId,name:'General',price:100,currency:'CLP'}],campuses:[{id:10,name:'Santiago'},{id:20,name:'Viña del Mar'}]},manage,registrations:regs}});
+  if(path.endsWith('/check-in')){
+   const r=regs.find(x=>String(body.code).toLowerCase().includes(x.id));
+   if(!r)return route.fulfill({json:{result:'not_found',message:'Esta entrada no corresponde a este evento.',attendee:null,counts:counts()}});
+   if(r.status!=='confirmed')return route.fulfill({json:{result:'invalid',message:'El pago de esta entrada no está confirmado.',attendee:r,counts:counts()}});
+   if(r.checkedInAt)return route.fulfill({json:{result:'already',message:'Esta entrada ya se usó para ingresar.',attendee:r,counts:counts()}});
+   Object.assign(r,{checkedInAt:'2027-01-10T22:42:00Z',checkedInBy:'Prueba ARM'});return route.fulfill({json:{result:'ok',message:`Bienvenida/o, ${r.firstName}.`,attendee:r,counts:counts()}});
+  }
+  const m=/registrations\/([^/]+)\/([a-z-]+)$/.exec(path);
+  if(m){const r=regs.find(x=>x.id===m[1])!;
+   if(m[2]==='undo-check-in'){Object.assign(r,{checkedInAt:null,checkedInBy:null});return route.fulfill({json:{attendee:r,counts:counts()}});}
+   if(m[2]==='cancel'){r.status='cancelled';return route.fulfill({json:{attendee:r,message:'Inscripción anulada y cupo liberado.'}});}
+   if(m[2]==='resend')return route.fulfill({json:{message:`Entrada reenviada a ${r.email}.`}});
+   if(m[2]==='verify-payment'){r.status='confirmed';r.paymentId='111';return route.fulfill({json:{status:'confirmed',message:'Pago aprobado verificado con Mercado Pago. La inscripción quedó confirmada.'}});}
+  }
+  if(path.endsWith('/registrations')){const r={...people[1],id:'9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d',firstName:body.firstName,lastName:body.lastName,email:body.email,campusId:body.campusId,campusName:'Viña del Mar',ticketName:'Cortesía',amount:0,paymentId:null,source:'manual',createdBy:'Prueba ARM',note:body.note??null};regs.unshift(r);return route.fulfill({json:{attendee:r,emailSent:body.sendEmail}});}
+  return route.fulfill({status:404,json:{message:'No encontrado'}});
+ });
+ return {regs,calls};
+}
+for(const width of [393,1280])test(`inscritos: buscar, verificar, marcar ingreso, anular y agregar ${width}`,async({page})=>{
+ const {calls}=await attendance(page);await page.setViewportSize({width,height:900});
+ await page.goto(`/dashboard/eventos/${id}/inscritos`);
+ await expect(page.getByRole('heading',{name:'3 inscripciones'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/event-attendees-${width}.png`,fullPage:true});
+ // Verificar el pago pendiente con Mercado Pago lo confirma.
+ await page.getByRole('button',{name:'Verificar pago'}).click();
  await expect(page.getByRole('status').filter({hasText:'La inscripción quedó confirmada.'})).toBeVisible();
- await expect(page.getByText('Confirmada',{exact:true})).toBeVisible();
- await expect(page.getByRole('button',{name:'Verificar pago con Mercado Pago'})).toHaveCount(0);
- expect(calls).toEqual(['POST']);
+ // Buscar sin tildes y marcar ingreso.
+ await page.getByPlaceholder('Buscar por nombre, correo, teléfono o código').fill('jose munoz');
+ await expect(page.getByText('1 de 3 personas')).toBeVisible();
+ await page.getByRole('button',{name:'Marcar ingreso'}).click();
+ await expect(page.getByText('Ingreso registrado.')).toBeVisible();
+ await expect(page.getByRole('button',{name:'Deshacer'})).toBeVisible();
+ // Anular pide confirmación en la misma fila.
+ await page.getByRole('button',{name:'Anular'}).click();
+ await page.getByRole('button',{name:'Sí, anular'}).click();
+ await expect(page.getByText('Inscripción anulada y cupo liberado.')).toBeVisible();
+ await page.getByPlaceholder('Buscar por nombre, correo, teléfono o código').fill('');
+ // Agregar una cortesía.
+ await page.getByRole('button',{name:'Agregar persona'}).click();
+ const dialog=page.getByRole('dialog',{name:'Agregar persona'});
+ await dialog.getByLabel('Nombre',{exact:true}).fill('Luis');await dialog.getByLabel('Apellido').fill('Soto');
+ await dialog.getByLabel('Correo electrónico').fill('luis@example.com');await dialog.getByLabel('Campus').selectOption('20');
+ await dialog.getByLabel(/Nota interna/).fill('Equipo de alabanza');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/event-add-person-${width}.png`});
+ await dialog.getByRole('button',{name:'Agregar persona'}).click();
+ await expect(page.getByText('Luis Soto quedó inscrita/o con entrada confirmada. Le enviamos la entrada a luis@example.com.')).toBeVisible();
+ expect(calls.find(c=>c.path.endsWith('/registrations'))?.body).toEqual({firstName:'Luis',lastName:'Soto',email:'luis@example.com',campusId:20,sendEmail:true,note:'Equipo de alabanza'});
+ // Descarga a Excel.
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'Descargar Excel'}).click();
+ expect((await download).suggestedFilename()).toBe('inscritos-retiro-de-hombres.xlsx');
+});
+test('puerta: busca por nombre, registra el ingreso y rechaza entradas no válidas',async({page})=>{
+ await attendance(page);await page.setViewportSize({width:393,height:852});
+ await page.goto('/dashboard/eventos/acceso');
+ await page.getByRole('link',{name:'Abrir control de acceso'}).click();
+ await expect(page.getByText('de 1 ingresaron')).toBeVisible();
+ await expect(page.getByRole('button',{name:'Activar cámara'})).toBeVisible();
+ await page.screenshot({path:'test-results/event-door-scan-393.png',fullPage:true});
+ // Código escrito a mano de una entrada sin pago.
+ await page.getByLabel('Código de la entrada').fill(people[0].id);await page.keyboard.press('Enter');
+ await expect(page.getByRole('heading',{name:'No puede entrar'})).toBeVisible();
+ await expect(page.getByText('El pago de esta entrada no está confirmado.')).toBeVisible();
+ await page.screenshot({path:'test-results/event-door-denied-393.png'});
+ await page.getByRole('button',{name:'Siguiente'}).click();
+ // Búsqueda por nombre.
+ await page.getByRole('tab',{name:'Buscar por nombre'}).click();
+ await page.getByPlaceholder('Nombre, correo o código de la entrada').fill('jose');
+ await page.getByRole('button',{name:'Marcar ingreso'}).click();
+ await expect(page.getByRole('heading',{name:'Puede entrar'})).toBeVisible();
+ await expect(page.getByText('de 1 ingresaron · 100%')).toBeVisible();
+ await page.screenshot({path:'test-results/event-door-ok-393.png',fullPage:true});
+ // La misma entrada otra vez avisa que ya ingresó.
+ await page.getByRole('button',{name:'Cerrar'}).click();
+ await page.getByRole('tab',{name:'Escanear QR'}).click();
+ await page.getByLabel('Código de la entrada').fill(`ARM:${people[1].id}`);await page.keyboard.press('Enter');
+ await expect(page.getByRole('heading',{name:'Ya ingresó'})).toBeVisible();
+ await expect(page.getByText(/Ingresó a las 19:42/).first()).toBeVisible();
+ await expect(page.getByRole('region',{name:'Últimos registros'})).toContainText('José Muñoz');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('quien solo registra ingresos ve la puerta, sin acciones de gestión',async({page})=>{
+ await attendance(page,['eventos:checkin'],false);await page.setViewportSize({width:1280,height:900});
+ await page.goto('/dashboard/eventos/acceso');
+ await expect(page.getByRole('link',{name:'Abrir control de acceso'})).toBeVisible();
+ await expect(page.getByRole('navigation',{name:'Eventos'}).getByRole('link',{name:'Gestión de eventos'})).toHaveCount(0);
+ await page.goto(`/dashboard/eventos/${id}/inscritos`);
+ await expect(page.getByRole('heading',{name:'3 inscripciones'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Agregar persona'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Anular'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Marcar ingreso'})).toBeVisible();
 });

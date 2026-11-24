@@ -1,5 +1,5 @@
 export const PERMISSION_CATALOG = {
-  eventos: { label: 'Eventos', description: 'Eventos, publicación y configuración', actions: { manageAll: 'Administrar todos los eventos y categorías', manageCampus: 'Administrar eventos del propio campus', organize: 'Editar eventos asignados como organizador' } },
+  eventos: { label: 'Eventos', description: 'Eventos, publicación y configuración', actions: { manageAll: 'Administrar todos los eventos y categorías', manageCampus: 'Administrar eventos del propio campus', organize: 'Editar eventos asignados como organizador', checkin: 'Registrar ingresos en la puerta (eventos de su campus)' } },
   'institutional-mail': {
     label: 'Correos y accesos', description: 'Solicitudes institucionales y control de cuentas',
     actions: { approve: 'Habilitar al aprobador designado', manage: 'Gestionar solicitudes e inventario como TI' },

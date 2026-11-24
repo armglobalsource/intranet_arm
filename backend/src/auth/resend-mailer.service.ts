@@ -56,7 +56,7 @@ export class ResendMailerService {
   }
 
   /** Correo con HTML propio (reportes). No registra destinatarios ni contenido en los errores. */
-  async sendHtml(mail: { to: string[]; subject: string; html: string; text: string; idempotencyKey: string; sender?: { name?: string; email?: string } }) {
+  async sendHtml(mail: { to: string[]; subject: string; html: string; text: string; idempotencyKey: string; sender?: { name?: string; email?: string }; attachments?: { filename: string; content: string; content_id?: string }[] }) {
     const key = this.config.get<string>('RESEND_API_KEY');
     const from = this.config.get<string>('RESEND_FROM_EMAIL');
     if (!key || !from || !from.includes('@') || /[\r\n]/.test(from)) {
@@ -66,7 +66,7 @@ export class ResendMailerService {
       method: 'POST', signal: AbortSignal.timeout(15000),
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'Idempotency-Key': mail.idempotencyKey },
       // Un evento puede enviar con su propio nombre y buzón (mismo dominio verificado); las respuestas van a ese buzón.
-      body: JSON.stringify((() => { const s = senderFor(from, mail.sender?.name, mail.sender?.email); return { from: s.from ?? from, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text, ...(s.replyTo ? { reply_to: s.replyTo } : {}) }; })()),
+      body: JSON.stringify((() => { const s = senderFor(from, mail.sender?.name, mail.sender?.email); return { from: s.from ?? from, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text, ...(s.replyTo ? { reply_to: s.replyTo } : {}), ...(mail.attachments?.length ? { attachments: mail.attachments } : {}) }; })()),
     });
     if (!response.ok) throw new ServiceUnavailableException(`No se pudo enviar el correo (código ${response.status}). Inténtalo de nuevo.`);
     const data = await response.json() as { id?: string };

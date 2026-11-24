@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import * as QRCode from 'qrcode';
 import { DatabaseService } from '../common/database/database.service';
 import { ResendMailerService } from '../auth/resend-mailer.service';
 import { EventPaymentService, InspectedPayment } from './event-payment.service';
@@ -102,9 +103,10 @@ export class EventRegistrationService {
    return {url:checkout.url};
   });
  }
- async notify(row:any){
+ /** Envía el correo del estado actual. Sin `force` se envía una sola vez; devuelve si quedó enviado. */
+ async notify(row:any,options:{force?:boolean}={}):Promise<boolean>{
   const confirmed=row.status==='confirmed';
-  if(confirmed?row.confirmation_sent_at:row.email_sent_at)return;
+  if(!options.force&&(confirmed?row.confirmation_sent_at:row.email_sent_at))return true;
   const link=`${this.settings().origin}/eventos/${encodeURIComponent(row.snapshot.slug)}/inscripcion#id=${row.id}&token=${this.token(row.id)}`;
   const testPayment=Number(row.amount)>0&&(row.snapshot.paymentMode??'test')==='test';
   try{
@@ -113,15 +115,19 @@ export class EventRegistrationService {
    const d=event?.details??{};
    const kind:EmailKind=confirmed?'confirmed':row.status==='pending_payment'?'pending_payment':row.status==='waitlisted'?'waitlisted':'registered';
    const mail=renderEventEmail({
-    kind,firstName:row.participant?.firstName??'',link,origin:this.settings().origin,ticketCode:confirmed?row.id:null,
+    kind,firstName:row.participant?.firstName??'',link,origin:this.settings().origin,ticketCode:confirmed?row.id:null,qrCid:confirmed?'entrada-qr':null,
     amount:Number(row.amount),currency:row.currency,ticketName:row.snapshot.ticketName,expiresAt:row.expires_at?new Date(row.expires_at).toISOString():null,testPayment,senderName:d.senderName,
     event:{title:event?.title??row.snapshot.title,summary:d.summary,bannerUrl:d.bannerUrl,color:d.color,
      startsAt:new Date(event?.starts_at??row.snapshot.startsAt).toISOString(),endsAt:event?.ends_at?new Date(event.ends_at).toISOString():undefined,
      timezone:d.timezone??row.snapshot.timezone,modality:d.modality,location:d.location,address:d.address,campusName:event?.campus_name},
    });
-   await this.mail.sendHtml({to:[row.email],subject:mail.subject,text:mail.text,html:mail.html,sender:{name:d.senderName,email:d.senderEmail},idempotencyKey:`event-registration/${row.id}/${confirmed?'confirmed':'registered'}`});
+   // El QR va como imagen adjunta (cid:) para no exponer el código en una URL pública.
+   const attachments=confirmed?[{filename:'entrada-qr.png',content:(await QRCode.toBuffer(row.id,{type:'png',width:360,margin:1,errorCorrectionLevel:'M'})).toString('base64'),content_id:'entrada-qr'}]:undefined;
+   const key=`event-registration/${row.id}/${confirmed?'confirmed':'registered'}${options.force?`/${Date.now()}`:''}`;
+   await this.mail.sendHtml({to:[row.email],subject:mail.subject,text:mail.text,html:mail.html,sender:{name:d.senderName,email:d.senderEmail},idempotencyKey:key,attachments});
    await this.db.query(`UPDATE arm_app.event_registrations SET ${confirmed?'confirmation_sent_at':'email_sent_at'}=now() WHERE id=$1`,[row.id]);
-  }catch{/* A failed email never undoes a committed booking; authenticated retry is available. */}
+   return true;
+  }catch{/* A failed email never undoes a committed booking; authenticated retry is available. */return false;}
  }
  async resend(id:string,token:string){this.authorize(id,token);await this.notify(await this.row(id));return this.get(id,token);}
  /**
@@ -186,10 +192,5 @@ export class EventRegistrationService {
    :found.some((p:InspectedPayment)=>p.status==='approved')?'Hay un pago aprobado, pero no corresponde a esta cuenta o entorno de pagos.'
    :`Mercado Pago informa el pago como «${found[0].status}${found[0].statusDetail?` · ${found[0].statusDetail}`:''}».`;
   return {status:after.status,message,payments};
- }
- async list(user:EventActor,eventId:string){
-  const event=(await this.db.query('SELECT * FROM arm_app.event_programs WHERE id=$1',[eventId])).rows[0];
-  if(!event)throw new NotFoundException('Evento no encontrado');assertEventScope(user,{campus_id:event.campus_id,organizer_id:event.organizer_id});
-  return (await this.db.query(`SELECT r.id,r.participant,r.email,c.name AS "campusName",CASE WHEN r.status='pending_payment' AND r.expires_at<=now() THEN 'expired' ELSE r.status END AS status,r.amount,r.currency,r.payment_id AS "paymentId",(r.amount>0 AND coalesce(r.snapshot->>'paymentMode','test')='test') AS "testPayment",r.created_at AS "createdAt" FROM arm_app.event_registrations r JOIN arm_app.campuses c ON c.id=r.campus_id WHERE r.event_id=$1 ORDER BY r.created_at DESC LIMIT 500`,[eventId])).rows;
  }
 }

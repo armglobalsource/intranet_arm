@@ -14,6 +14,17 @@ import c from './event-checkout.module.css';
 type Receipt = { id: string; token: string; status: string; participantName: string; title: string; startsAt: string; timezone: string; amount: number; currency: string; ticketName?: string | null; expiresAt: string | null; emailSent: boolean; testPayment: boolean; ticketCode: string | null };
 type Returned = null | 'approved' | 'pending' | 'failed';
 
+/** QR de la entrada, generado en el navegador: el código no sale a ningún otro servicio. */
+function TicketQr({ code }: { code: string }) {
+  const [src, setSrc] = useState('');
+  useEffect(() => {
+    let alive = true;
+    void import('qrcode').then((QR) => QR.toDataURL(code, { width: 440, margin: 1, errorCorrectionLevel: 'M' })).then((url) => { if (alive) setSrc(url); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [code]);
+  return src ? <img className={c.qr} src={src} alt="Código QR de tu entrada" width={220} height={220} /> : <span className={c.qr} aria-hidden="true" />;
+}
+
 const post = async (path: string, body: unknown) => (await axios.post(`${api.defaults.baseURL}${path}`, body)).data;
 const receiptKey = (slug: string) => `event-receipt:${slug}`;
 const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
@@ -258,7 +269,7 @@ export function EventReceipt({ slug }: { slug: string }) {
           {time && <div><dt>Horario</dt><dd>{time}</dd></div>}
           {place && <div className={c.span2}><dt>Lugar</dt><dd>{place}</dd></div>}
         </dl>
-        <div className={c.ticketCode}><small>Código de tu entrada</small><code>{receipt.ticketCode}</code><small>Presenta este código al equipo del evento.</small></div>
+        <div className={c.ticketCode}>{receipt.ticketCode && <TicketQr code={receipt.ticketCode} />}<small>Código de tu entrada</small><code>{receipt.ticketCode}</code><small>Muestra este código QR en la entrada del evento.</small></div>
       </article>
       <div className={c.row}>
         <button type="button" className={c.secondary} onClick={() => window.print()}><Printer size={16} aria-hidden="true" />Imprimir / Guardar PDF</button>

@@ -1,4 +1,6 @@
 import { EventRegistrationController } from './event-management/event-registration.controller';
+import { EventAttendanceController } from './event-management/event-attendance.controller';
+import { EventAttendanceService } from './event-management/event-attendance.service';
 import { EventRegistrationService } from './event-management/event-registration.service';
 import { EventPaymentService } from './event-management/event-payment.service';
 import { EventProgramController, PublicEventProgramController } from './event-management/event-program.controller';
@@ -58,9 +60,9 @@ import { OrgChartController } from './orgchart/orgchart.controller';
 import { PostgresOrgChartService } from './orgchart/postgres-orgchart.service';
 
 // Domain controllers and their PostgreSQL services.
-export const postgresDomainControllers=[EventRegistrationController,EventProgramController,PublicEventProgramController,EventsController,EstadisticasController,AnunciosController,KiloamorController,SiembraController,EncuentrosController,ReconciliationController,EquipoRosterController,TipoCambioController,VisualReferencesController,SearchController,FeedbackController,PostgresHealthController,ContentsController,DocumentsController,FichasController,CampusController,ArmCatalogosController,JobTitlesController,OnboardingController,CancionesController,PaletasController,DisponibilidadController,TecnicosController,CampusTurnosController,OrgChartController];
+export const postgresDomainControllers=[EventAttendanceController,EventRegistrationController,EventProgramController,PublicEventProgramController,EventsController,EstadisticasController,AnunciosController,KiloamorController,SiembraController,EncuentrosController,ReconciliationController,EquipoRosterController,TipoCambioController,VisualReferencesController,SearchController,FeedbackController,PostgresHealthController,ContentsController,DocumentsController,FichasController,CampusController,ArmCatalogosController,JobTitlesController,OnboardingController,CancionesController,PaletasController,DisponibilidadController,TecnicosController,CampusTurnosController,OrgChartController];
 export const postgresDomainProviders=[
-  ArmRecordStore, EventProgramService, EventRegistrationService, EventPaymentService,
+  ArmRecordStore, EventProgramService, EventRegistrationService, EventAttendanceService, EventPaymentService,
   PostgresEventsService,PostgresJobsService,PostgresEstadisticasService,WeeklyReportSettings,PostgresAnunciosService,PostgresKiloamorService,
   PostgresSiembraService,PostgresEncuentrosService,PostgresReconciliationService,PostgresEquipoRosterService,
   PostgresTipoCambioService,PostgresVisualReferencesService,PostgresSearchService,PostgresFeedbackService,

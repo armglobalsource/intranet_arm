@@ -132,6 +132,7 @@
 .ticketInfo dd { margin: 3px 0 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 .span2 { grid-column: 1 / -1; }
 .ticketCode { position: relative; padding: 18px 22px 20px; border-top: 2px dashed var(--line); background: var(--cream); text-align: center; }
+.qr { display: block; width: 200px; height: 200px; margin: 0 auto 12px; padding: 8px; background: #fff; border: 1px solid var(--line); border-radius: 12px; image-rendering: pixelated; }
 .ticketCode::before, .ticketCode::after { content: ''; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1px solid var(--line); }
 .ticketCode::before { left: -11px; }
 .ticketCode::after { right: -11px; }

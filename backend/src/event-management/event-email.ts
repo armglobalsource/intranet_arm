@@ -10,6 +10,8 @@ export interface EventEmailData {
   link: string;
   origin: string;
   ticketCode?: string | null;
+  /** Content-ID de la imagen QR adjunta al correo (se muestra con cid:). */
+  qrCid?: string | null;
   amount: number;
   currency: string;
   ticketName?: string;
@@ -75,8 +77,9 @@ export function renderEventEmail(d: EventEmailData) {
         <tr><td style="padding:18px 20px;text-align:center">
           <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${color}">Tu entrada</div>
           <div style="margin-top:6px;font-size:20px;font-weight:800;color:#1d1d1b">${esc(d.firstName)} · ${esc(d.ticketName || 'Entrada general')}</div>
+          ${d.qrCid ? `<img src="cid:${esc(d.qrCid)}" alt="Código QR de tu entrada" width="180" height="180" style="display:block;margin:14px auto 0;width:180px;height:180px;border:0">` : ''}
           <div style="margin-top:8px;font-family:Consolas,Menlo,monospace;font-size:12px;color:#656260;word-break:break-all">${esc(d.ticketCode)}</div>
-          <div style="margin-top:8px;font-size:13px;color:#656260">Presenta este código al equipo del evento.</div>
+          <div style="margin-top:8px;font-size:13px;color:#656260">${d.qrCid ? 'Muestra este código QR en la entrada del evento.' : 'Presenta este código al equipo del evento.'}</div>
         </td></tr></table></td></tr>` : '';
 
   const notice = d.kind === 'pending_payment'

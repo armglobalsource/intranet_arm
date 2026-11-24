@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, ArrowRight, Eye, Save, Plus, Trash2, Check, CircleDashed, Monitor, Smartphone,
   CalendarDays, MapPin, Users, Sparkles, Image as ImageIcon, Ticket, Globe2, Building2, Shuffle, X, Upload, Loader2, Mail,
+  ScanLine,
 } from 'lucide-react';
 import Link from 'next/link';
 import { api, apiErrorMessage } from '@/lib/api';
@@ -17,7 +18,6 @@ import { EventProgram, EventDetails, EventOptions, newEvent, eventStatuses, Publ
 import { EVENT_COLORS, EVENT_TIMEZONES, eventReadiness, slugify } from './event-helpers';
 import { EventLanding } from './EventLanding';
 import { uploadCover } from './cover-upload';
-import { EventParticipants } from './EventParticipants';
 import s from './events.module.css';
 import x from './event-editor.module.css';
 
@@ -95,7 +95,7 @@ export function EventEditor({ id }: { id?: string }) {
   const query = useQuery({ queryKey: ['event-program', id], enabled: !!id && access.allowed, queryFn: () => api.get<EventProgram>(`/event-management/${id}`).then((r) => r.data) });
   useEffect(() => { if (!draft) { if (id && query.data) setDraft(query.data); else if (!id && user) setDraft(newEvent(user.id, user.campusId ?? 0)); } }, [id, query.data, user, draft]);
   return (
-    <EventShell title={id ? 'Edita tu evento' : 'Crea un nuevo evento'} description="Completa los pasos y mira en vivo cómo lo verán los participantes." action={<Link className={s.button} href="/dashboard/eventos/gestion"><ArrowLeft size={16} />Volver</Link>}>
+    <EventShell title={id ? 'Edita tu evento' : 'Crea un nuevo evento'} description="Completa los pasos y mira en vivo cómo lo verán los participantes." action={<div className={s.actions} style={{ marginTop: 0 }}><Link className={s.button} href="/dashboard/eventos/gestion"><ArrowLeft size={16} />Volver</Link>{id && <><Link className={s.button} href={`/dashboard/eventos/${id}/inscritos`}><Users size={16} aria-hidden="true" />Inscritos</Link><Link className={s.button} href={`/dashboard/eventos/${id}/acceso`}><ScanLine size={16} aria-hidden="true" />Control de acceso</Link></>}</div>}>
       {(options.isError || query.isError) && <div className={s.error} role="alert">{apiErrorMessage(options.error ?? query.error, 'No se pudo cargar el evento o su configuración.')} <button className={s.button} onClick={() => { options.refetch(); if (id) query.refetch(); }}>Reintentar</button></div>}
       {(!draft || !options.data) && !options.isError && !query.isError && <p role="status">Preparando el editor…</p>}
       {draft && options.data && <EditorForm initial={draft} options={options.data} onReload={async () => { if (id) { const r = await query.refetch(); if (r.data) setDraft(r.data); } }} key={`${id ?? 'new'}-${draft.version}`} />}
@@ -344,7 +344,7 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
         </div>
       )}
 
-      {event.id && !preview && <EventParticipants id={event.id} />}
+      {event.id && !preview && <div className={s.notice}>Las inscripciones, el ingreso con QR y las acciones sobre cada persona están en <Link href={`/dashboard/eventos/${event.id}/inscritos`}><b>Inscritos</b></Link> y <Link href={`/dashboard/eventos/${event.id}/acceso`}><b>Control de acceso</b></Link>.</div>}
       <div className={s.savebar}>
         <p>{dirty ? 'Tienes cambios sin guardar' : `Versión ${event.version} · ${eventStatuses[event.status]}`}</p>
         <button className={s.button} onClick={() => setPreview(!preview)}><Eye size={16} />{preview ? 'Editar' : 'Vista previa'}</button>
