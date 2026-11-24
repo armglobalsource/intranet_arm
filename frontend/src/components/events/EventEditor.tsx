@@ -287,6 +287,13 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
               <Card icon={<Users size={18} />} title="Preguntas para cada asistente" text="Lo que necesitas saber de cada persona: talla de polera, alergias, contacto de emergencia…">
                 <QuestionsEditor questions={d.questions ?? []} onChange={(next) => detail('questions', next)} />
               </Card>
+              <Card icon={<Mail size={18} />} title="Después de inscribirse" text="Lo que cada persona puede hacer con sus entradas desde su comprobante o desde «Mis entradas».">
+                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.selfTransfer ?? true} onChange={(e) => detail('selfTransfer', e.target.checked)} />Puede transferir su entrada a otra persona (el código QR anterior deja de servir)</label>
+                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.selfCancel ?? d.pricing !== 'paid'} onChange={(e) => detail('selfCancel', e.target.checked)} />Puede cancelar su entrada y liberar el cupo{d.pricing === 'paid' ? ' (la devolución del dinero la gestiona el equipo)' : ''}</label>
+                <Field title="Hasta cuántas horas antes del inicio" hint="Después de ese plazo, los cambios los hace el equipo."><input type="number" min={0} max={720} value={d.selfServiceHours ?? 24} onChange={(e) => detail('selfServiceHours', e.target.value === '' ? 24 : Number(e.target.value))} /></Field>
+                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.reminders ?? true} onChange={(e) => detail('reminders', e.target.checked)} />Enviar recordatorios automáticos por correo una semana y un día antes, con las entradas</label>
+                {d.waitlist && <p className={x.help + ' ' + s.wide}>Con lista de espera activa, cuando se libera un cupo pasa automáticamente a la siguiente persona: si el evento es pagado, recibe 24 horas para pagar.</p>}
+              </Card>
               <Card icon={<Users size={18} />} title="Cupos y fechas de inscripción" text="Sin fechas, la inscripción queda abierta mientras la publiques.">
                 <Field title="Cupos totales" hint="Vacío: sin límite."><input type="number" min={1} max={1000000} value={event.capacity ?? ''} onChange={(e) => change('capacity', e.target.value ? Number(e.target.value) : null)} /></Field>
                 <Field title="Edad mínima" hint="Opcional."><input type="number" min={0} max={120} value={d.minimumAge ?? ''} onChange={(e) => detail('minimumAge', e.target.value ? Number(e.target.value) : null)} /></Field>

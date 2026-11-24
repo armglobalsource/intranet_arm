@@ -56,7 +56,7 @@ export function EventAttendees({ id }: { id: string }) {
     } finally { setBusy(null); }
   }
   const checkIn = (r: Attendee) => act(r.id, async () => {
-    const { data: reply } = await api.post<CheckInReply>(`/event-management/${id}/check-in`, { code: r.id });
+    const { data: reply } = await api.post<CheckInReply>(`/event-management/${id}/check-in`, { code: r.ticketCode ?? r.id });
     patch(reply.attendee);
     return { tone: reply.result === 'ok' ? 'ok' : 'error', text: reply.result === 'ok' ? 'Ingreso registrado.' : reply.message };
   });
@@ -144,7 +144,7 @@ export function EventAttendees({ id }: { id: string }) {
                       <tr key={r.id}>
                         <td className={a.person}><strong>{fullName(r)}</strong><span>{r.email}</span>{r.phone && <span>{r.phone}</span>}<span>{r.campusName}</span>{boughtBy(r) && <span>Compra de {boughtBy(r)}</span>}{(data.event.questions ?? []).filter((q) => answerText(r.answers?.[q.id]) !== '').map((q) => <span key={q.id} className={a.answer}>{q.label}: <b>{answerText(r.answers?.[q.id])}</b></span>)}</td>
                         <td data-label="Entrada">{r.ticketName ?? '—'}<br /><span className={a.tagMuted}>{Number(r.amount) > 0 ? money(Number(r.amount)) : r.source === 'manual' ? `Agregada por ${r.createdBy ?? 'el equipo'}` : 'Sin costo'}</span>{r.note && <div className={a.tagMuted}>«{r.note}»</div>}</td>
-                        <td data-label="Estado"><span className={a.tag} data-status={r.status}>{STATUS_LABELS[r.status] ?? r.status}</span>{r.testPayment && <span className={a.tagMuted}>Prueba</span>}{r.paymentId && <div className={a.tagMuted}>Pago N° {r.paymentId}</div>}</td>
+                        <td data-label="Estado"><span className={a.tag} data-status={r.status}>{STATUS_LABELS[r.status] ?? r.status}</span>{r.testPayment && <span className={a.tagMuted}>Prueba</span>}{r.transferredAt && <span className={a.tagMuted}>Transferida</span>}{r.paymentId && <div className={a.tagMuted}>Pago N° {r.paymentId}</div>}</td>
                         <td data-label="Ingreso">
                           <div className={a.presence}>
                             {r.checkedInAt

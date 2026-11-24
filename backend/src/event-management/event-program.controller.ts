@@ -24,6 +24,7 @@ export class EventProgramController {
 @Controller('public-events')
 export class PublicEventProgramController {
  constructor(private readonly service:EventProgramService){}
+ @Public() @Get() list(){return this.service.publicList();}
  @Public() @Get(':slug') get(@Param('slug') slug:string){return this.service.publicEvent(slug);}
  @Public() @Post(':slug/code') @Throttle({default:{limit:10,ttl:60000}}) code(@Param('slug') slug:string,@Body() d:CodeLookupDto){return this.service.lookupCode(slug,d.code);}
 }

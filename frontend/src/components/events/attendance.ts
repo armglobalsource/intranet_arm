@@ -5,7 +5,7 @@ export type Attendee = {
   campusId: number; campusName: string; ticketName: string | null; status: string; amount: number; currency: string;
   paymentId?: string | null; testPayment?: boolean; source: 'public' | 'manual'; note?: string | null; createdAt: string;
   checkedInAt: string | null; checkedInBy: string | null; createdBy?: string | null; emailSent?: boolean;
-  orderId?: string; buyerName?: string; buyerEmail?: string; discountCode?: string | null; answers?: Record<string, string | boolean>;
+  orderId?: string; ticketCode?: string; transferredAt?: string | null; buyerName?: string; buyerEmail?: string; discountCode?: string | null; answers?: Record<string, string | boolean>;
 };
 export type AttendanceQuestion = { id: string; label: string; type: string };
 export type AttendanceEvent = {
@@ -41,7 +41,7 @@ export function filterAttendees(list: Attendee[], f: AttendeeFilter) {
     if (f.presence === 'in' && !a.checkedInAt) return false;
     if (f.presence === 'out' && (a.checkedInAt || a.status !== 'confirmed')) return false;
     if (!words.length) return true;
-    const hay = fold(`${a.firstName} ${a.lastName} ${a.email} ${a.phone} ${a.id} ${a.ticketName ?? ''}`);
+    const hay = fold(`${a.firstName} ${a.lastName} ${a.email} ${a.phone} ${a.id} ${a.ticketCode ?? ''} ${a.ticketName ?? ''}`);
     return words.every((w) => hay.includes(w));
   });
 }
@@ -83,7 +83,8 @@ export function exportRows(list: Attendee[], timeZone?: string, questions: Atten
     'Fecha de inscripción': when(a.createdAt), Nota: a.note ?? '',
     'Compró': a.buyerName ?? '', 'Correo de quien compró': a.buyerEmail ?? '', 'Código de descuento': a.discountCode ?? '', Compra: a.orderId ?? '',
     ...Object.fromEntries(questions.map((q) => [q.label, answerText(a.answers?.[q.id])])),
-    Código: a.id,
+    Transferida: a.transferredAt ? 'Sí' : '',
+    Código: a.ticketCode ?? a.id,
   }));
 }
 

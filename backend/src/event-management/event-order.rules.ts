@@ -72,3 +72,14 @@ export function cleanAnswers(questions:Question[]|undefined,answers:Record<strin
  }
  return out;
 }
+
+export type SelfService = { transfer:boolean; cancel:boolean; until:string; open:boolean };
+/**
+ * Qué puede hacer quien compró con sus entradas y hasta cuándo. Por defecto: transferir sí;
+ * cancelar solo en eventos gratuitos (en los pagados la devolución la decide el equipo); hasta 24 h antes.
+ */
+export function selfService(details:any,startsAt:string|Date,now=Date.now()):SelfService{
+ const hours=Number.isFinite(Number(details?.selfServiceHours))&&details?.selfServiceHours!=null?Number(details.selfServiceHours):24;
+ const until=new Date(new Date(startsAt).getTime()-hours*3600_000);
+ return {transfer:details?.selfTransfer??true,cancel:details?.selfCancel??(details?.pricing!=='paid'),until:until.toISOString(),open:now<until.getTime()};
+}

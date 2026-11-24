@@ -1,14 +1,14 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import * as QRCode from 'qrcode';
 import { DatabaseService } from '../common/database/database.service';
 import { ResendMailerService } from '../auth/resend-mailer.service';
 import { EventPaymentService, InspectedPayment } from './event-payment.service';
-import { renderEventEmail, EmailKind } from './event-email';
+import { renderEventEmail, renderTicketsLinkEmail, EmailKind } from './event-email';
 import { RegistrationDto } from './event-registration.dto';
 import { assertEventScope, EventActor, eventAccess } from './event-program.rules';
-import { CodeRow, Question, TicketRow, cleanAnswers, codeAppliesTo, codeProblem, priceOrder, saleState, ticketSummary } from './event-order.rules';
+import { CodeRow, Question, TicketRow, cleanAnswers, codeAppliesTo, codeProblem, priceOrder, saleState, selfService, ticketSummary } from './event-order.rules';
 
 // Una compra (event_orders) reúne a quien compra, el total y el pago de Mercado Pago;
 // cada entrada (event_registrations) es un asistente con su propio código QR.
@@ -65,17 +65,21 @@ export class EventRegistrationService {
  private async order(id:string,db:Db=this.db){const r=(await db.query('SELECT * FROM arm_app.event_orders WHERE id=$1',[id])).rows[0];if(!r)throw new NotFoundException('Inscripción no encontrada');return r;}
  private async tickets(orderId:string,db:Db=this.db){return (await db.query('SELECT * FROM arm_app.event_registrations WHERE order_id=$1 ORDER BY created_at,id',[orderId])).rows;}
  private authorize(id:string,token:string){const expected=this.token(id);if(!/^[a-f0-9]{64}$/.test(token)||!timingSafeEqual(Buffer.from(expected,'hex'),Buffer.from(token,'hex')))throw new NotFoundException('Inscripción no encontrada');}
- private view(order:any,tickets:any[]){
+ private view(order:any,tickets:any[],event?:any){
   const expired=order.status==='pending_payment'&&Date.parse(order.expires_at)<=Date.now();
   const status=expired?'expired':order.status;
   return {id:order.id,token:this.token(order.id),status,buyerName:fullName(order.buyer),title:order.snapshot.title,startsAt:order.snapshot.startsAt,timezone:order.snapshot.timezone,
    subtotal:Number(order.subtotal),discount:Number(order.discount),amount:Number(order.amount),currency:order.currency,code:order.snapshot.code??null,summary:order.snapshot.ticketSummary??order.snapshot.ticketName??null,
    expiresAt:order.expires_at,emailSent:!!(order.status==='confirmed'?order.confirmation_sent_at:order.email_sent_at),testPayment:Number(order.amount)>0&&(order.snapshot.paymentMode??'test')==='test',
-   tickets:tickets.map(t=>{const st=t.status==='cancelled'?'cancelled':status;return {id:t.id,name:fullName(t.participant),ticketName:t.snapshot?.ticketName??'Entrada',amount:Number(t.amount),status:st,code:st==='confirmed'?t.id:null};})};
+   tickets:tickets.map(t=>{const st=t.status==='cancelled'?'cancelled':status;return {id:t.id,name:fullName(t.participant),ticketName:t.snapshot?.ticketName??'Entrada',amount:Number(t.amount),status:st,code:st==='confirmed'?(t.ticket_code??t.id):null,checkedIn:!!t.checked_in_at,transferred:!!t.transferred_at};}),
+   selfService:event?selfService(event.details,event.starts_at):null};
  }
 
  async register(slug:string,dto:RegistrationDto){
   this.settings();
+  // Si se liberaron cupos, la lista de espera tiene prioridad sobre las nuevas inscripciones.
+  const target=(await this.db.query('SELECT id FROM arm_app.event_programs WHERE slug=$1',[slug])).rows[0];
+  if(target)await this.promoteWaitlist(target.id).catch(()=>[]);
   if(!dto.firstName.trim()||!dto.lastName.trim())throw new BadRequestException('Completa tu nombre y apellido');
   const email=dto.email.trim().toLowerCase();const requestHash=createHash('sha256').update(dto.requestKey).digest('hex');
   let order:any;
@@ -158,9 +162,9 @@ export class EventRegistrationService {
  }
  async get(id:string,token:string){
   this.authorize(id,token);const order=await this.reconcile(await this.order(id));
-  const event=(await this.db.query('SELECT status FROM arm_app.event_programs WHERE id=$1',[order.event_id])).rows[0];
+  const event=(await this.db.query('SELECT status,details,starts_at FROM arm_app.event_programs WHERE id=$1',[order.event_id])).rows[0];
   if(event?.status==='cancelled')order.status='cancelled';
-  return this.view(order,await this.tickets(id));
+  return this.view(order,await this.tickets(id),event?.status==='published'?event:undefined);
  }
  async checkout(id:string,token:string){
   this.authorize(id,token);
@@ -178,9 +182,10 @@ export class EventRegistrationService {
   });
  }
  /** Envía el correo del estado de la compra a quien compró. Sin `force` se envía una sola vez; devuelve si quedó enviado. */
- async notify(order:any,options:{force?:boolean}={}):Promise<boolean>{
+ async notify(order:any,options:{force?:boolean;kind?:EmailKind}={}):Promise<boolean>{
   const confirmed=order.status==='confirmed';
   if(!options.force&&(confirmed?order.confirmation_sent_at:order.email_sent_at))return true;
+  const reminder=options.kind==='reminder_week'||options.kind==='reminder_day';
   const link=`${this.settings().origin}/eventos/${encodeURIComponent(order.snapshot.slug)}/inscripcion#id=${order.id}&token=${this.token(order.id)}`;
   const testPayment=Number(order.amount)>0&&(order.snapshot.paymentMode??'test')==='test';
   try{
@@ -188,8 +193,8 @@ export class EventRegistrationService {
    const event=(await this.db.query('SELECT e.title,e.starts_at,e.ends_at,e.details,c.name AS campus_name FROM arm_app.event_programs e LEFT JOIN arm_app.campuses c ON c.id=e.campus_id WHERE e.id=$1',[order.event_id])).rows[0];
    const d=event?.details??{};
    const tickets=confirmed?(await this.tickets(order.id)).filter((t:any)=>t.status==='confirmed'):[];
-   const kind:EmailKind=confirmed?'confirmed':order.status==='pending_payment'?'pending_payment':order.status==='waitlisted'?'waitlisted':'registered';
-   const shown=tickets.map((t:any,i:number)=>({name:fullName(t.participant),ticketName:t.snapshot?.ticketName??'Entrada',code:t.id,qrCid:`entrada-qr-${i+1}`}));
+   const kind:EmailKind=options.kind??(confirmed?'confirmed':order.status==='pending_payment'?'pending_payment':order.status==='waitlisted'?'waitlisted':order.status==='cancelled'?'cancelled':'registered');
+   const shown=tickets.map((t:any,i:number)=>({name:fullName(t.participant),ticketName:t.snapshot?.ticketName??'Entrada',code:t.ticket_code??t.id,qrCid:`entrada-qr-${i+1}`}));
    const mail=renderEventEmail({
     kind,firstName:order.buyer?.firstName??'',link,origin:this.settings().origin,tickets:shown,
     amount:Number(order.amount),discount:Number(order.discount)||0,currency:order.currency,ticketName:order.snapshot.ticketSummary??order.snapshot.ticketName,expiresAt:order.expires_at?new Date(order.expires_at).toISOString():null,testPayment,senderName:d.senderName,
@@ -199,9 +204,11 @@ export class EventRegistrationService {
    });
    // Cada QR va como imagen adjunta (cid:) para no exponer los códigos en URLs públicas.
    const attachments=await Promise.all(shown.map(async(t:any)=>({filename:`${t.qrCid}.png`,content:(await QRCode.toBuffer(t.code,{type:'png',width:360,margin:1,errorCorrectionLevel:'M'})).toString('base64'),content_id:t.qrCid})));
-   const key=`event-registration/${order.id}/${confirmed?'confirmed':'registered'}${options.force?`/${Date.now()}`:''}`;
+   if(reminder&&!shown.length)return false;
+   const key=`event-registration/${order.id}/${options.kind??(confirmed?'confirmed':'registered')}${options.force?`/${Date.now()}`:''}`;
    await this.mail.sendHtml({to:[order.email],subject:mail.subject,text:mail.text,html:mail.html,sender:{name:d.senderName,email:d.senderEmail},idempotencyKey:key,attachments:attachments.length?attachments:undefined});
-   await this.db.query(`UPDATE arm_app.event_orders SET ${confirmed?'confirmation_sent_at':'email_sent_at'}=now() WHERE id=$1`,[order.id]);
+   const column=options.kind==='reminder_week'?'reminder_week_sent_at':options.kind==='reminder_day'?'reminder_day_sent_at':options.kind==='cancelled'?null:confirmed?'confirmation_sent_at':'email_sent_at';
+   if(column)await this.db.query(`UPDATE arm_app.event_orders SET ${column}=now() WHERE id=$1`,[order.id]);
    return true;
   }catch{/* A failed email never undoes a committed booking; authenticated retry is available. */return false;}
  }
@@ -275,5 +282,179 @@ export class EventRegistrationService {
    :found.some((p:InspectedPayment)=>p.status==='approved')?'Hay un pago aprobado, pero no corresponde a esta cuenta o entorno de pagos.'
    :`Mercado Pago informa el pago como «${found[0].status}${found[0].statusDetail?` · ${found[0].statusDetail}`:''}».`;
   return {status:after.status,message,payments};
+ }
+
+ // ── Autogestión de quien compró (con el enlace firmado de su compra) ──
+
+ /** Cambia el titular de una entrada confirmada. El QR anterior deja de servir y el nuevo llega a quien la recibe. */
+ async transfer(orderId:string,token:string,ticketId:string,dto:{firstName:string;lastName:string;email?:string}){
+  this.authorize(orderId,token);
+  if(!dto.firstName.trim()||!dto.lastName.trim())throw new BadRequestException('Escribe nombre y apellido de quien recibe la entrada');
+  const result=await this.db.transaction(async db=>{
+   const order=(await db.query('SELECT * FROM arm_app.event_orders WHERE id=$1 FOR UPDATE',[orderId])).rows[0];
+   if(!order)throw new NotFoundException('Inscripción no encontrada');
+   const event=(await db.query('SELECT * FROM arm_app.event_programs WHERE id=$1',[order.event_id])).rows[0];
+   const ticket=(await db.query('SELECT * FROM arm_app.event_registrations WHERE id=$1 AND order_id=$2 FOR UPDATE',[ticketId,orderId])).rows[0];
+   if(!ticket)throw new NotFoundException('Entrada no encontrada');
+   const policy=selfService(event.details,event.starts_at);
+   if(event.status!=='published')throw new BadRequestException('El evento no admite cambios');
+   if(!policy.transfer)throw new ForbiddenException('Este evento no permite transferir entradas. Escribe al equipo organizador.');
+   if(!policy.open)throw new BadRequestException('El plazo para transferir entradas ya terminó.');
+   if(order.status!=='confirmed'||ticket.status!=='confirmed')throw new BadRequestException('Solo puedes transferir entradas confirmadas.');
+   if(ticket.checked_in_at)throw new BadRequestException('Esta entrada ya se usó para ingresar.');
+   const participant={firstName:dto.firstName.trim(),lastName:dto.lastName.trim(),phone:'',age:null,transferredFrom:fullName(ticket.participant)};
+   const updated=(await db.query(`UPDATE arm_app.event_registrations SET participant=$2,email=$3,ticket_code=gen_random_uuid(),transferred_at=now(),updated_at=now() WHERE id=$1 RETURNING *`,
+    [ticketId,JSON.stringify(participant),dto.email?.trim().toLowerCase()||ticket.email])).rows[0];
+   return {updated,event,from:fullName(ticket.participant)};
+  });
+  if(dto.email?.trim())await this.notifyTransfer(result.updated,result.event,result.from);
+  return this.get(orderId,token);
+ }
+ private async notifyTransfer(ticket:any,event:any,from:string){
+  const d=event.details??{};
+  try{
+   const mail=renderEventEmail({kind:'transferred',firstName:ticket.participant?.firstName??'',link:`${this.settings().origin}/eventos/${encodeURIComponent(event.slug)}`,origin:this.settings().origin,
+    tickets:[{name:fullName(ticket.participant),ticketName:ticket.snapshot?.ticketName??'Entrada',code:ticket.ticket_code,qrCid:'entrada-qr-1'}],amount:0,currency:'CLP',ticketName:`${ticket.snapshot?.ticketName??'Entrada'} · de ${from}`,senderName:d.senderName,
+    event:{title:event.title,summary:d.summary,bannerUrl:d.bannerUrl,color:d.color,startsAt:new Date(event.starts_at).toISOString(),endsAt:new Date(event.ends_at).toISOString(),timezone:d.timezone,modality:d.modality,location:d.location,address:d.address}});
+   const content=(await QRCode.toBuffer(ticket.ticket_code,{type:'png',width:360,margin:1,errorCorrectionLevel:'M'})).toString('base64');
+   await this.mail.sendHtml({to:[ticket.email],subject:mail.subject,text:mail.text,html:mail.html,sender:{name:d.senderName,email:d.senderEmail},idempotencyKey:`event-ticket/${ticket.id}/transfer/${ticket.ticket_code}`,attachments:[{filename:'entrada-qr-1.png',content,content_id:'entrada-qr-1'}]});
+   return true;
+  }catch{return false;}
+ }
+
+ /**
+  * Cancela una entrada confirmada (si el evento lo permite y está dentro del plazo) o, sin entrada,
+  * una reserva pendiente o en espera completa. El cupo liberado pasa a la lista de espera.
+  */
+ async cancelBySelf(orderId:string,token:string,ticketId?:string){
+  this.authorize(orderId,token);
+  const eventId=await this.db.transaction(async db=>{
+   const order=(await db.query('SELECT * FROM arm_app.event_orders WHERE id=$1 FOR UPDATE',[orderId])).rows[0];
+   if(!order)throw new NotFoundException('Inscripción no encontrada');
+   const event=(await db.query('SELECT * FROM arm_app.event_programs WHERE id=$1',[order.event_id])).rows[0];
+   const policy=selfService(event.details,event.starts_at);
+   if(order.status==='cancelled')throw new ConflictException('Esta inscripción ya estaba cancelada.');
+   if(order.status==='confirmed'){
+    if(!ticketId)throw new BadRequestException('Elige la entrada que quieres cancelar.');
+    if(!policy.cancel)throw new ForbiddenException('Este evento no permite cancelar entradas desde aquí. Escribe al equipo organizador.');
+    if(!policy.open)throw new BadRequestException('El plazo para cancelar entradas ya terminó.');
+    const t=(await db.query("UPDATE arm_app.event_registrations SET status='cancelled',cancelled_at=now(),updated_at=now() WHERE id=$1 AND order_id=$2 AND status='confirmed' AND checked_in_at IS NULL RETURNING id",[ticketId,orderId])).rows[0];
+    if(!t)throw new BadRequestException('Esta entrada no se puede cancelar (ya se usó o ya estaba cancelada).');
+    await db.query("UPDATE arm_app.event_orders o SET status='cancelled',updated_at=now() WHERE o.id=$1 AND NOT EXISTS(SELECT 1 FROM arm_app.event_registrations r WHERE r.order_id=o.id AND r.status<>'cancelled')",[orderId]);
+   }else if(['pending_payment','waitlisted','expired'].includes(order.status)){
+    // Una reserva sin pagar se cancela completa: su total corresponde a todas sus entradas.
+    await db.query("UPDATE arm_app.event_orders SET status='cancelled',updated_at=now() WHERE id=$1",[orderId]);
+    await db.query("UPDATE arm_app.event_registrations SET status='cancelled',cancelled_at=now(),updated_at=now() WHERE order_id=$1 AND status<>'cancelled'",[orderId]);
+   }else throw new BadRequestException('Esta inscripción está en revisión: escribe al equipo organizador.');
+   return order.event_id as string;
+  });
+  const order=await this.order(orderId);
+  if(order.status==='cancelled')await this.notify(order,{force:true,kind:'cancelled'});
+  await this.promoteWaitlist(eventId).catch(()=>[]);
+  return this.get(orderId,token);
+ }
+
+ /**
+  * Pasa compras de la lista de espera (por orden de llegada) a los cupos libres: las gratuitas quedan
+  * confirmadas y las pagadas con una reserva nueva para pagar. Avisa por correo a cada una.
+  */
+ async promoteWaitlist(eventId:string){
+  const promoted:string[]=await this.db.transaction(async db=>{
+   const event=(await db.query('SELECT * FROM arm_app.event_programs WHERE id=$1 FOR UPDATE',[eventId])).rows[0];
+   if(!event||event.status!=='published'||Date.now()>=new Date(event.ends_at).getTime())return [];
+   const waiting=(await db.query("SELECT * FROM arm_app.event_orders WHERE event_id=$1 AND status='waitlisted' ORDER BY created_at,id FOR UPDATE",[eventId])).rows;
+   if(!waiting.length)return [];
+   const d=event.details??{};
+   await db.query("UPDATE arm_app.event_orders SET status='expired',updated_at=now() WHERE event_id=$1 AND status='pending_payment' AND expires_at<=now()",[eventId]);
+   await db.query("UPDATE arm_app.event_registrations SET status='expired',updated_at=now() WHERE event_id=$1 AND status='pending_payment' AND expires_at<=now()",[eventId]);
+   const used=Number((await db.query("SELECT count(*) FROM arm_app.event_registrations WHERE event_id=$1 AND status IN ('confirmed','pending_payment')",[eventId])).rows[0].count);
+   let left=event.capacity==null?Infinity:Number(event.capacity)-used;
+   const types=new Map<string,any>((await db.query('SELECT * FROM arm_app.event_ticket_types WHERE event_id=$1',[eventId])).rows.map((t:any)=>[t.id,t]));
+   const sold=await soldByTicket(db,eventId);
+   const paymentClosed=d.paymentDueAt&&Date.now()>=Date.parse(d.paymentDueAt);
+   const done:string[]=[];
+   for(const order of waiting){
+    if(left<=0)break;
+    const tickets=(await db.query("SELECT * FROM arm_app.event_registrations WHERE order_id=$1 AND status='waitlisted'",[order.id])).rows;
+    if(!tickets.length)continue;
+    if(tickets.length>left)break; // por orden de llegada: nadie se salta a quien espera antes
+    const need=new Map<string,number>();for(const t of tickets)if(t.ticket_type_id)need.set(t.ticket_type_id,(need.get(t.ticket_type_id)??0)+1);
+    const fits=[...need].every(([id,n])=>{const t=types.get(id);return !t?.capacity||(sold.get(id)??0)+n<=Number(t.capacity);});
+    if(!fits)break;
+    const paid=Number(order.amount)>0;
+    if(paid&&(paymentClosed||!['test','production'].includes(order.snapshot?.paymentMode)))continue;
+    const status=paid?'pending_payment':'confirmed';
+    const expires=paid?new Date(Math.min(Date.now()+24*60*60*1000,new Date(event.ends_at).getTime(),d.paymentDueAt?Date.parse(d.paymentDueAt):Infinity)).toISOString():null;
+    await db.query('UPDATE arm_app.event_orders SET status=$2,expires_at=$3,promoted_at=now(),updated_at=now() WHERE id=$1',[order.id,status,expires]);
+    await db.query("UPDATE arm_app.event_registrations SET status=$2,expires_at=$3,updated_at=now() WHERE order_id=$1 AND status='waitlisted'",[order.id,status,expires]);
+    left-=tickets.length;for(const [id,n] of need)sold.set(id,(sold.get(id)??0)+n);
+    done.push(order.id);
+   }
+   return done;
+  });
+  for(const id of promoted){const o=await this.order(id);await this.notify(o,o.status==='pending_payment'?{force:true,kind:'spot_opened'}:{});}
+  return promoted;
+ }
+
+ // ── «Mis entradas»: enlace firmado por correo, sin cuenta ──
+ private ticketsToken(email:string,expires:number){
+  const payload=`${Buffer.from(email).toString('base64url')}.${expires}`;
+  return `${payload}.${createHmac('sha256',this.settings().secret).update(`my-tickets:${payload}`).digest('base64url')}`;
+ }
+ private ticketsEmail(token:string){
+  const [b64,exp,sig]=(token??'').split('.');
+  if(!b64||!/^\d+$/.test(exp??'')||!sig)throw new UnauthorizedException('El enlace no es válido. Pide uno nuevo.');
+  const expected=createHmac('sha256',this.settings().secret).update(`my-tickets:${b64}.${exp}`).digest();
+  const given=Buffer.from(sig,'base64url');
+  if(given.length!==expected.length||!timingSafeEqual(given,expected))throw new UnauthorizedException('El enlace no es válido. Pide uno nuevo.');
+  if(Date.now()>Number(exp))throw new UnauthorizedException('El enlace venció. Pide uno nuevo.');
+  return Buffer.from(b64,'base64url').toString();
+ }
+ /** Envía el enlace solo si el correo tiene compras; la respuesta es igual en ambos casos. */
+ async sendTicketsLink(rawEmail:string){
+  const email=rawEmail.trim().toLowerCase();
+  const has=(await this.db.query('SELECT 1 FROM arm_app.event_orders WHERE lower(email)=$1 LIMIT 1',[email])).rows.length>0;
+  if(has){
+   const origin=this.settings().origin;
+   const link=`${origin}/mis-entradas#token=${this.ticketsToken(email,Date.now()+24*60*60*1000)}`;
+   const mail=renderTicketsLinkEmail({link,origin});
+   const minute=Math.floor(Date.now()/60000);
+   try{await this.mail.sendHtml({to:[email],subject:mail.subject,html:mail.html,text:mail.text,idempotencyKey:`my-tickets/${createHash('sha256').update(email).digest('hex').slice(0,24)}/${minute}`});}catch{/* misma respuesta */}
+  }
+  return {message:'Si ese correo tiene inscripciones, te enviamos un enlace para verlas. Revisa tu bandeja de entrada.'};
+ }
+ async myTickets(token:string){
+  const email=this.ticketsEmail(token);
+  const rows=(await this.db.query(`SELECT o.*,e.title,e.slug,e.starts_at,e.ends_at,e.status AS event_status,e.details AS event_details,
+   (SELECT count(*)::int FROM arm_app.event_registrations r WHERE r.order_id=o.id AND r.status<>'cancelled') AS active_tickets
+   FROM arm_app.event_orders o JOIN arm_app.event_programs e ON e.id=o.event_id
+   WHERE lower(o.email)=$1 AND e.ends_at>now()-interval '180 days' ORDER BY e.starts_at DESC,o.created_at DESC LIMIT 60`,[email])).rows;
+  return {email,orders:rows.map((o:any)=>{
+   const d=o.event_details??{};
+   const status=o.event_status==='cancelled'?'cancelled':o.status==='pending_payment'&&Date.parse(o.expires_at)<=Date.now()?'expired':o.status;
+   return {id:o.id,token:this.token(o.id),status,tickets:Number(o.active_tickets),summary:o.snapshot?.ticketSummary??o.snapshot?.ticketName??null,amount:Number(o.amount),currency:o.currency,
+    upcoming:new Date(o.ends_at).getTime()>Date.now(),
+    event:{title:o.title,slug:o.slug,startsAt:o.starts_at,endsAt:o.ends_at,timezone:d.timezone,bannerUrl:d.bannerUrl,color:d.color,location:d.modality==='online'?'Evento online':d.location}};
+  })};
+ }
+
+ // ── Tarea diaria: lista de espera y recordatorios ──
+ async runDaily(){
+  const events=(await this.db.query(`SELECT DISTINCT event_id FROM arm_app.event_orders o JOIN arm_app.event_programs e ON e.id=o.event_id WHERE o.status='waitlisted' AND e.status='published' AND e.ends_at>now()`)).rows;
+  let promoted=0;for(const e of events)promoted+=(await this.promoteWaitlist(e.event_id).catch(()=>[])).length;
+  const base=`FROM arm_app.event_orders o JOIN arm_app.event_programs e ON e.id=o.event_id WHERE o.status='confirmed' AND e.status='published' AND coalesce((e.details->>'reminders')::boolean,true)`;
+  const day=(await this.db.query(`SELECT o.* ${base} AND o.reminder_day_sent_at IS NULL AND e.starts_at>now() AND e.starts_at<=now()+interval '30 hours' LIMIT 300`)).rows;
+  const week=(await this.db.query(`SELECT o.* ${base} AND o.reminder_week_sent_at IS NULL AND o.reminder_day_sent_at IS NULL AND e.starts_at>now()+interval '30 hours' AND e.starts_at<=now()+interval '7 days' AND o.created_at<now()-interval '2 days' LIMIT 300`)).rows;
+  let sent=0;
+  for(const o of day)if(await this.notify(o,{force:true,kind:'reminder_day'}))sent++;
+  for(const o of week)if(await this.notify(o,{force:true,kind:'reminder_week'}))sent++;
+  return {promoted,reminders:sent,dayCandidates:day.length,weekCandidates:week.length};
+ }
+ /** La tarea diaria solo corre con el secreto de Vercel Cron (CRON_SECRET). */
+ assertCron(authorization:string|undefined){
+  const secret=this.config.get<string>('CRON_SECRET')??'';
+  if(secret.length<16)throw new ServiceUnavailableException('La tarea diaria no está configurada.');
+  const expected=Buffer.from(`Bearer ${secret}`);const given=Buffer.from(authorization??'');
+  if(given.length!==expected.length||!timingSafeEqual(given,expected))throw new UnauthorizedException();
  }
 }

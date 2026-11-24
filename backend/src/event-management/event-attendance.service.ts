@@ -23,7 +23,7 @@ const NOT_VALID:Record<string,string>={
 const ATTENDEE_SQL=`SELECT r.id,r.participant,r.email,r.campus_id AS "campusId",c.name AS "campusName",r.snapshot->>'ticketName' AS "ticketName",r.ticket_type_id AS "ticketTypeId",
  CASE WHEN r.status='pending_payment' AND r.expires_at<=now() THEN 'expired' ELSE r.status END AS status,r.amount,r.currency,coalesce(o.payment_id,r.payment_id) AS "paymentId",
  (o.amount>0 AND coalesce(o.snapshot->>'paymentMode','test')='test') AS "testPayment",r.source,r.note,r.created_at AS "createdAt",r.answers,
- r.order_id AS "orderId",o.email AS "buyerEmail",concat_ws(' ',o.buyer->>'firstName',o.buyer->>'lastName') AS "buyerName",o.snapshot->>'code' AS "discountCode",
+ r.order_id AS "orderId",r.ticket_code AS "ticketCode",r.transferred_at AS "transferredAt",o.email AS "buyerEmail",concat_ws(' ',o.buyer->>'firstName',o.buyer->>'lastName') AS "buyerName",o.snapshot->>'code' AS "discountCode",
  r.checked_in_at AS "checkedInAt",nullif(concat_ws(' ',ci."firstName",ci."lastName"),'') AS "checkedInBy",
  nullif(concat_ws(' ',cb."firstName",cb."lastName"),'') AS "createdBy",(CASE WHEN o.status='confirmed' THEN o.confirmation_sent_at ELSE o.email_sent_at END) IS NOT NULL AS "emailSent"
  FROM arm_app.event_registrations r JOIN arm_app.event_orders o ON o.id=r.order_id JOIN arm_app.campuses c ON c.id=r.campus_id
@@ -100,9 +100,15 @@ export class EventAttendanceService {
   const reply=async(result:CheckInResult,message:string,a:any=null)=>({result,message,attendee:a,counts:await this.counts(eventId)});
   if(!id)return reply('not_found','No reconocemos este código. Prueba de nuevo o busca a la persona por su nombre.');
   if(event.status==='cancelled')return reply('invalid','El evento está cancelado: no se registran ingresos.');
-  const updated=(await this.db.query(`UPDATE arm_app.event_registrations SET checked_in_at=now(),checked_in_by=$3,updated_at=now() WHERE id=$1 AND event_id=$2 AND status='confirmed' AND checked_in_at IS NULL RETURNING id`,[id,eventId,user.sub])).rows[0];
-  const a=await this.one(eventId,id);
-  if(!a)return reply('not_found','Esta entrada no corresponde a este evento.');
+  // El QR lleva el código de la entrada, que cambia al transferirla: el código anterior deja de servir.
+  const updated=(await this.db.query(`UPDATE arm_app.event_registrations SET checked_in_at=now(),checked_in_by=$3,updated_at=now() WHERE ticket_code=$1 AND event_id=$2 AND status='confirmed' AND checked_in_at IS NULL RETURNING id`,[id,eventId,user.sub])).rows[0];
+  const found=(await this.db.query(`${ATTENDEE_SQL} WHERE r.event_id=$1 AND r.ticket_code=$2`,[eventId,id])).rows[0];
+  const a=found?attendee(found):null;
+  if(!a){
+   const old=await this.one(eventId,id);
+   if(old?.transferredAt)return reply('invalid',`Esta entrada fue transferida a ${old.firstName} ${old.lastName}: el código anterior ya no sirve.`,old);
+   return reply('not_found','Esta entrada no corresponde a este evento.');
+  }
   if(updated)return reply('ok',`Bienvenida/o, ${a.firstName}.`,a);
   if(a.status==='confirmed'&&a.checkedInAt)return reply('already','Esta entrada ya se usó para ingresar.',a);
   return reply('invalid',NOT_VALID[a.status]??'Esta entrada no es válida para ingresar.',a);
@@ -160,6 +166,7 @@ export class EventAttendanceService {
   });
   if(!r){if(!(await this.one(eventId,registrationId)))throw new NotFoundException('Inscripción no encontrada');throw new ConflictException('Esta inscripción ya estaba anulada');}
   const paid=r.payment_id&&Number(r.amount)>0;
+  await this.registrations.promoteWaitlist(eventId).catch(()=>[]);
   return {attendee:await this.one(eventId,registrationId),message:paid?`Inscripción anulada y cupo liberado. Si corresponde devolver el dinero, hazlo en Mercado Pago (pago N° ${r.payment_id}).`:'Inscripción anulada y cupo liberado.'};
  }
 

@@ -28,3 +28,21 @@ export class RegistrationAccessDto {
 export class CodeLookupDto {
  @IsString() @MinLength(1) @MaxLength(30) code:string;
 }
+/** Quien compró transfiere una de sus entradas a otra persona. */
+export class TransferDto {
+ @Matches(/^[a-f0-9]{64}$/) token:string;
+ @IsString() @MinLength(1) @MaxLength(80) firstName:string;
+ @IsString() @MinLength(1) @MaxLength(80) lastName:string;
+ @IsOptional() @IsEmail() @MaxLength(254) email?:string;
+}
+/** Cancelar una entrada confirmada (ticketId) o una reserva pendiente completa (sin ticketId). */
+export class SelfCancelDto {
+ @Matches(/^[a-f0-9]{64}$/) token:string;
+ @IsOptional() @IsUUID() ticketId?:string;
+}
+export class TicketsLinkDto {
+ @IsEmail() @MaxLength(254) email:string;
+}
+export class TicketsTokenDto {
+ @IsString() @MinLength(10) @MaxLength(600) token:string;
+}

@@ -142,6 +142,20 @@ export class EventProgramService {
    capacityLeft:row.capacity==null?null:Math.max(Number(row.capacity)-Number(occupied.rows[0]?.n??0),0),codesEnabled:Number(codes.rows[0]?.n??0)>0,
    paymentMode:this.registrations?.paymentMode()??'disabled',registrationEnabled:registrationsOpen(row),campusOptions:campuses.rows.map(c=>({id:Number(c.id),name:c.name}))};
  }
+ /** Catálogo público: eventos publicados que aún no terminan, con su rango de precios y si quedan cupos. */
+ async publicList(){
+  const rows=(await this.db.query(`SELECT e.id,e.slug,e.title,e.starts_at,e.ends_at,e.capacity,e.registration_status,e.status,e.published_at,e.details,c.name AS campus_name,k.name AS category_name,
+   (SELECT array_agg(pc.name ORDER BY pc.name) FROM arm_app.event_program_campuses ec JOIN arm_app.campuses pc ON pc.id=ec.campus_id WHERE ec.event_id=e.id) AS campuses,
+   (SELECT min(t.price) FROM arm_app.event_ticket_types t WHERE t.event_id=e.id AND NOT t.archived AND NOT t.hidden AND t.price>0) AS min_price,
+   (SELECT max(t.price) FROM arm_app.event_ticket_types t WHERE t.event_id=e.id AND NOT t.archived AND NOT t.hidden AND t.price>0) AS max_price,
+   (SELECT count(*)::int FROM arm_app.event_registrations r WHERE r.event_id=e.id AND ${OCCUPYING}) AS occupied
+   FROM arm_app.event_programs e JOIN arm_app.campuses c ON c.id=e.campus_id LEFT JOIN arm_app.event_categories k ON k.id=e.category_id
+   WHERE e.status='published' AND e.published_at IS NOT NULL AND e.ends_at>now() ORDER BY e.starts_at,e.id LIMIT 200`,[])).rows;
+  return rows.map((r:any)=>{const d=r.details??{};const left=r.capacity==null?null:Math.max(Number(r.capacity)-Number(r.occupied),0);
+   return {slug:r.slug,title:r.title,startsAt:r.starts_at,endsAt:r.ends_at,timezone:d.timezone,summary:d.summary,bannerUrl:d.bannerUrl,color:d.color,modality:d.modality,location:d.location,
+    campusName:r.campus_name,categoryName:r.category_name,campuses:r.campuses??[],pricing:d.pricing,minPrice:r.min_price==null?null:Number(r.min_price),maxPrice:r.max_price==null?null:Number(r.max_price),
+    registrationEnabled:registrationsOpen(r),soldOut:left===0&&!d.waitlist,capacityLeft:left};});
+ }
  /** Comprueba un código en la portada: el descuento que da y las entradas ocultas que desbloquea. */
  async lookupCode(slug:string,input:string){
   const event=(await this.db.query(`SELECT id FROM arm_app.event_programs WHERE slug=$1 AND published_at IS NOT NULL AND status='published'`,[slug])).rows[0];

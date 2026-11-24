@@ -45,7 +45,7 @@ describe('Inscripciones',()=>{
   const pipe=new ValidationPipe({whitelist:true,forbidNonWhitelisted:true,transform:true});
   for(const body of [{...dto,amount:0},{...dto,status:'confirmed'},{...dto,consent:false},{...dto,email:'invalid'},{...dto,items:[]},{...dto,items:Array(11).fill(item())},{...dto,items:[{...item(),price:0}]}])await expect(pipe.transform(body,{type:'body',metatype:RegistrationDto})).rejects.toThrow();
  });
- it('confirma un evento gratuito y no solicita pago',async()=>{const x=setup();const result=await x.service.register('free',dto);expect(result.status).toBe('confirmed');expect(result.amount).toBe(0);expect(result.tickets[0].code).toBe(x.store.tickets[0].id);expect(x.query.mock.calls[0][0]).toContain('FOR UPDATE');});
+ it('confirma un evento gratuito y no solicita pago',async()=>{const x=setup();const result=await x.service.register('free',dto);expect(result.status).toBe('confirmed');expect(result.amount).toBe(0);expect(result.tickets[0].code).toBe(x.store.tickets[0].id);expect(x.query.mock.calls.some(([sql])=>sql.includes('event_programs WHERE slug=$1 FOR UPDATE'))).toBe(true);});
  it('rechaza el último cupo ocupado o usa lista de espera sin emitir entrada',async()=>{
   await expect(setup({count:1}).service.register('full',dto)).rejects.toThrow(/agotaron/);
   const result=await setup({count:1,waitlist:true}).service.register('full',dto);expect(result.status).toBe('waitlisted');expect(result.tickets[0].code).toBeNull();

@@ -10,10 +10,11 @@ import { api, apiErrorMessage } from '@/lib/api';
 import { eventPrice, PublicEvent, TicketType } from './event-types';
 import { AppliedCode, Attendee, FREE_KEY, choosable, describeCode, initialQty, maxFor, missingAnswer, slots, totals } from './checkout';
 import { eventDay, eventIcs, eventTimeRange, momentLabel } from './event-helpers';
+import { CancelReservation, SelfService, TicketActions, selfServiceNote } from './ReceiptActions';
 import c from './event-checkout.module.css';
 
-type ReceiptTicket = { id: string; name: string; ticketName: string; amount: number; status: string; code: string | null };
-type Receipt = { id: string; token: string; status: string; buyerName: string; title: string; startsAt: string; timezone: string; subtotal: number; discount: number; amount: number; currency: string; code: string | null; summary: string | null; expiresAt: string | null; emailSent: boolean; testPayment: boolean; tickets: ReceiptTicket[] };
+type ReceiptTicket = { id: string; name: string; ticketName: string; amount: number; status: string; code: string | null; checkedIn?: boolean; transferred?: boolean };
+type Receipt = { id: string; token: string; status: string; buyerName: string; title: string; startsAt: string; timezone: string; subtotal: number; discount: number; amount: number; currency: string; code: string | null; summary: string | null; expiresAt: string | null; emailSent: boolean; testPayment: boolean; tickets: ReceiptTicket[]; selfService?: SelfService | null };
 type Returned = null | 'approved' | 'pending' | 'failed';
 
 /** QR de la entrada, generado en el navegador: el código no sale a ningún otro servicio. */
@@ -315,6 +316,10 @@ export function EventReceipt({ slug }: { slug: string }) {
     return () => window.clearInterval(timer);
   }, [returned, receipt?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [notice, setNotice] = useState('');
+  /** Respuesta de transferir o cancelar: actualiza la página sin recargar. */
+  const updated = (r: Receipt, message: string) => { status.current = r.status; setReceipt(r); setNotice(message); remember(slug, r); };
+
   async function action(kind: 'checkout' | 'email') {
     if (!receipt) return;
     setBusy(true); setError('');
@@ -343,7 +348,7 @@ export function EventReceipt({ slug }: { slug: string }) {
   const price = receipt ? (paid ? money(receipt.amount, receipt.currency) : 'Gratis') : '';
   const firstName = receipt?.buyerName.split(' ')[0] ?? '';
   const ready = receipt?.tickets.filter((t) => t.code) ?? [];
-  const many = (receipt?.tickets.length ?? 0) > 1;
+  const many = (receipt?.tickets.filter((t) => t.status !== 'cancelled').length ?? 0) > 1;
   const st = receipt?.status;
   const checking = st === 'pending_payment' && polling;
 
@@ -366,9 +371,11 @@ export function EventReceipt({ slug }: { slug: string }) {
             {time && <div><dt>Horario</dt><dd>{time}</dd></div>}
             {place && <div className={c.span2}><dt>Lugar</dt><dd>{place}</dd></div>}
           </dl>
-          <div className={c.ticketCode}><TicketQr code={t.code!} /><small>Código de la entrada</small><code>{t.code}</code><small>Muestra este código QR en la entrada del evento.</small></div>
+          <div className={c.ticketCode}><TicketQr code={t.code!} /><small>Código de la entrada</small><code>{t.code}</code><small>{t.checkedIn ? 'Esta entrada ya se usó para ingresar.' : t.transferred ? 'Entrada transferida: este es su nuevo código.' : 'Muestra este código QR en la entrada del evento.'}</small></div>
+          <TicketActions<Receipt> orderId={receipt.id} token={receipt.token} ticket={t} policy={receipt.selfService} onDone={updated} />
         </article>
       ))}
+      {selfServiceNote(receipt.selfService, tz) && <p className={c.fine}>{selfServiceNote(receipt.selfService, tz)}</p>}
       <div className={c.row}>
         <button type="button" className={c.secondary} onClick={() => window.print()}><Printer size={16} aria-hidden="true" />Imprimir / Guardar PDF</button>
         {event?.startsAt && <button type="button" className={c.secondary} onClick={addToCalendar}><CalendarPlus size={16} aria-hidden="true" />Agregar al calendario</button>}
@@ -405,11 +412,13 @@ export function EventReceipt({ slug }: { slug: string }) {
         </ul>
         <p className={c.fine}>Te llevamos a Mercado Pago y, al terminar, vuelves aquí para ver tu entrada.</p>
         <button type="button" className={c.textButton} disabled={busy} onClick={() => load()}><RefreshCw size={14} aria-hidden="true" />Ya pagué: actualizar estado</button>
+        <CancelReservation<Receipt> orderId={receipt.id} token={receipt.token} label="Cancelar reserva" onDone={updated} />
       </>;
     } else if (st === 'waitlisted') body = <>
       {icon('wait', <Hourglass size={28} />)}
       <h1 className={c.title}>Estás en lista de espera</h1>
-      <p className={c.lead}>Los cupos están completos. Guardamos tu lugar en la lista: si se libera un cupo, el equipo organizador te contactará. No debes pagar por ahora.</p>
+      <p className={c.lead}>Los cupos están completos. Guardamos tu lugar en la lista: si se libera un cupo, te avisaremos por correo{paid ? ' y tendrás 24 horas para pagar' : ' y tu entrada quedará confirmada'}. No debes pagar por ahora.</p>
+      <CancelReservation<Receipt> orderId={receipt.id} token={receipt.token} label="Salir de la lista de espera" onDone={updated} />
     </>;
     else if (st === 'payment_review') body = <>
       {icon('wait', <Hourglass size={28} />)}
@@ -444,6 +453,7 @@ export function EventReceipt({ slug }: { slug: string }) {
       </header>
       <section className={c.card}>
         {error && <p role="alert" className={c.error}>{error}</p>}
+        {notice && <p role="status" className={c.alert}>{notice}</p>}
         {body ?? (!error && <p role="status" className={c.loading}><Loader2 size={18} className={c.spin} aria-hidden="true" />Consultando tu inscripción…</p>)}
         {receipt && (
           <div className={c.mail}>

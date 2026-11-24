@@ -2,7 +2,10 @@
 // el estado, datos en tarjetas y botón del color del evento. Solo tablas y estilos en
 // línea para que se vea igual en Gmail, Outlook y el teléfono.
 
-export type EmailKind = 'confirmed' | 'pending_payment' | 'waitlisted' | 'registered';
+export type EmailKind = 'confirmed' | 'pending_payment' | 'waitlisted' | 'registered'
+  | 'reminder_week' | 'reminder_day' | 'spot_opened' | 'transferred' | 'cancelled';
+/** Correos que muestran las entradas con su QR. */
+const WITH_TICKETS: EmailKind[] = ['confirmed', 'reminder_week', 'reminder_day', 'transferred'];
 
 export interface EventEmailData {
   kind: EmailKind;
@@ -49,6 +52,11 @@ const COPY: Record<EmailKind, { subject: string; heading: string; intro: string;
   pending_payment: { subject: 'Completa tu pago', heading: 'Tu cupo te espera', intro: 'Recibimos tu inscripción. Completa el pago para confirmar tu entrada.', cta: 'Completar mi pago' },
   waitlisted: { subject: 'Estás en lista de espera', heading: 'Estás en lista de espera', intro: 'Los cupos están completos. Si se libera uno, el equipo organizador te contactará. No debes pagar por ahora.', cta: 'Ver mi inscripción' },
   registered: { subject: 'Recibimos tu inscripción', heading: 'Recibimos tu inscripción', intro: 'Tu inscripción quedó registrada.', cta: 'Ver mi inscripción' },
+  reminder_week: { subject: 'Falta una semana', heading: '¡Falta una semana!', intro: 'Te esperamos. Aquí tienes todo lo que necesitas para llegar, y tus entradas con su código QR.', cta: 'Ver mis entradas' },
+  reminder_day: { subject: '¡Mañana es el día!', heading: '¡Ya casi es el día!', intro: 'Te esperamos muy pronto. Ten a mano tu código QR para entrar rápido.', cta: 'Ver mis entradas' },
+  spot_opened: { subject: 'Se liberó un cupo para ti', heading: '¡Se liberó un cupo para ti!', intro: 'Estabas en lista de espera y ahora hay lugar. Completa el pago para confirmar tu entrada antes de que venza la reserva.', cta: 'Completar mi pago' },
+  transferred: { subject: 'Te transfirieron una entrada', heading: 'Tienes una entrada', intro: 'Te transfirieron una entrada a tu nombre. Muestra este código QR al llegar.', cta: 'Ver el evento' },
+  cancelled: { subject: 'Cancelaste tu entrada', heading: 'Tu entrada fue cancelada', intro: 'Registramos la cancelación y el cupo quedó libre para otra persona.', cta: 'Ver mi inscripción' },
 };
 
 export function renderEventEmail(d: EventEmailData) {
@@ -76,7 +84,7 @@ export function renderEventEmail(d: EventEmailData) {
       <div style="margin-top:3px;font-size:16px;font-weight:600;color:#1d1d1b">${esc(value)}</div>${extra}</td></tr>` : '';
 
   // Una tarjeta por entrada confirmada, cada una con su QR (una compra puede traer varias).
-  const tickets = d.kind !== 'confirmed' ? [] : d.tickets?.length ? d.tickets
+  const tickets = !WITH_TICKETS.includes(d.kind) ? [] : d.tickets?.length ? d.tickets
     : d.ticketCode ? [{ name: d.firstName, ticketName: d.ticketName || 'Entrada general', code: d.ticketCode, qrCid: d.qrCid }] : [];
   const ticket = tickets.map((t, i) => `
     <tr><td style="padding:${i ? 14 : 8}px 32px 0">
@@ -89,7 +97,7 @@ export function renderEventEmail(d: EventEmailData) {
           <div style="margin-top:8px;font-size:13px;color:#656260">${t.qrCid ? 'Muestra este código QR en la entrada del evento.' : 'Presenta este código al equipo del evento.'}</div>
         </td></tr></table></td></tr>`).join('');
 
-  const notice = d.kind === 'pending_payment'
+  const notice = d.kind === 'pending_payment' || d.kind === 'spot_opened'
     ? `<tr><td style="padding:16px 32px 0"><div style="padding:14px 16px;border-radius:12px;background:#fdf1e9;color:#96523f;font-size:14px;line-height:1.5">${d.expiresAt ? `Tu reserva está vigente hasta el <strong>${esc(fmt(d.expiresAt, tz, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }))} hrs</strong>. ` : ''}${d.testPayment ? 'Modo de prueba: no uses tarjetas reales.' : 'El pago es seguro con Mercado Pago. Tu entrada se confirma cuando Mercado Pago aprueba el pago.'}</div></td></tr>`
     : '';
 
@@ -149,3 +157,22 @@ export function renderEventEmail(d: EventEmailData) {
   return { subject: `${copy.subject} · ${e.title}`, html, text };
 }
 
+
+/** Correo con el enlace a «Mis entradas»: no depende de un evento y no revela qué compras hay. */
+export function renderTicketsLinkEmail(d: { link: string; origin: string }) {
+  const logo = `${d.origin}/logo_negro.png`;
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tus entradas</title></head>
+<body style="margin:0;padding:0;background:#f6f1ec">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ec"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#ffffff;border-radius:18px;font-family:Outfit,'Segoe UI',Arial,sans-serif;color:#31302e">
+  <tr><td style="padding:32px 32px 8px"><img src="${esc(logo)}" alt="ARM Global" width="110" style="display:block;width:110px;height:auto;border:0"></td></tr>
+  <tr><td style="padding:8px 32px 0">
+    <h1 style="margin:14px 0 8px;font-size:28px;line-height:1.15;font-weight:800;color:#1d1d1b">Tus entradas</h1>
+    <p style="margin:0;font-size:16px;line-height:1.6">Abre este enlace para ver todas tus inscripciones a eventos de ARM Global, con sus códigos QR. Desde ahí también puedes transferir o cancelar una entrada cuando el evento lo permita.</p>
+  </td></tr>
+  <tr><td align="center" style="padding:26px 32px 8px"><a href="${esc(d.link)}" style="display:inline-block;padding:15px 30px;border-radius:999px;background:#1d1d1b;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none">Ver mis entradas</a></td></tr>
+  <tr><td style="padding:18px 32px 30px"><p style="margin:0;font-size:13px;line-height:1.6;color:#8f8f8f">El enlace vale por 24 horas. Si no lo pediste, puedes ignorar este correo: nadie más puede ver tus entradas.</p></td></tr>
+</table></td></tr></table></body></html>`;
+  const text = `Tus entradas · ARM Global\n\nAbre este enlace para ver todas tus inscripciones con sus códigos QR:\n${d.link}\n\nEl enlace vale por 24 horas. Si no lo pediste, ignora este correo.`;
+  return { subject: 'Tus entradas · ARM Global', html, text };
+}

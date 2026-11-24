@@ -395,3 +395,106 @@ test('códigos: crear un descuento para una entrada y desactivarlo',async({page}
  expect(posted[1].active).toBe(false);
  await page.screenshot({path:'test-results/event-codes-list-393.png',fullPage:true});
 });
+// Fase 3: autogestión desde el comprobante, «Mis entradas» y catálogo público.
+const policy={transfer:true,cancel:true,until:'2027-01-09T12:00:00Z',open:true};
+test('comprobante: transferir una entrada y cancelar otra',async({page})=>{
+ await page.setViewportSize({width:393,height:852});
+ const T2=`${id.slice(0,-1)}1`;let state='two';const calls:any[]=[];
+ const receipt=()=>{const r:any=receiptOf('confirmed',{tickets:[{name:'Ana Soto',ticketName:'General',amount:0},{name:state==='transferred'||state==='cancelled'?'Luis Rojas':'Tomás Soto',ticketName:'General',amount:0}]});r.selfService=policy;
+  if(state!=='two'){r.tickets[1].transferred=true;r.tickets[1].code='99999999-9999-4999-8999-999999999999';}
+  if(state==='cancelled'){r.tickets[0].status='cancelled';r.tickets[0].code=null;}return r;};
+ await page.route('**/api/v1/**',async route=>{
+  const req=route.request(),path=new URL(req.url()).pathname;
+  if(path.endsWith('/status'))return route.fulfill({json:receipt()});
+  if(path.endsWith('/transfer')){calls.push({path,body:req.postDataJSON()});state='transferred';return route.fulfill({json:receipt()});}
+  if(path.endsWith('/cancel')){calls.push({path,body:req.postDataJSON()});state='cancelled';return route.fulfill({json:receipt()});}
+  return route.fulfill({json:familyEvent});
+ });
+ await page.goto(`/eventos/familias/inscripcion#id=${id}&token=${'b'.repeat(64)}`);
+ await expect(page.getByText('Puedes transferir o cancelar tus entradas hasta el')).toBeVisible();
+ const tomas=page.getByRole('article',{name:'Entrada de Tomás Soto'});
+ await tomas.getByRole('button',{name:'Transferir a otra persona'}).click();
+ await tomas.getByLabel('Nombre de quien recibe').fill('Luis');await tomas.getByLabel('Apellido de quien recibe').fill('Rojas');await tomas.getByLabel('Correo de quien recibe').fill('luis@example.com');
+ await page.screenshot({path:'test-results/event-transfer-393.png',fullPage:true});
+ await tomas.getByRole('button',{name:'Transferir entrada'}).click();
+ await expect(page.getByText('Entrada transferida a Luis Rojas. Le enviamos su entrada a luis@example.com.')).toBeVisible();
+ await expect(page.getByRole('article',{name:'Entrada de Luis Rojas'})).toContainText('Entrada transferida: este es su nuevo código.');
+ expect(calls[0]).toEqual({path:`/api/v1/event-registrations/${id}/tickets/${T2}/transfer`,body:{token:'b'.repeat(64),firstName:'Luis',lastName:'Rojas',email:'luis@example.com'}});
+ const ana=page.getByRole('article',{name:'Entrada de Ana Soto'});
+ await ana.getByRole('button',{name:'Cancelar esta entrada'}).click();
+ await ana.getByRole('button',{name:'Sí, cancelar entrada'}).click();
+ await expect(page.getByText('Cancelamos la entrada de Ana Soto. El cupo quedó libre para otra persona.')).toBeVisible();
+ expect(calls[1].body).toEqual({token:'b'.repeat(64),ticketId:id});
+ await expect(page.getByRole('heading',{name:'¡Tu entrada está lista!'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('reserva pendiente: se puede cancelar completa',async({page})=>{
+ await page.setViewportSize({width:393,height:852});let cancelled=false;
+ await page.route('**/api/v1/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/cancel')){cancelled=true;expect(route.request().postDataJSON()).toEqual({token:'b'.repeat(64)});}
+  if(path.endsWith('/status')||path.endsWith('/cancel'))return route.fulfill({json:receiptOf(cancelled?'cancelled':'pending_payment')});
+  return route.fulfill({json:familyEvent});
+ });
+ await page.goto(`/eventos/familias/inscripcion#id=${id}&token=${'b'.repeat(64)}`);
+ await page.getByRole('button',{name:'Cancelar reserva'}).click();
+ await page.getByRole('button',{name:'Sí, cancelar reserva'}).click();
+ await expect(page.getByRole('heading',{name:'Inscripción cancelada'})).toBeVisible();
+});
+for(const width of [393,1280])test(`mis entradas: pedir el enlace y ver las compras ${width}`,async({page})=>{
+ await page.setViewportSize({width,height:900});
+ const asked:any[]=[];
+ await page.route('**/api/v1/my-tickets**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/link')){asked.push(route.request().postDataJSON());return route.fulfill({json:{message:'Si ese correo tiene inscripciones, te enviamos un enlace para verlas. Revisa tu bandeja de entrada.'}});}
+  if(route.request().postDataJSON().token!=='firmado.123.abc')return route.fulfill({status:401,json:{message:'El enlace venció. Pide uno nuevo.'}});
+  return route.fulfill({json:{email:'ana@example.com',orders:[
+   {id,token:'b'.repeat(64),status:'confirmed',tickets:3,summary:'2 × General, Niños',amount:20000,upcoming:true,event:{title:'Retiro de Familias',slug:'familias',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',timezone:'America/Santiago',color:'#102b40',location:'Centro de encuentros'}},
+   {id:`${id.slice(0,-1)}9`,token:'c'.repeat(64),status:'confirmed',tickets:1,summary:'Entrada gratuita',amount:0,upcoming:false,event:{title:'Noche de Alabanza',slug:'alabanza',startsAt:'2026-10-10T23:00:00Z',endsAt:'2026-10-11T01:00:00Z',timezone:'America/Santiago',color:'#96523f',location:'Campus Santiago'}},
+  ]}});
+ });
+ await page.goto('/mis-entradas');
+ await page.getByLabel('Correo electrónico').fill('ana@example.com');
+ await page.getByRole('button',{name:'Enviarme el enlace'}).click();
+ await expect(page.getByText(/te enviamos un enlace/)).toBeVisible();
+ expect(asked).toEqual([{email:'ana@example.com'}]);
+ await page.screenshot({path:`test-results/event-my-tickets-request-${width}.png`,fullPage:true});
+ await page.goto('/mis-entradas#token=firmado.123.abc');await page.reload();
+ await expect(page.getByRole('heading',{name:'Retiro de Familias'})).toBeVisible();
+ await expect(page.getByRole('region',{name:'Eventos anteriores'})).toContainText('Noche de Alabanza');
+ await expect(page.getByText('3 entradas · 2 × General, Niños')).toBeVisible();
+ await expect(page.getByRole('link',{name:'Ver entradas'}).first()).toHaveAttribute('href',`/eventos/familias/inscripcion#id=${id}&token=${'b'.repeat(64)}`);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/event-my-tickets-${width}.png`,fullPage:true});
+ await page.goto('/mis-entradas#token=otro.1.x');await page.reload();
+ await expect(page.getByText('El enlace venció. Pide uno nuevo.')).toBeVisible();
+});
+for(const width of [393,1280])test(`catálogo público de eventos ${width}`,async({page})=>{
+ await page.setViewportSize({width,height:900});
+ const ev=(o:any)=>({slug:'retiro',title:'Retiro de Familias',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',timezone:'America/Santiago',color:'#102b40',modality:'onsite',location:'Centro de encuentros',campusName:'Santiago',categoryName:'Retiros',campuses:['Santiago'],pricing:'paid',minPrice:8000,maxPrice:12000,registrationEnabled:true,soldOut:false,capacityLeft:20,...o});
+ await page.route('**/api/v1/public-events',r=>r.fulfill({json:[ev({}),ev({slug:'alabanza',title:'Noche de Alabanza',campusName:'Viña del Mar',campuses:['Viña del Mar'],categoryName:'Alabanza',pricing:'free',minPrice:null,maxPrice:null}),ev({slug:'jovenes',title:'Congreso Jóvenes',soldOut:true,minPrice:15000,maxPrice:15000})]}));
+ await page.goto('/eventos');
+ await expect(page.getByRole('heading',{name:'Próximos eventos'})).toBeVisible();
+ await expect(page.getByRole('link',{name:/Retiro de Familias/})).toContainText('Desde $8.000');
+ await expect(page.getByRole('link',{name:/Noche de Alabanza/})).toContainText('Gratis');
+ await expect(page.getByRole('link',{name:/Congreso Jóvenes/})).toContainText('Cupos agotados');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/event-catalog-${width}.png`,fullPage:true});
+ await page.getByLabel('Campus').selectOption('Viña del Mar');
+ await expect(page.getByRole('link',{name:/Retiro de Familias/})).toHaveCount(0);
+ await page.getByLabel('Campus').selectOption('');
+ await page.getByPlaceholder('Buscar retiro, conferencia, campus…').fill('congreso');
+ await expect(page.getByRole('link',{name:/Congreso Jóvenes/})).toHaveAttribute('href','/eventos/jovenes');
+ await expect(page.getByRole('link',{name:/Noche de Alabanza/})).toHaveCount(0);
+});
+test('editor: autogestión y recordatorios se guardan con el evento',async({page})=>{
+ const calls=await fixture(page);await page.setViewportSize({width:1280,height:900});
+ await page.goto(`/dashboard/eventos/${id}`);
+ await page.getByRole('tab',{name:/Inscripción y entradas/}).click();
+ await page.getByRole('checkbox',{name:/Puede cancelar su entrada/}).uncheck();
+ await page.getByLabel('Hasta cuántas horas antes del inicio').fill('48');
+ await page.getByRole('checkbox',{name:/recordatorios automáticos/}).uncheck();
+ await page.getByRole('button',{name:'Guardar evento'}).click();
+ await expect(page.getByRole('status')).toContainText('Cambios guardados');
+ expect(calls[0].details).toMatchObject({selfCancel:false,selfServiceHours:48,reminders:false});
+});

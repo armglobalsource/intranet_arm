@@ -61,7 +61,7 @@ export function EventLanding({ event: e, preview = false }: { event: PublicEvent
         {d.bannerUrl ? <img className={l.heroImage} src={d.bannerUrl} alt="" referrerPolicy="no-referrer" /> : <div className={l.heroPattern} aria-hidden="true" />}
         <nav className={l.topbar} aria-label="Identidad del evento">
           <img src="/logo_ficha.png" alt="ARM Global" />
-          <span>Eventos</span>
+          {preview ? <span>Eventos</span> : <span style={{ display: 'flex', gap: 18 }}><a href="/eventos" style={{ color: 'inherit', textDecoration: 'none' }}>Eventos</a><a href="/mis-entradas" style={{ color: 'inherit', textDecoration: 'none' }}>Mis entradas</a></span>}
         </nav>
         <div className={l.heroInner}>
           {day && (

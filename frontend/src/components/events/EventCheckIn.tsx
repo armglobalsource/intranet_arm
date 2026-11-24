@@ -138,7 +138,7 @@ export function EventCheckIn({ id }: { id: string }) {
                 <div className={a.manualItem} key={r.id}>
                   <div className={a.person}><strong>{fullName(r)}</strong><span>{r.ticketName ?? 'Entrada'} · {r.campusName}</span>
                     <span>{r.checkedInAt ? `Ingresó a las ${clock(r.checkedInAt, tz)}` : r.status === 'confirmed' ? 'Aún no ingresa' : STATUS_LABELS[r.status] ?? r.status}</span></div>
-                  {r.status === 'confirmed' && !r.checkedInAt && <button type="button" className={a.btnPrimary} disabled={busy} onClick={() => void submit(r.id)}>Marcar ingreso</button>}
+                  {r.status === 'confirmed' && !r.checkedInAt && <button type="button" className={a.btnPrimary} disabled={busy} onClick={() => void submit(r.ticketCode ?? r.id)}>Marcar ingreso</button>}
                 </div>
               ))}
             </div>

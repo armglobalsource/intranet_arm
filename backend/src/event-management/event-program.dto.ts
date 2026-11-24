@@ -60,6 +60,12 @@ export class EventDetailsDto {
  @IsIn(['free','paid']) pricing: string;
  @IsArray() @ArrayMaxSize(20) @ValidateNested({each:true}) @Type(()=>EventFaqDto) faqs: EventFaqDto[];
  @IsOptional() @IsArray() @ArrayMaxSize(15) @ValidateNested({each:true}) @Type(()=>EventQuestionDto) questions?: EventQuestionDto[];
+ /** Autogestión de quien compra: transferir o cancelar sus entradas hasta cierto número de horas antes. */
+ @IsOptional() @IsBoolean() selfTransfer?: boolean;
+ @IsOptional() @IsBoolean() selfCancel?: boolean;
+ @IsOptional() @IsInt() @Min(0) @Max(720) selfServiceHours?: number;
+ /** Recordatorios automáticos una semana y un día antes. */
+ @IsOptional() @IsBoolean() reminders?: boolean;
  /** Remitente de los correos del evento, p. ej. «AR Hombres» y arhombres@armglobal.org (mismo dominio verificado). */
  @IsOptional() @IsString() @MaxLength(80) senderName?: string;
  @IsOptional() @IsString() @MaxLength(254) @Matches(/^$|^[A-Za-z0-9._%+-]+@armglobal\.org$/i,{message:'El correo remitente debe ser una dirección @armglobal.org'}) senderEmail?: string;

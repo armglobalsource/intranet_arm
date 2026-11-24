@@ -28,6 +28,7 @@ function setup(opts:{status?:string;checkedIn?:boolean;participating?:boolean;ev
   // La compra queda anulada cuando ya no le quedan entradas vigentes.
   if(sql.startsWith("UPDATE arm_app.event_orders o SET status='cancelled'"))return {rows:[{payment_id:reg.payment_id}]};
   if(sql.startsWith('SELECT o.* FROM arm_app.event_registrations r JOIN'))return {rows:v[0]===reg.id?[{id:'order-1',status:reg.status,email:reg.email,expires_at:null}]:[]};
+  if(sql.includes('WHERE r.event_id=$1 AND r.ticket_code=$2'))return {rows:v[1]===(reg.ticket_code??reg.id)?[{...reg,participant:reg.participant,checkedInAt:reg.checked_in_at,status:reg.status}]:[]};
   if(sql.includes('WHERE r.event_id=$1 AND r.id=$2'))return {rows:v[1]===reg.id?[{...reg,participant:reg.participant,checkedInAt:reg.checked_in_at,status:reg.status}]:[]};
   if(sql.startsWith('SELECT * FROM arm_app.event_registrations WHERE id=$1 AND event_id=$2'))return {rows:v[0]===reg.id?[reg]:[]};
   if(sql.startsWith('SELECT count(*) FILTER'))return {rows:[{confirmed:3,checkedIn:reg.checked_in_at?1:0}]};
@@ -40,8 +41,9 @@ function setup(opts:{status?:string;checkedIn?:boolean;participating?:boolean;ev
  });
  const db={query,transaction:async(fn:any)=>fn({query})};
  const resendOrder=vi.fn().mockResolvedValue(true);
- const registrations={notify,resendOrder} as unknown as EventRegistrationService;
- return {service:new EventAttendanceService(db as any,registrations),query,notify,resendOrder,reg};
+ const promoteWaitlist=vi.fn().mockResolvedValue([]);
+ const registrations={notify,resendOrder,promoteWaitlist} as unknown as EventRegistrationService;
+ return {service:new EventAttendanceService(db as any,registrations),query,notify,resendOrder,promoteWaitlist,reg};
 }
 
 describe('Control de ingreso',()=>{
@@ -103,6 +105,7 @@ describe('Acciones del equipo organizador',()=>{
   const x=setup();
   const r=await x.service.cancel(admin,EVENT,TICKET);
   expect(r.message).toContain('Mercado Pago');expect(x.reg.status).toBe('cancelled');
+  expect(x.promoteWaitlist).toHaveBeenCalledWith(EVENT);
   await expect(x.service.cancel(admin,EVENT,TICKET)).rejects.toThrow(/ya estaba anulada/);
  });
  it('reenvía la entrada aunque ya se haya enviado antes',async()=>{
@@ -135,5 +138,22 @@ describe('Correo de la entrada',()=>{
   expect(sent.attachments[0]).toMatchObject({filename:'entrada-qr-1.png',content_id:'entrada-qr-1'});
   expect(Buffer.from(sent.attachments[0].content,'base64').subarray(1,4).toString()).toBe('PNG');
   expect(sent.idempotencyKey).toMatch(/confirmed\/\d+$/);
+ });
+});
+
+describe('Entradas transferidas',()=>{
+ it('el QR anterior a la transferencia ya no permite entrar',async()=>{
+  const NEW='66666666-6666-4666-8666-666666666666';
+  const row={id:TICKET,participant:{firstName:'Luis',lastName:'Rojas'},status:'confirmed',amount:'0',transferredAt:new Date(),ticketCode:NEW};
+  const query=vi.fn(async(sql:string,v:any[]=[])=>{
+   if(sql.startsWith('SELECT * FROM arm_app.event_programs'))return {rows:[{id:EVENT,campus_id:10,organizer_id:1,status:'published',details:{}}]};
+   if(sql.includes('r.ticket_code=$2'))return {rows:v[1]===NEW?[row]:[]};
+   if(sql.includes('r.id=$2'))return {rows:v[1]===TICKET?[row]:[]};
+   if(sql.startsWith('SELECT count(*) FILTER'))return {rows:[{confirmed:1,checkedIn:0}]};
+   return {rows:[]};
+  });
+  const service=new EventAttendanceService({query,transaction:async(fn:any)=>fn({query})} as any,{} as any);
+  const r=await service.checkIn(admin,EVENT,TICKET);
+  expect(r.result).toBe('invalid');expect(r.message).toContain('transferida a Luis Rojas');
  });
 });

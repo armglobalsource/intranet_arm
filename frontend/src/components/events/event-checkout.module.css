@@ -197,3 +197,15 @@
   .qtyRow .stepper { grid-column: 1 / -1; justify-self: end; }
   .person { padding: 14px; }
 }
+
+/* Fase 3: transferir o cancelar una entrada desde el comprobante. */
+.ticketActions { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 12px 22px 16px; border-top: 1px solid var(--line); background: #fff; }
+.actionBox { flex-basis: 100%; display: grid; gap: 12px; padding: 4px 0 2px; font-size: 14px; line-height: 1.5; color: var(--charcoal); }
+.actionBox p { margin: 0; }
+.actionBox .row { margin: 0; }
+.danger { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 12px 20px; border-radius: 999px; border: 0; background: #a3321f; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+.danger:disabled { opacity: .6; cursor: wait; }
+.card > .textButton, .card .actionBox { margin-top: 14px; }
+@media print { .ticketActions { display: none; } }
+.ticketActions > .textButton { margin: 0; }
+.actionBox .danger, .actionBox .cta { flex: 1 1 200px; width: auto; margin: 0; }
