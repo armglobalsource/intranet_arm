@@ -166,3 +166,5 @@
 @media (max-width: 420px) {
   .filters { grid-template-columns: 1fr; }
 }
+.person .answer { font-size: 12px; margin-top: 2px; }
+.person .answer b { color: #31302e; font-weight: 600; }

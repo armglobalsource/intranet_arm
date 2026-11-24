@@ -12,6 +12,10 @@ export interface EventEmailData {
   ticketCode?: string | null;
   /** Content-ID de la imagen QR adjunta al correo (se muestra con cid:). */
   qrCid?: string | null;
+  /** Entradas de la compra; si falta, se usa ticketCode/qrCid como una sola entrada. */
+  tickets?: { name: string; ticketName: string; code: string; qrCid?: string | null }[];
+  /** Descuento aplicado con un código, para mostrar el detalle del total. */
+  discount?: number;
   amount: number;
   currency: string;
   ticketName?: string;
@@ -71,16 +75,19 @@ export function renderEventEmail(d: EventEmailData) {
       <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#8f8f8f">${esc(label)}</div>
       <div style="margin-top:3px;font-size:16px;font-weight:600;color:#1d1d1b">${esc(value)}</div>${extra}</td></tr>` : '';
 
-  const ticket = d.kind === 'confirmed' && d.ticketCode ? `
-    <tr><td style="padding:8px 32px 0">
+  // Una tarjeta por entrada confirmada, cada una con su QR (una compra puede traer varias).
+  const tickets = d.kind !== 'confirmed' ? [] : d.tickets?.length ? d.tickets
+    : d.ticketCode ? [{ name: d.firstName, ticketName: d.ticketName || 'Entrada general', code: d.ticketCode, qrCid: d.qrCid }] : [];
+  const ticket = tickets.map((t, i) => `
+    <tr><td style="padding:${i ? 14 : 8}px 32px 0">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px dashed ${color};border-radius:14px;background:#fff9f4">
         <tr><td style="padding:18px 20px;text-align:center">
-          <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${color}">Tu entrada</div>
-          <div style="margin-top:6px;font-size:20px;font-weight:800;color:#1d1d1b">${esc(d.firstName)} · ${esc(d.ticketName || 'Entrada general')}</div>
-          ${d.qrCid ? `<img src="cid:${esc(d.qrCid)}" alt="Código QR de tu entrada" width="180" height="180" style="display:block;margin:14px auto 0;width:180px;height:180px;border:0">` : ''}
-          <div style="margin-top:8px;font-family:Consolas,Menlo,monospace;font-size:12px;color:#656260;word-break:break-all">${esc(d.ticketCode)}</div>
-          <div style="margin-top:8px;font-size:13px;color:#656260">${d.qrCid ? 'Muestra este código QR en la entrada del evento.' : 'Presenta este código al equipo del evento.'}</div>
-        </td></tr></table></td></tr>` : '';
+          <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${color}">${tickets.length > 1 ? `Entrada ${i + 1} de ${tickets.length}` : 'Tu entrada'}</div>
+          <div style="margin-top:6px;font-size:20px;font-weight:800;color:#1d1d1b">${esc(t.name)} · ${esc(t.ticketName)}</div>
+          ${t.qrCid ? `<img src="cid:${esc(t.qrCid)}" alt="Código QR de la entrada de ${esc(t.name)}" width="180" height="180" style="display:block;margin:14px auto 0;width:180px;height:180px;border:0">` : ''}
+          <div style="margin-top:8px;font-family:Consolas,Menlo,monospace;font-size:12px;color:#656260;word-break:break-all">${esc(t.code)}</div>
+          <div style="margin-top:8px;font-size:13px;color:#656260">${t.qrCid ? 'Muestra este código QR en la entrada del evento.' : 'Presenta este código al equipo del evento.'}</div>
+        </td></tr></table></td></tr>`).join('');
 
   const notice = d.kind === 'pending_payment'
     ? `<tr><td style="padding:16px 32px 0"><div style="padding:14px 16px;border-radius:12px;background:#fdf1e9;color:#96523f;font-size:14px;line-height:1.5">${d.expiresAt ? `Tu reserva está vigente hasta el <strong>${esc(fmt(d.expiresAt, tz, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }))} hrs</strong>. ` : ''}${d.testPayment ? 'Modo de prueba: no uses tarjetas reales.' : 'El pago es seguro con Mercado Pago. Tu entrada se confirma cuando Mercado Pago aprueba el pago.'}</div></td></tr>`
@@ -113,7 +120,7 @@ export function renderEventEmail(d: EventEmailData) {
     ${row('📅', 'Fecha', date)}
     ${row('🕒', 'Horario', hours)}
     ${row(online ? '💻' : '📍', 'Lugar', place, `${e.address && !online ? `<div style="margin-top:2px;font-size:14px;color:#656260">${esc(e.address)}</div>` : ''}${map ? `<a href="${esc(map)}" style="display:inline-block;margin-top:6px;font-size:14px;font-weight:700;color:${color}">Cómo llegar →</a>` : ''}`)}
-    ${row('🎟️', 'Entrada', `${d.ticketName || 'Entrada general'} · ${price}`)}
+    ${row('🎟️', (d.tickets?.length ?? 1) > 1 ? 'Entradas' : 'Entrada', `${d.ticketName || 'Entrada general'} · ${price}${d.discount ? ` (incluye ${money(d.discount, d.currency)} de descuento)` : ''}`)}
   </table></td></tr>
   ${ticket}${notice}
   <tr><td align="center" style="padding:26px 32px 8px">
@@ -135,7 +142,7 @@ export function renderEventEmail(d: EventEmailData) {
     `Hola ${d.firstName}:`, copy.intro, '',
     date ? `Fecha: ${date}` : null, hours ? `Horario: ${hours}` : null, place ? `Lugar: ${place}${e.address && !online ? `, ${e.address}` : ''}` : null,
     `Entrada: ${d.ticketName || 'Entrada general'} · ${price}`,
-    d.kind === 'confirmed' && d.ticketCode ? `Código de tu entrada: ${d.ticketCode}` : null,
+    ...tickets.map((t) => `Entrada de ${t.name} (${t.ticketName}): ${t.code}`),
     '', `${copy.cta}: ${d.link}`, '', `Enviado por ${sender} · ARM Global.`,
   ].filter((l): l is string => l !== null).join('\n');
 

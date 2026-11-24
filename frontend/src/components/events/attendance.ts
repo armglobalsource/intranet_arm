@@ -5,11 +5,13 @@ export type Attendee = {
   campusId: number; campusName: string; ticketName: string | null; status: string; amount: number; currency: string;
   paymentId?: string | null; testPayment?: boolean; source: 'public' | 'manual'; note?: string | null; createdAt: string;
   checkedInAt: string | null; checkedInBy: string | null; createdBy?: string | null; emailSent?: boolean;
+  orderId?: string; buyerName?: string; buyerEmail?: string; discountCode?: string | null; answers?: Record<string, string | boolean>;
 };
+export type AttendanceQuestion = { id: string; label: string; type: string };
 export type AttendanceEvent = {
   id: string; slug: string; title: string; status: string; startsAt: string; endsAt: string; capacity: number | null;
   timezone?: string; pricing?: 'free' | 'paid'; color?: string; bannerUrl?: string;
-  tickets: { id: string; name: string; price: number; currency: string }[]; campuses: { id: number; name: string }[];
+  tickets: { id: string; name: string; price: number; currency: string }[]; campuses: { id: number; name: string }[]; questions?: AttendanceQuestion[];
 };
 export type AttendanceData = { event: AttendanceEvent; manage: boolean; registrations: Attendee[] };
 export type Counts = { confirmed: number; checkedIn: number };
@@ -59,7 +61,16 @@ export function summarize(list: Attendee[], capacity: number | null) {
 }
 
 /** Filas para Excel, con encabezados en español y fechas en la zona del evento. */
-export function exportRows(list: Attendee[], timeZone?: string) {
+/** Respuesta legible: «Sí»/«No» para casillas. */
+export function answerText(value: string | boolean | undefined) {
+  return value === true ? 'Sí' : value === false ? 'No' : (value ?? '');
+}
+/** Quién compró, si no es la misma persona que asiste. */
+export function boughtBy(a: Attendee) {
+  return a.buyerName && fold(a.buyerName) !== fold(fullName(a)) ? a.buyerName : '';
+}
+
+export function exportRows(list: Attendee[], timeZone?: string, questions: AttendanceQuestion[] = []) {
   const when = (v: string | null) => {
     if (!v) return '';
     try { return new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }).format(new Date(v)); } catch { return v; }
@@ -69,7 +80,10 @@ export function exportRows(list: Attendee[], timeZone?: string) {
     Campus: a.campusName, Entrada: a.ticketName ?? '', Estado: STATUS_LABELS[a.status] ?? a.status,
     Monto: Number(a.amount) || 0, 'Pago Mercado Pago': a.paymentId ?? '', Origen: a.source === 'manual' ? 'Agregada por el equipo' : 'Inscripción pública',
     Ingresó: a.checkedInAt ? 'Sí' : 'No', 'Hora de ingreso': when(a.checkedInAt), 'Registrado por': a.checkedInBy ?? '',
-    'Fecha de inscripción': when(a.createdAt), Nota: a.note ?? '', Código: a.id,
+    'Fecha de inscripción': when(a.createdAt), Nota: a.note ?? '',
+    'Compró': a.buyerName ?? '', 'Correo de quien compró': a.buyerEmail ?? '', 'Código de descuento': a.discountCode ?? '', Compra: a.orderId ?? '',
+    ...Object.fromEntries(questions.map((q) => [q.label, answerText(a.answers?.[q.id])])),
+    Código: a.id,
   }));
 }
 

@@ -10,9 +10,36 @@ export class EventFaqDto {
  @IsString() @MinLength(1) @MaxLength(2000) answer: string;
 }
 export class EventTicketTypeDto {
+ /** Presente al editar un tipo existente: conserva sus ventas y sus códigos. */
+ @IsOptional() @IsUUID() id?: string;
  @IsString() @MinLength(1) @MaxLength(80) name: string;
  @IsNumber({maxDecimalPlaces:2}) @Min(0) @Max(999999999) price: number;
  @IsString() @Matches(/^[A-Z]{3}$/) currency: string;
+ @IsOptional() @IsString() @MaxLength(300) description?: string;
+ @IsOptional() @IsInt() @Min(1) @Max(1000000) capacity?: number | null;
+ @IsOptional() @IsISO8601({strict:true}) salesStart?: string | null;
+ @IsOptional() @IsISO8601({strict:true}) salesEnd?: string | null;
+ @IsOptional() @IsBoolean() hidden?: boolean;
+ @IsOptional() @IsInt() @Min(1) @Max(10) maxPerOrder?: number;
+}
+/** Pregunta que responde cada asistente al inscribirse. */
+export class EventQuestionDto {
+ @Matches(/^[a-z0-9]{4,16}$/) id: string;
+ @IsString() @MinLength(1) @MaxLength(200) label: string;
+ @IsIn(['text','select','yesno']) type: 'text'|'select'|'yesno';
+ @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({each:true}) @MaxLength(80,{each:true}) options?: string[];
+ @IsBoolean() required: boolean;
+}
+/** Código de descuento o de acceso a entradas ocultas (descuento 0). */
+export class EventDiscountCodeDto {
+ @Matches(/^[A-Za-z0-9_-]{3,30}$/,{message:'El código usa de 3 a 30 letras, números, guiones o guiones bajos'}) code: string;
+ @IsIn(['percent','amount']) kind: 'percent'|'amount';
+ @IsNumber({maxDecimalPlaces:0}) @Min(0) @Max(999999999) value: number;
+ @IsOptional() @IsInt() @Min(1) @Max(1000000) maxUses?: number | null;
+ @IsOptional() @IsISO8601({strict:true}) startsAt?: string | null;
+ @IsOptional() @IsISO8601({strict:true}) endsAt?: string | null;
+ @IsArray() @ArrayMaxSize(20) @ArrayUnique() @IsUUID('all',{each:true}) ticketTypeIds: string[];
+ @IsBoolean() active: boolean;
 }
 export class EventDetailsDto {
  @IsString() @MaxLength(240) summary: string;
@@ -32,6 +59,7 @@ export class EventDetailsDto {
  @IsString() @MaxLength(5000) cancellationPolicy: string;
  @IsIn(['free','paid']) pricing: string;
  @IsArray() @ArrayMaxSize(20) @ValidateNested({each:true}) @Type(()=>EventFaqDto) faqs: EventFaqDto[];
+ @IsOptional() @IsArray() @ArrayMaxSize(15) @ValidateNested({each:true}) @Type(()=>EventQuestionDto) questions?: EventQuestionDto[];
  /** Remitente de los correos del evento, p. ej. «AR Hombres» y arhombres@armglobal.org (mismo dominio verificado). */
  @IsOptional() @IsString() @MaxLength(80) senderName?: string;
  @IsOptional() @IsString() @MaxLength(254) @Matches(/^$|^[A-Za-z0-9._%+-]+@armglobal\.org$/i,{message:'El correo remitente debe ser una dirección @armglobal.org'}) senderEmail?: string;

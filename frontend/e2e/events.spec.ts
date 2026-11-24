@@ -58,27 +58,34 @@ test('cuenta sin permisos no carga administración',async({page})=>{
  await fixture(page,[]);await page.goto('/dashboard/eventos');await expect(page.getByText(/No tienes permisos para administrar eventos/)).toBeVisible();await expect(page.getByRole('link',{name:'Crear evento',exact:true})).toHaveCount(0);
 });
 
+const receiptOf=(status:string,o:{amount?:number;tickets?:{name:string;ticketName:string;amount:number}[];testPayment?:boolean;discount?:number;code?:string|null}={})=>{
+ const tickets=(o.tickets??[{name:'Prueba ARM',ticketName:'General',amount:o.amount??1000}]).map((t,i)=>({id:i?`${id.slice(0,-1)}${i}`:id,status,code:status==='confirmed'?(i?`${id.slice(0,-1)}${i}`:id):null,...t}));
+ const amount=o.amount??tickets.reduce((s,t)=>s+t.amount,0);
+ return {id,token:'b'.repeat(64),status,buyerName:'Prueba ARM',title:'Encuentro de prueba',startsAt:'2027-01-10T12:00:00Z',timezone:'America/Santiago',testPayment:!!o.testPayment,subtotal:amount+(o.discount??0),discount:o.discount??0,amount,currency:'CLP',code:o.code??null,summary:null,expiresAt:'2027-01-09T12:00:00Z',emailSent:true,tickets};
+};
 for(const mode of ['free','test','production'])test(`inscripción móvil ${mode}`,async({page})=>{
  const paid=mode!=='free';
  await page.setViewportSize({width:393,height:852});
  const captured:any[]=[];
  await page.route('**/api/v1/**',async route=>{
   const path=new URL(route.request().url()).pathname;
-  if(path.endsWith('/registrations')){captured.push(route.request().postDataJSON());return route.fulfill({json:{id,token:'b'.repeat(64),status:paid?'pending_payment':'confirmed'}});}
-  if(path.endsWith('/status'))return route.fulfill({json:{id,token:'b'.repeat(64),status:paid?'pending_payment':'confirmed',participantName:'Prueba ARM',title:'Encuentro de prueba',startsAt:'2027-01-10T12:00:00Z',timezone:'America/Santiago',testPayment:mode==='test',amount:paid?1000:0,currency:'CLP',expiresAt:'2027-01-09T12:00:00Z',emailSent:true,ticketCode:paid?null:id}});
-  return route.fulfill({json:{title:'Encuentro de prueba',slug:'prueba',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',status:'published',registrationStatus:'open',paymentMode:mode,capacity:100,details:{...details,pricing:paid?'paid':'free'},campusName:'Santiago',campuses:['Santiago'],campusOptions:[{id:10,name:'Santiago'}],ticketTypes:paid?[{id:categoryId,name:'General',price:1000,currency:'CLP'}]:[],registrationEnabled:true}});
+  if(path.endsWith('/registrations')){captured.push(route.request().postDataJSON());return route.fulfill({json:receiptOf(paid?'pending_payment':'confirmed',{amount:paid?1000:0})});}
+  if(path.endsWith('/status'))return route.fulfill({json:receiptOf(paid?'pending_payment':'confirmed',{amount:paid?1000:0,testPayment:mode==='test'})});
+  return route.fulfill({json:{title:'Encuentro de prueba',slug:'prueba',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',status:'published',registrationStatus:'open',paymentMode:mode,capacity:100,capacityLeft:100,details:{...details,pricing:paid?'paid':'free'},campusName:'Santiago',campuses:['Santiago'],campusOptions:[{id:10,name:'Santiago'}],ticketTypes:paid?[{id:categoryId,name:'General',price:1000,currency:'CLP',maxPerOrder:10,remaining:null,sale:'on'}]:[],registrationEnabled:true}});
  });
  await page.goto('/eventos/prueba');await page.getByRole('link',{name:'Inscribirme ahora'}).first().click();
- await page.getByLabel('Nombre',{exact:true}).fill('Prueba');await page.getByLabel('Apellido',{exact:true}).fill('ARM');await page.getByLabel('Correo electrónico',{exact:true}).fill('prueba@example.com');await page.getByLabel('Edad',{exact:true}).fill('30');
+ await expect(page.getByLabel(paid?'Cantidad de General':'Cantidad de Entrada gratuita')).toHaveText('1');
+ await page.getByLabel('Nombre',{exact:true}).fill('Prueba');await page.getByLabel('Apellido',{exact:true}).fill('ARM');await page.getByLabel('Correo electrónico',{exact:true}).fill('prueba@example.com');
+ await page.getByLabel('Edad (entrada 1)').fill('30');
  await page.getByLabel('Teléfono / WhatsApp').fill('+56912345678');await page.getByLabel('Campus',{exact:true}).selectOption('10');
- if(paid)await expect(page.getByRole('radio',{name:/General/})).toBeChecked();
- await page.getByRole('checkbox').check();
+ await expect(page.getByRole('checkbox',{name:'Esta entrada es para mí'})).toBeChecked();
+ await page.getByRole('checkbox',{name:/Acepto las condiciones/}).check();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`test-results/event-registration-${mode}-393.png`,fullPage:true});
  await page.getByRole('button',{name:paid?/^Continuar al pago/:'Confirmar mi inscripción'}).click();
  await expect(page.getByRole('heading',{name:paid?'Último paso: paga tu entrada':'¡Tu entrada está lista!',exact:true})).toBeVisible();
  await page.screenshot({path:`test-results/event-receipt-${mode}-393.png`,fullPage:true});
- expect(captured[0]).toMatchObject({campusId:10,consent:true});expect(captured[0].amount).toBeUndefined();
+ expect(captured[0]).toMatchObject({campusId:10,consent:true,firstName:'Prueba',items:[{firstName:'Prueba',lastName:'ARM',age:30,...(paid?{ticketTypeId:categoryId}:{})}]});expect(captured[0].amount).toBeUndefined();
  if(paid){await expect(page.getByRole('article',{name:'Tu entrada'})).toHaveCount(0);await expect(page.getByRole('button',{name:mode==='test'?'Pagar con Mercado Pago · Prueba':'Pagar con Mercado Pago',exact:true})).toBeVisible();if(mode==='production')await expect(page.getByText('Modo de prueba · No utilices tarjetas ni cuentas reales.')).toHaveCount(0);}else await expect(page.getByRole('button',{name:'Imprimir / Guardar PDF'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
@@ -86,10 +93,9 @@ for(const mode of ['free','test','production'])test(`inscripción móvil ${mode}
 for(const width of [393,1280])test(`regreso desde Mercado Pago confirma la entrada ${width}`,async({page})=>{
  await page.setViewportSize({width,height:900});
  let checks=0;
- const receipt=(status:string)=>({id,token:'b'.repeat(64),status,participantName:'Prueba ARM',title:'Encuentro de prueba',startsAt:'2027-01-10T12:00:00Z',timezone:'America/Santiago',testPayment:false,amount:1000,currency:'CLP',ticketName:'General',expiresAt:'2027-01-09T12:00:00Z',emailSent:true,ticketCode:status==='confirmed'?id:null});
  await page.route('**/api/v1/**',async route=>{
   const path=new URL(route.request().url()).pathname;
-  if(path.endsWith('/status')){checks++;return route.fulfill({json:receipt(checks<3?'pending_payment':'confirmed')});}
+  if(path.endsWith('/status')){checks++;return route.fulfill({json:receiptOf(checks<3?'pending_payment':'confirmed')});}
   return route.fulfill({json:{title:'Encuentro de prueba',slug:'prueba',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',status:'published',registrationStatus:'open',paymentMode:'production',capacity:100,details:{...details,pricing:'paid'},campusName:'Santiago',campuses:['Santiago'],ticketTypes:[{id:categoryId,name:'General',price:1000,currency:'CLP'}],registrationEnabled:true}});
  });
  await page.goto(`/eventos/prueba/inscripcion?collection_status=approved&payment_id=123#id=${id}&token=${'b'.repeat(64)}`);
@@ -101,6 +107,88 @@ for(const width of [393,1280])test(`regreso desde Mercado Pago confirma la entra
  expect(page.url()).not.toContain('collection_status');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`test-results/event-receipt-confirmed-${width}.png`,fullPage:true});
+});
+
+// Fase 2: compra familiar con cantidades, código de descuento, entrada oculta y preguntas.
+const GENERAL='a1b2c3d4-0000-4000-8000-000000000001',KIDS='a1b2c3d4-0000-4000-8000-000000000002',STAFF='a1b2c3d4-0000-4000-8000-000000000003';
+const familyEvent={title:'Retiro de Familias',slug:'familias',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',status:'published',registrationStatus:'open',paymentMode:'production',capacity:100,capacityLeft:40,codesEnabled:true,
+ details:{...details,pricing:'paid',minimumAge:null,questions:[{id:'talla',label:'Talla de polera',type:'select',options:['S','M','L'],required:true},{id:'alergia',label:'Alergias',type:'text',required:false}]},
+ campusName:'Santiago',campuses:['Santiago'],campusOptions:[{id:10,name:'Santiago'}],registrationEnabled:true,
+ ticketTypes:[{id:GENERAL,name:'General',description:'Incluye almuerzo',price:10000,currency:'CLP',maxPerOrder:4,remaining:5,sale:'on'},{id:KIDS,name:'Niños',description:'Hasta 12 años',price:0,currency:'CLP',maxPerOrder:10,remaining:null,sale:'on'},{id:'a1b2c3d4-0000-4000-8000-000000000009',name:'Preventa',price:8000,currency:'CLP',maxPerOrder:4,remaining:0,soldOut:true,sale:'on'}]};
+for(const width of [393,1280])test(`compra familiar con código y preguntas ${width}`,async({page})=>{
+ await page.setViewportSize({width,height:900});
+ const captured:any[]=[];
+ await page.route('**/api/v1/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/code')){const code=route.request().postDataJSON().code.toUpperCase();if(code!=='FAMILIA')return route.fulfill({status:400,json:{message:'El código no es válido para este evento.'}});return route.fulfill({json:{code:'FAMILIA',kind:'percent',value:25,ticketTypeIds:[GENERAL],unlockedTickets:[]}});}
+  if(path.endsWith('/registrations')){captured.push(route.request().postDataJSON());return route.fulfill({json:receiptOf('pending_payment')});}
+  if(path.endsWith('/status'))return route.fulfill({json:receiptOf('pending_payment',{discount:5000,code:'FAMILIA',tickets:[{name:'Prueba ARM',ticketName:'General',amount:7500},{name:'Ana ARM',ticketName:'General',amount:7500},{name:'Tomás ARM',ticketName:'Niños',amount:0}]})});
+  return route.fulfill({json:familyEvent});
+ });
+ await page.goto('/eventos/familias');
+ await page.getByRole('link',{name:'Inscribirme ahora'}).first().click();
+ await expect(page.getByText('Agotada').first()).toBeVisible();
+ await expect(page.getByRole('button',{name:'Agregar una entrada Preventa'})).toBeDisabled();
+ await page.getByRole('button',{name:'Agregar una entrada General'}).click();await page.getByRole('button',{name:'Agregar una entrada General'}).click();
+ await page.getByRole('button',{name:'Agregar una entrada Niños'}).click();
+ await expect(page.getByLabel('Resumen de la compra')).toContainText('2 × General');
+ // Un código equivocado se explica; el correcto aplica el descuento solo a General.
+ await page.getByRole('button',{name:'¿Tienes un código?'}).click();
+ await page.getByLabel('Código',{exact:true}).fill('otro');await page.getByRole('button',{name:'Aplicar'}).click();
+ await expect(page.getByText('El código no es válido para este evento.')).toBeVisible();
+ await page.getByLabel('Código',{exact:true}).fill('familia');await page.getByRole('button',{name:'Aplicar'}).click();
+ await expect(page.getByText('25 % de descuento en General')).toBeVisible();
+ await expect(page.getByLabel('Resumen de la compra')).toContainText('−$5.000');
+ await expect(page.getByRole('button',{name:/Continuar al pago · \$15\.000/})).toBeVisible();
+ // Quien compra y cada asistente.
+ await page.getByLabel('Nombre',{exact:true}).fill('Prueba');await page.getByLabel('Apellido',{exact:true}).fill('ARM');await page.getByLabel('Correo electrónico',{exact:true}).fill('prueba@example.com');
+ await page.getByLabel('Teléfono / WhatsApp').fill('+56912345678');
+ await page.getByLabel('Talla de polera (entrada 1)').selectOption('M');
+ await page.getByLabel('Nombre (entrada 2)').fill('Ana');await page.getByLabel('Apellido (entrada 2)').fill('ARM');await page.getByLabel('Talla de polera (entrada 2)').selectOption('S');
+ await page.getByLabel('Nombre (entrada 3)').fill('Tomás');await page.getByLabel('Apellido (entrada 3)').fill('ARM');await page.getByLabel('Talla de polera (entrada 3)').selectOption('S');await page.getByLabel('Alergias (entrada 3)').fill('Maní');
+ await page.getByRole('checkbox',{name:/Acepto las condiciones/}).check();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/event-family-form-${width}.png`,fullPage:true});
+ await page.getByRole('button',{name:/Continuar al pago/}).click();
+ await expect(page.getByRole('heading',{name:'Último paso: paga tus entradas'})).toBeVisible();
+ expect(captured[0]).toMatchObject({firstName:'Prueba',email:'prueba@example.com',campusId:10,code:'FAMILIA',items:[
+  {ticketTypeId:GENERAL,firstName:'Prueba',lastName:'ARM',answers:{talla:'M'}},
+  {ticketTypeId:GENERAL,firstName:'Ana',lastName:'ARM',answers:{talla:'S'}},
+  {ticketTypeId:KIDS,firstName:'Tomás',lastName:'ARM',answers:{talla:'S',alergia:'Maní'}},
+ ]});
+ await expect(page.getByText('Incluye $5.000 de descuento con el código FAMILIA.')).toBeVisible();
+ await expect(page.getByText('Tomás ARM').first()).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/event-family-receipt-${width}.png`,fullPage:true});
+});
+test('entrada oculta: aparece al ingresar su código',async({page})=>{
+ await page.setViewportSize({width:393,height:852});
+ await page.route('**/api/v1/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/code'))return route.fulfill({json:{code:'EQUIPO',kind:'percent',value:0,ticketTypeIds:[STAFF],unlockedTickets:[{id:STAFF,name:'Equipo de servicio',price:0,currency:'CLP',maxPerOrder:1,remaining:null,sale:'on'}]}});
+  return route.fulfill({json:{...familyEvent,ticketTypes:familyEvent.ticketTypes.slice(0,1)}});
+ });
+ await page.goto('/eventos/familias');await page.getByRole('link',{name:'Inscribirme ahora'}).first().click();
+ await expect(page.getByText('Equipo de servicio')).toHaveCount(0);
+ await page.getByRole('button',{name:'¿Tienes un código?'}).click();
+ await page.getByLabel('Código',{exact:true}).fill('equipo');await page.keyboard.press('Enter');
+ await expect(page.getByText('desbloquea «Equipo de servicio»')).toBeVisible();
+ await expect(page.getByLabel('Cantidad de Equipo de servicio')).toBeVisible();
+ await page.getByRole('button',{name:'Quitar',exact:true}).click();
+ await expect(page.getByText('Equipo de servicio')).toHaveCount(0);
+});
+test('comprobante con varias entradas: una entrada con QR por asistente',async({page})=>{
+ await page.setViewportSize({width:393,height:852});
+ await page.route('**/api/v1/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/status'))return route.fulfill({json:receiptOf('confirmed',{tickets:[{name:'Prueba ARM',ticketName:'General',amount:10000},{name:'Tomás ARM',ticketName:'Niños',amount:0}]})});
+  return route.fulfill({json:familyEvent});
+ });
+ await page.goto(`/eventos/familias/inscripcion#id=${id}&token=${'b'.repeat(64)}`);
+ await expect(page.getByRole('heading',{name:'¡Tus entradas están listas!'})).toBeVisible();
+ await expect(page.getByRole('article',{name:'Entrada de Tomás ARM'})).toContainText('Niños');
+ await expect(page.getByAltText('Código QR de tu entrada')).toHaveCount(2);
+ await page.screenshot({path:'test-results/event-family-tickets-393.png',fullPage:true});
 });
 
 test('crear evento: enlace automático, pasos guiados y vista previa en vivo',async({page})=>{
@@ -247,4 +335,63 @@ test('quien solo registra ingresos ve la puerta, sin acciones de gestión',async
  await expect(page.getByRole('button',{name:'Agregar persona'})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Anular'})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Marcar ingreso'})).toBeVisible();
+});
+test('editor: reglas por entrada y preguntas se guardan con el evento',async({page})=>{
+ const calls=await fixture(page);await page.setViewportSize({width:1280,height:900});
+ await page.goto(`/dashboard/eventos/${id}`);
+ await page.getByRole('tab',{name:/Inscripción y entradas/}).click();
+ await page.getByRole('radio',{name:/Pagado/}).click();
+ const general=page.getByRole('group',{name:'Entrada Entrada general'});
+ await general.getByLabel('Valor (CLP)').fill('15000');
+ await general.getByLabel('Cupos de esta entrada').fill('80');
+ await general.getByLabel('Máximo por compra').selectOption('4');
+ await page.getByRole('button',{name:'Agregar tipo de entrada'}).click();
+ const second=page.getByRole('group',{name:'Entrada Entrada general'}).nth(1);
+ await second.getByLabel('Nombre',{exact:true}).fill('Equipo');
+ await page.getByRole('group',{name:'Entrada Equipo'}).getByRole('checkbox',{name:/Entrada oculta/}).check();
+ await page.getByRole('button',{name:'Agregar pregunta'}).click();
+ const q=page.getByRole('group',{name:'Pregunta 1'});
+ await q.getByLabel('Pregunta',{exact:true}).fill('Talla de polera');
+ await q.getByLabel('Tipo de respuesta').selectOption('select');
+ await q.getByLabel('Opciones').fill('S\nM\n\nL');
+ await q.getByRole('checkbox',{name:'Respuesta obligatoria'}).check();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/event-editor-tickets-1280.png',fullPage:true});
+ await page.getByRole('button',{name:'Guardar evento'}).click();
+ await expect(page.getByRole('status')).toContainText('Cambios guardados');
+ expect(calls[0].ticketTypes).toEqual([
+  expect.objectContaining({name:'Entrada general',price:15000,capacity:80,maxPerOrder:4}),
+  expect.objectContaining({name:'Equipo',price:0,hidden:true}),
+ ]);
+ expect(calls[0].details.questions).toEqual([expect.objectContaining({label:'Talla de polera',type:'select',options:['S','M','L'],required:true})]);
+});
+test('códigos: crear un descuento para una entrada y desactivarlo',async({page})=>{
+ await fixture(page);await page.setViewportSize({width:393,height:852});
+ const codes:any[]=[];const posted:any[]=[];
+ await page.route(/\/api\/v1\/event-management\/[^/]+(\/codes.*)?$/,async route=>{
+  const req=route.request(),path=new URL(req.url()).pathname;
+  if(path.endsWith('/codes')&&req.method()==='GET')return route.fulfill({json:codes});
+  if(path.endsWith('/codes')&&req.method()==='POST'){const b=req.postDataJSON();posted.push(b);codes.push({...b,id:'c1',code:b.code.toUpperCase(),uses:0,given:0});return route.fulfill({json:codes[0]});}
+  if(path.includes('/codes/')&&req.method()==='PATCH'){const b=req.postDataJSON();posted.push(b);Object.assign(codes[0],b);return route.fulfill({json:codes[0]});}
+  if(req.method()==='GET')return route.fulfill({json:{id,version:1,title:'Retiro de Hombres',slug:'retiro-hombres',details,status:'published',ticketTypes:[{id:'t1',name:'General',price:10000,currency:'CLP'},{id:'t2',name:'Equipo',price:0,currency:'CLP',hidden:true}]}});
+  return route.continue();
+ });
+ await page.goto(`/dashboard/eventos/${id}/codigos`);
+ await expect(page.getByRole('heading',{name:'Aún no hay códigos'})).toBeVisible();
+ await page.getByRole('button',{name:'Crear código'}).click();
+ await page.getByRole('textbox',{name:/^Código/}).fill('familia2027');
+ await page.getByLabel('Porcentaje (%)').fill('25');
+ await page.getByLabel('Usos máximos').fill('30');
+ await page.getByRole('group',{name:'Entradas a las que aplica'}).getByRole('button',{name:'General'}).click();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/event-codes-form-393.png',fullPage:true});
+ await page.getByRole('button',{name:'Guardar código'}).click();
+ await expect(page.getByText('Código FAMILIA2027 guardado.')).toBeVisible();
+ expect(posted[0]).toEqual({code:'familia2027',kind:'percent',value:25,maxUses:30,startsAt:null,endsAt:null,ticketTypeIds:['t1'],active:true});
+ await expect(page.getByText('25 % de descuento')).toBeVisible();
+ await expect(page.getByText('0 de 30 usos')).toBeVisible();
+ await page.getByRole('button',{name:'Desactivar'}).click();
+ await expect(page.getByText('Código FAMILIA2027 desactivado.')).toBeVisible();
+ expect(posted[1].active).toBe(false);
+ await page.screenshot({path:'test-results/event-codes-list-393.png',fullPage:true});
 });

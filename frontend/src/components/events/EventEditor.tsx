@@ -18,6 +18,7 @@ import { EventProgram, EventDetails, EventOptions, newEvent, eventStatuses, Publ
 import { EVENT_COLORS, EVENT_TIMEZONES, eventReadiness, slugify } from './event-helpers';
 import { EventLanding } from './EventLanding';
 import { uploadCover } from './cover-upload';
+import { QuestionsEditor, TicketsEditor, cleanQuestions } from './EventSalesEditor';
 import s from './events.module.css';
 import x from './event-editor.module.css';
 
@@ -95,7 +96,7 @@ export function EventEditor({ id }: { id?: string }) {
   const query = useQuery({ queryKey: ['event-program', id], enabled: !!id && access.allowed, queryFn: () => api.get<EventProgram>(`/event-management/${id}`).then((r) => r.data) });
   useEffect(() => { if (!draft) { if (id && query.data) setDraft(query.data); else if (!id && user) setDraft(newEvent(user.id, user.campusId ?? 0)); } }, [id, query.data, user, draft]);
   return (
-    <EventShell title={id ? 'Edita tu evento' : 'Crea un nuevo evento'} description="Completa los pasos y mira en vivo cómo lo verán los participantes." action={<div className={s.actions} style={{ marginTop: 0 }}><Link className={s.button} href="/dashboard/eventos/gestion"><ArrowLeft size={16} />Volver</Link>{id && <><Link className={s.button} href={`/dashboard/eventos/${id}/inscritos`}><Users size={16} aria-hidden="true" />Inscritos</Link><Link className={s.button} href={`/dashboard/eventos/${id}/acceso`}><ScanLine size={16} aria-hidden="true" />Control de acceso</Link></>}</div>}>
+    <EventShell title={id ? 'Edita tu evento' : 'Crea un nuevo evento'} description="Completa los pasos y mira en vivo cómo lo verán los participantes." action={<div className={s.actions} style={{ marginTop: 0 }}><Link className={s.button} href="/dashboard/eventos/gestion"><ArrowLeft size={16} />Volver</Link>{id && <><Link className={s.button} href={`/dashboard/eventos/${id}/inscritos`}><Users size={16} aria-hidden="true" />Inscritos</Link><Link className={s.button} href={`/dashboard/eventos/${id}/acceso`}><ScanLine size={16} aria-hidden="true" />Control de acceso</Link><Link className={s.button} href={`/dashboard/eventos/${id}/codigos`}><Ticket size={16} aria-hidden="true" />Códigos</Link></>}</div>}>
       {(options.isError || query.isError) && <div className={s.error} role="alert">{apiErrorMessage(options.error ?? query.error, 'No se pudo cargar el evento o su configuración.')} <button className={s.button} onClick={() => { options.refetch(); if (id) query.refetch(); }}>Reintentar</button></div>}
       {(!draft || !options.data) && !options.isError && !query.isError && <p role="status">Preparando el editor…</p>}
       {draft && options.data && <EditorForm initial={draft} options={options.data} onReload={async () => { if (id) { const r = await query.refetch(); if (r.data) setDraft(r.data); } }} key={`${id ?? 'new'}-${draft.version}`} />}
@@ -126,7 +127,8 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
     mutationFn: async () => {
       if (!event.title.trim() || !event.slug || !event.campusId || !event.organizerId || !event.startsAt || !event.endsAt) throw new Error('Completa nombre, enlace, campus, responsable y fechas en «Lo esencial».');
       if (new Date(event.endsAt) < new Date(event.startsAt)) throw new Error('El término debe ser posterior al inicio.');
-      const { id, audit, ...body } = event;
+      const { id, audit, ...rest } = event;
+      const body = { ...rest, details: { ...rest.details, questions: cleanQuestions(rest.details.questions) } };
       return (await (id ? api.patch(`/event-management/${id}`, body) : api.post('/event-management', body))).data as { id: string; version: number };
     },
     onSuccess: (r) => { setEvent((e) => ({ ...e, id: r.id, version: r.version })); setDirty(false); setSaved(true); setError(''); qc.invalidateQueries({ queryKey: ['event-programs'] }); qc.invalidateQueries({ queryKey: ['event-program', r.id] }); if (!initial.id) router.replace(`/dashboard/eventos/${r.id}`); },
@@ -268,20 +270,10 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
               <Card icon={<Ticket size={18} />} title="¿Cómo se participa?">
                 <div className={`${s.wide} ${x.choiceCards}`} role="radiogroup" aria-label="Tipo de acceso">
                   <button type="button" role="radio" aria-checked={d.pricing === 'free'} onClick={() => { detail('pricing', 'free'); change('ticketTypes', event.ticketTypes.map((t) => ({ ...t, price: 0 }))); }}><b>Gratuito</b><span>Se confirma el cupo sin pago.</span></button>
-                  <button type="button" role="radio" aria-checked={d.pricing === 'paid'} onClick={() => { detail('pricing', 'paid'); if (!event.ticketTypes.length) change('ticketTypes', [{ name: 'Entrada general', price: 0, currency: 'CLP' }]); }}><b>Pagado</b><span>Pago seguro con Mercado Pago.</span></button>
+                  <button type="button" role="radio" aria-checked={d.pricing === 'paid'} onClick={() => { detail('pricing', 'paid'); if (!event.ticketTypes.length) change('ticketTypes', [{ name: 'Entrada general', price: 0, currency: 'CLP', maxPerOrder: 10 }]); }}><b>Pagado</b><span>Pago seguro con Mercado Pago.</span></button>
                 </div>
                 {d.pricing === 'paid' && <div className={s.wide}>
                   <div className={s.notice}>{options.paymentMode === 'production' ? 'Mercado Pago Chile · Pagos reales.' : options.paymentMode === 'test' ? 'Mercado Pago Chile · Modo de prueba: no uses tarjetas reales.' : 'Mercado Pago aún no está configurado.'} La reserva dura hasta 24 horas y la entrada se confirma cuando se verifica el pago.</div>
-                  <span className={x.miniLabel}>Entradas</span>
-                  {event.ticketTypes.map((t, i) => (
-                    <div key={i} className={x.ticketRow}>
-                      <Field title="Nombre de la entrada"><input value={t.name} maxLength={80} onChange={(e) => change('ticketTypes', event.ticketTypes.map((q, j) => i === j ? { ...q, name: e.target.value } : q))} /></Field>
-                      <Field title="Valor"><input type="number" min={0} step="1" max={999999999} value={t.price} onChange={(e) => change('ticketTypes', event.ticketTypes.map((q, j) => i === j ? { ...q, price: Number(e.target.value) } : q))} /></Field>
-                      <Field title="Moneda"><select value={t.currency} onChange={(e) => change('ticketTypes', event.ticketTypes.map((q, j) => i === j ? { ...q, currency: e.target.value } : q))}>{['CLP', 'UYU', 'ARS', 'USD', 'VES'].map((c) => <option key={c}>{c}</option>)}</select></Field>
-                      <button className={s.button} aria-label={`Quitar entrada ${t.name || i + 1}`} onClick={() => change('ticketTypes', event.ticketTypes.filter((_, j) => j !== i))}><Trash2 size={16} /></button>
-                    </div>
-                  ))}
-                  <button className={s.button} disabled={event.ticketTypes.length >= 20} onClick={() => change('ticketTypes', [...event.ticketTypes, { name: 'Entrada general', price: 0, currency: 'CLP' }])}><Plus size={16} />Agregar entrada</button>
                   <div className={x.inlineCheck}>
                     <button type="button" className={s.button} disabled={paymentCheck.isPending} onClick={() => paymentCheck.mutate()}>{paymentCheck.isPending ? 'Comprobando…' : 'Comprobar conexión de pagos'}</button>
                     {paymentCheck.isSuccess && <p role="status" className={s.success}>{paymentCheck.data.mode === 'production' ? 'Producción' : 'Pruebas'} · Cuenta {paymentCheck.data.collectorId}. {paymentCheck.data.message}</p>}
@@ -289,6 +281,11 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
                   </div>
                   {dateField('Fecha límite de pago', 'paymentDueAt')}
                 </div>}
+                <TicketsEditor tickets={event.ticketTypes} paid={d.pricing === 'paid'} onChange={(next) => change('ticketTypes', next)} />
+                {event.id && <p className={`${x.help} ${s.wide}`}>¿Descuentos o acceso a entradas ocultas? Crea códigos en <Link href={`/dashboard/eventos/${event.id}/codigos`}><b>Códigos de descuento</b></Link>.</p>}
+              </Card>
+              <Card icon={<Users size={18} />} title="Preguntas para cada asistente" text="Lo que necesitas saber de cada persona: talla de polera, alergias, contacto de emergencia…">
+                <QuestionsEditor questions={d.questions ?? []} onChange={(next) => detail('questions', next)} />
               </Card>
               <Card icon={<Users size={18} />} title="Cupos y fechas de inscripción" text="Sin fechas, la inscripción queda abierta mientras la publiques.">
                 <Field title="Cupos totales" hint="Vacío: sin límite."><input type="number" min={1} max={1000000} value={event.capacity ?? ''} onChange={(e) => change('capacity', e.target.value ? Number(e.target.value) : null)} /></Field>

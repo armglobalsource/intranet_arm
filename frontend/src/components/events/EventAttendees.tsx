@@ -9,7 +9,7 @@ import { EventShell } from './EventWorkspace';
 import { eventPrice } from './event-types';
 import {
   AttendanceData, Attendee, AttendeeFilter, CheckInReply, STATUS_LABELS, VERIFIABLE,
-  clock, exportRows, fileSlug, filterAttendees, fullName, summarize,
+  answerText, boughtBy, clock, exportRows, fileSlug, filterAttendees, fullName, summarize,
 } from './attendance';
 import a from './event-attendance.module.css';
 
@@ -84,8 +84,8 @@ export function EventAttendees({ id }: { id: string }) {
   async function download() {
     if (!data) return;
     const XLSX = await import('xlsx');
-    const sheet = XLSX.utils.json_to_sheet(exportRows(shown, tz));
-    sheet['!cols'] = [14, 16, 28, 16, 6, 16, 18, 16, 10, 18, 22, 8, 16, 18, 18, 24, 38].map((wch) => ({ wch }));
+    const sheet = XLSX.utils.json_to_sheet(exportRows(shown, tz, data.event.questions));
+    sheet['!cols'] = [14, 16, 28, 16, 6, 16, 18, 16, 10, 18, 22, 8, 16, 18, 18, 24, 22, 28, 16, 38, ...(data.event.questions ?? []).map(() => 20), 38].map((wch) => ({ wch }));
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, 'Inscritos');
     XLSX.writeFile(book, `inscritos-${fileSlug(data.event.title)}.xlsx`);
@@ -142,7 +142,7 @@ export function EventAttendees({ id }: { id: string }) {
                     const note = notes[r.id];
                     return (
                       <tr key={r.id}>
-                        <td className={a.person}><strong>{fullName(r)}</strong><span>{r.email}</span>{r.phone && <span>{r.phone}</span>}<span>{r.campusName}</span></td>
+                        <td className={a.person}><strong>{fullName(r)}</strong><span>{r.email}</span>{r.phone && <span>{r.phone}</span>}<span>{r.campusName}</span>{boughtBy(r) && <span>Compra de {boughtBy(r)}</span>}{(data.event.questions ?? []).filter((q) => answerText(r.answers?.[q.id]) !== '').map((q) => <span key={q.id} className={a.answer}>{q.label}: <b>{answerText(r.answers?.[q.id])}</b></span>)}</td>
                         <td data-label="Entrada">{r.ticketName ?? '—'}<br /><span className={a.tagMuted}>{Number(r.amount) > 0 ? money(Number(r.amount)) : r.source === 'manual' ? `Agregada por ${r.createdBy ?? 'el equipo'}` : 'Sin costo'}</span>{r.note && <div className={a.tagMuted}>«{r.note}»</div>}</td>
                         <td data-label="Estado"><span className={a.tag} data-status={r.status}>{STATUS_LABELS[r.status] ?? r.status}</span>{r.testPayment && <span className={a.tagMuted}>Prueba</span>}{r.paymentId && <div className={a.tagMuted}>Pago N° {r.paymentId}</div>}</td>
                         <td data-label="Ingreso">

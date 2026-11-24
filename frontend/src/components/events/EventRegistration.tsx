@@ -5,13 +5,15 @@
 import { ChangeEvent, CSSProperties, FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { ArrowLeft, CalendarPlus, Check, CheckCircle2, Clock, CreditCard, Hourglass, Loader2, Lock, Printer, RefreshCw, ShieldCheck, Wallet, XCircle } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, Check, CheckCircle2, Clock, CreditCard, Hourglass, Loader2, Lock, Minus, Plus, Printer, RefreshCw, ShieldCheck, Tag, Wallet, XCircle } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
-import { eventPrice, PublicEvent } from './event-types';
+import { eventPrice, PublicEvent, TicketType } from './event-types';
+import { AppliedCode, Attendee, FREE_KEY, choosable, describeCode, initialQty, maxFor, missingAnswer, slots, totals } from './checkout';
 import { eventDay, eventIcs, eventTimeRange, momentLabel } from './event-helpers';
 import c from './event-checkout.module.css';
 
-type Receipt = { id: string; token: string; status: string; participantName: string; title: string; startsAt: string; timezone: string; amount: number; currency: string; ticketName?: string | null; expiresAt: string | null; emailSent: boolean; testPayment: boolean; ticketCode: string | null };
+type ReceiptTicket = { id: string; name: string; ticketName: string; amount: number; status: string; code: string | null };
+type Receipt = { id: string; token: string; status: string; buyerName: string; title: string; startsAt: string; timezone: string; subtotal: number; discount: number; amount: number; currency: string; code: string | null; summary: string | null; expiresAt: string | null; emailSent: boolean; testPayment: boolean; tickets: ReceiptTicket[] };
 type Returned = null | 'approved' | 'pending' | 'failed';
 
 /** QR de la entrada, generado en el navegador: el código no sale a ningún otro servicio. */
@@ -57,24 +59,66 @@ function Steps({ current, paid }: { current: number; paid: boolean }) {
 
 export function EventRegistrationForm({ event: e }: { event: PublicEvent }) {
   const paid = e.details.pricing === 'paid';
+  const questions = e.details.questions ?? [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({
-    firstName: '', lastName: '', email: '', phone: '', age: '', consent: false,
-    campusId: e.campusOptions?.length === 1 ? String(e.campusOptions[0].id) : '',
-    ticketTypeId: paid && e.ticketTypes.length === 1 ? String(e.ticketTypes[0].id ?? '') : '',
+  const [code, setCode] = useState<AppliedCode | null>(null);
+  const [codeOpen, setCodeOpen] = useState(false);
+  const [codeInput, setCodeInput] = useState('');
+  const [codeState, setCodeState] = useState<{ busy: boolean; error: string }>({ busy: false, error: '' });
+  const tickets = choosable(e, code);
+  const [qty, setQty] = useState<Record<string, number>>(() => initialQty(choosable(e, null), e.capacityLeft));
+  const [buyer, setBuyer] = useState({ firstName: '', lastName: '', email: '', phone: '', consent: false, campusId: e.campusOptions?.length === 1 ? String(e.campusOptions[0].id) : '' });
+  const [people, setPeople] = useState<Attendee[]>([]);
+  // La clave de la solicitud dura lo que el formulario: un reintento no duplica la compra.
+  const requestKey = useRef('');
+  const seats = slots(tickets, qty);
+  const sum = totals(tickets, qty, code);
+  const money = (n: number) => eventPrice({ name: '', price: n, currency: 'CLP' });
+  const attendee = (i: number): Attendee => people[i] ?? { self: i === 0, firstName: '', lastName: '', age: '', answers: {} };
+  const setAttendee = (i: number, patch: Partial<Attendee>) => setPeople((p) => { const next = [...p]; next[i] = { ...attendee(i), ...patch }; return next; });
+  const setB = (key: 'firstName' | 'lastName' | 'email' | 'phone' | 'campusId') => (ev: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setBuyer((b) => ({ ...b, [key]: ev.target.value }));
+  const step = (t: TicketType, d: 1 | -1) => setQty((q) => {
+    const key = t.id ?? FREE_KEY; const n = Math.max(0, Math.min(maxFor(t, e.capacityLeft), (q[key] ?? 0) + d));
+    const others = sum.count - (q[key] ?? 0);
+    return others + n > 10 ? q : { ...q, [key]: n };
   });
-  const ticket = e.ticketTypes.find((t) => String(t.id) === form.ticketTypeId);
-  const set = (key: keyof typeof form) => (ev: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [key]: ev.target.value }));
+
+  async function applyCode() {
+    if (!codeInput.trim()) return;
+    setCodeState({ busy: true, error: '' });
+    try {
+      const r: AppliedCode = await post(`/public-events/${encodeURIComponent(e.slug)}/code`, { code: codeInput.trim() });
+      setCode(r); setCodeOpen(false); setCodeState({ busy: false, error: '' });
+      if (r.unlockedTickets.length === 1 && !sum.count) setQty({ [r.unlockedTickets[0].id!]: 1 });
+    } catch (err) {
+      setCodeState({ busy: false, error: apiErrorMessage(err, 'No pudimos comprobar el código.') });
+    }
+  }
+  function removeCode() {
+    const hidden = new Set(code?.unlockedTickets.map((t) => t.id));
+    setQty((q) => Object.fromEntries(Object.entries(q).filter(([k]) => !hidden.has(k))));
+    setCode(null); setCodeInput('');
+  }
 
   async function submit(ev: FormEvent) {
     ev.preventDefault();
-    setBusy(true); setError('');
+    setError('');
+    if (!sum.count) { setError('Elige al menos una entrada.'); return; }
+    const missing = seats.map((_, i) => missingAnswer(questions, attendee(i))).findIndex(Boolean);
+    if (missing >= 0) { setError(`Falta responder «${missingAnswer(questions, attendee(missing))!.label}» en la entrada ${missing + 1}.`); return; }
+    setBusy(true);
     try {
-      const requestStorageKey = `event-request:${e.slug}:${form.email.trim().toLowerCase()}`;
-      let key = sessionStorage.getItem(requestStorageKey);
-      if (!key) { key = Array.from(crypto.getRandomValues(new Uint8Array(32)), (x) => x.toString(16).padStart(2, '0')).join(''); sessionStorage.setItem(requestStorageKey, key); }
-      const r: Receipt = await post(`/public-events/${encodeURIComponent(e.slug)}/registrations`, { ...form, campusId: Number(form.campusId), age: form.age ? Number(form.age) : undefined, ticketTypeId: paid ? form.ticketTypeId : undefined, requestKey: key });
+      if (!requestKey.current) requestKey.current = Array.from(crypto.getRandomValues(new Uint8Array(32)), (x) => x.toString(16).padStart(2, '0')).join('');
+      const items = seats.map((t, i) => {
+        const a = attendee(i); const self = i === 0 && a.self;
+        return { ...(t.id && t.id !== FREE_KEY ? { ticketTypeId: t.id } : {}), firstName: self ? buyer.firstName : a.firstName, lastName: self ? buyer.lastName : a.lastName,
+          ...(a.age ? { age: Number(a.age) } : {}), ...(questions.length ? { answers: a.answers } : {}) };
+      });
+      const r: Receipt = await post(`/public-events/${encodeURIComponent(e.slug)}/registrations`, {
+        firstName: buyer.firstName, lastName: buyer.lastName, email: buyer.email, phone: buyer.phone, campusId: Number(buyer.campusId), consent: buyer.consent,
+        requestKey: requestKey.current, items, ...(code ? { code: code.code } : {}),
+      });
       remember(e.slug, r);
       window.location.assign(`/eventos/${encodeURIComponent(e.slug)}/inscripcion#id=${r.id}&token=${r.token}`);
     } catch (err) {
@@ -83,61 +127,105 @@ export function EventRegistrationForm({ event: e }: { event: PublicEvent }) {
     }
   }
 
-  const input = (key: 'firstName' | 'lastName' | 'email' | 'phone', label: string, type: string, autoComplete: string, extra?: { wide?: boolean; hint?: string; placeholder?: string }) => (
+  const buyerInput = (key: 'firstName' | 'lastName' | 'email' | 'phone', label: string, type: string, autoComplete: string, extra?: { wide?: boolean; hint?: string; placeholder?: string }) => (
     <label className={`${c.field} ${extra?.wide ? c.wide : ''}`}>
       <span>{label}</span>
-      <input aria-label={label} type={type} autoComplete={autoComplete} required placeholder={extra?.placeholder} maxLength={key === 'email' ? 254 : key === 'phone' ? 25 : 80} value={form[key]} onChange={set(key)} />
+      <input aria-label={label} type={type} autoComplete={autoComplete} required placeholder={extra?.placeholder} maxLength={key === 'email' ? 254 : key === 'phone' ? 25 : 80} value={buyer[key]} onChange={setB(key)} />
       {extra?.hint && <small>{extra.hint}</small>}
     </label>
   );
+  const askPerson = seats.length > 1 || questions.length > 0 || e.details.minimumAge != null;
+  const total = paid ? (sum.count ? (sum.total > 0 ? money(sum.total) : 'Sin costo') : '—') : 'Gratis';
 
   return (
     <section className={c.panel} id="inscribirme" aria-labelledby="inscribirme-title">
       <p className={c.eyebrow}>Inscripción</p>
-      <h2 id="inscribirme-title" className={c.title}>Consigue tu entrada</h2>
-      <p className={c.lead}>{paid ? 'Completa tus datos y paga en línea con Mercado Pago. Te toma un par de minutos.' : 'Completa tus datos y listo: tu entrada llega a tu correo.'}</p>
-      <Steps current={0} paid={paid} />
-      <form onSubmit={submit}>
+      <h2 id="inscribirme-title" className={c.title}>Consigue tus entradas</h2>
+      <p className={c.lead}>{paid ? 'Elige cuántas entradas quieres, completa los datos y paga en línea con Mercado Pago.' : 'Elige cuántas entradas quieres y completa los datos: las entradas llegan a tu correo.'}</p>
+      <Steps current={0} paid={paid && sum.total > 0} />
+      <form onSubmit={submit} noValidate={false}>
         <fieldset disabled={busy} className={c.fieldset}>
-          {paid && (
-            <div className={c.group}>
-              <h3>Elige tu entrada</h3>
-              <div className={c.ticketChoices} role="radiogroup" aria-label="Entrada">
-                {e.ticketTypes.map((t) => (
-                  <label key={t.id} className={c.ticketChoice}>
-                    <input type="radio" name="ticketTypeId" required value={t.id} checked={form.ticketTypeId === String(t.id)} onChange={() => setForm((f) => ({ ...f, ticketTypeId: String(t.id) }))} />
-                    <span className={c.radio} aria-hidden="true"><Check size={13} /></span>
-                    <span className={c.ticketChoiceName}>{t.name || 'Entrada'}</span>
-                    <strong>{eventPrice(t)}</strong>
-                  </label>
-                ))}
-              </div>
+          <div className={c.group}>
+            <h3>Elige tus entradas</h3>
+            <div className={c.ticketChoices} role="group" aria-label="Entradas">
+              {tickets.map((t) => {
+                const key = t.id ?? FREE_KEY; const n = qty[key] ?? 0; const max = maxFor(t, e.capacityLeft);
+                const note = t.soldOut ? 'Agotada' : t.sale === 'soon' ? `Disponible desde el ${momentLabel(t.salesStart, e.details.timezone)}` : t.sale === 'over' ? 'Venta terminada'
+                  : t.remaining != null && t.remaining <= 10 ? `Quedan ${t.remaining}` : '';
+                return (
+                  <div key={key} className={c.qtyRow} data-off={max === 0 || undefined}>
+                    <div className={c.qtyInfo}>
+                      <span className={c.ticketChoiceName}>{t.name}</span>
+                      {t.description && <small>{t.description}</small>}
+                      {note && <small className={c.qtyNote}>{note}</small>}
+                    </div>
+                    <strong>{t.price > 0 ? eventPrice(t) : paid ? 'Sin costo' : 'Gratis'}</strong>
+                    <div className={c.stepper}>
+                      <button type="button" onClick={() => step(t, -1)} disabled={n === 0} aria-label={`Quitar una entrada ${t.name}`}><Minus size={16} /></button>
+                      <output aria-live="polite" aria-label={`Cantidad de ${t.name}`}>{n}</output>
+                      <button type="button" onClick={() => step(t, 1)} disabled={n >= max || sum.count >= 10} aria-label={`Agregar una entrada ${t.name}`}><Plus size={16} /></button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
+            {e.codesEnabled && (
+              code
+                ? <p className={c.codeApplied}><Tag size={15} aria-hidden="true" /><span><b>{code.code}</b> · {describeCode(code, tickets, money)}</span><button type="button" className={c.textButton} onClick={removeCode}>Quitar</button></p>
+                : codeOpen
+                  ? <div className={c.codeRow}>
+                    <input aria-label="Código" value={codeInput} maxLength={30} autoCapitalize="characters" placeholder="Escribe tu código" onChange={(ev) => setCodeInput(ev.target.value)} onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); void applyCode(); } }} />
+                    <button type="button" className={c.secondary} disabled={codeState.busy} onClick={() => void applyCode()}>{codeState.busy ? 'Revisando…' : 'Aplicar'}</button>
+                    {codeState.error && <p className={c.error} role="alert">{codeState.error}</p>}
+                  </div>
+                  : <button type="button" className={c.textButton} onClick={() => setCodeOpen(true)}><Tag size={14} aria-hidden="true" />¿Tienes un código?</button>
+            )}
+          </div>
 
           <div className={c.group}>
             <h3>Tus datos</h3>
             <div className={c.grid}>
-              {input('firstName', 'Nombre', 'text', 'given-name')}
-              {input('lastName', 'Apellido', 'text', 'family-name')}
-              {input('email', 'Correo electrónico', 'email', 'email', { wide: true, hint: 'Aquí te enviaremos tu entrada.', placeholder: 'tu@correo.com' })}
-              {input('phone', 'Teléfono / WhatsApp', 'tel', 'tel', { placeholder: '+56 9 1234 5678' })}
+              {buyerInput('firstName', 'Nombre', 'text', 'given-name')}
+              {buyerInput('lastName', 'Apellido', 'text', 'family-name')}
+              {buyerInput('email', 'Correo electrónico', 'email', 'email', { wide: true, hint: seats.length > 1 ? 'Aquí te enviaremos todas las entradas.' : 'Aquí te enviaremos tu entrada.', placeholder: 'tu@correo.com' })}
+              {buyerInput('phone', 'Teléfono / WhatsApp', 'tel', 'tel', { placeholder: '+56 9 1234 5678' })}
               <label className={c.field}>
                 <span>Campus</span>
-                <select aria-label="Campus" required value={form.campusId} onChange={set('campusId')}>
+                <select aria-label="Campus" required value={buyer.campusId} onChange={setB('campusId')}>
                   <option value="">Selecciona tu campus</option>
                   {e.campusOptions?.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </select>
               </label>
-              {e.details.minimumAge != null && (
-                <label className={c.field}>
-                  <span>Edad</span>
-                  <input aria-label="Edad" type="number" inputMode="numeric" required min={e.details.minimumAge} max={120} value={form.age} onChange={set('age')} />
-                  <small>Desde {e.details.minimumAge} años.</small>
-                </label>
-              )}
             </div>
           </div>
+
+          {askPerson && seats.map((t, i) => {
+            const a = attendee(i); const self = i === 0 && a.self;
+            return (
+              <div className={c.person} key={i} role="group" aria-label={`Entrada ${i + 1}`}>
+                <h3>Entrada {i + 1}<span> · {t.name}</span></h3>
+                {i === 0 && <label className={c.consent}><input type="checkbox" checked={a.self} onChange={(ev) => setAttendee(0, { self: ev.target.checked })} /><span>Esta entrada es para mí</span></label>}
+                <div className={c.grid}>
+                  {!self && <>
+                    <label className={c.field}><span>Nombre</span><input aria-label={`Nombre (entrada ${i + 1})`} required maxLength={80} value={a.firstName} onChange={(ev) => setAttendee(i, { firstName: ev.target.value })} /></label>
+                    <label className={c.field}><span>Apellido</span><input aria-label={`Apellido (entrada ${i + 1})`} required maxLength={80} value={a.lastName} onChange={(ev) => setAttendee(i, { lastName: ev.target.value })} /></label>
+                  </>}
+                  {e.details.minimumAge != null && (
+                    <label className={c.field}><span>Edad</span>
+                      <input aria-label={`Edad (entrada ${i + 1})`} type="number" inputMode="numeric" required min={e.details.minimumAge} max={120} value={a.age} onChange={(ev) => setAttendee(i, { age: ev.target.value })} />
+                      <small>Desde {e.details.minimumAge} años.</small></label>
+                  )}
+                  {questions.map((q) => q.type === 'yesno'
+                    ? <label key={q.id} className={`${c.consent} ${c.wide}`}><input type="checkbox" required={q.required} checked={a.answers[q.id] === true} onChange={(ev) => setAttendee(i, { answers: { ...a.answers, [q.id]: ev.target.checked } })} /><span>{q.label}</span></label>
+                    : <label key={q.id} className={`${c.field} ${c.wide}`}><span>{q.label}{!q.required && <small> · Opcional</small>}</span>
+                      {q.type === 'select'
+                        ? <select aria-label={`${q.label} (entrada ${i + 1})`} required={q.required} value={String(a.answers[q.id] ?? '')} onChange={(ev) => setAttendee(i, { answers: { ...a.answers, [q.id]: ev.target.value } })}><option value="">Elige una opción</option>{(q.options ?? []).map((o) => <option key={o}>{o}</option>)}</select>
+                        : <input aria-label={`${q.label} (entrada ${i + 1})`} required={q.required} maxLength={500} value={String(a.answers[q.id] ?? '')} onChange={(ev) => setAttendee(i, { answers: { ...a.answers, [q.id]: ev.target.value } })} />}
+                    </label>)}
+                </div>
+              </div>
+            );
+          })}
 
           {(e.details.conditions || e.details.cancellationPolicy) && (
             <details className={c.conditions}>
@@ -147,21 +235,27 @@ export function EventRegistrationForm({ event: e }: { event: PublicEvent }) {
             </details>
           )}
           <label className={c.consent}>
-            <input required type="checkbox" checked={form.consent} onChange={(ev) => setForm((f) => ({ ...f, consent: ev.target.checked }))} />
-            <span>Acepto las condiciones del evento y el uso de mis datos para gestionar esta inscripción y recibir sus comunicaciones.</span>
+            <input required type="checkbox" checked={buyer.consent} onChange={(ev) => setBuyer((b) => ({ ...b, consent: ev.target.checked }))} />
+            <span>Acepto las condiciones del evento y el uso de los datos para gestionar esta inscripción y recibir sus comunicaciones.</span>
           </label>
 
           <div className={c.summary}>
-            <div className={c.total}><span>Total</span><strong>{paid ? (ticket ? eventPrice(ticket) : '—') : 'Gratis'}</strong></div>
-            {paid && e.paymentMode === 'test' && <p className={c.notice}>Modo de prueba: no uses tarjetas reales.</p>}
+            {sum.lines.length > 0 && (
+              <dl className={c.lines} aria-label="Resumen de la compra">
+                {sum.lines.map((l) => <div key={l.ticket.id ?? FREE_KEY}><dt>{l.n} × {l.ticket.name}</dt><dd>{paid ? (l.subtotal > 0 ? money(l.subtotal) : 'Sin costo') : 'Gratis'}</dd></div>)}
+                {sum.discount > 0 && <div className={c.discountLine}><dt>Descuento {code?.code}</dt><dd>−{money(sum.discount)}</dd></div>}
+              </dl>
+            )}
+            <div className={c.total}><span>Total</span><strong>{total}</strong></div>
+            {paid && sum.total > 0 && e.paymentMode === 'test' && <p className={c.notice}>Modo de prueba: no uses tarjetas reales.</p>}
             {error && <p className={c.error} role="alert">{error}</p>}
-            <button className={c.cta} type="submit">
-              {busy ? <><Loader2 size={18} className={c.spin} aria-hidden="true" />Reservando tu cupo…</>
-                : paid ? <>Continuar al pago{ticket ? ` · ${eventPrice(ticket)}` : ''}</>
-                : 'Confirmar mi inscripción'}
+            <button className={c.cta} type="submit" disabled={!sum.count}>
+              {busy ? <><Loader2 size={18} className={c.spin} aria-hidden="true" />Reservando tus cupos…</>
+                : paid && sum.total > 0 ? <>Continuar al pago · {money(sum.total)}</>
+                  : sum.count > 1 ? `Confirmar ${sum.count} entradas` : 'Confirmar mi inscripción'}
             </button>
-            {paid
-              ? <p className={c.fine}><Lock size={13} aria-hidden="true" />Tu cupo queda reservado y en el siguiente paso pagas de forma segura con Mercado Pago.</p>
+            {paid && sum.total > 0
+              ? <p className={c.fine}><Lock size={13} aria-hidden="true" />Tus cupos quedan reservados y en el siguiente paso pagas de forma segura con Mercado Pago.</p>
               : <p className={c.fine}>Recibirás la confirmación en tu correo.</p>}
             {e.details.waitlist && <p className={c.fine}>Si se agotan los cupos, quedarás en lista de espera y no tendrás que pagar.</p>}
           </div>
@@ -247,7 +341,9 @@ export function EventReceipt({ slug }: { slug: string }) {
   const place = d ? (d.modality === 'online' ? 'Evento online' : [d.location, d.address].filter(Boolean).join(', ')) : '';
   const paid = (receipt?.amount ?? 0) > 0;
   const price = receipt ? (paid ? money(receipt.amount, receipt.currency) : 'Gratis') : '';
-  const firstName = receipt?.participantName.split(' ')[0] ?? '';
+  const firstName = receipt?.buyerName.split(' ')[0] ?? '';
+  const ready = receipt?.tickets.filter((t) => t.code) ?? [];
+  const many = (receipt?.tickets.length ?? 0) > 1;
   const st = receipt?.status;
   const checking = st === 'pending_payment' && polling;
 
@@ -258,19 +354,21 @@ export function EventReceipt({ slug }: { slug: string }) {
     if (st === 'confirmed') body = <>
       <Steps current={paid ? 2 : 1} paid={paid} />
       {icon('ok', <CheckCircle2 size={30} />)}
-      <h1 className={c.title}>¡Tu entrada está lista!</h1>
-      <p className={c.lead}>{firstName ? `${firstName}, ya` : 'Ya'} tienes tu lugar. {receipt.emailSent ? 'También te la enviamos por correo.' : 'Guarda esta página: es tu comprobante.'}</p>
-      <article className={c.ticket} aria-label="Tu entrada">
-        <div className={c.ticketHead}><span>Tu entrada</span><strong>{event?.title || receipt.title}</strong></div>
-        <dl className={c.ticketInfo}>
-          <div><dt>Participante</dt><dd>{receipt.participantName}</dd></div>
-          <div><dt>Entrada</dt><dd>{receipt.ticketName || (paid ? 'Entrada general' : 'Entrada gratuita')} · {price}</dd></div>
-          {day && <div><dt>Fecha</dt><dd>{cap(day.full)}</dd></div>}
-          {time && <div><dt>Horario</dt><dd>{time}</dd></div>}
-          {place && <div className={c.span2}><dt>Lugar</dt><dd>{place}</dd></div>}
-        </dl>
-        <div className={c.ticketCode}>{receipt.ticketCode && <TicketQr code={receipt.ticketCode} />}<small>Código de tu entrada</small><code>{receipt.ticketCode}</code><small>Muestra este código QR en la entrada del evento.</small></div>
-      </article>
+      <h1 className={c.title}>{many ? '¡Tus entradas están listas!' : '¡Tu entrada está lista!'}</h1>
+      <p className={c.lead}>{firstName ? `${firstName}, ya` : 'Ya'} {many ? `tienen sus ${ready.length} lugares` : 'tienes tu lugar'}. {receipt.emailSent ? (many ? 'También te las enviamos por correo.' : 'También te la enviamos por correo.') : 'Guarda esta página: es tu comprobante.'}</p>
+      {ready.map((t, i) => (
+        <article key={t.id} className={c.ticket} aria-label={many ? `Entrada de ${t.name}` : 'Tu entrada'}>
+          <div className={c.ticketHead}><span>{many ? `Entrada ${i + 1} de ${ready.length}` : 'Tu entrada'}</span><strong>{event?.title || receipt.title}</strong></div>
+          <dl className={c.ticketInfo}>
+            <div><dt>Participante</dt><dd>{t.name}</dd></div>
+            <div><dt>Entrada</dt><dd>{t.ticketName}{t.amount > 0 ? ` · ${money(t.amount, receipt.currency)}` : ''}</dd></div>
+            {day && <div><dt>Fecha</dt><dd>{cap(day.full)}</dd></div>}
+            {time && <div><dt>Horario</dt><dd>{time}</dd></div>}
+            {place && <div className={c.span2}><dt>Lugar</dt><dd>{place}</dd></div>}
+          </dl>
+          <div className={c.ticketCode}><TicketQr code={t.code!} /><small>Código de la entrada</small><code>{t.code}</code><small>Muestra este código QR en la entrada del evento.</small></div>
+        </article>
+      ))}
       <div className={c.row}>
         <button type="button" className={c.secondary} onClick={() => window.print()}><Printer size={16} aria-hidden="true" />Imprimir / Guardar PDF</button>
         {event?.startsAt && <button type="button" className={c.secondary} onClick={addToCalendar}><CalendarPlus size={16} aria-hidden="true" />Agregar al calendario</button>}
@@ -288,13 +386,14 @@ export function EventReceipt({ slug }: { slug: string }) {
         <Steps current={1} paid />
         {returned === 'failed' && <p className={c.alert} role="alert">El pago no se completó y no se hizo ningún cargo. Puedes intentarlo de nuevo.</p>}
         {returned && returned !== 'failed' && <p className={c.alert} role="status">Si ya pagaste, la confirmación puede tardar unos minutos. Te enviaremos tu entrada por correo apenas Mercado Pago la apruebe; no vuelvas a pagar.</p>}
-        <h1 className={c.title}>Último paso: paga tu entrada</h1>
-        <p className={c.lead}>{firstName ? `Hola ${firstName}, tu` : 'Tu'} cupo está reservado. Completa el pago para confirmar tu entrada.</p>
+        <h1 className={c.title}>{many ? 'Último paso: paga tus entradas' : 'Último paso: paga tu entrada'}</h1>
+        <p className={c.lead}>{firstName ? `Hola ${firstName}, ` : ''}{many ? 'tus cupos están reservados. Completa el pago para confirmar las entradas.' : 'tu cupo está reservado. Completa el pago para confirmar tu entrada.'}</p>
         <div className={c.order}>
-          <div className={c.orderLine}><div><strong>{receipt.ticketName || 'Entrada'}</strong><small>{receipt.participantName}{day ? ` · ${day.full}` : ''}</small></div><span>{price}</span></div>
+          {receipt.tickets.map((t) => <div key={t.id} className={c.orderLine}><div><strong>{t.ticketName}</strong><small>{t.name}{day ? ` · ${day.full}` : ''}</small></div><span>{t.amount > 0 ? money(t.amount, receipt.currency) : 'Sin costo'}</span></div>)}
+          {receipt.discount > 0 && <p className={c.discountNote}><Tag size={14} aria-hidden="true" />Incluye {money(receipt.discount, receipt.currency)} de descuento con el código {receipt.code}.</p>}
           <div className={c.orderTotal}><span>Total a pagar</span><strong>{price}</strong></div>
         </div>
-        {expires && <p className={c.reserve}><Clock size={16} aria-hidden="true" /><span>Tu cupo está reservado hasta el <b>{expires}</b>.</span></p>}
+        {expires && <p className={c.reserve}><Clock size={16} aria-hidden="true" /><span>{many ? "Tus cupos están reservados" : "Tu cupo está reservado"} hasta el <b>{expires}</b>.</span></p>}
         {receipt.testPayment && <p className={c.notice}>Modo de prueba · No utilices tarjetas ni cuentas reales.</p>}
         <button type="button" disabled={busy} className={c.cta} onClick={() => action('checkout')}>
           {busy ? <><Loader2 size={18} className={c.spin} aria-hidden="true" />Abriendo Mercado Pago…</> : receipt.testPayment ? 'Pagar con Mercado Pago · Prueba' : 'Pagar con Mercado Pago'}

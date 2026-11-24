@@ -122,6 +122,6 @@ export function eventReadiness(e: EventProgram): ReadinessItem[] {
     { key: 'description', label: 'Descripción del evento', step: 1, done: !!d.description.trim(), required: true },
     { key: 'banner', label: 'Imagen de portada', step: 1, done: !!d.bannerUrl.trim(), required: false },
   ];
-  if (d.pricing === 'paid') items.push({ key: 'tickets', label: 'Entradas con valor', step: 2, done: e.ticketTypes.length > 0 && e.ticketTypes.every((t) => t.name.trim() && t.price > 0), required: true });
+  if (d.pricing === 'paid') items.push({ key: 'tickets', label: 'Entradas con valor', step: 2, done: e.ticketTypes.length > 0 && e.ticketTypes.every((t) => t.name.trim() && t.price >= 0) && e.ticketTypes.some((t) => t.price > 0), required: true });
   return items;
 }

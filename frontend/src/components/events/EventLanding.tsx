@@ -32,7 +32,7 @@ export function EventLanding({ event: e, preview = false }: { event: PublicEvent
   const day = eventDay(e.startsAt, d.timezone);
   const time = eventTimeRange(e.startsAt, e.endsAt, d.timezone);
   const map = d.modality !== 'online' ? mapsUrl(d.location, d.address) : '';
-  const price = d.pricing === 'free' ? 'Gratis' : ticketPriceLabel(e.ticketTypes) || 'Valor por confirmar';
+  const price = d.pricing === 'free' ? 'Gratis' : ticketPriceLabel(e.ticketTypes.filter((t) => t.price > 0 && !t.hidden)) || 'Valor por confirmar';
   const place = d.modality === 'online' ? 'Evento online' : d.location || 'Lugar por confirmar';
   const [shared, setShared] = useState(false);
   const url = typeof window !== 'undefined' ? `${window.location.origin}/eventos/${e.slug}` : `/eventos/${e.slug}`;
@@ -109,11 +109,16 @@ export function EventLanding({ event: e, preview = false }: { event: PublicEvent
             </ul>
           </section>
 
-          {d.pricing === 'paid' && e.ticketTypes.length > 0 && (
+          {e.ticketTypes.filter((t) => !t.hidden).length > 0 && (
             <section className={l.section}>
               <h2>Entradas</h2>
               <div className={l.tickets}>
-                {e.ticketTypes.map((t, i) => <div key={t.id ?? i} className={l.ticket}><span>{t.name || 'Entrada'}</span><strong>{eventPrice(t)}</strong></div>)}
+                {e.ticketTypes.filter((t) => !t.hidden).map((t, i) => (
+                  <div key={t.id ?? i} className={l.ticket}>
+                    <span>{t.name || 'Entrada'}{t.description && <small style={{ display: 'block', fontWeight: 400, opacity: .75, marginTop: 2 }}>{t.description}</small>}</span>
+                    <strong>{t.soldOut ? 'Agotada' : t.price > 0 ? eventPrice(t) : 'Sin costo'}</strong>
+                  </div>
+                ))}
               </div>
             </section>
           )}

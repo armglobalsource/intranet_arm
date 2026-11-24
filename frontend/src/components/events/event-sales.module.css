@@ -1,0 +1,32 @@
+/* Tipos de entrada, preguntas y códigos (editor). Paleta armglobal.org. */
+.ticket { border: 1px solid #ece5dd; border-radius: 14px; padding: 14px 16px 16px; margin: 0 0 12px; min-width: 0; background: #fffdfb; }
+.ticketHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.ticketHead strong { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: #1d1d1b; overflow-wrap: anywhere; }
+.ticketTools { display: inline-flex; gap: 2px; }
+.icon { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; color: #656260; }
+.icon:hover:not(:disabled) { background: #f6f1ec; color: #1d1d1b; }
+.icon:disabled { opacity: .35; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; background: #f6f1ec; color: #656260; font-size: 11px; font-weight: 700; }
+.free { display: inline-flex; align-items: center; min-height: 44px; margin-top: 20px; font-size: 13px; color: #656260; }
+
+/* Página de códigos */
+.codes { display: grid; gap: 12px; }
+.code { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; background: #fff; border: 1px solid #e4ddd5; border-radius: 14px; padding: 14px 16px; }
+.code[data-active=false] { opacity: .6; }
+.codeName { font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 16px; font-weight: 700; letter-spacing: .04em; color: #1d1d1b; overflow-wrap: anywhere; }
+.codeMeta { font-size: 13px; color: #656260; line-height: 1.5; }
+.codeMeta b { color: #1d1d1b; }
+.codeActions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 7px 12px; border: 1px solid #e4ddd5; border-radius: 99px; font-size: 13px; background: #fff; color: #31302e; }
+.chips button[aria-pressed=true] { background: #1d1d1b; border-color: #1d1d1b; color: #fff; }
+.segmented { display: inline-flex; padding: 4px; background: #f6f1ec; border-radius: 10px; gap: 4px; }
+.segmented button { min-height: 38px; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 650; color: #656260; }
+.segmented button[aria-pressed=true] { background: #fff; color: #1d1d1b; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+
+@media (max-width: 720px) {
+  .grid { grid-template-columns: 1fr; }
+  .code { grid-template-columns: 1fr; gap: 6px; }
+  .codeActions { justify-content: flex-start; }
+}

@@ -24,20 +24,24 @@ function setup(opts:{status?:string;checkedIn?:boolean;participating?:boolean;ev
    return {rows:[]};
   }
   if(sql.startsWith('UPDATE arm_app.event_registrations SET checked_in_at=NULL')){if(reg.checked_in_at){reg.checked_in_at=null;return {rows:[{id:reg.id}]};}return {rows:[]};}
-  if(sql.startsWith("UPDATE arm_app.event_registrations SET status='cancelled'")){if(reg.status!=='cancelled'){reg.status='cancelled';return {rows:[{id:reg.id,payment_id:reg.payment_id,amount:reg.amount}]};}return {rows:[]};}
+  if(sql.startsWith("UPDATE arm_app.event_registrations SET status='cancelled'")){if(reg.status!=='cancelled'){reg.status='cancelled';return {rows:[{id:reg.id,order_id:'order-1',amount:reg.amount}]};}return {rows:[]};}
+  // La compra queda anulada cuando ya no le quedan entradas vigentes.
+  if(sql.startsWith("UPDATE arm_app.event_orders o SET status='cancelled'"))return {rows:[{payment_id:reg.payment_id}]};
+  if(sql.startsWith('SELECT o.* FROM arm_app.event_registrations r JOIN'))return {rows:v[0]===reg.id?[{id:'order-1',status:reg.status,email:reg.email,expires_at:null}]:[]};
   if(sql.includes('WHERE r.event_id=$1 AND r.id=$2'))return {rows:v[1]===reg.id?[{...reg,participant:reg.participant,checkedInAt:reg.checked_in_at,status:reg.status}]:[]};
   if(sql.startsWith('SELECT * FROM arm_app.event_registrations WHERE id=$1 AND event_id=$2'))return {rows:v[0]===reg.id?[reg]:[]};
   if(sql.startsWith('SELECT count(*) FILTER'))return {rows:[{confirmed:3,checkedIn:reg.checked_in_at?1:0}]};
   if(sql.startsWith('SELECT name FROM arm_app.event_ticket_types'))return {rows:[{name:'General'}]};
+  if(sql.trim().startsWith('INSERT INTO arm_app.event_orders'))return {rows:[{id:v[0],status:'confirmed',email:v[4]}]};
   if(sql.trim().startsWith('INSERT INTO arm_app.event_registrations')){
-   if(opts.conflict)throw Object.assign(new Error('duplicate'),{code:'23505'});
    Object.assign(reg,{id:v[0],status:'confirmed',email:v[4],participant:JSON.parse(v[5]),snapshot:JSON.parse(v[6])});return {rows:[{...reg}]};
   }
   return {rows:[]};
  });
  const db={query,transaction:async(fn:any)=>fn({query})};
- const registrations={notify} as unknown as EventRegistrationService;
- return {service:new EventAttendanceService(db as any,registrations),query,notify,reg};
+ const resendOrder=vi.fn().mockResolvedValue(true);
+ const registrations={notify,resendOrder} as unknown as EventRegistrationService;
+ return {service:new EventAttendanceService(db as any,registrations),query,notify,resendOrder,reg};
 }
 
 describe('Control de ingreso',()=>{
@@ -83,13 +87,17 @@ describe('Acciones del equipo organizador',()=>{
  it('agrega una cortesía confirmada, sin cobro, y envía la entrada si se pide',async()=>{
   const x=setup({participating:true});
   const r=await x.service.addManual(admin,EVENT,{firstName:' Luis ',lastName:'Soto',email:'LUIS@example.com',campusId:20,ticketTypeId:TICKET,sendEmail:true,note:'Staff'});
-  const insert=x.query.mock.calls.find(([sql])=>sql.trim().startsWith('INSERT'))!;
+  // Una compra sin cobro hecha por el equipo, con una sola entrada.
+  const order=x.query.mock.calls.find(([sql])=>sql.trim().startsWith('INSERT INTO arm_app.event_orders'))!;
+  expect(order[0]).toContain("'confirmed',0,0,0,'CLP','manual'");
+  const insert=x.query.mock.calls.find(([sql])=>sql.trim().startsWith('INSERT INTO arm_app.event_registrations'))!;
   expect(insert[0]).toContain("'confirmed',0,'CLP','manual'");
   expect(insert[1][4]).toBe('luis@example.com');expect(JSON.parse(insert[1][6]).ticketName).toBe('General');
+  expect(insert[1][9]).toBe(order[1][0]);expect(insert[1][10]).toBe(TICKET);
   expect(x.notify).toHaveBeenCalledTimes(1);expect(r.emailSent).toBe(true);
  });
- it('explica si el correo ya tiene una inscripción vigente',async()=>{
-  await expect(setup({conflict:true}).service.addManual(admin,EVENT,{firstName:'A',lastName:'B',email:'a@b.cl',campusId:10,sendEmail:false})).rejects.toThrow(/vigente/);
+ it('no agrega personas a un evento cancelado',async()=>{
+  await expect(setup({eventStatus:'cancelled'}).service.addManual(admin,EVENT,{firstName:'A',lastName:'B',email:'a@b.cl',campusId:10,sendEmail:false})).rejects.toThrow(/cancelado/);
  });
  it('anula, libera el cupo y recuerda devolver el pago en Mercado Pago',async()=>{
   const x=setup();
@@ -100,7 +108,7 @@ describe('Acciones del equipo organizador',()=>{
  it('reenvía la entrada aunque ya se haya enviado antes',async()=>{
   const x=setup();
   const r=await x.service.resend(admin,EVENT,TICKET);
-  expect(x.notify).toHaveBeenCalledWith(expect.anything(),{force:true});expect(r.message).toContain('ana@example.com');
+  expect(x.resendOrder).toHaveBeenCalledWith('order-1');expect(r.message).toContain('ana@example.com');
  });
  it('valida los datos que llegan desde el panel',async()=>{
   const pipe=new ValidationPipe({whitelist:true,forbidNonWhitelisted:true,transform:true});
@@ -115,14 +123,16 @@ describe('Correo de la entrada',()=>{
  it('adjunta el QR de la entrada confirmada como imagen incrustada',async()=>{
   const config={get:(k:string)=>({EVENT_REGISTRATION_SECRET:'x'.repeat(40),FRONTEND_URL:'https://example.com'}[k])};
   const mail={sendHtml:vi.fn().mockResolvedValue({id:'m'})};
-  const query=vi.fn(async()=>({rows:[{title:'Retiro',starts_at:new Date(),details:{}}]}));
+  const ticket={id:TICKET,status:'confirmed',participant:{firstName:'Ana',lastName:'Pérez'},snapshot:{ticketName:'General'}};
+  const query=vi.fn(async(sql:string)=>({rows:sql.includes('WHERE order_id')?[ticket]:[{title:'Retiro',starts_at:new Date(),details:{}}]}));
   const service=new EventRegistrationService({query} as any,config as any,new EventPaymentService(config as any),mail as any);
-  const row={id:TICKET,event_id:EVENT,status:'confirmed',email:'ana@example.com',participant:{firstName:'Ana'},snapshot:{slug:'retiro',title:'Retiro',startsAt:new Date().toISOString()},amount:0,currency:'CLP',confirmation_sent_at:new Date()};
-  expect(await service.notify(row)).toBe(true);expect(mail.sendHtml).not.toHaveBeenCalled();
-  expect(await service.notify(row,{force:true})).toBe(true);
+  const order={id:'order-1',event_id:EVENT,status:'confirmed',email:'ana@example.com',buyer:{firstName:'Ana'},snapshot:{slug:'retiro',title:'Retiro',startsAt:new Date().toISOString()},amount:0,discount:0,currency:'CLP',confirmation_sent_at:new Date()};
+  expect(await service.notify(order)).toBe(true);expect(mail.sendHtml).not.toHaveBeenCalled();
+  expect(await service.notify(order,{force:true})).toBe(true);
   const sent=mail.sendHtml.mock.calls[0][0];
-  expect(sent.html).toContain('cid:entrada-qr');
-  expect(sent.attachments[0]).toMatchObject({filename:'entrada-qr.png',content_id:'entrada-qr'});
+  expect(sent.html).toContain('cid:entrada-qr-1');
+  expect(sent.html).toContain('Ana Pérez · General');
+  expect(sent.attachments[0]).toMatchObject({filename:'entrada-qr-1.png',content_id:'entrada-qr-1'});
   expect(Buffer.from(sent.attachments[0].content,'base64').subarray(1,4).toString()).toBe('PNG');
   expect(sent.idempotencyKey).toMatch(/confirmed\/\d+$/);
  });

@@ -24,7 +24,7 @@ describe('correos de inscripción con la identidad del evento', () => {
     expect(m.html).toContain('Ver mi entrada');
     expect(m.html).toContain('background:#283033');
     expect(m.html).toContain('Enviado por AR Hombres');
-    expect(m.text).toContain('Código de tu entrada: 3520053e');
+    expect(m.text).toContain('Entrada de Pablo (Entrada general): 3520053e');
   });
 
   it('pago pendiente: pide completar el pago, muestra la reserva y no entrega código', () => {
@@ -50,5 +50,18 @@ describe('correos de inscripción con la identidad del evento', () => {
     expect(senderFor(configured, 'AR Hombres', 'arhombres@gmail.com')).toEqual({ from: 'AR Hombres <acceso@armglobal.org>', replyTo: undefined });
     expect(senderFor(configured, 'Nombre <falso>\r\n', '')).toEqual({ from: 'Nombre falso <acceso@armglobal.org>', replyTo: undefined });
     expect(senderFor(configured)).toEqual({ from: undefined, replyTo: undefined });
+  });
+});
+
+describe('compras con varias entradas', () => {
+  it('muestra una tarjeta con QR por asistente, el resumen y el descuento', () => {
+    const m = renderEventEmail({ ...base, ticketCode: null, ticketName: '2 × General', amount: 9000, discount: 1000,
+      tickets: [{ name: 'Pablo Encina', ticketName: 'General', code: 'aaaa', qrCid: 'entrada-qr-1' }, { name: 'Tomás Encina', ticketName: 'General', code: 'bbbb', qrCid: 'entrada-qr-2' }] });
+    expect(m.html).toContain('Entrada 1 de 2');
+    expect(m.html).toContain('Entrada 2 de 2');
+    expect(m.html).toContain('cid:entrada-qr-2');
+    expect(m.html).toContain('Tomás Encina · General');
+    expect(m.html).toContain('de descuento');
+    expect(m.text).toContain('Entrada de Tomás Encina (General): bbbb');
   });
 });
