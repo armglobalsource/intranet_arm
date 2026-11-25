@@ -222,6 +222,29 @@ test('comprobante con varias entradas: una entrada con QR por asistente',async({
  await expect(page.getByAltText('Código QR de tu entrada')).toHaveCount(2);
  await page.screenshot({path:'test-results/event-family-tickets-393.png',fullPage:true});
 });
+for(const device of ['iphone','android','desktop'] as const)test(`comprobante: guardar la entrada en Wallet (${device})`,async({browser})=>{
+ const ua={iphone:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+  android:'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+  desktop:'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0'}[device];
+ const ctx=await browser.newContext({userAgent:ua,viewport:device==='desktop'?{width:1280,height:900}:{width:393,height:852},baseURL:'http://localhost:3005'});
+ const page=await ctx.newPage();
+ const links={apple:`https://ecosistema.armglobal.org/api/v1/event-wallet/${id}/apple?s=firma`,google:`https://ecosistema.armglobal.org/api/v1/event-wallet/${id}/google?s=firma`};
+ await page.route('**/api/v1/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/status')){const r:any=receiptOf('confirmed',{tickets:[{name:'Prueba ARM',ticketName:'General',amount:10000},{name:'Tomás ARM',ticketName:'Niños',amount:0}]});r.tickets[0].wallet=links;r.tickets[1].wallet=links;r.tickets[1].checkedIn=true;return route.fulfill({json:r});}
+  return route.fulfill({json:familyEvent});
+ });
+ await page.goto(`/eventos/familias/inscripcion#id=${id}&token=${'b'.repeat(64)}`);
+ const first=page.getByRole('article',{name:'Entrada de Prueba ARM'});
+ const apple=first.getByRole('link',{name:'Agregar a Apple Wallet'}),google=first.getByRole('link',{name:'Guardar en Google Wallet'});
+ if(device==='android')await expect(apple).toHaveCount(0);else await expect(apple).toHaveAttribute('href',links.apple);
+ if(device==='iphone')await expect(google).toHaveCount(0);else await expect(google).toHaveAttribute('href',links.google);
+ // Una entrada ya usada para ingresar no ofrece guardarla.
+ await expect(page.getByRole('article',{name:'Entrada de Tomás ARM'}).getByRole('link',{name:/Wallet/})).toHaveCount(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:`test-results/event-wallet-${device}.png`,fullPage:true});
+ await ctx.close();
+});
 
 test('crear evento: enlace automático, pasos guiados y vista previa en vivo',async({page})=>{
  await fixture(page);await page.setViewportSize({width:1440,height:900});await page.goto('/dashboard/eventos/nuevo');

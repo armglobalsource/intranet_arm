@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -6,9 +7,21 @@ import { EventActor } from './event-program.rules';
 import { RegistrationAccessDto, RegistrationDto, SelfCancelDto, TicketsLinkDto, TicketsTokenDto, TransferDto } from './event-registration.dto';
 import { EventRegistrationService } from './event-registration.service';
 import { EventInsightsService } from './event-insights.service';
+import { EventWalletService } from './event-wallet.service';
 @Controller()
 export class EventRegistrationController {
- constructor(private readonly service:EventRegistrationService,private readonly insights:EventInsightsService){}
+ constructor(private readonly service:EventRegistrationService,private readonly insights:EventInsightsService,private readonly wallet:EventWalletService){}
+ /** Pase de Apple Wallet (.pkpass). El enlace firmado viene en el comprobante y en el correo. */
+ @Public() @Get('event-wallet/:ticketId/apple') @Throttle({default:{limit:20,ttl:60000}})
+ async applePass(@Param('ticketId',ParseUUIDPipe) id:string,@Query('s') s:string,@Res() res:Response){
+  const pass=await this.wallet.apple(id,s??'');
+  res.set({'Content-Type':'application/vnd.apple.pkpass','Content-Disposition':`attachment; filename="${pass.name}"`,'Cache-Control':'no-store'}).send(pass.file);
+ }
+ /** Lleva a «Guardar en Google Wallet» con el pase recién firmado. */
+ @Public() @Get('event-wallet/:ticketId/google') @Throttle({default:{limit:20,ttl:60000}})
+ async googlePass(@Param('ticketId',ParseUUIDPipe) id:string,@Query('s') s:string,@Res() res:Response){
+  res.set('Cache-Control','no-store').redirect(302,await this.wallet.google(id,s??''));
+ }
  @Post('event-management/payments/check') @Throttle({default:{limit:5,ttl:60000}})
  check(@CurrentUser() u:EventActor){return this.service.checkPayments(u);}
  @Public() @Post('public-events/:slug/registrations') @Throttle({default:{limit:5,ttl:60000}})

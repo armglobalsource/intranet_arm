@@ -16,7 +16,7 @@ export interface EventEmailData {
   /** Content-ID de la imagen QR adjunta al correo (se muestra con cid:). */
   qrCid?: string | null;
   /** Entradas de la compra; si falta, se usa ticketCode/qrCid como una sola entrada. */
-  tickets?: { name: string; ticketName: string; code: string; qrCid?: string | null }[];
+  tickets?: { name: string; ticketName: string; code: string; qrCid?: string | null; wallet?: { apple?: string; google?: string } }[];
   /** Descuento aplicado con un código, para mostrar el detalle del total. */
   discount?: number;
   amount: number;
@@ -85,8 +85,12 @@ export function renderEventEmail(d: EventEmailData) {
       <div style="margin-top:3px;font-size:16px;font-weight:600;color:#1d1d1b">${esc(value)}</div>${extra}</td></tr>` : '';
 
   // Una tarjeta por entrada confirmada, cada una con su QR (una compra puede traer varias).
-  const tickets = !WITH_TICKETS.includes(d.kind) ? [] : d.tickets?.length ? d.tickets
+  const tickets: NonNullable<EventEmailData['tickets']> = !WITH_TICKETS.includes(d.kind) ? [] : d.tickets?.length ? d.tickets
     : d.ticketCode ? [{ name: d.firstName, ticketName: d.ticketName || 'Entrada general', code: d.ticketCode, qrCid: d.qrCid }] : [];
+  // Botones de Wallet bajo el QR (solo si están configurados).
+  const walletButton = (href: string, label: string) => `<a href="${esc(href)}" style="display:inline-block;margin:4px;padding:10px 16px;border-radius:10px;background:#1d1d1b;color:#ffffff;font-size:13px;font-weight:700;text-decoration:none">${label}</a>`;
+  const walletRow = (w?: { apple?: string; google?: string }) => w && (w.apple || w.google)
+    ? `<div style="margin-top:12px">${w.apple ? walletButton(w.apple, 'Agregar a Apple Wallet') : ''}${w.google ? walletButton(w.google, 'Guardar en Google Wallet') : ''}</div>` : '';
   const ticket = tickets.map((t, i) => `
     <tr><td style="padding:${i ? 14 : 8}px 32px 0">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px dashed ${color};border-radius:14px;background:#fff9f4">
@@ -96,6 +100,7 @@ export function renderEventEmail(d: EventEmailData) {
           ${t.qrCid ? `<img src="cid:${esc(t.qrCid)}" alt="Código QR de la entrada de ${esc(t.name)}" width="180" height="180" style="display:block;margin:14px auto 0;width:180px;height:180px;border:0">` : ''}
           <div style="margin-top:8px;font-family:Consolas,Menlo,monospace;font-size:12px;color:#656260;word-break:break-all">${esc(t.code)}</div>
           <div style="margin-top:8px;font-size:13px;color:#656260">${t.qrCid ? 'Muestra este código QR en la entrada del evento.' : 'Presenta este código al equipo del evento.'}</div>
+          ${walletRow(t.wallet)}
         </td></tr></table></td></tr>`).join('');
 
   const notice = d.kind === 'pending_payment' || d.kind === 'spot_opened'
@@ -151,7 +156,7 @@ export function renderEventEmail(d: EventEmailData) {
     `Hola ${d.firstName}:`, copy.intro, '',
     date ? `Fecha: ${date}` : null, hours ? `Horario: ${hours}` : null, place ? `Lugar: ${place}${e.address && !online ? `, ${e.address}` : ''}` : null,
     `Entrada: ${d.ticketName || 'Entrada general'} · ${price}`,
-    ...tickets.map((t) => `Entrada de ${t.name} (${t.ticketName}): ${t.code}`),
+    ...tickets.map((t) => `Entrada de ${t.name} (${t.ticketName}): ${t.code}${t.wallet?.apple ? `\nApple Wallet: ${t.wallet.apple}` : ''}${t.wallet?.google ? `\nGoogle Wallet: ${t.wallet.google}` : ''}`),
     '', `${copy.cta}: ${d.link}`, '', `Enviado por ${sender} · ARM Global.`,
   ].filter((l): l is string => l !== null).join('\n');
 

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import * as QRCode from 'qrcode';
@@ -7,6 +7,7 @@ import { ResendMailerService } from '../auth/resend-mailer.service';
 import { EventPaymentService, InspectedPayment } from './event-payment.service';
 import { renderEventEmail, renderTicketsLinkEmail, EmailKind } from './event-email';
 import { RegistrationDto } from './event-registration.dto';
+import { EventWalletService } from './event-wallet.service';
 import { assertEventScope, EventActor, eventAccess } from './event-program.rules';
 import { CodeRow, Question, TicketRow, cleanAnswers, codeAppliesTo, codeProblem, priceOrder, saleState, selfService, ticketSummary } from './event-order.rules';
 
@@ -34,7 +35,7 @@ const fullName=(p:any)=>`${p?.firstName??''} ${p?.lastName??''}`.trim();
 
 @Injectable()
 export class EventRegistrationService {
- constructor(private readonly db:DatabaseService,private readonly config:ConfigService,private readonly payments:EventPaymentService,private readonly mail:ResendMailerService){}
+ constructor(private readonly db:DatabaseService,private readonly config:ConfigService,private readonly payments:EventPaymentService,private readonly mail:ResendMailerService,@Optional() private readonly wallet?:EventWalletService){}
  private settings(){
   const secret=this.config.get<string>('EVENT_REGISTRATION_SECRET')??'';
   let url:URL;
@@ -75,7 +76,7 @@ export class EventRegistrationService {
   return {id:order.id,token:this.token(order.id),status,buyerName:fullName(order.buyer),title:order.snapshot.title,startsAt:order.snapshot.startsAt,timezone:order.snapshot.timezone,
    subtotal:Number(order.subtotal),discount:Number(order.discount),amount:Number(order.amount),currency:order.currency,code:order.snapshot.code??null,summary:order.snapshot.ticketSummary??order.snapshot.ticketName??null,
    expiresAt:order.expires_at,emailSent:!!(order.status==='confirmed'?order.confirmation_sent_at:order.email_sent_at),testPayment:Number(order.amount)>0&&(order.snapshot.paymentMode??'test')==='test',
-   tickets:tickets.map(t=>{const st=t.status==='cancelled'?'cancelled':status;return {id:t.id,name:fullName(t.participant),ticketName:t.snapshot?.ticketName??'Entrada',amount:Number(t.amount),status:st,code:st==='confirmed'?(t.ticket_code??t.id):null,checkedIn:!!t.checked_in_at,transferred:!!t.transferred_at};}),
+   tickets:tickets.map(t=>{const st=t.status==='cancelled'?'cancelled':status;return {id:t.id,name:fullName(t.participant),ticketName:t.snapshot?.ticketName??'Entrada',amount:Number(t.amount),status:st,code:st==='confirmed'?(t.ticket_code??t.id):null,wallet:st==='confirmed'?this.wallet?.links(t.id,t.ticket_code??t.id)??{}:{},checkedIn:!!t.checked_in_at,transferred:!!t.transferred_at};}),
    selfService:event?selfService(event.details,event.starts_at):null};
  }
 
@@ -198,7 +199,7 @@ export class EventRegistrationService {
    const d=event?.details??{};
    const tickets=confirmed?(await this.tickets(order.id)).filter((t:any)=>t.status==='confirmed'):[];
    const kind:EmailKind=options.kind??(confirmed?'confirmed':order.status==='pending_payment'?'pending_payment':order.status==='waitlisted'?'waitlisted':order.status==='cancelled'?'cancelled':'registered');
-   const shown=tickets.map((t:any,i:number)=>({name:fullName(t.participant),ticketName:t.snapshot?.ticketName??'Entrada',code:t.ticket_code??t.id,qrCid:`entrada-qr-${i+1}`}));
+   const shown=tickets.map((t:any,i:number)=>({name:fullName(t.participant),ticketName:t.snapshot?.ticketName??'Entrada',code:t.ticket_code??t.id,qrCid:`entrada-qr-${i+1}`,wallet:this.wallet?.links(t.id,t.ticket_code??t.id)}));
    const mail=renderEventEmail({
     kind,firstName:order.buyer?.firstName??'',link,origin:this.settings().origin,tickets:shown,
     amount:Number(order.amount),discount:Number(order.discount)||0,currency:order.currency,ticketName:order.snapshot.ticketSummary??order.snapshot.ticketName,expiresAt:order.expires_at?new Date(order.expires_at).toISOString():null,testPayment,senderName:d.senderName,

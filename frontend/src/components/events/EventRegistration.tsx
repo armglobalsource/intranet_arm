@@ -13,7 +13,7 @@ import { eventDay, eventIcs, eventTimeRange, momentLabel } from './event-helpers
 import { CancelReservation, SelfService, TicketActions, selfServiceNote } from './ReceiptActions';
 import c from './event-checkout.module.css';
 
-type ReceiptTicket = { id: string; name: string; ticketName: string; amount: number; status: string; code: string | null; checkedIn?: boolean; transferred?: boolean };
+type ReceiptTicket = { id: string; name: string; ticketName: string; amount: number; status: string; code: string | null; checkedIn?: boolean; transferred?: boolean; wallet?: { apple?: string; google?: string } };
 type Receipt = { id: string; token: string; status: string; buyerName: string; title: string; startsAt: string; timezone: string; subtotal: number; discount: number; amount: number; currency: string; code: string | null; summary: string | null; expiresAt: string | null; emailSent: boolean; testPayment: boolean; tickets: ReceiptTicket[]; selfService?: SelfService | null };
 type Returned = null | 'approved' | 'pending' | 'failed';
 
@@ -26,6 +26,24 @@ function TicketQr({ code }: { code: string }) {
     return () => { alive = false; };
   }, [code]);
   return src ? <img className={c.qr} src={src} alt="Código QR de tu entrada" width={220} height={220} /> : <span className={c.qr} aria-hidden="true" />;
+}
+
+/** Botones para guardar la entrada en el celular. En iPhone/Mac se muestra Apple Wallet y en Android, Google Wallet. */
+export function WalletButtons({ wallet, name }: { wallet?: { apple?: string; google?: string }; name: string }) {
+  const [device, setDevice] = useState<'apple' | 'android' | 'other'>('other');
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    setDevice(/iPhone|iPad|iPod|Macintosh/.test(ua) ? 'apple' : /Android/.test(ua) ? 'android' : 'other');
+  }, []);
+  const apple = wallet?.apple && device !== 'android';
+  const google = wallet?.google && device !== 'apple';
+  if (!apple && !google) return null;
+  return (
+    <div className={c.wallet} role="group" aria-label={`Guardar la entrada de ${name} en el celular`}>
+      {apple && <a className={c.walletButton} href={wallet!.apple} rel="nofollow"><Wallet size={17} aria-hidden="true" />Agregar a Apple Wallet</a>}
+      {google && <a className={c.walletButton} href={wallet!.google} rel="nofollow"><Wallet size={17} aria-hidden="true" />Guardar en Google Wallet</a>}
+    </div>
+  );
 }
 
 const post = async (path: string, body: unknown) => (await axios.post(`${api.defaults.baseURL}${path}`, body)).data;
@@ -372,6 +390,7 @@ export function EventReceipt({ slug }: { slug: string }) {
             {place && <div className={c.span2}><dt>Lugar</dt><dd>{place}</dd></div>}
           </dl>
           <div className={c.ticketCode}><TicketQr code={t.code!} /><small>Código de la entrada</small><code>{t.code}</code><small>{t.checkedIn ? 'Esta entrada ya se usó para ingresar.' : t.transferred ? 'Entrada transferida: este es su nuevo código.' : 'Muestra este código QR en la entrada del evento.'}</small></div>
+          {!t.checkedIn && <WalletButtons wallet={t.wallet} name={t.name} />}
           <TicketActions<Receipt> orderId={receipt.id} token={receipt.token} ticket={t} policy={receipt.selfService} onDone={updated} />
         </article>
       ))}

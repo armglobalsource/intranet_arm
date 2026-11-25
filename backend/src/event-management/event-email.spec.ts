@@ -65,3 +65,15 @@ describe('compras con varias entradas', () => {
     expect(m.text).toContain('Entrada de Tomás Encina (General): bbbb');
   });
 });
+
+describe('entradas en Wallet', () => {
+  it('agrega los botones de Apple y Google Wallet bajo cada QR, solo si están configurados', () => {
+    const wallet = { apple: 'https://ecosistema.armglobal.org/api/v1/event-wallet/t1/apple?s=x&y=<z>', google: 'https://ecosistema.armglobal.org/api/v1/event-wallet/t1/google?s=x' };
+    const m = renderEventEmail({ ...base, ticketCode: null, tickets: [{ name: 'Pablo Encina', ticketName: 'General', code: 'aaaa', qrCid: 'entrada-qr-1', wallet }, { name: 'Tomás Encina', ticketName: 'General', code: 'bbbb', qrCid: 'entrada-qr-2' }] });
+    expect(m.html.match(/Agregar a Apple Wallet/g)).toHaveLength(1);
+    expect(m.html.match(/Guardar en Google Wallet/g)).toHaveLength(1);
+    expect(m.html).toContain('href="https://ecosistema.armglobal.org/api/v1/event-wallet/t1/apple?s=x&amp;y=&lt;z&gt;"');
+    expect(m.text).toContain('Google Wallet: https://ecosistema.armglobal.org/api/v1/event-wallet/t1/google?s=x');
+    expect(renderEventEmail({ ...base, kind: 'pending_payment', tickets: [{ name: 'P', ticketName: 'G', code: 'c', wallet }] }).html).not.toContain('Wallet');
+  });
+});
