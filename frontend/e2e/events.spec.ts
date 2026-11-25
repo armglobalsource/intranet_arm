@@ -33,7 +33,7 @@ for(const width of [320,393,834,1440])test(`portada y editor sin desbordes ${wid
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`test-results/event-public-${width}.png`,fullPage:true});
  await page.goto(`/dashboard/eventos/${id}`);await expect(page.getByLabel('Nombre del evento *',{exact:true})).toHaveValue('Retiro de Hombres');
- for(const name of ['Lo esencial','Portada y contenido','Inscripción y entradas','Revisar y publicar']){
+ for(const name of ['Lo esencial','Portada y contenido','Entradas y pago','Revisar y publicar']){
   await page.getByRole('tab',{name:new RegExp(name)}).click();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   expect(await page.locator('main').evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);
@@ -44,10 +44,38 @@ for(const width of [320,393,834,1440])test(`portada y editor sin desbordes ${wid
 test('edición, publicación y persistencia del payload',async({page})=>{
  const calls=await fixture(page);await page.goto(`/dashboard/eventos/${id}`);
  await page.getByLabel('Nombre del evento *',{exact:true}).fill('Retiro actualizado');
- await page.getByRole('tab',{name:/Revisar y publicar/}).click();await page.getByLabel('Estado del evento',{exact:true}).selectOption('published');
+ await page.getByRole('tab',{name:/Revisar y publicar/}).click();
+ await expect(page.getByRole('combobox',{name:/Estado/})).toHaveCount(0);
+ await page.getByRole('radio',{name:/Publicado, inscripciones próximamente/}).click();
  await page.getByRole('button',{name:'Guardar y publicar',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('Cambios guardados');
- expect(calls[0]).toMatchObject({title:'Retiro actualizado',status:'published',version:1});expect(calls[0].audit).toBeUndefined();expect(calls[0].id).toBeUndefined();
+ expect(calls[0]).toMatchObject({title:'Retiro actualizado',status:'published',registrationStatus:'pending',version:1});
+ expect(calls[0].details.paymentDueAt).toBeNull();expect(calls[0].audit).toBeUndefined();expect(calls[0].id).toBeUndefined();
+});
+test('publicar: dice exactamente qué falta y publica con un clic',async({page})=>{
+ const calls=await fixture(page);await page.setViewportSize({width:1280,height:900});
+ await page.goto(`/dashboard/eventos/${id}`);
+ await page.getByRole('tab',{name:/Portada y contenido/}).click();
+ await page.getByLabel('Invitación breve').fill('');
+ await page.getByRole('tab',{name:/Revisar y publicar/}).click();
+ const publish=page.getByRole('button',{name:'Publicar y abrir inscripciones'});
+ await expect(publish).toBeDisabled();
+ await page.getByRole('radio',{name:/Publicado con inscripciones abiertas/}).click();
+ await expect(page.getByText('Para publicar falta: invitación breve.')).toBeVisible();
+ await page.getByRole('button',{name:'Guardar y publicar',exact:true}).click();
+ await expect(page.getByRole('alert').filter({hasText:'Para publicar falta: invitación breve.'})).toBeVisible();
+ expect(calls).toHaveLength(0);
+ await page.getByRole('radio',{name:/Borrador/}).click();
+ await page.getByRole('tab',{name:/Portada y contenido/}).click();
+ await page.getByLabel('Invitación breve').fill('Un fin de semana para renovar la fe.');
+ await page.getByRole('tab',{name:/Revisar y publicar/}).click();
+ await expect(page.getByRole('radio',{name:/Finalizado/})).toHaveCount(0);
+ await page.screenshot({path:'test-results/event-editor-publish-1280.png',fullPage:true});
+ await publish.click();
+ await expect(page.getByRole('status')).toContainText('Cambios guardados');
+ expect(calls[0]).toMatchObject({status:'published',registrationStatus:'open',details:{summary:'Un fin de semana para renovar la fe.'}});
+ await expect(page.getByRole('radio',{name:/Publicado con inscripciones abiertas/})).toHaveAttribute('aria-checked','true');
+ await expect(page.getByRole('button',{name:'Guardar cambios',exact:true})).toBeVisible();
 });
 test('gestor de campus ve Eventos y no la configuración global',async({page})=>{
  await fixture(page,['eventos:manageCampus']);await page.setViewportSize({width:1440,height:900});await page.goto('/dashboard/eventos');
@@ -73,7 +101,11 @@ for(const mode of ['free','test','production'])test(`inscripción móvil ${mode}
   if(path.endsWith('/status'))return route.fulfill({json:receiptOf(paid?'pending_payment':'confirmed',{amount:paid?1000:0,testPayment:mode==='test'})});
   return route.fulfill({json:{title:'Encuentro de prueba',slug:'prueba',startsAt:'2027-01-10T12:00:00Z',endsAt:'2027-01-10T21:00:00Z',status:'published',registrationStatus:'open',paymentMode:mode,capacity:100,capacityLeft:100,details:{...details,pricing:paid?'paid':'free'},campusName:'Santiago',campuses:['Santiago'],campusOptions:[{id:10,name:'Santiago'}],ticketTypes:paid?[{id:categoryId,name:'General',price:1000,currency:'CLP',maxPerOrder:10,remaining:null,sale:'on'}]:[],registrationEnabled:true}});
  });
- await page.goto('/eventos/prueba');await page.getByRole('link',{name:'Inscribirme ahora'}).first().click();
+ await page.goto('/eventos/prueba');
+ // Con el formulario abierto, las entradas no se repiten en otra sección ni en el resumen lateral.
+ await expect(page.getByRole('heading',{name:'Entradas',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('complementary',{name:'Resumen de inscripción'})).toBeHidden();
+ await page.getByRole('link',{name:'Inscribirme ahora'}).first().click();
  await expect(page.getByLabel(paid?'Cantidad de General':'Cantidad de Entrada gratuita')).toHaveText('1');
  await page.getByLabel('Nombre',{exact:true}).fill('Prueba');await page.getByLabel('Apellido',{exact:true}).fill('ARM');await page.getByLabel('Correo electrónico',{exact:true}).fill('prueba@example.com');
  await page.getByLabel('Edad (entrada 1)').fill('30');
@@ -339,7 +371,7 @@ test('quien solo registra ingresos ve la puerta, sin acciones de gestión',async
 test('editor: reglas por entrada y preguntas se guardan con el evento',async({page})=>{
  const calls=await fixture(page);await page.setViewportSize({width:1280,height:900});
  await page.goto(`/dashboard/eventos/${id}`);
- await page.getByRole('tab',{name:/Inscripción y entradas/}).click();
+ await page.getByRole('tab',{name:/Entradas y pago/}).click();
  await page.getByRole('radio',{name:/Pagado/}).click();
  const general=page.getByRole('group',{name:'Entrada Entrada general'});
  await general.getByLabel('Valor (CLP)').fill('15000');
@@ -490,7 +522,7 @@ for(const width of [393,1280])test(`catálogo público de eventos ${width}`,asyn
 test('editor: autogestión y recordatorios se guardan con el evento',async({page})=>{
  const calls=await fixture(page);await page.setViewportSize({width:1280,height:900});
  await page.goto(`/dashboard/eventos/${id}`);
- await page.getByRole('tab',{name:/Inscripción y entradas/}).click();
+ await page.getByRole('tab',{name:/Entradas y pago/}).click();
  await page.getByRole('checkbox',{name:/Puede cancelar su entrada/}).uncheck();
  await page.getByLabel('Hasta cuántas horas antes del inicio').fill('48');
  await page.getByRole('checkbox',{name:/recordatorios automáticos/}).uncheck();

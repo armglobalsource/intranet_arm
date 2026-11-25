@@ -38,6 +38,10 @@ export function validateEventProgram(dto:SaveEventProgramDto) {
  if(d.pricing==='paid'&&!dto.ticketTypes.some(t=>t.price>0))throw new BadRequestException('Define al menos una entrada con precio');
  if(dto.ticketTypes.some(t=>!t.name.trim()))throw new BadRequestException('Cada entrada necesita un nombre');
  if(new Set(dto.ticketTypes.map(t=>t.name.trim().toLowerCase())).size!==dto.ticketTypes.length)throw new BadRequestException('Los nombres de entradas deben ser distintos');
- if(dto.status==='published'&&(!dto.categoryId||!d.summary.trim()||!d.description.trim()||(d.modality!=='online'&&!d.location.trim())))throw new BadRequestException('Para publicar completa categoría, resumen, descripción y lugar');
+ if(dto.status==='published'){
+  // Nombra solo lo que falta: un mensaje genérico hacía creer que faltaba algo ya completado.
+  const missing=[!dto.categoryId&&'la categoría',!d.summary.trim()&&'la invitación breve',!d.description.trim()&&'la descripción',d.modality!=='online'&&!d.location.trim()&&'el lugar',!dto.campusIds.length&&'los campus que pueden inscribirse'].filter(Boolean) as string[];
+  if(missing.length)throw new BadRequestException(`Para publicar, completa ${missing.length>1?`${missing.slice(0,-1).join(', ')} y ${missing[missing.length-1]}`:missing[0]}`);
+ }
  if(['cancelled','finished'].includes(dto.status)&&dto.registrationStatus!=='closed')throw new BadRequestException('Cierra las inscripciones al finalizar o cancelar');
 }

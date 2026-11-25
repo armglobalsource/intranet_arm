@@ -35,6 +35,8 @@ export function EventLanding({ event: e, preview = false }: { event: PublicEvent
   const price = d.pricing === 'free' ? 'Gratis' : ticketPriceLabel(e.ticketTypes.filter((t) => t.price > 0 && !t.hidden)) || 'Valor por confirmar';
   const place = d.modality === 'online' ? 'Evento online' : d.location || 'Lugar por confirmar';
   const [shared, setShared] = useState(false);
+  // Con el formulario a la vista, él muestra las entradas y el total: no se repiten en otra sección.
+  const withForm = e.registrationEnabled && !preview;
   const url = typeof window !== 'undefined' ? `${window.location.origin}/eventos/${e.slug}` : `/eventos/${e.slug}`;
 
   function addToCalendar() {
@@ -93,7 +95,7 @@ export function EventLanding({ event: e, preview = false }: { event: PublicEvent
 
       <Main className={l.main}>
         <div className={l.content}>
-          {e.registrationEnabled && !preview && <EventRegistrationForm event={e} />}
+          {withForm && <EventRegistrationForm event={e} />}
           <section className={l.section}>
             <h2>Sobre el evento</h2>
             <p className={l.prose}>{d.description || 'Cuenta de qué se trata, para quién es y qué vivirán los participantes.'}</p>
@@ -109,7 +111,7 @@ export function EventLanding({ event: e, preview = false }: { event: PublicEvent
             </ul>
           </section>
 
-          {e.ticketTypes.filter((t) => !t.hidden).length > 0 && (
+          {!withForm && e.ticketTypes.filter((t) => !t.hidden).length > 0 && (
             <section className={l.section}>
               <h2>Entradas</h2>
               <div className={l.tickets}>
@@ -139,12 +141,12 @@ export function EventLanding({ event: e, preview = false }: { event: PublicEvent
           )}
         </div>
 
-        <aside className={l.booking} aria-label="Inscripción">
+        <aside className={l.booking} aria-label="Resumen de inscripción" data-with-form={withForm || undefined}>
           <p className={l.bookingEyebrow}>Tu lugar en este evento</p>
           <strong className={l.bookingPrice}>{price}</strong>
           {e.capacity ? <p className={l.muted}>{e.capacity} cupos en total</p> : null}
           <div className={`${l.bookingStatus} ${l[`tone_${status.tone}`]}`}>{status.text}</div>
-          {e.registrationEnabled && !preview && <a href="#inscribirme" className={l.cta}><Ticket size={18} aria-hidden="true" />Inscribirme ahora</a>}
+          {withForm && <a href="#inscribirme" className={l.cta}><Ticket size={18} aria-hidden="true" />Inscribirme ahora</a>}
           <p className={l.muted}>{status.note}</p>
           <div className={l.bookingActions}>
             <button type="button" onClick={addToCalendar} disabled={!e.startsAt}><CalendarPlus size={16} aria-hidden="true" />Calendario</button>

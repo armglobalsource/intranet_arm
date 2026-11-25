@@ -15,7 +15,7 @@ import { api, apiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { EventShell, useEventAccess, useEventOptions } from './EventWorkspace';
 import { EventProgram, EventDetails, EventOptions, newEvent, eventStatuses, PublicEvent } from './event-types';
-import { EVENT_COLORS, EVENT_TIMEZONES, eventReadiness, slugify } from './event-helpers';
+import { EVENT_COLORS, EVENT_TIMEZONES, PUBLISH_STATES, PublishState, eventReadiness, missingToPublish, publishStateOf, slugify, withPublishState } from './event-helpers';
 import { EventLanding } from './EventLanding';
 import { uploadCover } from './cover-upload';
 import { QuestionsEditor, TicketsEditor, cleanQuestions } from './EventSalesEditor';
@@ -26,7 +26,7 @@ import x from './event-editor.module.css';
 const STEPS = [
   { title: 'Lo esencial', hint: 'Qué, cuándo, dónde y quién' },
   { title: 'Portada y contenido', hint: 'Imagen, invitación y detalles' },
-  { title: 'Inscripción y entradas', hint: 'Cupos, fechas y valor' },
+  { title: 'Entradas y pago', hint: 'Valor, cupos y fechas' },
   { title: 'Revisar y publicar', hint: 'Lista final y estado' },
 ];
 
@@ -110,7 +110,7 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
   const router = useRouter(); const qc = useQueryClient();
   const [event, setEvent] = useState(initial); const [tab, setTab] = useState(0); const [preview, setPreview] = useState(false);
   const [device, setDevice] = useState<'phone' | 'desktop'>('phone');
-  const [dirty, setDirty] = useState(false); const [error, setError] = useState(''); const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false); const [savedStatus, setSavedStatus] = useState(initial.status); const [error, setError] = useState(''); const [saved, setSaved] = useState(false);
   // El enlace se arma solo a partir del nombre hasta que alguien lo edita a mano.
   const [slugTouched, setSlugTouched] = useState(!!initial.slug);
   const access = useEventAccess(); const user = useAuthStore((u) => u.user);
@@ -126,16 +126,26 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
   }
 
   const save = useMutation({
-    mutationFn: async () => {
+    // `next` permite guardar un cambio de estado en el mismo clic (p. ej. «Publicar ahora»).
+    mutationFn: async (next?: EventProgram) => {
+      const event = next ?? current;
       if (!event.title.trim() || !event.slug || !event.campusId || !event.organizerId || !event.startsAt || !event.endsAt) throw new Error('Completa nombre, enlace, campus, responsable y fechas en «Lo esencial».');
       if (new Date(event.endsAt) < new Date(event.startsAt)) throw new Error('El término debe ser posterior al inicio.');
+      const missing = event.status === 'published' ? missingToPublish(event) : [];
+      if (missing.length) throw new Error(`Para publicar falta: ${missing.map((m) => m.label.toLowerCase()).join(', ')}. Revisa «Revisar y publicar».`);
       const { id, audit, ...rest } = event;
-      const body = { ...rest, details: { ...rest.details, questions: cleanQuestions(rest.details.questions) } };
+      // La fecha límite de pago ya no se pide: el pago se cierra con las inscripciones (y cada reserva dura 24 horas).
+      const body = { ...rest, details: { ...rest.details, paymentDueAt: null, questions: cleanQuestions(rest.details.questions) } };
       return (await (id ? api.patch(`/event-management/${id}`, body) : api.post('/event-management', body))).data as { id: string; version: number };
     },
-    onSuccess: (r) => { setEvent((e) => ({ ...e, id: r.id, version: r.version })); setDirty(false); setSaved(true); setError(''); qc.invalidateQueries({ queryKey: ['event-programs'] }); qc.invalidateQueries({ queryKey: ['event-program', r.id] }); if (!initial.id) router.replace(`/dashboard/eventos/${r.id}`); },
+    onSuccess: (r, next) => { setSavedStatus((next ?? current).status); setEvent((e) => ({ ...e, id: r.id, version: r.version })); setDirty(false); setSaved(true); setError(''); qc.invalidateQueries({ queryKey: ['event-programs'] }); qc.invalidateQueries({ queryKey: ['event-program', r.id] }); if (!initial.id) router.replace(`/dashboard/eventos/${r.id}`); },
     onError: (e) => setError(apiErrorMessage(e, e instanceof Error ? e.message : 'No se pudo guardar el evento')),
   });
+  const current = event;
+  const state = publishStateOf(event);
+  const wasLive = savedStatus !== 'draft';
+  function setState(next: PublishState) { setEvent((e) => withPublishState(e, next)); setDirty(true); setSaved(false); }
+  function publishNow() { const next = withPublishState(event, 'open'); setEvent(next); setError(''); save.mutate(next); }
   const paymentCheck = useMutation({ mutationFn: async () => (await api.post('/event-management/payments/check')).data as { mode: string; collectorId: string; message: string } });
 
   const editableOwner = options.access.global || (options.access.campus && Number(event.campusId) === Number(user?.campusId));
@@ -230,8 +240,8 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
                 <Field title="Campus organizador *"><select disabled={!options.access.global && !!initial.id} value={event.campusId || ''} onChange={(e) => change('campusId', Number(e.target.value))}><option value="">Elige el campus</option>{options.campuses.filter((c) => options.access.global || c.id === user?.campusId || c.id === initial.campusId).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
                 <Field title="Responsable *"><select disabled={!editableOwner} value={event.organizerId || ''} onChange={(e) => change('organizerId', Number(e.target.value))}><option value="">Elige al responsable</option>{options.organizers.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></Field>
                 <div className={s.wide}>
-                  <span className={x.miniLabel}>Campus invitados</span>
-                  <p className={x.help}>Se muestran en la portada. No dan permisos de administración.</p>
+                  <span className={x.miniLabel}>Campus que pueden inscribirse *</span>
+                  <p className={x.help}>Cada persona elige uno de estos al inscribirse y se muestran en la portada. No dan permisos de administración.</p>
                   <div className={x.chipPicker}>
                     {options.campuses.map((c) => { const on = event.campusIds.includes(c.id); return <button key={c.id} type="button" aria-pressed={on} onClick={() => change('campusIds', on ? event.campusIds.filter((cid) => cid !== c.id) : [...event.campusIds, c.id])}>{on && <Check size={14} />}{c.name}</button>; })}
                   </div>
@@ -266,52 +276,49 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
                   <button className={s.button} disabled={d.faqs.length >= 20} onClick={() => detail('faqs', [...d.faqs, { question: '', answer: '' }])}><Plus size={16} />Agregar pregunta</button>
                 </div>
               </Card>
+              <Card icon={<Check size={18} />} title="Condiciones" text="Se muestran en la portada y la persona las acepta al inscribirse.">
+                <Field title="Condiciones y requisitos" wide><textarea maxLength={5000} value={d.conditions} onChange={(e) => detail('conditions', e.target.value)} placeholder="Ej.: Trae tu identificación y ropa cómoda." /></Field>
+                <Field title="Política de cancelación" wide><textarea maxLength={5000} value={d.cancellationPolicy} onChange={(e) => detail('cancellationPolicy', e.target.value)} placeholder="Ej.: Puedes cancelar hasta 7 días antes; el equipo gestiona la devolución." /></Field>
+              </Card>
             </>}
 
             {tab === 2 && <>
-              <Card icon={<Ticket size={18} />} title="¿Cómo se participa?">
+              <Card icon={<Ticket size={18} />} title="¿Cómo se participa?" text="Con «Pagado», la entrada se confirma solo cuando Mercado Pago aprueba el pago.">
                 <div className={`${s.wide} ${x.choiceCards}`} role="radiogroup" aria-label="Tipo de acceso">
+                  <button type="button" role="radio" aria-checked={d.pricing === 'paid'} onClick={() => { detail('pricing', 'paid'); if (!event.ticketTypes.length) change('ticketTypes', [{ name: 'Entrada general', price: 0, currency: 'CLP', maxPerOrder: 10 }]); }}><b>Pagado</b><span>Reserva el cupo y paga con Mercado Pago.</span></button>
                   <button type="button" role="radio" aria-checked={d.pricing === 'free'} onClick={() => { detail('pricing', 'free'); change('ticketTypes', event.ticketTypes.map((t) => ({ ...t, price: 0 }))); }}><b>Gratuito</b><span>Se confirma el cupo sin pago.</span></button>
-                  <button type="button" role="radio" aria-checked={d.pricing === 'paid'} onClick={() => { detail('pricing', 'paid'); if (!event.ticketTypes.length) change('ticketTypes', [{ name: 'Entrada general', price: 0, currency: 'CLP', maxPerOrder: 10 }]); }}><b>Pagado</b><span>Pago seguro con Mercado Pago.</span></button>
                 </div>
                 {d.pricing === 'paid' && <div className={s.wide}>
-                  <div className={s.notice}>{options.paymentMode === 'production' ? 'Mercado Pago Chile · Pagos reales.' : options.paymentMode === 'test' ? 'Mercado Pago Chile · Modo de prueba: no uses tarjetas reales.' : 'Mercado Pago aún no está configurado.'} La reserva dura hasta 24 horas y la entrada se confirma cuando se verifica el pago.</div>
+                  <div className={s.notice}>{options.paymentMode === 'production' ? 'Mercado Pago Chile · Pagos reales.' : options.paymentMode === 'test' ? 'Mercado Pago Chile · Modo de prueba: no uses tarjetas reales.' : 'Mercado Pago aún no está configurado: nadie podrá pagar.'} Cada reserva dura hasta 24 horas; si no se paga, el cupo se libera solo.</div>
                   <div className={x.inlineCheck}>
                     <button type="button" className={s.button} disabled={paymentCheck.isPending} onClick={() => paymentCheck.mutate()}>{paymentCheck.isPending ? 'Comprobando…' : 'Comprobar conexión de pagos'}</button>
                     {paymentCheck.isSuccess && <p role="status" className={s.success}>{paymentCheck.data.mode === 'production' ? 'Producción' : 'Pruebas'} · Cuenta {paymentCheck.data.collectorId}. {paymentCheck.data.message}</p>}
                     {paymentCheck.isError && <p role="alert" className={s.error}>{apiErrorMessage(paymentCheck.error, 'No se pudo verificar la configuración de pagos.')}</p>}
                   </div>
-                  {dateField('Fecha límite de pago', 'paymentDueAt')}
                 </div>}
                 <TicketsEditor tickets={event.ticketTypes} paid={d.pricing === 'paid'} onChange={(next) => change('ticketTypes', next)} />
+                <Field title="Cupos totales del evento" hint="Vacío: sin límite. Cada tipo de entrada puede tener además su propio cupo."><input type="number" min={1} max={1000000} value={event.capacity ?? ''} onChange={(e) => change('capacity', e.target.value ? Number(e.target.value) : null)} /></Field>
                 {event.id && <p className={`${x.help} ${s.wide}`}>¿Descuentos o acceso a entradas ocultas? Crea códigos en <Link href={`/dashboard/eventos/${event.id}/codigos`}><b>Códigos de descuento</b></Link>.</p>}
               </Card>
-              <Card icon={<Users size={18} />} title="Preguntas para cada asistente" text="Lo que necesitas saber de cada persona: talla de polera, alergias, contacto de emergencia…">
+              <Card icon={<CalendarDays size={18} />} title="¿Cuándo y quién puede inscribirse?" text="Sin fechas, se puede inscribir desde que publicas hasta el inicio del evento.">
+                {dateField('Abrir inscripciones desde', 'registrationOpensAt', 'Vacío: desde que publicas.')}{dateField('Cerrar inscripciones el', 'registrationClosesAt', d.pricing === 'paid' ? 'También cierra las compras nuevas.' : 'Vacío: hasta el inicio del evento.')}
+                <Field title="Edad mínima" hint="Opcional. Se pide la edad de cada asistente."><input type="number" min={0} max={120} value={d.minimumAge ?? ''} onChange={(e) => detail('minimumAge', e.target.value ? Number(e.target.value) : null)} /></Field>
+                <label className={`${s.check} ${s.wide}`}><input type="checkbox" checked={d.waitlist} onChange={(e) => detail('waitlist', e.target.checked)} />Abrir lista de espera cuando se agoten los cupos</label>
+                {d.waitlist && <p className={x.help + ' ' + s.wide}>Cuando se libera un cupo pasa solo a la siguiente persona{d.pricing === 'paid' ? ', que recibe 24 horas para pagar' : ''}.</p>}
+              </Card>
+              <Card icon={<Users size={18} />} title="Datos de cada asistente" text="Siempre se pide nombre y apellido. Agrega lo que necesites: talla de polera, alergias, contacto de emergencia…">
                 <QuestionsEditor questions={d.questions ?? []} onChange={(next) => detail('questions', next)} />
               </Card>
-              <Card icon={<Mail size={18} />} title="Después de inscribirse" text="Lo que cada persona puede hacer con sus entradas desde su comprobante o desde «Mis entradas».">
-                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.selfTransfer ?? true} onChange={(e) => detail('selfTransfer', e.target.checked)} />Puede transferir su entrada a otra persona (el código QR anterior deja de servir)</label>
-                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.selfCancel ?? d.pricing !== 'paid'} onChange={(e) => detail('selfCancel', e.target.checked)} />Puede cancelar su entrada y liberar el cupo{d.pricing === 'paid' ? ' (la devolución del dinero la gestiona el equipo)' : ''}</label>
-                <Field title="Hasta cuántas horas antes del inicio" hint="Después de ese plazo, los cambios los hace el equipo."><input type="number" min={0} max={720} value={d.selfServiceHours ?? 24} onChange={(e) => detail('selfServiceHours', e.target.value === '' ? 24 : Number(e.target.value))} /></Field>
-                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.reminders ?? true} onChange={(e) => detail('reminders', e.target.checked)} />Enviar recordatorios automáticos por correo una semana y un día antes, con las entradas</label>
-                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.survey ?? true} onChange={(e) => detail('survey', e.target.checked)} />Enviar una encuesta de satisfacción al día siguiente del evento (anónima)</label>
-                {(d.survey ?? true) && <Field title="Pregunta propia de la encuesta" wide hint="Opcional. Se suma a calificación, recomendación, lo mejor y qué mejorar."><input maxLength={200} value={d.surveyQuestion ?? ''} onChange={(e) => detail('surveyQuestion', e.target.value)} placeholder="Ej.: ¿Qué tema te gustaría para el próximo retiro?" /></Field>}
-                {d.waitlist && <p className={x.help + ' ' + s.wide}>Con lista de espera activa, cuando se libera un cupo pasa automáticamente a la siguiente persona: si el evento es pagado, recibe 24 horas para pagar.</p>}
-              </Card>
-              <Card icon={<Users size={18} />} title="Cupos y fechas de inscripción" text="Sin fechas, la inscripción queda abierta mientras la publiques.">
-                <Field title="Cupos totales" hint="Vacío: sin límite."><input type="number" min={1} max={1000000} value={event.capacity ?? ''} onChange={(e) => change('capacity', e.target.value ? Number(e.target.value) : null)} /></Field>
-                <Field title="Edad mínima" hint="Opcional."><input type="number" min={0} max={120} value={d.minimumAge ?? ''} onChange={(e) => detail('minimumAge', e.target.value ? Number(e.target.value) : null)} /></Field>
-                {dateField('Abrir inscripciones desde', 'registrationOpensAt')}{dateField('Cerrar inscripciones el', 'registrationClosesAt')}
-                <label className={`${s.check} ${s.wide}`}><input type="checkbox" checked={d.waitlist} onChange={(e) => detail('waitlist', e.target.checked)} />Abrir lista de espera cuando se agoten los cupos</label>
-              </Card>
-              <Card icon={<Mail size={18} />} title="Correos a los participantes" text="Las confirmaciones y entradas llevan la portada y el color del evento. Elige quién las firma.">
+              <Card icon={<Mail size={18} />} title="Correos y cambios" text="Las entradas llegan por correo con la portada y el color del evento.">
                 <Field title="Nombre del remitente" hint="Ej.: AR Hombres. Vacío: Ecosistema ARM."><input maxLength={80} value={d.senderName ?? ''} onChange={(e) => detail('senderName', e.target.value)} placeholder="AR Hombres" /></Field>
                 <Field title="Correo del remitente" hint="Solo direcciones @armglobal.org. Las respuestas llegan a este buzón."><input type="email" maxLength={254} value={d.senderEmail ?? ''} onChange={(e) => detail('senderEmail', e.target.value.trim())} placeholder="arhombres@armglobal.org" /></Field>
                 {!!d.senderEmail && !/^[A-Za-z0-9._%+-]+@armglobal\.org$/i.test(d.senderEmail) && <p role="alert" className={`${s.error} ${s.wide}`}>Usa un correo que termine en @armglobal.org.</p>}
-              </Card>
-              <Card icon={<Check size={18} />} title="Condiciones">
-                <Field title="Condiciones y requisitos" wide><textarea maxLength={5000} value={d.conditions} onChange={(e) => detail('conditions', e.target.value)} placeholder="Ej.: Trae tu identificación y ropa cómoda." /></Field>
-                <Field title="Política de cancelación" wide><textarea maxLength={5000} value={d.cancellationPolicy} onChange={(e) => detail('cancellationPolicy', e.target.value)} /></Field>
+                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.reminders ?? true} onChange={(e) => detail('reminders', e.target.checked)} />Enviar recordatorios automáticos por correo una semana y un día antes, con las entradas</label>
+                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.selfTransfer ?? true} onChange={(e) => detail('selfTransfer', e.target.checked)} />Puede transferir su entrada a otra persona (el código QR anterior deja de servir)</label>
+                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.selfCancel ?? d.pricing !== 'paid'} onChange={(e) => detail('selfCancel', e.target.checked)} />Puede cancelar su entrada y liberar el cupo{d.pricing === 'paid' ? ' (la devolución del dinero la gestiona el equipo)' : ''}</label>
+                {((d.selfTransfer ?? true) || (d.selfCancel ?? d.pricing !== 'paid')) && <Field title="Hasta cuántas horas antes del inicio" hint="Después de ese plazo, los cambios los hace el equipo."><input type="number" min={0} max={720} value={d.selfServiceHours ?? 24} onChange={(e) => detail('selfServiceHours', e.target.value === '' ? 24 : Number(e.target.value))} /></Field>}
+                <label className={s.check + ' ' + s.wide}><input type="checkbox" checked={d.survey ?? true} onChange={(e) => detail('survey', e.target.checked)} />Enviar una encuesta de satisfacción al día siguiente del evento (anónima)</label>
+                {(d.survey ?? true) && <Field title="Pregunta propia de la encuesta" wide hint="Opcional. Se suma a calificación, recomendación, lo mejor y qué mejorar."><input maxLength={200} value={d.surveyQuestion ?? ''} onChange={(e) => detail('surveyQuestion', e.target.value)} placeholder="Ej.: ¿Qué tema te gustaría para el próximo retiro?" /></Field>}
               </Card>
             </>}
 
@@ -327,13 +334,26 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
                     </li>
                   ))}
                 </ul>
+                {savedStatus === 'draft' && state === 'draft' && (
+                  <div className={x.publishNow}>
+                    <button type="button" className={s.primary} disabled={ready < required.length || save.isPending || (!initial.id && !access.create)} onClick={publishNow}><Ticket size={16} />{save.isPending ? 'Publicando…' : 'Publicar y abrir inscripciones'}</button>
+                    <p className={x.help}>{ready < required.length ? 'Completa los puntos pendientes para poder publicar.' : d.pricing === 'paid' ? 'La portada queda pública y las personas pueden inscribirse y pagar con Mercado Pago.' : 'La portada queda pública y las personas pueden inscribirse.'}</p>
+                  </div>
+                )}
               </section>
-              <Card icon={<Eye size={18} />} title="Estado" text="Publicado muestra la portada. Las inscripciones se abren aparte.">
-                <Field title="Estado del evento"><select value={event.status} onChange={(e) => { change('status', e.target.value as EventProgram['status']); if (['finished', 'cancelled'].includes(e.target.value)) change('registrationStatus', 'closed'); }}>{Object.entries(eventStatuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
-                <Field title="Estado de inscripciones"><select value={event.registrationStatus} onChange={(e) => change('registrationStatus', e.target.value as EventProgram['registrationStatus'])}><option value="pending">Próximamente</option><option value="open">Abiertas (según las fechas)</option><option value="closed">Cerradas</option></select></Field>
-                {event.status === 'published' && ready < required.length && <div className={`${s.notice} ${s.wide}`}>Estás por publicar con puntos pendientes. Revisa la lista de arriba.</div>}
-                <p className={`${x.help} ${s.wide}`}>Guardar no envía correos.</p>
-              </Card>
+              <section className={x.card} aria-labelledby="event-state-title">
+                <header><span className={x.cardIcon} aria-hidden="true"><Eye size={18} /></span><div><h3 id="event-state-title">¿Qué ven las personas?</h3><p>Una sola elección para la portada y las inscripciones.</p></div></header>
+                <div className={x.stateList} role="radiogroup" aria-labelledby="event-state-title">
+                  {PUBLISH_STATES.filter((p) => wasLive || !['finished', 'cancelled'].includes(p.value)).map((p) => (
+                    <button key={p.value} type="button" role="radio" aria-checked={state === p.value} onClick={() => setState(p.value)}>
+                      <span className={x.radioDot} aria-hidden="true" /><span><b>{p.title}</b><small>{p.text}</small></span>
+                    </button>
+                  ))}
+                </div>
+                {state !== 'draft' && ready < required.length && <div className={s.notice}>Para publicar falta: {missingToPublish(event).map((m) => m.label.toLowerCase()).join(', ')}.</div>}
+                {state === 'open' && d.pricing === 'paid' && options.paymentMode !== 'production' && <div className={s.notice}>{options.paymentMode === 'test' ? 'Mercado Pago está en modo de prueba: los pagos no son reales.' : 'Mercado Pago no está configurado: nadie podrá pagar.'}</div>}
+                <p className={x.help}>Los cambios se aplican al guardar. Guardar no envía correos.</p>
+              </section>
               <section className={x.card}>
                 <header><span className={x.cardIcon} aria-hidden="true"><Save size={18} /></span><div><h3>Últimos cambios</h3></div></header>
                 {initial.audit?.length ? initial.audit.map((a, i) => <div key={i} className={s.audit}>{a.actor} · {a.action}<br />Versión {a.version} · {new Date(a.createdAt).toLocaleString('es-CL')}</div>) : <p className={x.help}>El historial comienza al guardar este evento.</p>}
@@ -352,11 +372,10 @@ function EditorForm({ initial, options, onReload }: { initial: EventProgram; opt
         </div>
       )}
 
-      {event.id && !preview && <div className={s.notice}>Las inscripciones, el ingreso con QR y las acciones sobre cada persona están en <Link href={`/dashboard/eventos/${event.id}/inscritos`}><b>Inscritos</b></Link> y <Link href={`/dashboard/eventos/${event.id}/acceso`}><b>Control de acceso</b></Link>.</div>}
       <div className={s.savebar}>
         <p>{dirty ? 'Tienes cambios sin guardar' : `Versión ${event.version} · ${eventStatuses[event.status]}`}</p>
         <button className={s.button} onClick={() => setPreview(!preview)}><Eye size={16} />{preview ? 'Editar' : 'Vista previa'}</button>
-        <button className={s.primary} disabled={save.isPending || (!initial.id && !access.create)} onClick={() => { setError(''); save.mutate(); }}><Save size={16} />{save.isPending ? 'Guardando…' : event.status === 'published' ? 'Guardar y publicar' : 'Guardar evento'}</button>
+        <button className={s.primary} disabled={save.isPending || (!initial.id && !access.create)} onClick={() => { setError(''); save.mutate(undefined); }}><Save size={16} />{save.isPending ? 'Guardando…' : event.status === 'draft' ? 'Guardar evento' : savedStatus === 'draft' ? 'Guardar y publicar' : 'Guardar cambios'}</button>
       </div>
     </>
   );

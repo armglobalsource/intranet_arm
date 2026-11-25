@@ -25,6 +25,13 @@ describe('Validación y publicación',()=>{
  it('acepta un borrador válido',()=>expect(()=>validateEventProgram(dto())).not.toThrow());
  it('rechaza fechas invertidas y sin offset',()=>{expect(()=>validateEventProgram({...dto(),endsAt:'2026-01-01T00:00:00Z'})).toThrow();expect(()=>validateEventProgram({...dto(),startsAt:'2027-01-10T09:00:00'})).toThrow();});
  it('no permite publicar sin contenido',()=>{const d=dto();d.status='published';d.details.summary='';expect(()=>validateEventProgram(d)).toThrow();});
+ it('al publicar nombra solo lo que falta',()=>{
+  const d=dto();d.status='published';d.details.summary='';d.details.description='';
+  expect(()=>validateEventProgram(d)).toThrow('Para publicar, completa la invitación breve y la descripción');
+  const e=dto();e.status='published';e.campusIds=[];
+  expect(()=>validateEventProgram(e)).toThrow('Para publicar, completa los campus que pueden inscribirse');
+  const f=dto();f.status='published';expect(()=>validateEventProgram(f)).not.toThrow();
+ });
  it('bloquea URLs no HTTPS y con credenciales',()=>{for(const url of ['javascript:alert(1)','http://example.com/x','https://user:pass@example.com/x']){const d=dto();d.details.bannerUrl=url;expect(()=>validateEventProgram(d)).toThrow();}});
  it('comprueba la zona horaria',()=>{const d=dto();d.details.timezone='Fake/City';expect(()=>validateEventProgram(d)).toThrow();});
  it('valida precios y ventanas de inscripción',()=>{const d=dto();d.details.pricing='paid';expect(()=>validateEventProgram(d)).toThrow();d.ticketTypes=[{name:'General',price:20,currency:'CLP'}];expect(()=>validateEventProgram(d)).not.toThrow();d.details.registrationOpensAt='2028-01-01T00:00:00Z';expect(()=>validateEventProgram(d)).toThrow();});

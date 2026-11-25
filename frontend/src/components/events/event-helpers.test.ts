@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventDay, eventIcs, isPast, momentLabel, upcomingMoment, eventReadiness, eventTimeRange, mapsUrl, slugify, ticketPriceLabel } from './event-helpers';
+import { eventDay, eventIcs, isPast, momentLabel, upcomingMoment, eventReadiness, eventTimeRange, mapsUrl, missingToPublish, publishStateOf, slugify, ticketPriceLabel, withPublishState } from './event-helpers';
 import { newEvent } from './event-types';
 
 describe('ayudas de eventos', () => {
@@ -42,9 +42,22 @@ describe('ayudas de eventos', () => {
   it('indica qué falta para publicar', () => {
     const e = newEvent(1, 10);
     const pending = eventReadiness(e).filter((i) => i.required && !i.done).map((i) => i.key);
-    expect(pending).toEqual(['title', 'dates', 'place', 'category', 'summary', 'description']);
+    expect(pending).toEqual(['title', 'dates', 'place', 'category', 'campuses', 'summary', 'description']);
+    expect(missingToPublish({ ...e, campusIds: [10] }).map((i) => i.key)).not.toContain('campuses');
     const online = eventReadiness({ ...e, details: { ...e.details, modality: 'online', pricing: 'paid' }, ticketTypes: [] });
     expect(online.find((i) => i.key === 'place')?.done).toBe(true);
     expect(online.find((i) => i.key === 'tickets')?.done).toBe(false);
+  });
+
+  it('un solo estado decide portada e inscripciones', () => {
+    const e = newEvent(1, 10);
+    expect(publishStateOf(e)).toBe('draft');
+    expect(withPublishState(e, 'open')).toMatchObject({ status: 'published', registrationStatus: 'open' });
+    expect(withPublishState(e, 'soon')).toMatchObject({ status: 'published', registrationStatus: 'pending' });
+    expect(withPublishState(e, 'cancelled')).toMatchObject({ status: 'cancelled', registrationStatus: 'closed' });
+    expect(withPublishState(withPublishState(e, 'open'), 'draft')).toMatchObject({ status: 'draft', registrationStatus: 'pending' });
+    for (const st of ['draft', 'open', 'soon', 'closed', 'finished', 'cancelled'] as const) expect(publishStateOf(withPublishState(e, st))).toBe(st);
+    // Un borrador nunca queda con inscripciones abiertas (el servidor lo rechazaría).
+    expect(publishStateOf({ status: 'draft', registrationStatus: 'open' })).toBe('draft');
   });
 });
