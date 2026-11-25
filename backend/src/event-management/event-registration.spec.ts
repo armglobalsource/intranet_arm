@@ -50,7 +50,7 @@ describe('Inscripciones',()=>{
   await expect(setup({count:1}).service.register('full',dto)).rejects.toThrow(/agotaron/);
   const result=await setup({count:1,waitlist:true}).service.register('full',dto);expect(result.status).toBe('waitlisted');expect(result.tickets[0].code).toBeNull();
  });
- it('toma el precio del servidor y no emite ticket antes de pagar',async()=>{const x=setup({paid:true});const result=await x.service.register('paid',{...dto,items:[item({ticketTypeId:GENERAL})]});expect(result.status).toBe('pending_payment');expect(result.amount).toBe(1000);expect(result.tickets[0].code).toBeNull();});
+ it('toma el precio del servidor y no emite ticket antes de pagar',async()=>{const x=setup({paid:true});const result=await x.service.register('paid',{...dto,items:[item({ticketTypeId:GENERAL})]});expect(result.status).toBe('pending_payment');expect(result.amount).toBe(1000);expect(result.tickets[0].code).toBeNull();expect(x.mail.sendHtml).not.toHaveBeenCalled();});
  it('un error de correo no revierte una inscripción confirmada',async()=>{const x=setup();x.mail.sendHtml.mockRejectedValue(new Error('offline'));const result=await x.service.register('free',dto);expect(result.status).toBe('confirmed');expect(result.emailSent).toBe(false);});
  it('no repite una inscripción al reintentar la misma clave',async()=>{
   const old={id:'existing',buyer:{firstName:'A',lastName:'B'},snapshot:{title:'Evento'},amount:0,subtotal:0,discount:0,status:'confirmed',confirmation_sent_at:new Date()};

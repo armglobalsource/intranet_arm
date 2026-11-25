@@ -1,8 +1,8 @@
 'use client';
-// Navegación entre las páginas de un evento: editar, inscritos, ventas, códigos, mensajes, encuesta y puerta.
+// Navegación entre las páginas de un evento: editar, inscritos, ventas, códigos, mensajes, encuesta, puerta y equipaje.
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, ClipboardList, Mail, PenLine, ScanLine, Smile, Tag } from 'lucide-react';
+import { BarChart3, Briefcase, ClipboardList, Mail, PenLine, ScanLine, Smile, Tag } from 'lucide-react';
 import i from './event-insights.module.css';
 
 const TABS = [
@@ -13,12 +13,13 @@ const TABS = [
   { path: '/mensajes', label: 'Mensajes', icon: Mail },
   { path: '/encuesta', label: 'Encuesta', icon: Smile },
   { path: '/acceso', label: 'Puerta', icon: ScanLine },
+  { path: '/equipaje', label: 'Equipaje', icon: Briefcase },
 ];
 
 export function EventSubnav({ id, manage = true }: { id: string; manage?: boolean }) {
   const pathname = usePathname() ?? '';
   const base = `/dashboard/eventos/${id}`;
-  const tabs = manage ? TABS : TABS.filter((t) => t.path === '/inscritos' || t.path === '/acceso');
+  const tabs = manage ? TABS : TABS.filter((t) => t.path === '/inscritos' || t.path === '/acceso' || t.path === '/equipaje');
   return (
     <nav className={i.subnav} aria-label="Secciones del evento">
       {tabs.map(({ path, label, icon: Icon }) => {

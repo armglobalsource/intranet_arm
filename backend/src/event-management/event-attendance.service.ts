@@ -39,6 +39,8 @@ export class EventAttendanceService {
  constructor(private readonly db:DatabaseService,private readonly registrations:EventRegistrationService){}
 
  /** Carga el evento y comprueba el ámbito: `manage` para modificar inscripciones, `door` para la puerta. */
+ /** También lo usa el equipaje: misma puerta, mismos permisos. */
+ async scope(user:EventActor,id:string,mode:'manage'|'door'){return this.event(user,id,mode);}
  private async event(user:EventActor,id:string,mode:'manage'|'door'){
   const event:any=(await this.db.query('SELECT * FROM arm_app.event_programs WHERE id=$1',[id])).rows[0];
   if(!event)throw new NotFoundException('Evento no encontrado');

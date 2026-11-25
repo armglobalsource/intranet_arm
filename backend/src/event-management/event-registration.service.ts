@@ -162,7 +162,9 @@ export class EventRegistrationService {
    }
    return row;
   });}catch(e){if((e as any).code==='23505')throw new ConflictException('Ya recibimos esta inscripción. Revisa tu correo o vuelve a intentarlo en unos segundos.');throw e;}
-  await this.notify(order);
+  // Con pago pendiente no se envía correo: la persona sigue directo a Mercado Pago y el primer
+  // correo que recibe es su entrada confirmada (un «Completa tu pago» confundía a quien ya estaba pagando).
+  if(order.status!=='pending_payment')await this.notify(order);
   return this.view(await this.order(order.id),await this.tickets(order.id));
  }
  async get(id:string,token:string){

@@ -476,7 +476,9 @@ export function EventReceipt({ slug }: { slug: string }) {
         {body ?? (!error && <p role="status" className={c.loading}><Loader2 size={18} className={c.spin} aria-hidden="true" />Consultando tu inscripción…</p>)}
         {receipt && (
           <div className={c.mail}>
-            {receipt.emailSent
+            {receipt.status === 'pending_payment'
+              ? <p className={c.fine}>Tu entrada llegará a tu correo apenas Mercado Pago apruebe el pago. Mientras tanto, guarda el enlace de esta página.</p>
+              : receipt.emailSent
               ? <p className={c.fine}>Enviamos el enlace de esta página a tu correo para que vuelvas cuando quieras.</p>
               : <><p className={c.fine}>Tu inscripción está guardada, pero no pudimos confirmar el envío del correo. Guarda el enlace de esta página.</p>
                 <button type="button" disabled={busy} className={c.textButton} onClick={() => action('email')}>Reintentar envío de correo</button></>}

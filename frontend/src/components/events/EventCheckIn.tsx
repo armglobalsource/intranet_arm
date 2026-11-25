@@ -3,57 +3,21 @@
 // Puerta del evento: escanea el QR de la entrada (o busca por nombre) y registra el ingreso.
 // Pensado para el teléfono de quien recibe: un resultado grande y claro, sonido y vibración.
 import Link from 'next/link';
-import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, CircleSlash, List, QrCode, ScanLine, Search, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Briefcase, CheckCircle2, CircleSlash, List, ScanLine, Search, Users } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { EventShell } from './EventWorkspace';
 import { useAttendance } from './EventAttendees';
-import { AttendanceData, Attendee, CheckInReply, Counts, DoorEvent, STATUS_LABELS, clock, filterAttendees, fullName, ticketCodeIn } from './attendance';
+import { AttendanceData, Attendee, CheckInReply, Counts, DoorEvent, STATUS_LABELS, clock, filterAttendees, fullName } from './attendance';
+import { QrScanner, feedback } from './QrScanner';
+import { LuggageDialog } from './EventLuggage';
 import { eventDay } from './event-helpers';
 import a from './event-attendance.module.css';
 
 const TITLES: Record<CheckInReply['result'], string> = { ok: 'Puede entrar', already: 'Ya ingresó', invalid: 'No puede entrar', not_found: 'Código no reconocido' };
 const ICONS = { ok: CheckCircle2, already: AlertTriangle, invalid: CircleSlash, not_found: CircleSlash };
 type Shown = CheckInReply & { at: number };
-
-/** Tono corto: agudo si puede entrar, grave si no. */
-function feedback(ok: boolean) {
-  try { navigator.vibrate?.(ok ? 80 : [120, 80, 120]); } catch { /* sin vibración */ }
-  try {
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-    const ctx = new Ctx(); const osc = ctx.createOscillator(); const gain = ctx.createGain();
-    osc.frequency.value = ok ? 880 : 220; gain.gain.value = 0.08;
-    osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + (ok ? 0.12 : 0.3));
-    osc.onended = () => void ctx.close();
-  } catch { /* sin sonido */ }
-}
-
-type Detector = (source: HTMLVideoElement, canvas: HTMLCanvasElement) => Promise<string | null>;
-/** Usa el lector nativo del navegador si existe (Chrome/Android) y, si no, jsQR (iPhone). */
-async function makeDetector(): Promise<Detector> {
-  const Native = (window as any).BarcodeDetector;
-  if (Native) {
-    try {
-      if ((await Native.getSupportedFormats?.())?.includes('qr_code')) {
-        const detector = new Native({ formats: ['qr_code'] });
-        return async (video) => (await detector.detect(video))[0]?.rawValue ?? null;
-      }
-    } catch { /* se usa jsQR */ }
-  }
-  const jsQR = (await import('jsqr')).default;
-  return async (video, canvas) => {
-    const w = video.videoWidth, h = video.videoHeight;
-    if (!w || !h) return null;
-    const scale = Math.min(1, 720 / Math.max(w, h));
-    canvas.width = Math.round(w * scale); canvas.height = Math.round(h * scale);
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return null;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    return jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' })?.data ?? null;
-  };
-}
 
 export function EventCheckIn({ id }: { id: string }) {
   const qc = useQueryClient();
@@ -65,7 +29,16 @@ export function EventCheckIn({ id }: { id: string }) {
   const [recent, setRecent] = useState<Shown[]>([]);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
+  const [luggage, setLuggage] = useState<Attendee | null>(null);
   const tz = data?.event.timezone;
+
+  // Después de mostrar un resultado, vuelve a escanear solo (salvo que esté abierto el equipaje).
+  useEffect(() => {
+    if (!shown || luggage || mode !== 'scan') return;
+    const t = setTimeout(() => setShown(null), shown.result === 'ok' ? 2200 : 4000);
+    return () => clearTimeout(t);
+  }, [shown, luggage, mode]);
+  const openLuggage = (r: Attendee) => { setShown(null); setLuggage(r); };
 
   const liveCounts = useMemo<Counts | null>(() => {
     if (!data) return counts;
@@ -112,7 +85,10 @@ export function EventCheckIn({ id }: { id: string }) {
       <div className={a.door} style={{ '--event-color': color } as CSSProperties}>
         <div className={a.doorHead}>
           <Link className={a.back} href="/dashboard/eventos/acceso"><ArrowLeft size={15} aria-hidden="true" />Eventos</Link>
-          <Link className={a.back} href={`/dashboard/eventos/${id}/inscritos`}><Users size={15} aria-hidden="true" />Ver inscritos</Link>
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Link className={a.back} href={`/dashboard/eventos/${id}/equipaje`}><Briefcase size={15} aria-hidden="true" />Equipaje</Link>
+            <Link className={a.back} href={`/dashboard/eventos/${id}/inscritos`}><Users size={15} aria-hidden="true" />Ver inscritos</Link>
+          </span>
         </div>
         {query.isError && <div role="alert" className={a.notice} data-tone="error">{apiErrorMessage(query.error, 'No pudimos cargar el evento.')}</div>}
         <div className={a.counter} aria-live="polite">
@@ -127,9 +103,13 @@ export function EventCheckIn({ id }: { id: string }) {
         </div>
 
         {mode === 'scan'
-          ? <Scanner busy={busy} shown={shown} tz={tz} onCode={submit} onDismiss={() => setShown(null)} onUndo={undo} />
+          ? <QrScanner paused={busy || !!shown || !!luggage} busy={busy} onCode={submit}
+            overlay={shown && <ResultCard shown={shown} tz={tz} busy={busy} onDismiss={() => setShown(null)} onUndo={undo} onLuggage={openLuggage} />}
+            idleText="Apunta la cámara al código QR de la entrada. Funciona con la entrada impresa o en la pantalla del teléfono."
+            readyText="Listo para escanear la siguiente entrada." busyText="Revisando la entrada…"
+            manualLabel="Código de la entrada" manualPlaceholder="¿El QR no se lee? Escribe el código y presiona Enter" />
           : <>
-            {shown && <ResultCard shown={shown} tz={tz} inline onDismiss={() => setShown(null)} onUndo={undo} busy={busy} />}
+            {shown && <ResultCard shown={shown} tz={tz} inline onDismiss={() => setShown(null)} onUndo={undo} onLuggage={openLuggage} busy={busy} />}
             <label className={a.searchBox}><span className="sr-only">Buscar persona</span><Search size={17} aria-hidden="true" />
               <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nombre, correo o código de la entrada" autoFocus /></label>
             {search.trim().length >= 2 && !matches.length && <p className={a.scanHint}>Nadie coincide. Si la persona no está inscrita, pídele a quien administra el evento que la agregue.</p>}
@@ -138,7 +118,10 @@ export function EventCheckIn({ id }: { id: string }) {
                 <div className={a.manualItem} key={r.id}>
                   <div className={a.person}><strong>{fullName(r)}</strong><span>{r.ticketName ?? 'Entrada'} · {r.campusName}</span>
                     <span>{r.checkedInAt ? `Ingresó a las ${clock(r.checkedInAt, tz)}` : r.status === 'confirmed' ? 'Aún no ingresa' : STATUS_LABELS[r.status] ?? r.status}</span></div>
-                  {r.status === 'confirmed' && !r.checkedInAt && <button type="button" className={a.btnPrimary} disabled={busy} onClick={() => void submit(r.ticketCode ?? r.id)}>Marcar ingreso</button>}
+                  {r.status === 'confirmed' && <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button type="button" className={a.btn} onClick={() => openLuggage(r)} aria-label={`Equipaje de ${fullName(r)}`}><Briefcase size={16} aria-hidden="true" />Equipaje</button>
+                    {!r.checkedInAt && <button type="button" className={a.btnPrimary} disabled={busy} onClick={() => void submit(r.ticketCode ?? r.id)}>Marcar ingreso</button>}
+                  </span>}
                 </div>
               ))}
             </div>
@@ -150,12 +133,13 @@ export function EventCheckIn({ id }: { id: string }) {
             <ul>{recent.map((r) => <li key={r.at}><span>{r.attendee ? fullName(r.attendee) : 'Código desconocido'}</span><span data-result={r.result}>{TITLES[r.result]} · {clock(new Date(r.at).toISOString(), tz)}</span></li>)}</ul>
           </section>
         )}
+        {luggage && data && <LuggageDialog eventId={id} eventTitle={data.event.title} registrationId={luggage.id} onClose={() => setLuggage(null)} />}
       </div>
     </EventShell>
   );
 }
 
-function ResultCard({ shown, tz, inline, busy, onDismiss, onUndo }: { shown: Shown; tz?: string; inline?: boolean; busy: boolean; onDismiss: () => void; onUndo: (r: Attendee) => void }) {
+function ResultCard({ shown, tz, inline, busy, onDismiss, onUndo, onLuggage }: { shown: Shown; tz?: string; inline?: boolean; busy: boolean; onDismiss: () => void; onUndo: (r: Attendee) => void; onLuggage: (r: Attendee) => void }) {
   const Icon = ICONS[shown.result];
   const r = shown.attendee;
   return (
@@ -166,101 +150,11 @@ function ResultCard({ shown, tz, inline, busy, onDismiss, onUndo }: { shown: Sho
       {r && <p>{r.ticketName ?? 'Entrada'} · {r.campusName}</p>}
       <p>{shown.result === 'already' && r?.checkedInAt ? `Ingresó a las ${clock(r.checkedInAt, tz)}${r.checkedInBy ? ` (registró ${r.checkedInBy})` : ''}.` : shown.result === 'ok' ? '' : shown.message}</p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {(shown.result === 'ok' || shown.result === 'already') && r?.status === 'confirmed' && <button type="button" className={a.btn} onClick={(e) => { e.stopPropagation(); onLuggage(r); }}><Briefcase size={16} aria-hidden="true" />Registrar equipaje</button>}
         {shown.result === 'ok' && r && <button type="button" className={a.btn} disabled={busy} onClick={(e) => { e.stopPropagation(); onUndo(r); }}>Deshacer ingreso</button>}
         <button type="button" className={a.btn} onClick={(e) => { e.stopPropagation(); onDismiss(); }}>{inline ? 'Cerrar' : 'Siguiente'}</button>
       </div>
     </div>
-  );
-}
-
-function Scanner({ busy, shown, tz, onCode, onDismiss, onUndo }: { busy: boolean; shown: Shown | null; tz?: string; onCode: (code: string) => Promise<void>; onDismiss: () => void; onUndo: (r: Attendee) => void }) {
-  const video = useRef<HTMLVideoElement>(null);
-  const canvas = useRef<HTMLCanvasElement | null>(null);
-  const stream = useRef<MediaStream | null>(null);
-  const last = useRef<{ code: string; at: number }>({ code: '', at: 0 });
-  const paused = useRef(false);
-  const [state, setState] = useState<'idle' | 'starting' | 'on' | 'error'>('idle');
-  const [error, setError] = useState('');
-  const [manual, setManual] = useState('');
-
-  paused.current = busy || !!shown;
-  const onCodeRef = useRef(onCode);
-  onCodeRef.current = onCode;
-
-  const stop = useCallback(() => {
-    stream.current?.getTracks().forEach((t) => t.stop());
-    stream.current = null;
-  }, []);
-  useEffect(() => stop, [stop]);
-
-  // Después de mostrar un resultado, vuelve a escanear solo.
-  useEffect(() => {
-    if (!shown) return;
-    const t = setTimeout(onDismiss, shown.result === 'ok' ? 2200 : 4000);
-    return () => clearTimeout(t);
-  }, [shown, onDismiss]);
-
-  async function start() {
-    setError(''); setState('starting');
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported');
-      const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-      stream.current = media;
-      const el = video.current!;
-      el.srcObject = media; await el.play();
-      setState('on');
-      try { await (navigator as any).wakeLock?.request('screen'); } catch { /* la pantalla puede apagarse */ }
-      const detect = await makeDetector();
-      canvas.current ??= document.createElement('canvas');
-      const loop = async () => {
-        if (!stream.current) return;
-        if (!paused.current && el.readyState >= 2) {
-          try {
-            const text = await detect(el, canvas.current!);
-            if (text) {
-              // El mismo código frente a la cámara no se envía dos veces seguidas.
-              const key = ticketCodeIn(text) ?? text;
-              const now = Date.now();
-              if (key !== last.current.code || now - last.current.at > 8000) {
-                last.current = { code: key, at: now };
-                await onCodeRef.current(key);
-              }
-            }
-          } catch { /* cuadro ilegible: se intenta con el siguiente */ }
-        }
-        setTimeout(() => requestAnimationFrame(() => void loop()), 120);
-      };
-      void loop();
-    } catch (err) {
-      stop(); setState('error');
-      const name = (err as any)?.name;
-      setError(name === 'NotAllowedError' ? 'No tenemos permiso para usar la cámara. Actívalo en el candado de la barra de direcciones o usa «Buscar por nombre».'
-        : name === 'NotFoundError' ? 'Este dispositivo no tiene cámara disponible. Usa «Buscar por nombre».'
-          : 'No pudimos abrir la cámara. Usa «Buscar por nombre» o escribe el código.');
-    }
-  }
-
-  return (
-    <>
-      <div className={a.camera}>
-        <video ref={video} playsInline muted aria-label="Vista de la cámara" />
-        {state === 'on' && <div className={a.frame} aria-hidden="true" />}
-        {state !== 'on' && (
-          <div className={a.cameraIdle}>
-            {state === 'error' ? <Camera size={40} aria-hidden="true" /> : <QrCode size={44} aria-hidden="true" />}
-            <p>{state === 'error' ? error : 'Apunta la cámara al código QR de la entrada. Funciona con la entrada impresa o en la pantalla del teléfono.'}</p>
-            <button type="button" className={a.btnPrimary} onClick={() => void start()} disabled={state === 'starting'}><Camera size={18} aria-hidden="true" />{state === 'starting' ? 'Abriendo cámara…' : state === 'error' ? 'Intentar de nuevo' : 'Activar cámara'}</button>
-          </div>
-        )}
-        {shown && <ResultCard shown={shown} tz={tz} busy={busy} onDismiss={onDismiss} onUndo={onUndo} />}
-      </div>
-      <p className={a.scanHint}>{state === 'on' ? (busy ? 'Revisando la entrada…' : 'Listo para escanear la siguiente entrada.') : ''}</p>
-      <form className={a.searchBox} style={{ marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); if (manual.trim()) { void onCode(manual.trim()); setManual(''); } }}>
-        <label className="sr-only" htmlFor="ticket-code">Código de la entrada</label>
-        <QrCode size={17} aria-hidden="true" />
-        <input id="ticket-code" value={manual} onChange={(e) => setManual(e.target.value)} placeholder="¿El QR no se lee? Escribe el código y presiona Enter" autoComplete="off" />
-      </form>
-    </>
   );
 }
 

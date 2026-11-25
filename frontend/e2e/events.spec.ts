@@ -118,7 +118,7 @@ for(const mode of ['free','test','production'])test(`inscripción móvil ${mode}
  await expect(page.getByRole('heading',{name:paid?'Último paso: paga tu entrada':'¡Tu entrada está lista!',exact:true})).toBeVisible();
  await page.screenshot({path:`test-results/event-receipt-${mode}-393.png`,fullPage:true});
  expect(captured[0]).toMatchObject({campusId:10,consent:true,firstName:'Prueba',items:[{firstName:'Prueba',lastName:'ARM',age:30,...(paid?{ticketTypeId:categoryId}:{})}]});expect(captured[0].amount).toBeUndefined();
- if(paid){await expect(page.getByRole('article',{name:'Tu entrada'})).toHaveCount(0);await expect(page.getByRole('button',{name:mode==='test'?'Pagar con Mercado Pago · Prueba':'Pagar con Mercado Pago',exact:true})).toBeVisible();if(mode==='production')await expect(page.getByText('Modo de prueba · No utilices tarjetas ni cuentas reales.')).toHaveCount(0);}else await expect(page.getByRole('button',{name:'Imprimir / Guardar PDF'})).toBeVisible();
+ if(paid){await expect(page.getByText('Tu entrada llegará a tu correo apenas Mercado Pago apruebe el pago.',{exact:false})).toBeVisible();await expect(page.getByRole('button',{name:'Reintentar envío de correo'})).toHaveCount(0);await expect(page.getByRole('article',{name:'Tu entrada'})).toHaveCount(0);await expect(page.getByRole('button',{name:mode==='test'?'Pagar con Mercado Pago · Prueba':'Pagar con Mercado Pago',exact:true})).toBeVisible();if(mode==='production')await expect(page.getByText('Modo de prueba · No utilices tarjetas ni cuentas reales.')).toHaveCount(0);}else await expect(page.getByRole('button',{name:'Imprimir / Guardar PDF'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
@@ -379,6 +379,131 @@ test('puerta: busca por nombre, registra el ingreso y rechaza entradas no válid
  await expect(page.getByText(/Ingresó a las 19:42/).first()).toBeVisible();
  await expect(page.getByRole('region',{name:'Últimos registros'})).toContainText('José Muñoz');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+/** Equipaje en memoria: bolsos por entrada, etiquetas, entrega con entrada o carnet. */
+async function luggage(page:Page,permissions=['*'],manage=true){
+ const att=await attendance(page,permissions,manage);
+ const bags:any[]=[];let n=0;const calls:any[]=[];
+ const owner=(rid:string)=>{const p=people.find(x=>x.id===rid)!;return {id:p.id,name:`${p.firstName} ${p.lastName}`,status:p.status,ticketName:p.ticketName,campusName:p.campusName};};
+ const view=(b:any)=>({...b,total:bags.filter(x=>x.registrationId===b.registrationId&&x.status!=='void').length,ownerName:owner(b.registrationId).name,campusName:owner(b.registrationId).campusName,ticketName:'General'});
+ const mine=(rid:string)=>bags.filter(b=>b.registrationId===rid&&b.status!=='void').map(view);
+ const counts=()=>({stored:bags.filter(b=>b.status==='stored').length,delivered:bags.filter(b=>b.status==='delivered').length,owners:new Set(bags.filter(b=>b.status!=='void').map(b=>b.registrationId)).size});
+ await page.addInitScript(()=>{(window as any).__prints=[];window.print=()=>{(window as any).__prints.push(document.getElementById('luggage-print')?.innerText??'');};});
+ await page.route(/\/api\/v1\/event-management\/[^/]+\/luggage(\/.*)?$/,async route=>{
+  const req=route.request(),path=new URL(req.url()).pathname.replace(/^.*\/luggage/,'');const body=req.method()==='POST'?req.postDataJSON():null;calls.push({path,body});
+  if(path===''&&req.method()==='GET')return route.fulfill({json:{event:{id,title:'Retiro de Hombres',color:'#102b40',timezone:'America/Santiago',startsAt:'2027-01-10T12:00:00Z'},bags:bags.map(view),counts:counts()}});
+  if(path.startsWith('/registrations/'))return route.fulfill({json:{owner:owner(path.split('/')[2]),bags:mine(path.split('/')[2])}});
+  if(path===''){const created:string[]=[];const last=Math.max(0,...bags.filter(b=>b.registrationId===body.registrationId).map(b=>b.number));
+   for(let i=1;i<=body.count;i++){n++;const b={id:`bag-${n}`,code:`BAG${String(n).padStart(5,'0')}`,number:last+i,description:body.description??null,status:'stored',registrationId:body.registrationId,createdAt:'2027-01-10T22:00:00Z',createdBy:'Prueba ARM',deliveredAt:null,deliveredBy:null,deliveredMethod:null};bags.push(b);created.push(b.id);}
+   return route.fulfill({json:{owner:owner(body.registrationId),bags:mine(body.registrationId),created,counts:counts()}});}
+  if(path==='/lookup'){const code=String(body.code).toUpperCase().replace(/^ARMEQ-/,'').replace(/-/g,'');const b=bags.find(x=>x.code===code);return b?route.fulfill({json:{bag:view(b)}}):route.fulfill({status:404,json:{message:'No reconocemos esta etiqueta en este evento.'}});}
+  if(path==='/deliver'){const code=String(body.bagCode).toUpperCase().replace(/^ARMEQ-/,'');const b=bags.find(x=>x.code===code);
+   if(!b)return route.fulfill({json:{result:'not_found',message:'No reconocemos esta etiqueta en este evento.',bag:null,counts:counts()}});
+   const ok=body.ticketCode?String(body.ticketCode).includes(b.registrationId):body.registrationId===b.registrationId&&body.idChecked;
+   if(!ok){const other=people.find(p=>String(body.ticketCode??'').includes(p.id));return route.fulfill({json:{result:'mismatch',message:`Este bolso es de ${owner(b.registrationId).name}, pero la entrada es de ${other?`${other.firstName} ${other.lastName}`:'otra persona'}.`,bag:view(b),counts:counts()}});}
+   Object.assign(b,{status:'delivered',deliveredAt:'2027-01-12T18:00:00Z',deliveredBy:'Mesa',deliveredMethod:body.ticketCode?'ticket':'id_check'});
+   return route.fulfill({json:{result:'ok',message:`Entregado a ${owner(b.registrationId).name}.`,bag:view(b),counts:counts()}});}
+  const v=/^\/(.+)\/void$/.exec(path);if(v){const b=bags.find(x=>x.id===v[1])!;b.status='void';return route.fulfill({json:{bags:mine(b.registrationId),counts:counts()}});}
+  return route.fulfill({status:404,json:{}});
+ });
+ return {...att,bags,calls};
+}
+test('equipaje en la puerta: registrar bolsos e imprimir sus etiquetas',async({page})=>{
+ const x=await luggage(page,['eventos:checkin'],false);await page.setViewportSize({width:393,height:852});
+ await page.goto(`/dashboard/eventos/${id}/acceso`);
+ await page.getByLabel('Código de la entrada').fill(people[1].id);await page.keyboard.press('Enter');
+ await expect(page.getByRole('heading',{name:'Puede entrar'})).toBeVisible();
+ await page.getByRole('button',{name:'Registrar equipaje'}).click();
+ const dialog=page.getByRole('dialog',{name:'Equipaje'});
+ await expect(dialog.getByRole('heading',{name:'José Muñoz'})).toBeVisible();
+ // El resultado no se cierra solo mientras se registra el equipaje.
+ await page.waitForTimeout(2600);await expect(dialog).toBeVisible();
+ await dialog.getByRole('button',{name:'Un bolso más'}).click();await dialog.getByRole('button',{name:'Un bolso más'}).click();
+ await expect(dialog.getByLabel('Cantidad de bolsos')).toHaveText('3');
+ await dialog.getByPlaceholder(/Descripción opcional/).fill('Maleta negra');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/event-luggage-door-393.png'});
+ await dialog.getByRole('button',{name:'Registrar 3 bolsos e imprimir'}).click();
+ await expect(dialog.getByRole('status').filter({hasText:'3 bolsos registrados'})).toBeVisible();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__prints.length)).toBe(1);
+ const printed=await page.evaluate(()=>(window as any).__prints[0]);
+ expect(printed).toContain('José Muñoz');expect(printed).toContain('BOLSO 3 DE 3');expect(printed).toContain('BAG0-0003');
+ expect(x.calls.find(c=>c.path===''&&c.body)?.body).toEqual({registrationId:people[1].id,count:3,description:'Maleta negra'});
+ await expect(dialog.getByRole('list',{name:'Bolsos registrados'}).getByRole('listitem')).toHaveCount(3);
+ // Anular una etiqueta mal impresa.
+ await dialog.getByRole('button',{name:'Anular etiqueta del bolso 2'}).click();
+ await dialog.getByRole('button',{name:'Sí, anular'}).click();
+ await expect(dialog.getByRole('status').filter({hasText:'Etiqueta BAG0-0002 anulada.'})).toBeVisible();
+ await expect(dialog.getByRole('list',{name:'Bolsos registrados'}).getByRole('listitem')).toHaveCount(2);
+ await dialog.getByRole('button',{name:'Cerrar equipaje'}).click();
+ await expect(dialog).toHaveCount(0);
+});
+test('mesa de equipaje: entregar solo con la entrada del dueño o su carnet',async({page})=>{
+ const x=await luggage(page);await page.setViewportSize({width:393,height:852});
+ x.bags.push({id:'bag-a',code:'AAAA2222',number:1,description:'Saco de dormir',status:'stored',registrationId:people[1].id,createdAt:'2027-01-10T22:00:00Z',createdBy:'Puerta',deliveredAt:null,deliveredBy:null,deliveredMethod:null},
+  {id:'bag-b',code:'BBBB3333',number:2,description:null,status:'stored',registrationId:people[1].id,createdAt:'2027-01-10T22:00:00Z',createdBy:'Puerta',deliveredAt:null,deliveredBy:null,deliveredMethod:null});
+ await page.goto(`/dashboard/eventos/${id}/equipaje`);
+ await expect(page.getByRole('navigation',{name:'Secciones del evento'}).getByRole('link',{name:'Equipaje'})).toHaveAttribute('aria-current','page');
+ await expect(page.getByText('bolsos guardados · 0 entregados · 1 persona')).toBeVisible();
+ await page.getByRole('tab',{name:'Entregar'}).click();
+ // Primero la entrada: se pide la etiqueta.
+ await page.getByLabel('Código de la etiqueta').fill(people[1].id);await page.keyboard.press('Enter');
+ await expect(page.getByText('Eso es una entrada. Primero escanea la etiqueta del bolso.')).toBeVisible();
+ await page.getByRole('alert').filter({hasText:'Etiqueta no reconocida'}).click();
+ await page.getByLabel('Código de la etiqueta').fill('ARMEQ-AAAA2222');await page.keyboard.press('Enter');
+ await expect(page.getByRole('status').filter({hasText:'José Muñoz'})).toContainText('Saco de dormir');
+ // Entrada de otra persona: no coincide y no se entrega.
+ await page.getByLabel('Código de la entrada').fill(people[0].id);await page.keyboard.press('Enter');
+ await expect(page.getByRole('heading',{name:'No coincide'})).toBeVisible();
+ await expect(page.getByText('Este bolso es de José Muñoz, pero la entrada es de Ana Pérez.')).toBeVisible();
+ expect(x.bags[0].status).toBe('stored');
+ await page.getByRole('alert').filter({hasText:'No coincide'}).click();
+ // Vuelve a pedir la etiqueta; ahora con la entrada correcta.
+ await page.getByLabel('Código de la etiqueta').fill('AAAA-2222');await page.keyboard.press('Enter');
+ await page.getByLabel('Código de la entrada').fill(`ARM:${people[1].id}`);await page.keyboard.press('Enter');
+ await expect(page.getByRole('heading',{name:'Entregado'})).toBeVisible();
+ await page.screenshot({path:'test-results/event-luggage-delivered-393.png'});
+ await page.getByRole('alert').filter({hasText:'Entregado'}).click();
+ // El segundo bolso de la misma persona sale solo con su etiqueta (ya mostró su entrada).
+ await page.getByLabel('Código de la etiqueta').fill('BBBB3333');await page.keyboard.press('Enter');
+ await expect(page.getByRole('heading',{name:'Entregado'})).toBeVisible();
+ expect(x.calls.filter(c=>c.path==='/deliver').at(-1)?.body).toEqual({bagCode:'BBBB3333',ticketCode:`ARM:${people[1].id}`});
+ expect(x.bags.map(b=>b.status)).toEqual(['delivered','delivered']);
+ // Lista: entregados con su hora.
+ await page.getByRole('tab',{name:'Lista'}).click();
+ await page.getByLabel('Estado del bolso').selectOption('delivered');
+ await expect(page.getByRole('list',{name:'Bolsos'}).getByRole('listitem')).toHaveCount(2);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('mesa de equipaje: entrega verificando el carnet cuando no trae la entrada',async({page})=>{
+ const x=await luggage(page);await page.setViewportSize({width:1280,height:900});
+ x.bags.push({id:'bag-a',code:'AAAA2222',number:1,description:null,status:'stored',registrationId:people[1].id,createdAt:'2027-01-10T22:00:00Z',createdBy:'Puerta',deliveredAt:null,deliveredBy:null,deliveredMethod:null});
+ await page.goto(`/dashboard/eventos/${id}/equipaje`);
+ await page.getByRole('tab',{name:'Entregar'}).click();
+ await page.getByLabel('Código de la etiqueta').fill('AAAA2222');await page.keyboard.press('Enter');
+ await page.getByRole('button',{name:'No tiene su entrada: verificar con carnet'}).click();
+ const give=page.getByRole('button',{name:'Entregar bolso'});
+ await expect(give).toBeDisabled();
+ await page.getByRole('checkbox',{name:/Revisé su carnet y es José Muñoz/}).check();
+ await page.screenshot({path:'test-results/event-luggage-idcheck-1280.png',fullPage:true});
+ await give.click();
+ await expect(page.getByRole('heading',{name:'Entregado'})).toBeVisible();
+ expect(x.calls.filter(c=>c.path==='/deliver').at(-1)?.body).toEqual({bagCode:'AAAA2222',registrationId:people[1].id,idChecked:true});
+ expect(x.bags[0].deliveredMethod).toBe('id_check');
+});
+test('mesa de equipaje: recibir buscando por nombre',async({page})=>{
+ await luggage(page);await page.setViewportSize({width:1280,height:900});
+ await page.goto(`/dashboard/eventos/${id}/equipaje`);
+ await page.getByRole('tab',{name:'Buscar por nombre'}).click();
+ await page.getByPlaceholder('Nombre, correo o código de la entrada').fill('ana');
+ await expect(page.getByText('Nadie con entrada confirmada coincide.')).toBeVisible();
+ await page.getByPlaceholder('Nombre, correo o código de la entrada').fill('jose');
+ await page.getByRole('button',{name:'Equipaje'}).click();
+ await page.getByRole('region',{name:'Equipaje de José Muñoz'}).getByRole('button',{name:'Registrar 1 bolso e imprimir'}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__prints.length)).toBe(1);
+ await page.screenshot({path:'test-results/event-luggage-desk-1280.png',fullPage:true});
+ await page.getByRole('button',{name:'Siguiente persona'}).click();
+ await expect(page.getByText('bolso guardado · 0 entregados · 1 persona')).toBeVisible();
 });
 test('quien solo registra ingresos ve la puerta, sin acciones de gestión',async({page})=>{
  await attendance(page,['eventos:checkin'],false);await page.setViewportSize({width:1280,height:900});
